@@ -1,0 +1,11 @@
+# please keep this in sync with packages/app/src/App.tsx
+dynamicPlugins:
+  frontend:
+    veecode-platform.plugin-veecode-homepage:
+      dynamicRoutes:
+        - path: /
+          importName: VeecodeHomepagePage
+          config:
+            props:
+              width: 1500
+              height: 800
