@@ -26,7 +26,7 @@
     "prepack": "backstage-cli package prepack",
     "postpack": "backstage-cli package postpack",
     "tsc": "tsc",
-    "build-dynamic-plugin": "npx @janus-idp/cli@latest package export-dynamic-plugin"
+    "build-dynamic-plugin": "npx @red-hat-developer-hub/cli@latest plugin export"
   },
   "dependencies": {
     "@backstage/catalog-model": "^1.7.5",

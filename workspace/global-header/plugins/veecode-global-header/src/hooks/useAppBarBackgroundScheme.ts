@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 import { useTheme } from '@mui/material/styles';
-import type { ThemeConfig } from '@red-hat-developer-hub/backstage-plugin-theme';
 
 /**
- * Get the app bar background scheme from the theme. Defaults to light if not set.
+ * Get the app bar background scheme from the theme. 
+ * Uses standard Backstage theme palette to determine if it's light or dark.
  */
 export const useAppBarBackgroundScheme = () => {
   const theme = useTheme();
-  const appBarBackgroundScheme = (theme as ThemeConfig)?.palette?.rhdh?.general
-    ?.appBarBackgroundScheme;
-
-  // default to 'dark' because Backstage's default theme is always dark
-  return appBarBackgroundScheme ?? 'dark';
+  
+  // Use standard MUI theme palette mode to determine background scheme
+  // In Backstage, the theme mode directly indicates whether it's light or dark
+  return theme.palette.mode === 'light' ? 'light' : 'dark';
 };

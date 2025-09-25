@@ -21,6 +21,10 @@ Workspaces mantained in this repository:
 - homepage: Contains the homepage plugin for DevPortal
 - global-header: Contains the global header plugin for DevPortal
 
+## Makefile
+
+The root project has a Makefle that helps you manage your releases separately for each workspace.
+
 ## Why we do this
 
 It was becoming increasingly hard to manage too many separate repositories for all DevPortal plugins. This monorepo approach allows us to enforce consistency across plugins, streamline maintenance, and simplify the development and onboarding process.

@@ -37,8 +37,7 @@ import Button from '@mui/material/Button';
 
 import { ScalprumContext, ScalprumState } from '@scalprum/react-core';
 import { PluginStore } from '@openshift/dynamic-plugin-sdk';
-
-import { getAllThemes } from '@red-hat-developer-hub/backstage-plugin-theme';
+import { UnifiedThemeProvider, themes } from '@backstage/theme';
 
 import {
   GlobalHeader,
@@ -165,7 +164,24 @@ const Providers = ({
 
 createDevApp()
   .registerPlugin(globalHeaderPlugin)
-  .addThemes(getAllThemes())
+  .addThemes([
+    {
+      id: 'light',
+      title: 'Light',
+      variant: 'light',
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={themes.light} children={children} />
+      ),
+    },
+    {
+      id: 'dark', 
+      title: 'Dark',
+      variant: 'dark',
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={themes.dark} children={children} />
+      ),
+    },
+  ])
   .addPage({
     element: (
       <Providers

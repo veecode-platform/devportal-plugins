@@ -16,6 +16,8 @@ import {
 
 import { rootRouteRef } from './routes';
 
+console.log('[veecode-homepage] Initializing plugin');
+
 export const veecodeHomepagePlugin = createPlugin({
   id: 'veecode-homepage',
   routes: {
@@ -28,8 +30,10 @@ export const veecodeHomepagePlugin = createPlugin({
         storageApi: storageApiRef,
         identityApi: identityApiRef,
       },
-      factory: ({ storageApi, identityApi }) =>
-        VisitsStorageApi.create({ storageApi, identityApi }),
+      factory: ({ storageApi, identityApi }) => {
+        console.log('[veecode-homepage] Creating VisitsStorageApi');
+        return VisitsStorageApi.create({ storageApi, identityApi });
+      },
     }),
   ],
 });
@@ -37,8 +41,10 @@ export const veecodeHomepagePlugin = createPlugin({
 export const VeecodeHomepagePage = veecodeHomepagePlugin.provide(
   createRoutableExtension({
     name: 'c',
-    component: () =>
-      import('./components/VeeCodeHomePage').then(m => m.VeeCodeHomePage),
+    component: () => {
+      console.log('[veecode-homepage] Loading VeeCodeHomePage component');
+      return import('./components/VeeCodeHomePage').then(m => m.VeeCodeHomePage);
+    },
     mountPoint: rootRouteRef,
   }),
 );
