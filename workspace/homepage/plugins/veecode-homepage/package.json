@@ -1,6 +1,6 @@
 {
   "name": "@veecode-platform/plugin-veecode-homepage",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "license": "Apache-2.0",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -41,16 +41,14 @@
     "@backstage/plugin-signals-react": "^0.0.15",
     "@backstage/plugin-user-settings": "^0.8.26",
     "@backstage/theme": "^0.6.8",
-    "@material-ui/core": "^4.12.4",
-    "@material-ui/icons": "^4.9.1",
-    "@mui/icons-material": "5.17.1",
-    "@mui/material": "5.17.1",
-    "@mui/x-charts": "^8.6.0",
     "@scalprum/react-core": "0.9.5",
     "lodash": "^4.17.21",
     "react-use": "^17.2.4"
   },
   "peerDependencies": {
+    "@mui/icons-material": "5.17.1",
+    "@mui/material": "5.17.1",
+    "@mui/x-charts": "^8.6.0",
     "react": "^18.0.0",
     "react-router-dom": "^6.0.0"
   },
@@ -60,6 +58,9 @@
     "@backstage/core-app-api": "^1.19.0",
     "@backstage/dev-utils": "^1.1.14",
     "@backstage/test-utils": "^1.7.11",
+    "@mui/icons-material": "5.17.1",
+    "@mui/material": "5.17.1",
+    "@mui/x-charts": "^8.6.0",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.0.0",
