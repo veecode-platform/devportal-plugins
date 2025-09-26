@@ -9,7 +9,7 @@ import CardContent from '@mui/material/CardContent';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
-import { CardHeader, Divider } from '@material-ui/core';
+import { CardHeader, Divider } from '@mui/material';
 import { useApi, configApiRef } from '@backstage/core-plugin-api';
 import { useVisited } from '../../hooks/useVisited';
 import { generateColorVariants } from '../../utils/generateColor';

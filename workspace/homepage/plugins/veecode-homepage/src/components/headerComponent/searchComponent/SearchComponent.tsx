@@ -17,7 +17,7 @@
 import { SearchContextProvider } from '@backstage/plugin-search-react';
 import { useState } from 'react';
 import { SearchBar } from './SearchBar';
-import { Box } from '@material-ui/core';
+import { Box } from '@mui/material';
 
 export const SearchComponent = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');

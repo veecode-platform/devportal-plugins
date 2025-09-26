@@ -2,7 +2,7 @@
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Box from '@mui/material/Box';
-import { CardHeader, Divider } from '@material-ui/core';
+import { CardHeader, Divider } from '@mui/material';
 import StatCard from './StatCards';
 import HighlightedCard from './HighLightedCard';
 import { useCatalog } from '../../hooks/useCatalog';

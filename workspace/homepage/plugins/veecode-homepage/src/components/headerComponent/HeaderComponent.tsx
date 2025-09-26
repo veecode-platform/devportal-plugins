@@ -26,7 +26,7 @@ export const HeaderComponent = () => {
   };
 
   return (
-    <Box sx={{ flexGrow: 1, position: 'relative' }}>
+    <Box sx={{ position: 'relative' }}>
       <AppBar
         position="sticky"
         component="nav"
