@@ -1,4 +1,5 @@
-import { makeStyles, Theme, Grid, Paper } from '@material-ui/core';
+import { Grid, Paper, Theme } from '@mui/material';
+import { makeStyles } from '@mui/styles';
 
 import { CatalogSearchResultListItem } from '@backstage/plugin-catalog';
 import {

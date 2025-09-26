@@ -1,9 +1,9 @@
 import { PropsWithChildren } from 'react';
-import { makeStyles } from '@material-ui/core';
-import HomeIcon from '@material-ui/icons/Home';
-import ExtensionIcon from '@material-ui/icons/Extension';
-import LibraryBooks from '@material-ui/icons/LibraryBooks';
-import CreateComponentIcon from '@material-ui/icons/AddCircleOutline';
+import { makeStyles } from '@mui/styles';
+import HomeIcon from '@mui/icons-material/Home';
+import ExtensionIcon from '@mui/icons-material/Extension';
+import LibraryBooks from '@mui/icons-material/LibraryBooks';
+import CreateComponentIcon from '@mui/icons-material/AddCircleOutline';
 import LogoFull from './LogoFull';
 import LogoIcon from './LogoIcon';
 import {
@@ -24,10 +24,10 @@ import {
   Link,
   CatalogIcon,
 } from '@backstage/core-components';
-import MenuIcon from '@material-ui/icons/Menu';
-import SearchIcon from '@material-ui/icons/Search';
+import MenuIcon from '@mui/icons-material/Menu';
+import SearchIcon from '@mui/icons-material/Search';
 import { MyGroupsSidebarItem } from '@backstage/plugin-org';
-import GroupIcon from '@material-ui/icons/People';
+import GroupIcon from '@mui/icons-material/People';
 import { NotificationsSidebarItem } from '@backstage/plugin-notifications';
 
 const useSidebarLogoStyles = makeStyles({
