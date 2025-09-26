@@ -117,7 +117,7 @@ publish-global-header-dynamic:
 	npm publish
 
 publish-all: publish-homepage publish-global-header
-	echo "All plugins published."
+	echo "All static plugins published."
 
 publish-all-dynamic: publish-homepage-dynamic publish-global-header-dynamic
 	echo "All dynamic plugins published."
