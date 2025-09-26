@@ -5,7 +5,7 @@ import Menu from '@mui/material/Menu';
 import Box from '@mui/material/Box';
 import { useUserProfile } from '@backstage/plugin-user-settings';
 import Typography from '@mui/material/Typography';
-import { Divider, ListItemIcon, MenuItem } from '@material-ui/core';
+import { Divider, ListItemIcon, MenuItem } from '@mui/material';
 import { UserAvatar } from '../userAvatar/UserAvatar';
 import { useApi } from '@backstage/core-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
