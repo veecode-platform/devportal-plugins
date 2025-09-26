@@ -1,5 +1,4 @@
-import { Grid, Paper, Theme } from '@mui/material';
-import { makeStyles } from '@mui/styles';
+import { Grid, Paper, Box } from '@mui/material';
 
 import { CatalogSearchResultListItem } from '@backstage/plugin-catalog';
 import {
@@ -25,23 +24,7 @@ import {
 } from '@backstage/core-components';
 import { useApi } from '@backstage/core-plugin-api';
 
-const useStyles = makeStyles((theme: Theme) => ({
-  bar: {
-    padding: theme.spacing(1, 0),
-  },
-  filters: {
-    padding: theme.spacing(2),
-    marginTop: theme.spacing(2),
-  },
-  filter: {
-    '& + &': {
-      marginTop: theme.spacing(2.5),
-    },
-  },
-}));
-
 const SearchPage = () => {
-  const classes = useStyles();
   const { types } = useSearch();
   const catalogApi = useApi(catalogApiRef);
 
@@ -51,7 +34,7 @@ const SearchPage = () => {
       <Content>
         <Grid container direction="row">
           <Grid item xs={12}>
-            <Paper className={classes.bar}>
+            <Paper sx={{ p: 1, py: 1 }}>
               <SearchBar />
             </Paper>
           </Grid>
@@ -72,10 +55,10 @@ const SearchPage = () => {
                 },
               ]}
             />
-            <Paper className={classes.filters}>
+            <Paper sx={{ p: 2, mt: 2 }}>
               {types.includes('techdocs') && (
                 <SearchFilter.Select
-                  className={classes.filter}
+                  // spacing handled by surrounding Box wrappers
                   label="Entity"
                   name="name"
                   values={async () => {
@@ -94,18 +77,20 @@ const SearchPage = () => {
                   }}
                 />
               )}
-              <SearchFilter.Select
-                className={classes.filter}
-                label="Kind"
-                name="kind"
-                values={['Component', 'Template']}
-              />
-              <SearchFilter.Checkbox
-                className={classes.filter}
-                label="Lifecycle"
-                name="lifecycle"
-                values={['experimental', 'production']}
-              />
+              <Box mt={2.5}>
+                <SearchFilter.Select
+                  label="Kind"
+                  name="kind"
+                  values={['Component', 'Template']}
+                />
+              </Box>
+              <Box mt={2.5}>
+                <SearchFilter.Checkbox
+                  label="Lifecycle"
+                  name="lifecycle"
+                  values={['experimental', 'production']}
+                />
+              </Box>
             </Paper>
           </Grid>
           <Grid item xs={9}>

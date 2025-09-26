@@ -1,5 +1,4 @@
 import { PropsWithChildren } from 'react';
-import { makeStyles } from '@mui/styles';
 import HomeIcon from '@mui/icons-material/Home';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import LibraryBooks from '@mui/icons-material/LibraryBooks';
@@ -30,31 +29,31 @@ import { MyGroupsSidebarItem } from '@backstage/plugin-org';
 import GroupIcon from '@mui/icons-material/People';
 import { NotificationsSidebarItem } from '@backstage/plugin-notifications';
 
-const useSidebarLogoStyles = makeStyles({
-  root: {
-    width: sidebarConfig.drawerWidthClosed,
-    height: 3 * sidebarConfig.logoHeight,
-    display: 'flex',
-    flexFlow: 'row nowrap',
-    alignItems: 'center',
-    marginBottom: -14,
-  },
-  link: {
-    width: sidebarConfig.drawerWidthClosed,
-    marginLeft: 24,
-  },
+import { styled } from '@mui/material/styles';
+
+const SidebarLogoRoot = styled('div')({
+  width: sidebarConfig.drawerWidthClosed,
+  height: 3 * sidebarConfig.logoHeight,
+  display: 'flex',
+  flexFlow: 'row nowrap',
+  alignItems: 'center',
+  marginBottom: -14,
+});
+
+const SidebarLogoLink = styled(Link)({
+  width: sidebarConfig.drawerWidthClosed,
+  marginLeft: 24,
+  textDecoration: 'none',
 });
 
 const SidebarLogo = () => {
-  const classes = useSidebarLogoStyles();
   const { isOpen } = useSidebarOpenState();
-
   return (
-    <div className={classes.root}>
-      <Link to="/" underline="none" className={classes.link} aria-label="Home">
+    <SidebarLogoRoot>
+      <SidebarLogoLink to="/" aria-label="Home">
         {isOpen ? <LogoFull /> : <LogoIcon />}
-      </Link>
-    </div>
+      </SidebarLogoLink>
+    </SidebarLogoRoot>
   );
 };
 
