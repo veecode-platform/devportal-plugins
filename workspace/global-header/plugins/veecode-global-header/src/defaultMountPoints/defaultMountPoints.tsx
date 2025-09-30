@@ -36,10 +36,10 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
         priority: 200,
         props: {
           to: '/catalog',
-          logo: {
-            light: 'https://veecode-platform.github.io/support/logos/logo.svg',
-            dark: 'https://veecode-platform.github.io/support/logos/logo-black.svg',
-          },
+          // logo: {
+          //   light: 'https://veecode-platform.github.io/support/logos/logo.svg',
+          //   dark: 'https://veecode-platform.github.io/support/logos/logo-black.svg',
+          // },
         },
       },
     },

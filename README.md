@@ -12,6 +12,18 @@ All VeeCode DevPortal plugins that are bundled with the standard DevPortal conta
 
 The `devportal-plugins` repository is organized into multiple workspaces, with each workspace containing a plugin or a set of related plugins. Each workspace operates independently, with its own release cycle and dependencies managed via npm.
 
+### Plugins requirements
+
+All plugins in this repository must meet the following requirements:
+
+- Keep a proper README.md file to display useful info in npm registries (it can be minimal and refer to VeeCode main documentation site).
+- Static linking to a companion Backstage vanilla app (for development and testing purposes).
+- Static linking documentation in its README.md file (or refer to this info elsewhere).
+- Dynamic linking documentation in its README.md file (or refer to this info elsewhere).
+- Good defaults that work out of the box and avoid errors (e.g., sensible configuration options).
+
+DON'T BREAK Backstage with bad defaults in a plugin, this is HARD to debug.
+
 ## Workspaces
 
 This repository contains several workspaces grouping related plugins together. Each workspace is an independent "vanilla" Backstage app used to develop and test the plugins it staticly links.

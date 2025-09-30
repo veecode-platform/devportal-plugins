@@ -1,9 +1,7 @@
 # The Plugins Folder
 
-This is where your own plugins and their associated modules live, each in a
-separate folder of its own.
+All plugins in this workspace were added to the parent app with static imports and using their defaults.
 
-If you want to create a new plugin here, go to your project root directory, run
-the command `yarn new`, and follow the on-screen instructions.
+This means that you can access them by running `yarn start` in the root directory, and then navigating to their respective paths.
 
-You can also check out existing plugins on [the plugin marketplace](https://backstage.io/plugins)!
+Please understand the README.md files in each plugin folder are shown in npm registries, so keep those files with useful documentation.

@@ -23,8 +23,8 @@ import { useAppBarBackgroundScheme } from '../../hooks/useAppBarBackgroundScheme
 const LogoRender = ({
   base64Logo,
   defaultLogo,
-  width = 150,
-  height = 40,
+  width = 120,
+  height = 32,
 }: {
   base64Logo: string | undefined;
   defaultLogo: JSX.Element;
