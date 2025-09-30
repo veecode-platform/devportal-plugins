@@ -20,7 +20,7 @@ All plugins in this repository must meet the following requirements:
 - Static linking to a companion Backstage vanilla app (for development and testing purposes).
 - Static linking documentation in its README.md file (or refer to this info elsewhere).
 - Dynamic linking documentation in its README.md file (or refer to this info elsewhere).
-- Good defaults that work out of the box and avoid errors (e.g., sensible configuration options).
+- Sensible defaults that work out of the box and avoid errors (e.g., good default configuration options).
 
 DON'T BREAK Backstage with bad defaults in a plugin, this is HARD to debug.
 

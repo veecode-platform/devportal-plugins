@@ -20,8 +20,18 @@ import {
   CreateDropdownMountPoint,
   GlobalHeaderComponentMountPoint,
 } from '../types';
-import { Spacer } from '../components/Spacer/Spacer';
+import { Divider } from '../components/Divider/Divider';
 import { CompanyLogo } from '../components/CompanyLogo/CompanyLogo';
+import { NotificationButton } from '../components/NotificationButton/NotificationButton';
+import { StarredDropdown } from '../components/HeaderDropdownComponent/StarredDropdown';
+import { HeaderIconButton, HeaderIconButtonProps } from '../components/HeaderIconButton/HeaderIconButton';
+
+const HeaderIconButtonCreate: React.FC<Partial<HeaderIconButtonProps>> = ({
+  title = 'Create...',
+  icon = 'add',
+  to = 'create',
+  ...rest
+}) => <HeaderIconButton title={title} icon={icon} to={to} {...rest} />;
 
 /**
  * default Global Header Components mount points
@@ -33,7 +43,7 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
     {
       Component: CompanyLogo,
       config: {
-        priority: 200,
+        priority: 50,
         props: {
           to: '/catalog',
           // logo: {
@@ -44,9 +54,33 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
       },
     },
     {
-      Component: Spacer,
+      Component: Divider,
       config: {
-        priority: 99, // the greater the number, the more to the left it will be
+        priority: 55, // the greater the number, the more to the left it will be
+        props: {
+          growFactor: 0,
+        },
+      },
+    },
+    {
+      Component: HeaderIconButtonCreate,
+      config: {
+        priority: 60, // the greater the number, the more to the left it will be
+      },
+    },
+    {
+      Component: NotificationButton,
+      config: {
+        priority: 60, // the greater the number, the more to the left it will be
+        props: {
+          growFactor: 0,
+        },
+      },
+    },
+    {
+      Component: StarredDropdown,
+      config: {
+        priority: 70, // the greater the number, the more to the left it will be
         props: {
           growFactor: 0,
         },

@@ -17,6 +17,16 @@ backend:
     port: 7007
     # Uncomment the following host directive to bind to specific interfaces
     # host: 127.0.0.1
+  auth:
+    secret: mysecret
+    dangerouslyDisableDefaultAuthPolicy: true
+    externalAccess:
+      - type: static
+        options:
+          # Notice: This test-token can be used to add notifications to the backstage demo application.
+          # Production enironments should define a token in a more secure way that supports rotation.
+          token: mysecrettoken
+          subject: mysecretsubject
   csp:
     connect-src: ["'self'", 'http:', 'https:']
     # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
@@ -66,7 +76,10 @@ auth:
   # see https://backstage.io/docs/auth/ to learn about auth providers
   providers:
     # See https://backstage.io/docs/auth/guest/provider
-    guest: {}
+    guest:
+      userEntityRef: user:default/admin
+      ownershipEntityRefs: [group:default/admins]
+      dangerouslyAllowOutsideDevelopment: true
 
 scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
@@ -76,7 +89,7 @@ catalog:
     entityFilename: catalog-info.yaml
     pullRequestBranchName: backstage-integration
   rules:
-    - allow: [Component, System, API, Resource, Location]
+    - allow: [Component, System, API, Resource, Location, User, Group]
   locations:
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file

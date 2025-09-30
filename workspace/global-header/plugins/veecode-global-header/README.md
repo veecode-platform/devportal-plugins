@@ -62,6 +62,40 @@ dynamicPlugins:
 
 There are several extension points available to customize the global header. You can disable buttons, change icons and logos, and more. Look for more details in the [VeeCode DevPortal Global Header Documentation](https://docs.platform.vee.codes/devportal/customization/custom-header).
 
+TODO: add example of one dynamic configuration with all custom mount points.
+
+## Sending notifications
+
+You need to send notifications to the DevPortal backend in order to show them in the global header. The Backstage hosting app configured in this repository exposes the backend APIs directly with a plain text token for simplicity.
+
+You can use the following `curl` command to send a notification:
+
+```bash
+NOTIFY_TOKEN="mysecrettoken"
+
+curl -X POST http://localhost:7007/api/notifications/notifications \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $NOTIFY_TOKEN" \
+  -d '{
+        "recipients": {
+          "type": "broadcast"
+        },
+        "payload": {
+          "title": "Title of broadcast message",
+          "description": "The description of the message.",
+          "link": "http://example.com/link",
+          "severity": "high",
+          "topic": "general"
+        }
+      }'
+```
+
+We have made available a helper script at `/scripts/send-notification.sh` to make it easier to send notifications. You can run it like this:
+
+```bash
+./scripts/send-notification.sh "Your custom message here"
+```
+
 ## Source code
 
 This plugin is part of the [VeeCode DevPortal Plugins Repository](https://github.com/veecode-platform/devportal-plugins).
