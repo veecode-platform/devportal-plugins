@@ -12,26 +12,32 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
  */
+
+/*
+ * This file has been modified by Veecode Platform to define a default
+ * behaviour for the Global Header when linked statically.
+ * 
+ * Modifications are also licensed under the Apache License, Version 2.0.
+ */
+
 import type { ComponentType } from 'react';
 import { RegisterAComponentSection } from '../components/HeaderDropdownComponent/RegisterAComponentSection';
 import { SoftwareTemplatesSection } from '../components/HeaderDropdownComponent/SoftwareTemplatesSection';
 import {
   CreateDropdownMountPoint,
   GlobalHeaderComponentMountPoint,
+  ProfileDropdownMountPoint,
 } from '../types';
 import { Divider } from '../components/Divider/Divider';
 import { CompanyLogo } from '../components/CompanyLogo/CompanyLogo';
 import { NotificationButton } from '../components/NotificationButton/NotificationButton';
 import { StarredDropdown } from '../components/HeaderDropdownComponent/StarredDropdown';
-import { HeaderIconButton, HeaderIconButtonProps } from '../components/HeaderIconButton/HeaderIconButton';
-
-const HeaderIconButtonCreate: React.FC<Partial<HeaderIconButtonProps>> = ({
-  title = 'Create...',
-  icon = 'add',
-  to = 'create',
-  ...rest
-}) => <HeaderIconButton title={title} icon={icon} to={to} {...rest} />;
+import { ToogleTheme } from '../components/headerComponent/toggleTheme/ToggleTheme';
+import { MenuItemLink } from '../components/MenuItemLink/MenuItemLink';
+import { LogoutButton } from '../components/LogoutButton/LogoutButton';
+import { ProfileDropdown } from '../components/HeaderDropdownComponent/ProfileDropdown';
 
 /**
  * default Global Header Components mount points
@@ -63,12 +69,6 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
       },
     },
     {
-      Component: HeaderIconButtonCreate,
-      config: {
-        priority: 60, // the greater the number, the more to the left it will be
-      },
-    },
-    {
       Component: NotificationButton,
       config: {
         priority: 60, // the greater the number, the more to the left it will be
@@ -86,6 +86,21 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
         },
       },
     },
+    {
+      Component: ToogleTheme,
+      config: {
+        priority: 75, // the greater the number, the more to the left it will be
+        props: {
+          growFactor: 0,
+        },
+      },
+    },
+    {
+      Component: ProfileDropdown,
+      config: {
+        priority: 10, // the greater the number, the more to the left it will be
+      },
+    },
   ];
 
 export const defaultCreateDropdownMountPoints: CreateDropdownMountPoint[] = [
@@ -97,6 +112,37 @@ export const defaultCreateDropdownMountPoints: CreateDropdownMountPoint[] = [
   },
   {
     Component: RegisterAComponentSection as ComponentType,
+    config: {
+      priority: 100,
+    },
+  },
+];
+
+export const defaultProfileDropdownMountPoints: ProfileDropdownMountPoint[] = [
+  {
+    Component: MenuItemLink as ComponentType,
+    config: {
+      priority: 200,
+      props: {
+        title: 'profile.settings',
+        icon: 'profile',
+        link: '/settings',
+      },
+    },
+  },
+  {
+    Component: MenuItemLink as ComponentType,
+    config: {
+      priority: 150,
+      props: {
+        title: 'profile.myProfile',
+        icon: 'person',
+        type: 'myProfile', // Semantic identifier
+      },
+    },
+  },
+  {
+    Component: LogoutButton,
     config: {
       priority: 100,
     },

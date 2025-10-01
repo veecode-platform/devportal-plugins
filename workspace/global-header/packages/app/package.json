@@ -41,15 +41,22 @@
     "@backstage/plugin-user-settings": "^0.8.26",
     "@backstage/theme": "^0.6.8",
     "@backstage/ui": "^0.7.1",
-    "@emotion/react": "^11.11.4",
-    "@emotion/styled": "^11.11.5",
-    "@mui/icons-material": "^5.17.1",
-    "@mui/material": "^5.17.1",
+    "@drodil/backstage-plugin-toolbox": "^1.33.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^5.18.0",
+    "@mui/material": "^5.18.0",
     "@veecode-platform/plugin-veecode-global-header": "workspace:^",
-    "react": "^18.0.2",
-    "react-dom": "^18.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-router": "^6.3.0",
     "react-router-dom": "^6.3.0"
+  },
+  "resolutions": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
     "@backstage/test-utils": "^1.7.11",

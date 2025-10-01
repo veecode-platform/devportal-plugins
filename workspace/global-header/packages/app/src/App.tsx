@@ -37,9 +37,22 @@ import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
+import { UnifiedThemeProvider, themes as builtinThemes } from '@backstage/theme';
+import { ToolboxPage, Tool } from '@drodil/backstage-plugin-toolbox';
+import { BackstageIcons } from './components/toolbox/BackstageIcons';
+import LogoutIcon from '@mui/icons-material/Logout';
+import ProfileIcon from '@mui/icons-material/ManageAccounts';
+import PersonIcon from '@mui/icons-material/Person';
 
 const app = createApp({
   apis,
+  // loading icons in addition to system icons
+  // "Show icons" button is available in the global header app
+  icons: {
+    logout: LogoutIcon,
+    profile: ProfileIcon,
+    person: PersonIcon,
+  },
   bindRoutes({ bind }) {
     bind(catalogPlugin.externalRoutes, {
       createComponent: scaffolderPlugin.routes.root,
@@ -60,7 +73,31 @@ const app = createApp({
   components: {
     SignInPage: props => <SignInPage {...props} auto providers={['guest']} />,
   },
+  themes: [
+    {
+      id: 'dark',
+      title: 'Dark',
+      variant: 'dark',
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={builtinThemes.dark} children={children} />
+      ),
+    },
+    {
+      id: 'light',
+      title: 'Light',
+      variant: 'light',
+      Provider: ({ children }) => (
+        <UnifiedThemeProvider theme={builtinThemes.light} children={children} />
+      ),
+    },
+  ],
 });
+
+const extraToolExample: Tool = {
+  id: 'list-icons',
+  name: 'Backstage Icons',
+  component: <BackstageIcons />,
+};
 
 const routes = (
   <FlatRoutes>
@@ -97,6 +134,7 @@ const routes = (
     <Route path="/settings" element={<UserSettingsPage />} />
     <Route path="/catalog-graph" element={<CatalogGraphPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
+    <Route path="/toolbox" element={<ToolboxPage extraTools={[extraToolExample]} />} />
   </FlatRoutes>
 );
 

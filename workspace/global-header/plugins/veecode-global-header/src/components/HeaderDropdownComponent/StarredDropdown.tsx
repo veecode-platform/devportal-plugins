@@ -93,7 +93,7 @@ const StarredItem: FC<SectionComponentProps> = ({
             e.stopPropagation();
             toggleStarredEntity(entityRef);
           }}
-        >
+          size="large">
           <Star color="warning" />
         </IconButton>
       </Tooltip>

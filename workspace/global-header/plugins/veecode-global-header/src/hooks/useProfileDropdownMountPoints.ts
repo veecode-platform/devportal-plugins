@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-//import { defaultCreateDropdownMountPoints } from '../defaultMountPoints/defaultMountPoints';
-import { CreateDropdownMountPoint, ScalprumState } from '../types';
+import { defaultProfileDropdownMountPoints } from '../defaultMountPoints/defaultMountPoints';
+import { ProfileDropdownMountPoint, ScalprumState } from '../types';
 import { useScalprum } from '@scalprum/react-core';
 
-export const useCreateDropdownMountPoints = ():
-  | CreateDropdownMountPoint[]
+export const useProfileDropdownMountPoints = ():
+  | ProfileDropdownMountPoint[]
   | undefined => {
   const scalprum = useScalprum<ScalprumState>();
 
-  const createDropdownMountPoints =
-    scalprum?.api?.dynamicRootConfig?.mountPoints?.['global.header/create'];
+  const profileDropdownMountPoints =
+    scalprum?.api?.dynamicRootConfig?.mountPoints?.['global.header/profile'];
 
   // default profile dropdown components for dev env
-  //if (Object.keys(scalprum?.api || {}).length === 0) {
-  //  return defaultCreateDropdownMountPoints;
-  //}
+  if (Object.keys(scalprum?.api || {}).length === 0) {
+    return defaultProfileDropdownMountPoints;
+  }
 
-  return createDropdownMountPoints ?? [];
+  return profileDropdownMountPoints ?? [];
 };

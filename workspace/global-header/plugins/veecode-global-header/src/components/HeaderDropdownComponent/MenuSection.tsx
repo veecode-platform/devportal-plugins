@@ -18,10 +18,11 @@ import { Fragment } from 'react';
 import type { ComponentType, FC } from 'react';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
-import MenuItem from '@mui/material/MenuItem';
+import MenuItem, { MenuItemProps } from '@mui/material/MenuItem';
 import { Link } from '@backstage/core-components';
 import { MenuItemLinkProps } from '../MenuItemLink/MenuItemLink';
 import ListSubheader from '@mui/material/ListSubheader';
+import { useTranslation } from '../../hooks/useTranslation';
 
 /**
  * Menu item configuration
@@ -29,7 +30,7 @@ import ListSubheader from '@mui/material/ListSubheader';
  * @public
  */
 export interface MenuItemConfig {
-  Component: ComponentType<MenuItemLinkProps | {}>;
+  Component: ComponentType<MenuItemLinkProps | MenuItemProps | {}>;
   label: string;
   icon?: string;
   subLabel?: string;
@@ -53,8 +54,15 @@ export const MenuSection: FC<MenuSectionConfig> = ({
   hideDivider = false,
   handleClose,
 }) => {
+  const { t } = useTranslation();
   const hasClickableSubheader =
     optionalLink && optionalLinkLabel && items.length > 0;
+
+  // Check if sectionLabel looks like a translation key (contains dots)
+  const translatedSectionLabel =
+    sectionLabel && sectionLabel.includes('.')
+      ? t(sectionLabel as any, {}) || sectionLabel // Fallback to original if translation fails
+      : sectionLabel;
 
   return (
     <>
@@ -79,7 +87,7 @@ export const MenuSection: FC<MenuSectionConfig> = ({
               fontWeight: 400,
             }}
           >
-            {sectionLabel}
+            {translatedSectionLabel}
           </ListSubheader>
 
           {optionalLinkLabel && (
@@ -108,7 +116,13 @@ export const MenuSection: FC<MenuSectionConfig> = ({
           component={link ? Link : Fragment}
           to={link}
         >
-          <Component icon={icon} to={link!} title={label} subTitle={subLabel} />
+          <Component
+            icon={icon}
+            to={link!}
+            title={label}
+            subTitle={subLabel}
+            onClick={handleClose}
+          />
         </MenuItem>
       ))}
       {!hideDivider && <Divider sx={{ my: 0.5 }} />}

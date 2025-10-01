@@ -11,7 +11,7 @@ import {
   SidebarItem,
   SidebarPage,
   SidebarScrollWrapper,
-  SidebarSpace,
+  SidebarSpace, 
 } from '@backstage/core-components';
 import MenuIcon from '@mui/icons-material/Menu';
 import { MyGroupsSidebarItem } from '@backstage/plugin-org';
@@ -123,6 +123,7 @@ export const Root = ({ children = null }: PropsWithChildren<{}>) => {
               />
               <SidebarItem icon={ExtensionIcon} to="api-docs" text="APIs" />
               <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
+              <SidebarItem icon={LibraryBooks} to="toolbox#list-icons" text="Show icons" />
               <NotificationsSidebarItem
                 webNotificationsEnabled
                 titleCounterEnabled
