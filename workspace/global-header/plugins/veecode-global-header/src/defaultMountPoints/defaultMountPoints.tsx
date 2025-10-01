@@ -38,6 +38,8 @@ import { ToogleTheme } from '../components/headerComponent/toggleTheme/ToggleThe
 import { MenuItemLink } from '../components/MenuItemLink/MenuItemLink';
 import { LogoutButton } from '../components/LogoutButton/LogoutButton';
 import { ProfileDropdown } from '../components/HeaderDropdownComponent/ProfileDropdown';
+import { SearchComponent } from '../components/SearchComponent/SearchComponent';
+import { Spacer } from '../components/Spacer/Spacer';
 
 /**
  * default Global Header Components mount points
@@ -47,9 +49,24 @@ import { ProfileDropdown } from '../components/HeaderDropdownComponent/ProfileDr
 export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMountPoint[] =
   [
     {
+      Component: SearchComponent,
+      config: {
+        priority: 100, // the greater the number, the more to the left it will be
+      },
+    },
+    {
+      Component: Spacer,
+      config: {
+        priority: 99, // the greater the number, the more to the left it will be
+        props: {
+          growFactor: 0,
+        },
+      },
+    },
+    {
       Component: CompanyLogo,
       config: {
-        priority: 50,
+        priority: 200,
         props: {
           to: '/catalog',
           // logo: {

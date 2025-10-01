@@ -20,6 +20,8 @@ import { ErrorBoundary } from '@backstage/core-components';
 
 import { GlobalHeaderComponentMountPoint } from '../types';
 import { HeaderComponent } from './headerComponent/HeaderComponent';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
 
 /**
  * Global Header Component properties
@@ -45,15 +47,24 @@ export const GlobalHeaderComponent = ({
   }, [globalHeaderMountPoints]);
 
   return (
-    <HeaderComponent>
-      {mountPoints.map((mountPoint, index) => (
-        <ErrorBoundary key={`header-component-${index}`}>
-          <mountPoint.Component
-            {...mountPoint.config?.props}
-            layout={mountPoint.config?.layout}
-          />
-        </ErrorBoundary>
-      ))}
-    </HeaderComponent>
+    <AppBar position="sticky" component="nav" id="global-header">
+      <Toolbar
+        sx={{
+          gap: 1,
+          color: theme =>
+            (theme as any).rhdh?.general.appBarForegroundColor ??
+            theme.palette.text.primary,
+        }}
+      >
+        {mountPoints.map((mountPoint, index) => (
+          <ErrorBoundary key={`header-component-${index}`}>
+            <mountPoint.Component
+              {...mountPoint.config?.props}
+              layout={mountPoint.config?.layout}
+            />
+          </ErrorBoundary>
+        ))}
+      </Toolbar>
+    </AppBar>
   );
 };
