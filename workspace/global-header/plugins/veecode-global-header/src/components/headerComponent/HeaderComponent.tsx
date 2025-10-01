@@ -3,7 +3,7 @@ import * as React from 'react';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
-import { ToogleTheme } from './toggleTheme/ToggleTheme';
+import { ToggleTheme } from './toggleTheme/ToggleTheme';
 import { SearchComponent } from './searchComponent/SearchComponent';
 import { MenuItems } from './menuItems/MenuItems';
 import { Notifications } from './notifications/Notifications';
@@ -46,7 +46,7 @@ export const HeaderComponent: React.FC<HeaderComponentProps> = ({
             }}
           >
             <Notifications />
-            <ToogleTheme />
+            <ToggleTheme />
             <Profile handleOpenMenu={handleProfileMenuOpen} />
             {children}
           </Box>

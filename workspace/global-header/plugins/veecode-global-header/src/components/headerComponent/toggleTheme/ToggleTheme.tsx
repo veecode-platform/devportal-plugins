@@ -4,7 +4,7 @@ import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import { appThemeApiRef, useApi } from '@backstage/core-plugin-api';
 import { IconButtonComponent } from '../iconButtonComponent/IconButtonComponent';
 
-export const ToogleTheme = () => {
+export const ToggleTheme = () => {
   const appThemeApi = useApi(appThemeApiRef);
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
