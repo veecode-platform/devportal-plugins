@@ -2,7 +2,7 @@ import { useTheme } from '@mui/material/styles';
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import { appThemeApiRef, useApi } from '@backstage/core-plugin-api';
-import { IconButtonComponent } from '../iconButtonComponent/IconButtonComponent';
+import { IconButtonComponent } from './IconButtonComponent';
 
 export const ToggleTheme = () => {
   const appThemeApi = useApi(appThemeApiRef);
