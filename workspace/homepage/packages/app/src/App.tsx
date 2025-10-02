@@ -37,30 +37,15 @@ import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
-import { UnifiedThemeProvider, themes as builtinThemes } from '@backstage/theme';
+import { getAllThemes } from '@red-hat-developer-hub/backstage-plugin-theme';
 
 import { VeecodeHomepagePage } from '@veecode-platform/plugin-veecode-homepage';
+import { MUI4TestPage } from '@red-hat-developer-hub/backstage-plugin-mui4-test';
+import { MUI5TestPage } from '@red-hat-developer-hub/backstage-plugin-mui5-test';
 
 const app = createApp({
   apis,
-  themes: [
-    {
-      id: 'dark',
-      title: 'Dark',
-      variant: 'dark',
-      Provider: ({ children }) => (
-        <UnifiedThemeProvider theme={builtinThemes.dark} children={children} />
-      ),
-    },
-    {
-      id: 'light',
-      title: 'Light',
-      variant: 'light',
-      Provider: ({ children }) => (
-        <UnifiedThemeProvider theme={builtinThemes.light} children={children} />
-      ),
-    },
-  ],
+  themes: getAllThemes(),
   bindRoutes({ bind }) {
     bind(catalogPlugin.externalRoutes, {
       createComponent: scaffolderPlugin.routes.root,
@@ -118,6 +103,8 @@ const routes = (
     <Route path="/settings" element={<UserSettingsPage />} />
     <Route path="/catalog-graph" element={<CatalogGraphPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
+    <Route path="/mui4-tests" element={<MUI4TestPage />} />
+    <Route path="/mui5-tests" element={<MUI5TestPage />} />
   </FlatRoutes>
 );
 

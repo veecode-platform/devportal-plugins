@@ -11,12 +11,12 @@ app:
         variant: "backstage"
         palette:
           navigation:
-            background: "#222222" # your fixed light theme sidebar background
+            #background: "#222222" # your fixed light theme sidebar background
       dark:
         variant: "backstage"
         palette:
           navigation:
-            background: "#222222" # same fixed color for dark theme
+            #background: "#222222" # same fixed color for dark theme
 
 organization:
   name: My Company
@@ -33,6 +33,16 @@ backend:
     port: 7007
     # Uncomment the following host directive to bind to specific interfaces
     # host: 127.0.0.1
+  auth:
+    secret: mysecret
+    dangerouslyDisableDefaultAuthPolicy: true
+    externalAccess:
+      - type: static
+        options:
+          # Notice: This test-token can be used to add notifications to the backstage demo application.
+          # Production enironments should define a token in a more secure way that supports rotation.
+          token: mysecrettoken
+          subject: mysecretsubject
   csp:
     connect-src: ["'self'", 'http:', 'https:']
     # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
@@ -79,10 +89,13 @@ techdocs:
     type: 'local' # Alternatives - 'googleGcs' or 'awsS3'. Read documentation for using alternatives.
 
 auth:
+  environment: development
   # see https://backstage.io/docs/auth/ to learn about auth providers
   providers:
     # See https://backstage.io/docs/auth/guest/provider
     guest:
+      userEntityRef: user:default/admin
+      ownershipEntityRefs: [group:default/admins]
       dangerouslyAllowOutsideDevelopment: true
 
 scaffolder:

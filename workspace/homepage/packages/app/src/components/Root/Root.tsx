@@ -1,8 +1,25 @@
+/*
+ * Copyright Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import { PropsWithChildren } from 'react';
-import HomeIcon from '@mui/icons-material/Home';
-import ExtensionIcon from '@mui/icons-material/Extension';
-import LibraryBooks from '@mui/icons-material/LibraryBooks';
-import CreateComponentIcon from '@mui/icons-material/AddCircleOutline';
+import { makeStyles } from '@material-ui/core';
+import HomeIcon from '@material-ui/icons/Home';
+import ExtensionIcon from '@material-ui/icons/Extension';
+import LibraryBooks from '@material-ui/icons/LibraryBooks';
+import CreateComponentIcon from '@material-ui/icons/AddCircleOutline';
 import LogoFull from './LogoFull';
 import LogoIcon from './LogoIcon';
 import {
@@ -23,37 +40,36 @@ import {
   Link,
   CatalogIcon,
 } from '@backstage/core-components';
-import MenuIcon from '@mui/icons-material/Menu';
-import SearchIcon from '@mui/icons-material/Search';
+import MenuIcon from '@material-ui/icons/Menu';
+import SearchIcon from '@material-ui/icons/Search';
 import { MyGroupsSidebarItem } from '@backstage/plugin-org';
-import GroupIcon from '@mui/icons-material/People';
-import { NotificationsSidebarItem } from '@backstage/plugin-notifications';
+import GroupIcon from '@material-ui/icons/People';
 
-import { styled } from '@mui/material/styles';
-
-const SidebarLogoRoot = styled('div')({
-  width: sidebarConfig.drawerWidthClosed,
-  height: 3 * sidebarConfig.logoHeight,
-  display: 'flex',
-  flexFlow: 'row nowrap',
-  alignItems: 'center',
-  // marginBottom: -14,
-});
-
-const SidebarLogoLink = styled(Link)({
-  width: sidebarConfig.drawerWidthClosed,
-  marginLeft: 24,
-  textDecoration: 'none',
+const useSidebarLogoStyles = makeStyles({
+  root: {
+    width: sidebarConfig.drawerWidthClosed,
+    height: 3 * sidebarConfig.logoHeight,
+    display: 'flex',
+    flexFlow: 'row nowrap',
+    alignItems: 'center',
+    marginBottom: -14,
+  },
+  link: {
+    width: sidebarConfig.drawerWidthClosed,
+    marginLeft: 24,
+  },
 });
 
 const SidebarLogo = () => {
+  const classes = useSidebarLogoStyles();
   const { isOpen } = useSidebarOpenState();
+
   return (
-    <SidebarLogoRoot>
-      <SidebarLogoLink to="/" aria-label="Home">
+    <div className={classes.root}>
+      <Link to="/" underline="none" className={classes.link} aria-label="Home">
         {isOpen ? <LogoFull /> : <LogoIcon />}
-      </SidebarLogoLink>
-    </SidebarLogoRoot>
+      </Link>
+    </div>
   );
 };
 
@@ -79,13 +95,14 @@ export const Root = ({ children }: PropsWithChildren<{}>) => (
         <SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />
         {/* End global nav */}
         <SidebarDivider />
+        <SidebarItem icon={ExtensionIcon} to="mui4-tests" text="MUI v4 tests" />
+        <SidebarItem icon={ExtensionIcon} to="mui5-tests" text="MUI v5 tests" />
+        <SidebarDivider />
         <SidebarScrollWrapper>
           {/* Items in this group will be scrollable if they run out of space */}
         </SidebarScrollWrapper>
       </SidebarGroup>
       <SidebarSpace />
-      <SidebarDivider />
-      <NotificationsSidebarItem />
       <SidebarDivider />
       <SidebarGroup
         label="Settings"

@@ -14,6 +14,14 @@ HOMEPAGE_DYNAMIC_PLUGIN := $(PWD)/workspace/homepage/plugins/veecode-homepage/di
 
 .PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header echo-paths
 
+start-global-header-app:
+	cd workspace/global-header && \
+	yarn start
+
+start-homepage-app:
+	cd workspace/homepage && \
+	yarn start
+
 echo-paths:
 	@echo "DYNAMIC_PLUGIN_ROOT: $(DYNAMIC_PLUGIN_ROOT)"
 	@echo "GLOBAL_HEADER_DYNAMIC_PLUGIN: $(GLOBAL_HEADER_DYNAMIC_PLUGIN)"
