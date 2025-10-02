@@ -37,7 +37,7 @@ const SidebarLogoRoot = styled('div')({
   display: 'flex',
   flexFlow: 'row nowrap',
   alignItems: 'center',
-  marginBottom: -14,
+  // marginBottom: -14,
 });
 
 const SidebarLogoLink = styled(Link)({

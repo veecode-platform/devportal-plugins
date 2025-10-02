@@ -1,5 +1,5 @@
 // import { makeStyles } from '@mui/styles';
-import { HeaderComponent } from './headerComponent/HeaderComponent';
+// import { HeaderComponent } from './headerComponent/HeaderComponent';
 import { HomeGreeting } from './homeGretting/HomeGretting';
 import { HomeContent } from './homeContent/HomeContent';
 import { Page } from '@backstage/core-components';
@@ -22,7 +22,7 @@ export const VeeCodeHomePage = () => {
         width: '100%', 
         minHeight: '100vh' 
       }}>
-        <HeaderComponent />
+        {/*<HeaderComponent />*/}
         <HomeGreeting />
         <HomeContent />
       </Box>

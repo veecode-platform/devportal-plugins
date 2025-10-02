@@ -1,13 +1,14 @@
 import { styled } from '@mui/material/styles';
 
-const StyledSvg = styled('svg')({
+const StyledSvg = styled('svg')(() => ({
   width: 'auto',
   height: 28,
-});
+  display: 'block',
+}));
 
-const StyledPath = styled('path')({
+const StyledPath = styled('path')(() => ({
   fill: '#7df3e1',
-});
+}));
 
 const LogoIcon = () => (
   <StyledSvg
