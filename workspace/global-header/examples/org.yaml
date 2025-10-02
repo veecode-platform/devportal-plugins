@@ -14,6 +14,10 @@ metadata:
   namespace: default
 spec:
   memberOf: [admins]
+  profile:
+    displayName: Admin User
+    email: admin@example.com
+    picture: https://avatars.githubusercontent.com/u/9919?s=200&v=4
 ---
 # https://backstage.io/docs/features/software-catalog/descriptor-format#kind-group
 apiVersion: backstage.io/v1alpha1

@@ -4,7 +4,34 @@
 # - npm publishing honors NPM_CONFIG_REGISTRY or .npmrc settings
 # - there are two variants of each plugin: static and dynamic
 #
-.PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header
+
+# point DEVPORTAL_BASE_PATH to "devportal-base" clone folder
+# falls back to $HOME/projects/veecode/devportal-base if empty
+DEVPORTAL_BASE_PATH ?= $(HOME)/projetos/veecode/devportal-base
+DYNAMIC_PLUGIN_ROOT ?= $(DEVPORTAL_BASE_PATH)/dynamic-plugins-root
+GLOBAL_HEADER_DYNAMIC_PLUGIN := $(PWD)/workspace/global-header/plugins/veecode-global-header/dist-dynamic
+HOMEPAGE_DYNAMIC_PLUGIN := $(PWD)/workspace/homepage/plugins/veecode-homepage/dist-dynamic
+
+.PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header echo-paths
+
+echo-paths:
+	@echo "DYNAMIC_PLUGIN_ROOT: $(DYNAMIC_PLUGIN_ROOT)"
+	@echo "GLOBAL_HEADER_DYNAMIC_PLUGIN: $(GLOBAL_HEADER_DYNAMIC_PLUGIN)"
+
+copy-dynamic-global-header-plugin: echo-paths
+	@echo "Copying dynamic global-header plugin to DYNAMIC_PLUGIN_ROOT"
+	@rm -Rf $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic
+	@cp -R $(GLOBAL_HEADER_DYNAMIC_PLUGIN) $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic
+	@echo "Done."
+
+copy-dynamic-homepage-plugin: echo-paths
+	@echo "Copying dynamic homepage plugin to DYNAMIC_PLUGIN_ROOT"
+	@rm -Rf $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic
+	@cp -R $(HOMEPAGE_DYNAMIC_PLUGIN) $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic
+	@echo "Done."
+
+copy-all-dynamic-plugins: copy-dynamic-global-header-plugin copy-dynamic-homepage-plugin
+	@echo "All dynamic plugins copied to DYNAMIC_PLUGIN_ROOT"
 
 # Build the homepage plugin
 build-homepage:

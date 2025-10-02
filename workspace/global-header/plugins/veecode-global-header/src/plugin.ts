@@ -27,6 +27,7 @@ import { SoftwareTemplatesSectionProps } from './components/HeaderDropdownCompon
 import { RegisterAComponentSectionProps } from './components/HeaderDropdownComponent/RegisterAComponentSection';
 import { CreateDropdownProps } from './components/HeaderDropdownComponent/CreateDropdown';
 import { SupportButtonProps } from './plugin';
+import { ProfileDropdownProps } from './components/HeaderDropdownComponent/ProfileDropdown';
 
 export type { GlobalHeaderComponentProps } from './components/GlobalHeaderComponent';
 
@@ -43,6 +44,8 @@ export type { DividerProps } from './components/Divider/Divider';
 export type { SpacerProps } from './components/Spacer/Spacer';
 export type { SupportButtonProps } from './components/SupportButton/SupportButton';
 export type { NotificationButtonProps } from './components/NotificationButton/NotificationButton';
+export type { ToggleThemeProps } from './components/ToggleThemeButton/ToggleThemeButton';
+
 export type {
   LogoURLs,
   CompanyLogoProps,
@@ -59,6 +62,8 @@ export type {
 } from './types';
 
 export { defaultGlobalHeaderComponentsMountPoints } from './defaultMountPoints/defaultMountPoints';
+
+console.log('[veecode-global-header] Initializing plugin');
 
 /**
  * Global Header Plugin
@@ -180,6 +185,24 @@ export const CreateDropdown: ComponentType<CreateDropdownProps> =
   );
 
 /**
+ * Profile Dropdown
+ *
+ * @public
+ */
+export const ProfileDropdown: ComponentType<ProfileDropdownProps> =
+  globalHeaderPlugin.provide(
+    createComponentExtension({
+      name: 'ProfileDropdown',
+      component: {
+        lazy: () =>
+          import('./components/HeaderDropdownComponent/ProfileDropdown').then(
+            m => m.ProfileDropdown,
+          ),
+      },
+    }),
+  );
+
+/**
  * Software Templates List
  *
  * @public
@@ -274,6 +297,21 @@ export const Divider = globalHeaderPlugin.provide(
     name: 'Divider',
     component: {
       lazy: () => import('./components/Divider/Divider').then(m => m.Divider),
+    },
+  }),
+);
+
+/**
+ * @public
+ */
+export const ToggleThemeButton = globalHeaderPlugin.provide(
+  createComponentExtension({
+    name: 'ToggleThemeButton',
+    component: {
+      lazy: () =>
+        import('./components/ToggleThemeButton/ToggleThemeButton').then(
+          m => m.ToggleThemeButton,
+        ),
     },
   }),
 );

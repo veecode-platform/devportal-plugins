@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import { forwardRef } from 'react';
 import type { CSSProperties } from 'react';
 import { Link as BackstageLink } from '@backstage/core-components';
 
@@ -54,9 +55,9 @@ export interface NotificationButtonProps {
 }
 
 // Backstage Link automatically detects external links and emits analytic events.
-const Link = (props: any) => (
-  <BackstageLink {...props} color="inherit" externalLinkIcon={false} />
-);
+const Link = forwardRef((props: any, ref: any) => (
+  <BackstageLink {...props} ref={ref} color="inherit" externalLinkIcon={false} />
+));
 
 /**
  * @public

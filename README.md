@@ -47,7 +47,30 @@ We have included a "Show icons" button in the global header hosting app to help 
 
 ## Makefile
 
-The root project has a Makefle that helps you manage your releases separately for each workspace.
+The root project has a Makefile that helps you manage your releases separately for each workspace. We recommend using a local registry like Verdaccio to validate this process locally.
+
+A few Makefile targets are show below:
+
+```bash
+# Build the global-header plugin
+make build-global-header
+# Build the homepage plugin
+make build-homepage
+# Build the dynamic version of global-header plugin
+make build-global-header-dynamic
+# Build the dynamic version of homepage plugin
+make build-homepage-dynamic
+# Publish the global-header plugin
+make publish-global-header
+# Publish the homepage plugin
+make publish-homepage
+# Publish the dynamic version of global-header plugin
+make publish-global-header-dynamic
+# Publish the dynamic version of homepage plugin
+make publish-homepage-dynamic
+# Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT
+make copy-all-dynamic-plugins
+```
 
 ## Why we do this
 

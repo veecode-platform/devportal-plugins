@@ -4,7 +4,17 @@ import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import { appThemeApiRef, useApi } from '@backstage/core-plugin-api';
 import { IconButtonComponent } from './IconButtonComponent';
 
-export const ToggleTheme = () => {
+import type { CSSProperties } from 'react';
+
+/**
+ * @public
+ */
+export interface ToggleThemeProps {
+  layout?: CSSProperties;
+}
+
+export const ToggleThemeButton = ({ layout }: ToggleThemeProps)  => {
+  console.log('ToggleTheme rendering started');
   const appThemeApi = useApi(appThemeApiRef);
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
@@ -32,6 +42,7 @@ export const ToggleTheme = () => {
       handleClick={handleSetTheme}
       color="inherit"
       label="Toggle-theme"
+      layout={layout}
     >
       {isDarkMode ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
     </IconButtonComponent>

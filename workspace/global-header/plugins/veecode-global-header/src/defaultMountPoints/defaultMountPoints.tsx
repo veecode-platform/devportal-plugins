@@ -34,7 +34,7 @@ import { Divider } from '../components/Divider/Divider';
 import { CompanyLogo } from '../components/CompanyLogo/CompanyLogo';
 import { NotificationButton } from '../components/NotificationButton/NotificationButton';
 import { StarredDropdown } from '../components/HeaderDropdownComponent/StarredDropdown';
-import { ToggleTheme } from '../components/ToggleThemeButton/ToggleTheme';
+import { ToggleThemeButton } from '../components/ToggleThemeButton/ToggleThemeButton';
 import { MenuItemLink } from '../components/MenuItemLink/MenuItemLink';
 import { LogoutButton } from '../components/LogoutButton/LogoutButton';
 import { ProfileDropdown } from '../components/HeaderDropdownComponent/ProfileDropdown';
@@ -104,7 +104,7 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
       },
     },
     {
-      Component: ToggleTheme,
+      Component: ToggleThemeButton,
       config: {
         priority: 75, // the greater the number, the more to the left it will be
         props: {

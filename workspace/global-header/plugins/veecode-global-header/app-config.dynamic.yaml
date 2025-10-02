@@ -86,6 +86,11 @@ dynamicPlugins:
             priority: 70
 
         - mountPoint: global.header/component
+          importName: ToggleThemeButton
+          config:
+            priority: 75
+
+        - mountPoint: global.header/component
           importName: Divider
           config:
             priority: 50

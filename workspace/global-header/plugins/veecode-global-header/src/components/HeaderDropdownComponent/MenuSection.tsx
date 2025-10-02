@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import { Fragment } from 'react';
 import type { ComponentType, FC } from 'react';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
@@ -73,8 +72,9 @@ export const MenuSection: FC<MenuSectionConfig> = ({
           }}
           disableRipple
           disableTouchRipple
-          component={hasClickableSubheader ? Link : Fragment}
-          to={optionalLink}
+          // component={hasClickableSubheader ? Link : Fragment}
+          // to={optionalLink}
+          {...(hasClickableSubheader && { component: Link, to: optionalLink })}
           onClick={handleClose}
         >
           <ListSubheader
@@ -113,8 +113,9 @@ export const MenuSection: FC<MenuSectionConfig> = ({
           disableTouchRipple
           onClick={handleClose}
           sx={{ py: 0.5 }}
-          component={link ? Link : Fragment}
-          to={link}
+          // component={link ? Link : Fragment}
+          // to={link}
+          {...(link && { component: Link, to: link })}
         >
           <Component
             icon={icon}

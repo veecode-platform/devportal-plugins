@@ -3,7 +3,8 @@
 # This script sends a notification to the Backstage notifications backend
 
 MESSAGE=${1:-"Hello, this is a test notification from the script!"}
-NOTIFY_TOKEN="mysecrettoken"
+# set to "mysecrettoken" if empty
+NOTIFY_TOKEN=${NOTIFY_TOKEN:-"mysecrettoken"}
 
 curl -X POST http://localhost:7007/api/notifications/notifications \
   -H "Content-Type: application/json" \
