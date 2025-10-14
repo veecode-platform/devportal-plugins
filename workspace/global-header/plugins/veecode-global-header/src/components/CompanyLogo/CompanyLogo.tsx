@@ -18,13 +18,13 @@ import { Link } from '@backstage/core-components';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
 import DefaultLogo from './DefaultLogo';
 import Box from '@mui/material/Box';
-import { useThemeCurrent } from '@veecode-platform/plugin-veecode-global-header/src/hooks';
+import { useAppBarBackgroundScheme } from '../../hooks/useAppBarBackgroundScheme';
 
 const LogoRender = ({
   base64Logo,
   defaultLogo,
-  width = 160,
-  height = 50,
+  width = 150,
+  height = 40,
 }: {
   base64Logo: string | undefined;
   defaultLogo: JSX.Element;
@@ -90,22 +90,23 @@ export interface CompanyLogoProps {
  * Gets a themed image based on the current theme.
  */
 const useFullLogo = (logo: LogoURLs): string | undefined => {
-  const theme = useThemeCurrent();
+  const appBarBackgroundScheme = useAppBarBackgroundScheme();
+
   const configApi = useApi(configApiRef);
 
   /** The fullLogo config specified by app.branding.fullLogo */
-  const fullLogo = theme === "light" ? configApi.getOptional<LogoURLs>('app.branding.fullLogo.light') : configApi.getOptional<LogoURLs>('app.branding.fullLogo.dark');
+  const fullLogo = configApi.getOptional<LogoURLs>('app.branding.fullLogo');
 
   /** The URI of the logo specified by app.branding.fullLogo */
   const fullLogoURI =
     typeof fullLogo === 'string'
       ? fullLogo
-      : fullLogo?.[theme];
+      : fullLogo?.[appBarBackgroundScheme];
 
   /** The URI of the logo specified by CompanyLogo props */
   const propsLogoURI =
-    typeof logo === 'string' ? logo : logo?.[theme];
- 
+    typeof logo === 'string' ? logo : logo?.[appBarBackgroundScheme];
+
   return propsLogoURI ?? fullLogoURI ?? undefined;
 };
 
@@ -120,8 +121,6 @@ export const CompanyLogo = ({
   const fullLogoWidth = configApi.getOptional<number | string>(
     'app.branding.fullLogoWidth',
   );
-
-  console.log("LOGO >>>>", logoURL)
   return (
     <Box
       data-testid="global-header-company-logo"
