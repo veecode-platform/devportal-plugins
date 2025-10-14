@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useAppBarBackgroundScheme } from '../../hooks/useAppBarBackgroundScheme';
+import { useThemeCurrent } from '../../hooks';
 
 export const DarkLogo = () => {
 	return (
 	  <svg
 		xmlns="http://www.w3.org/2000/svg"
 		xmlnsXlink="http://www.w3.org/1999/xlink"
-		width="1800"
+		width="160"
 		zoomAndPan="magnify"
 		viewBox="0 0 1350 449.999984"
-		height="600"
+		height="50"
 		preserveAspectRatio="xMidYMid meet"
 		version="1.0"
 	  >
@@ -105,10 +105,10 @@ export const LightLogo = () => {
 	  <svg
 		xmlns="http://www.w3.org/2000/svg"
 		xmlnsXlink="http://www.w3.org/1999/xlink"
-		width="1800"
+		width="160"
 		zoomAndPan="magnify"
 		viewBox="0 0 1350 449.999984"
-		height="600"
+		height="50"
 		preserveAspectRatio="xMidYMid meet"
 		version="1.2"
 	  >
@@ -150,8 +150,8 @@ export const LightLogo = () => {
   
 
 const DefaultLogo = () => {
-  const backgroundScheme = useAppBarBackgroundScheme();
-  const isDarkMode = backgroundScheme === 'dark';
+  const theme = useThemeCurrent();
+  const isDarkMode = theme === 'dark';
   if(isDarkMode)return <DarkLogo/>
   return <LightLogo/>
 };
