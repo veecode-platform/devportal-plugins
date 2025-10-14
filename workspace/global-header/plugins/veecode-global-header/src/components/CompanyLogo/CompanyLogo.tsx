@@ -121,7 +121,6 @@ export const CompanyLogo = ({
     'app.branding.fullLogoWidth',
   );
 
-  console.log("LOGO >>>>", logoURL)
   return (
     <Box
       data-testid="global-header-company-logo"
