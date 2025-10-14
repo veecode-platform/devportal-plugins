@@ -38,8 +38,6 @@ import { CompanyLogo } from '../components/CompanyLogo/CompanyLogo';
 import { HelpDropdown } from '../components/HeaderDropdownComponent/HelpDropdown';
 import { ToggleThemeButton } from '../components/ToggleThemeButton/ToggleThemeButton'
 
-import { LightLogo, DarkLogo } from '../components/CompanyLogo/DefaultLogo';
-
 /**
  * default Global Header Components mount points
  *
@@ -52,11 +50,7 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
       config: {
         priority: 200,
         props: {
-          to: '/catalog',
-          logo: {
-            light:LightLogo,
-            dark: DarkLogo
-          }
+          to: '/catalog'
         },
       },
     },
