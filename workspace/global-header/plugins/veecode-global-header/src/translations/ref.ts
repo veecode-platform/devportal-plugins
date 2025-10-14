@@ -60,6 +60,11 @@ export const globalHeaderMessages = {
     unsupportedDismissOption:
       'Unsupported dismiss option "{{option}}", currently supported "none", "session" or "localstorage"!',
   },
+  toggleTheme: {
+    title: 'Theme',
+    tooltipLight: 'Switch to light theme',
+    tooltipDark: 'Switch to dark theme',
+  },
   create: {
     title: 'Self-service',
     registerComponent: {

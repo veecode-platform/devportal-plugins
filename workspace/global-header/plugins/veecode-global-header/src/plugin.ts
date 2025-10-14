@@ -26,8 +26,10 @@ import { MenuItemLinkProps } from './components/MenuItemLink/MenuItemLink';
 import { SoftwareTemplatesSectionProps } from './components/HeaderDropdownComponent/SoftwareTemplatesSection';
 import { RegisterAComponentSectionProps } from './components/HeaderDropdownComponent/RegisterAComponentSection';
 import { CreateDropdownProps } from './components/HeaderDropdownComponent/CreateDropdown';
-import { SupportButtonProps } from './plugin';
 import { ProfileDropdownProps } from './components/HeaderDropdownComponent/ProfileDropdown';
+import { SupportButtonProps } from './plugin';
+import { HelpDropdownProps } from './components/HeaderDropdownComponent/HelpDropdown';
+import { globalHeaderTranslationRef } from './translations';
 
 export type { GlobalHeaderComponentProps } from './components/GlobalHeaderComponent';
 
@@ -35,6 +37,8 @@ export type { HeaderButtonProps } from './components/HeaderButton/HeaderButton';
 export type { HeaderIconProps } from './components/HeaderIcon/HeaderIcon';
 export type { HeaderIconButtonProps } from './components/HeaderIconButton/HeaderIconButton';
 export type { CreateDropdownProps } from './components/HeaderDropdownComponent/CreateDropdown';
+export type { ProfileDropdownProps } from './components/HeaderDropdownComponent/ProfileDropdown';
+export type { HelpDropdownProps } from './components/HeaderDropdownComponent/HelpDropdown';
 
 export type { MenuItemLinkProps } from './components/MenuItemLink/MenuItemLink';
 export type { MenuItemConfig } from './components/HeaderDropdownComponent/MenuSection';
@@ -63,8 +67,6 @@ export type {
 
 export { defaultGlobalHeaderComponentsMountPoints } from './defaultMountPoints/defaultMountPoints';
 
-console.log('[veecode-global-header] Initializing plugin');
-
 /**
  * Global Header Plugin
  *
@@ -72,7 +74,11 @@ console.log('[veecode-global-header] Initializing plugin');
  */
 export const globalHeaderPlugin = createPlugin({
   id: 'global-header',
-});
+  __experimentalTranslations: {
+    availableLanguages: ['en', 'de', 'es', 'fr', 'it'],
+    resources: [globalHeaderTranslationRef],
+  },
+} as any);
 
 /**
  * Global Header
@@ -150,6 +156,21 @@ export const HeaderIconButton = globalHeaderPlugin.provide(
 );
 
 /**
+ * @public
+ */
+export const ToggleThemeButton = globalHeaderPlugin.provide(
+  createComponentExtension({
+    name: 'ToggleThemeButton',
+    component: {
+      lazy: () =>
+        import('./components/ToggleThemeButton/ToggleThemeButton').then(
+          m => m.ToggleThemeButton,
+        ),
+    },
+  }),
+);
+
+/**
  * Search Component
  *
  * @public
@@ -197,6 +218,24 @@ export const ProfileDropdown: ComponentType<ProfileDropdownProps> =
         lazy: () =>
           import('./components/HeaderDropdownComponent/ProfileDropdown').then(
             m => m.ProfileDropdown,
+          ),
+      },
+    }),
+  );
+
+/**
+ * Help Dropdown
+ *
+ * @public
+ */
+export const HelpDropdown: ComponentType<HelpDropdownProps> =
+  globalHeaderPlugin.provide(
+    createComponentExtension({
+      name: 'HelpDropdown',
+      component: {
+        lazy: () =>
+          import('./components/HeaderDropdownComponent/HelpDropdown').then(
+            m => m.HelpDropdown,
           ),
       },
     }),
@@ -304,21 +343,6 @@ export const Divider = globalHeaderPlugin.provide(
 /**
  * @public
  */
-export const ToggleThemeButton = globalHeaderPlugin.provide(
-  createComponentExtension({
-    name: 'ToggleThemeButton',
-    component: {
-      lazy: () =>
-        import('./components/ToggleThemeButton/ToggleThemeButton').then(
-          m => m.ToggleThemeButton,
-        ),
-    },
-  }),
-);
-
-/**
- * @public
- */
 export const SupportButton: ComponentType<SupportButtonProps> =
   globalHeaderPlugin.provide(
     createComponentExtension({
@@ -382,6 +406,23 @@ export const StarredDropdown = globalHeaderPlugin.provide(
 );
 
 /**
+ * Application Launcher Dropdown
+ *
+ * @public
+ */
+export const ApplicationLauncherDropdown = globalHeaderPlugin.provide(
+  createComponentExtension({
+    name: 'ApplicationLauncherDropdown',
+    component: {
+      lazy: () =>
+        import(
+          './components/HeaderDropdownComponent/ApplicationLauncherDropdown'
+        ).then(m => m.ApplicationLauncherDropdown),
+    },
+  }),
+);
+
+/**
  * Company Logo
  *
  * @public
@@ -395,3 +436,10 @@ export const CompanyLogo = globalHeaderPlugin.provide(
     },
   }),
 );
+
+/**
+ * Translation resource for the global header plugin
+ *
+ * @public
+ */
+export { globalHeaderTranslations } from './translations';
