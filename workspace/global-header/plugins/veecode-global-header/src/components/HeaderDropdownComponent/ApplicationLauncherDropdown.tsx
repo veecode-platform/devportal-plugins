@@ -51,6 +51,7 @@ export const ApplicationLauncherDropdown = () => {
         label: mp.config?.props?.title,
         labelKey: mp.config?.props?.titleKey,
         link: mp.config?.props?.link,
+        type: mp.config?.props?.type,
         external: mp.config?.props?.external ?? false,
         priority: mp.config?.priority ?? 0,
       });

@@ -18,6 +18,7 @@ import { configApiRef, useApiHolder } from '@backstage/core-plugin-api';
 import { Link } from '@backstage/core-components';
 import MenuItem from '@mui/material/MenuItem';
 import { MenuItemLink } from '../MenuItemLink/MenuItemLink';
+import { IconByType } from '../RenderIconByType/RenderIconByType';
 import { CSSProperties } from 'react';
 import { useTranslation } from '../../hooks/useTranslation';
 import { translateWithFallback } from '../../utils/translationUtils';
@@ -31,6 +32,7 @@ export interface SupportButtonProps {
   titleKey?: string;
   to?: string;
   tooltip?: string;
+  type?: IconByType;
   style?: CSSProperties;
   onClick?: () => void;
 }
@@ -41,8 +43,9 @@ export const SupportButton = ({
   title = 'Support',
   titleKey = 'help.supportTitle',
   to,
-  icon = 'support',
+  icon,
   tooltip,
+  type,
   style,
   onClick = () => {},
 }: SupportButtonProps) => {
@@ -69,6 +72,7 @@ export const SupportButton = ({
         to={supportUrl}
         title={displayTitle}
         icon={icon}
+        type={type}
         tooltip={tooltip}
       />
     </MenuItem>

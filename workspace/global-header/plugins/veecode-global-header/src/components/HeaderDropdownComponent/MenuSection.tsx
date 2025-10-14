@@ -21,6 +21,7 @@ import Box from '@mui/material/Box';
 import MenuItem, { MenuItemProps } from '@mui/material/MenuItem';
 import { Link } from '@backstage/core-components';
 import { MenuItemLinkProps } from '../MenuItemLink/MenuItemLink';
+import { IconByType } from '../RenderIconByType/RenderIconByType';
 import ListSubheader from '@mui/material/ListSubheader';
 import { useTranslation } from '../../hooks/useTranslation';
 
@@ -37,6 +38,7 @@ export interface MenuItemConfig {
   subLabel?: string;
   subLabelKey?: string;
   link?: string;
+  type?: IconByType;
 }
 
 export interface MenuSectionConfig {
@@ -110,7 +112,7 @@ export const MenuSection: FC<MenuSectionConfig> = ({
 
       {items.map(
         (
-          { icon, label, labelKey, subLabel, subLabelKey, link, Component },
+          { icon, label, labelKey, subLabel, subLabelKey, link, type, Component },
           index,
         ) => (
           <MenuItem
@@ -129,6 +131,7 @@ export const MenuSection: FC<MenuSectionConfig> = ({
               titleKey={labelKey}
               subTitle={subLabel}
               subTitleKey={subLabelKey}
+              type={type}
               onClick={handleClose}
             />
           </MenuItem>

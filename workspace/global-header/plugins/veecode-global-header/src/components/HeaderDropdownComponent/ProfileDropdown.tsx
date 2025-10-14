@@ -150,6 +150,7 @@ export const ProfileDropdown = ({ layout }: ProfileDropdownProps) => {
           Component: mp.Component,
           label: translatedTitle,
           link,
+          type,
           priority: mp.config?.priority ?? 0,
           ...(icon && { icon }),
         };

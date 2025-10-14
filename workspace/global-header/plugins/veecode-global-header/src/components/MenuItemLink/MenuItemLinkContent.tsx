@@ -19,16 +19,20 @@ import Box from '@mui/material/Box';
 import { HeaderIcon } from '../HeaderIcon/HeaderIcon';
 import { useTheme } from '@mui/material/styles';
 import LaunchIcon from '@mui/icons-material/Launch';
+import { MenuItemLinkType } from './MenuItemLink';
+import { RenderIconByType } from '../RenderIconByType/RenderIconByType';
 
 interface MenuItemLinkContentProps {
   icon?: string;
   label?: string;
+  type?: MenuItemLinkType;
   subLabel?: string;
   isExternalLink?: boolean;
 }
 
 export const MenuItemLinkContent: FC<MenuItemLinkContentProps> = ({
   icon,
+  type,
   label,
   subLabel,
   isExternalLink = false,
@@ -65,6 +69,22 @@ export const MenuItemLinkContent: FC<MenuItemLinkContentProps> = ({
                 : {}
             }
           />
+        )}
+        {type && (
+          <Box
+            sx={{
+              marginRight: '0.5rem',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              color:
+                theme.palette.mode === 'dark'
+                  ? theme.palette.text.primary
+                  : theme.palette.text.disabled,
+            }}
+          >
+            {RenderIconByType(type)}
+          </Box>
         )}
         <Box
           sx={{

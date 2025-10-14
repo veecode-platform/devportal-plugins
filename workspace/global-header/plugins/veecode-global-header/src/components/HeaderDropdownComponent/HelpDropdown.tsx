@@ -113,6 +113,7 @@ export const HelpDropdown = ({ layout }: HelpDropdownProps) => {
           icon: mp.config?.props?.icon,
           label: mp.config?.props?.title,
           link: mp.config?.props?.link,
+          type: mp.config?.props?.type,
           tooltip: mp.config?.props?.tooltip,
           style: mp.config?.style,
           priority: mp.config?.priority ?? 0,
