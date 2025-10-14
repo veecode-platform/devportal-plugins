@@ -13,6 +13,9 @@ dynamicPlugins:
             priority: 200
             props:
               to: '/'
+              logo:
+                dark: https://veecode-platform.github.io/support/logos/logo.svg
+                light: https://veecode-platform.github.io/support/logos/logo-black.svg
 
         - mountPoint: global.header/component
           importName: SearchComponent

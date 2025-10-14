@@ -15,3 +15,7 @@
  */
 
 export { useDropdownManager } from './useDropdownManager';
+export { useTranslation } from './useTranslation';
+export { useLanguage } from './useLanguage';
+export { useThemeCurrent } from './useThemeCurrent';
+export { useAppBarBackgroundScheme } from './useAppBarBackgroundScheme';

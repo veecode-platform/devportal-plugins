@@ -50,7 +50,10 @@ const globalHeaderTranslationEs = createTranslationMessages({
     'notifications.title': 'Notificaciones',
     'notifications.unsupportedDismissOption':
       'Opción de descarte no compatible "{{option}}", actualmente compatible "none", "session" o "localstorage"!',
-    'create.title': 'Autoservicio',
+    'toggleTheme.title': 'Tema',
+    'toggleTheme.tooltipLight': 'Cambiar al tema claro',
+    'toggleTheme.tooltipDark': 'Cambiar al tema oscuro',
+      'create.title': 'Autoservicio',
     'create.registerComponent.title': 'Registrar un componente',
     'create.registerComponent.subtitle': 'Importarlo a la página de catálogo',
     'create.templates.sectionTitle': 'Usar una plantilla',

@@ -24,12 +24,20 @@ declare module '@backstage/config' {
          * Base64 URI for the full logo
          * @visibility frontend
          */
-        fullLogo?: string;
-        /**
-         * Base64 URI for the full log DarkMode
-         * @visibility frontend
-         */
-        fullLogoDarkMode?: string;
+        fullLogo?:
+        | string
+        | {
+            /**
+             * Base64 URI for the logo in light theme
+             * @visibility frontend
+             */
+            light: string;
+            /**
+             * Base64 URI for the logo in dark theme
+             * @visibility frontend
+             */
+            dark: string;
+          };
         /**
          *  Width
          * @visibility frontend
