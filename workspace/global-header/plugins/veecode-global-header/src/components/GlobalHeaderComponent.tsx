@@ -18,9 +18,10 @@ import { useMemo } from 'react';
 
 import { ErrorBoundary } from '@backstage/core-components';
 
-import { GlobalHeaderComponentMountPoint } from '../types';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
+
+import { GlobalHeaderComponentMountPoint } from '../types';
 
 /**
  * Global Header Component properties

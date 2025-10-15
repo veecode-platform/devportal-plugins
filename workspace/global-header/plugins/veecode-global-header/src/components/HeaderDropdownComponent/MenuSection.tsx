@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+import { Fragment } from 'react';
 import type { ComponentType, FC } from 'react';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import MenuItem, { MenuItemProps } from '@mui/material/MenuItem';
 import { Link } from '@backstage/core-components';
 import { MenuItemLinkProps } from '../MenuItemLink/MenuItemLink';
+import { IconByType } from '../RenderIconByType/RenderIconByType';
 import ListSubheader from '@mui/material/ListSubheader';
 import { useTranslation } from '../../hooks/useTranslation';
 
@@ -31,9 +33,12 @@ import { useTranslation } from '../../hooks/useTranslation';
 export interface MenuItemConfig {
   Component: ComponentType<MenuItemLinkProps | MenuItemProps | {}>;
   label: string;
+  labelKey?: string;
   icon?: string;
   subLabel?: string;
+  subLabelKey?: string;
   link?: string;
+  type?: IconByType;
 }
 
 export interface MenuSectionConfig {
@@ -72,9 +77,8 @@ export const MenuSection: FC<MenuSectionConfig> = ({
           }}
           disableRipple
           disableTouchRipple
-          // component={hasClickableSubheader ? Link : Fragment}
-          // to={optionalLink}
-          {...(hasClickableSubheader && { component: Link, to: optionalLink })}
+          component={hasClickableSubheader ? Link : Fragment}
+          to={optionalLink}
           onClick={handleClose}
         >
           <ListSubheader
@@ -106,26 +110,33 @@ export const MenuSection: FC<MenuSectionConfig> = ({
         </MenuItem>
       )}
 
-      {items.map(({ icon, label, subLabel, link, Component }, index) => (
-        <MenuItem
-          key={`menu-item-${index.toString()}`}
-          disableRipple
-          disableTouchRipple
-          onClick={handleClose}
-          sx={{ py: 0.5 }}
-          // component={link ? Link : Fragment}
-          // to={link}
-          {...(link && { component: Link, to: link })}
-        >
-          <Component
-            icon={icon}
-            to={link!}
-            title={label}
-            subTitle={subLabel}
+      {items.map(
+        (
+          { icon, label, labelKey, subLabel, subLabelKey, link, type, Component },
+          index,
+        ) => (
+          <MenuItem
+            key={`menu-item-${index.toString()}`}
+            disableRipple
+            disableTouchRipple
             onClick={handleClose}
-          />
-        </MenuItem>
-      ))}
+            sx={{ py: 0.5 }}
+            component={link ? Link : Fragment}
+            to={link}
+          >
+            <Component
+              icon={icon}
+              to={link!}
+              title={label}
+              titleKey={labelKey}
+              subTitle={subLabel}
+              subTitleKey={subLabelKey}
+              type={type}
+              onClick={handleClose}
+            />
+          </MenuItem>
+        ),
+      )}
       {!hideDivider && <Divider sx={{ my: 0.5 }} />}
     </>
   );

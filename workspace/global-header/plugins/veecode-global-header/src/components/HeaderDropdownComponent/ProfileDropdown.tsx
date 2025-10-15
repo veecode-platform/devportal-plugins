@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useUserProfile } from '@backstage/plugin-user-settings';
 import { useApi } from '@backstage/core-plugin-api';
@@ -27,11 +27,12 @@ import Typography from '@mui/material/Typography';
 import { lighten } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 
-import { MenuSection } from './MenuSection';
+import { MenuItemConfig, MenuSection } from './MenuSection';
 import { HeaderDropdownComponent } from './HeaderDropdownComponent';
 import { useProfileDropdownMountPoints } from '../../hooks/useProfileDropdownMountPoints';
 import { useDropdownManager } from '../../hooks';
 import { useTranslation } from '../../hooks/useTranslation';
+import { translateWithFallback } from '../../utils/translationUtils';
 
 /**
  * @public
@@ -42,7 +43,6 @@ export interface ProfileDropdownProps {
 }
 
 export const ProfileDropdown = ({ layout }: ProfileDropdownProps) => {
-  console.log('ProfileDropdown rendering started');
   const { anchorEl, handleOpen, handleClose } = useDropdownManager();
   const [user, setUser] = useState<string | null>();
   const [profileLink, setProfileLink] = useState<string | null>();
@@ -57,11 +57,9 @@ export const ProfileDropdown = ({ layout }: ProfileDropdownProps) => {
 
   const profileDropdownMountPoints = useProfileDropdownMountPoints();
 
-  // const headerRef = useRef<HTMLElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
   const [bgColor, setBgColor] = useState('#3C3F42');
-  const [userEntityStatus, setUserEntityStatus] = useState<'idle' | 'loading' | 'found' | 'missing'>('idle');
 
-  /*
   useEffect(() => {
     if (headerRef.current) {
       const computedStyle = window.getComputedStyle(headerRef.current);
@@ -69,84 +67,97 @@ export const ProfileDropdown = ({ layout }: ProfileDropdownProps) => {
       setBgColor(lighten(baseColor, 0.2));
     }
   }, []);
-  */
 
   useEffect(() => {
-    const container = document.getElementById('global-header') as HTMLElement | null;
+    const container = document.getElementById('global-header');
     if (container) {
-      const baseColor = window.getComputedStyle(container).backgroundColor;
+      const computedStyle = window.getComputedStyle(container);
+      const baseColor = computedStyle.backgroundColor;
       setBgColor(lighten(baseColor, 0.2));
     }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
     const fetchUserEntity = async () => {
-      if (!backstageIdentity?.userEntityRef) {
-        setUser(null);
-        setProfileLink(null);
-        setUserEntityStatus('missing');
-        return;
-      }
-      setUserEntityStatus('loading');
+      let userProfile;
+      let profileUrl: string | null = null;
+
       try {
-        const { namespace = 'default', name } = parseEntityRef(backstageIdentity.userEntityRef);
-        const profileUrl = `/catalog/${namespace}/user/${name}`;
-        const userProfile = (await catalogApi.getEntityByRef(backstageIdentity.userEntityRef)) as unknown as UserEntity | undefined;
-        if (!cancelled && userProfile) {
-            setUser(userProfile?.spec?.profile?.displayName ?? userProfile?.metadata?.title ?? null);
-            setProfileLink(profileUrl);
-            setUserEntityStatus('found');
-        } else if (!cancelled) {
-            setUser(null);
-            setProfileLink(null);
-            setUserEntityStatus('missing');
-        }
-      } catch {
-        if (!cancelled) {
+        if (backstageIdentity?.userEntityRef) {
+          const { namespace = 'default', name } = parseEntityRef(
+            backstageIdentity.userEntityRef,
+          );
+          profileUrl = `/catalog/${namespace}/user/${name}`;
+
+          userProfile = (await catalogApi.getEntityByRef(
+            backstageIdentity.userEntityRef,
+          )) as unknown as UserEntity;
+          setUser(
+            userProfile?.spec?.profile?.displayName ??
+              userProfile?.metadata?.title,
+          );
+          setProfileLink(profileUrl);
+        } else {
           setUser(null);
           setProfileLink(null);
-          setUserEntityStatus('missing');
         }
+      } catch (err) {
+        // User entity doesn't exist in catalog (e.g., guest user)
+        setUser(null);
+        setProfileLink(null);
       }
     };
+
     fetchUserEntity();
-    return () => { cancelled = true; };
   }, [backstageIdentity, catalogApi]);
 
-  const isGuestUser = useMemo(() => {
-    if (userEntityStatus === 'loading') return false; // suppress flicker
-    const ref = backstageIdentity?.userEntityRef ?? '';
-    // Match ":guest" or "/guest" at end (namespace/userName or entityRef tail)
-    const explicitGuest = /(^|[/:])guest$/i.test(ref);
-    return explicitGuest || userEntityStatus === 'missing';
-  }, [backstageIdentity, userEntityStatus]);
-
   const menuItems = useMemo(() => {
+    // Check if user is a guest (guest user has userEntityRef like "user:development/guest" or "user:default/guest")
+    const isGuestUser =
+      backstageIdentity?.userEntityRef?.includes('/guest') ||
+      profileLink === null;
+
     return (profileDropdownMountPoints ?? [])
       .map(mp => {
-        const { title = '', icon = '', link: staticLink = '', type = '' } = mp.config?.props ?? {};
-        const isMyProfile = type === 'myProfile';
-        const link = isMyProfile ? (profileLink || '') : staticLink;
+        const {
+          title = '',
+          titleKey = '',
+          icon = '',
+          link: staticLink = '',
+          type = '',
+        } = mp.config?.props ?? {};
+        // The title fallbacks are to be backward compatibility with older versions
+        // of the global-header configuration if a customer has customized it.
+        const isMyProfile =
+          type === 'myProfile' ||
+          title === 'profile.myProfile' ||
+          title === 'My profile';
+        const link = isMyProfile ? profileLink ?? '' : staticLink;
 
-        if (isMyProfile && isGuestUser) return null;
-        if (!link && title && !isMyProfile) return null;
+        // Hide "My Profile" for guest users or when user doesn't exist in catalog
+        if (isMyProfile && isGuestUser) {
+          return null;
+        }
 
-        const translatedTitle = title?.includes('.') ? (t(title as any, {}) || title) : title;
+        // Hide items without links (but allow "My Profile" to pass through for authenticated users)
+        if (!link && title && !isMyProfile) {
+          return null;
+        }
+
+        const translatedTitle = translateWithFallback(t, titleKey, title);
 
         return {
           Component: mp.Component,
           label: translatedTitle,
           link,
+          type,
           priority: mp.config?.priority ?? 0,
           ...(icon && { icon }),
         };
       })
-      .filter(Boolean)
-      .sort((a, b) => (b!.priority ?? 0) - (a!.priority ?? 0));
-  }, [profileDropdownMountPoints, profileLink, isGuestUser, t]);
-
-  console.log('isGuestUser stable:', isGuestUser, userEntityStatus);
+      .filter((item: MenuItemConfig) => item !== null)
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  }, [profileDropdownMountPoints, profileLink, backstageIdentity, t]);
 
   if (menuItems.length === 0) {
     return null;

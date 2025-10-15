@@ -25,10 +25,11 @@ import { globalHeaderTranslationRef } from './ref';
 export const globalHeaderTranslations = createTranslationResource({
   ref: globalHeaderTranslationRef,
   translations: {
-    // de: () => import('./de'),
+    de: () => import('./de'),
     es: () => import('./es'),
-    // fr: () => import('./fr'),
-    // it: () => import('./it'),
+    fr: () => import('./fr'),
+    it: () => import('./it'),
+    pt: () => import('./pt'),
   },
 });
 

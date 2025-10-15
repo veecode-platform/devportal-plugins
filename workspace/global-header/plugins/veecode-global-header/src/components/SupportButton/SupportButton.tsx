@@ -18,7 +18,10 @@ import { configApiRef, useApiHolder } from '@backstage/core-plugin-api';
 import { Link } from '@backstage/core-components';
 import MenuItem from '@mui/material/MenuItem';
 import { MenuItemLink } from '../MenuItemLink/MenuItemLink';
+import { IconByType } from '../RenderIconByType/RenderIconByType';
 import { CSSProperties } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
+import { translateWithFallback } from '../../utils/translationUtils';
 
 /**
  * @public
@@ -26,23 +29,32 @@ import { CSSProperties } from 'react';
 export interface SupportButtonProps {
   icon?: string;
   title?: string;
+  titleKey?: string;
   to?: string;
   tooltip?: string;
+  type?: IconByType;
   style?: CSSProperties;
+  onClick?: () => void;
 }
 /**
  * @public
  */
 export const SupportButton = ({
   title = 'Support',
+  titleKey = 'help.supportTitle',
   to,
-  icon = 'support',
+  icon,
   tooltip,
+  type,
   style,
+  onClick = () => {},
 }: SupportButtonProps) => {
   const apiHolder = useApiHolder();
   const config = apiHolder.get(configApiRef);
-  const supportUrl = to ?? config?.app?.support?.url;
+  const { t } = useTranslation();
+
+  const displayTitle = translateWithFallback(t, titleKey, title);
+  const supportUrl = to ?? config?.getOptionalString('app.support.url');
 
   if (!supportUrl) {
     return null;
@@ -53,12 +65,14 @@ export const SupportButton = ({
       to={supportUrl}
       component={Link}
       sx={{ width: '100%', color: 'inherit', ...style }}
+      onClick={onClick}
       data-testid="support-button"
     >
       <MenuItemLink
         to={supportUrl}
-        title={title}
+        title={displayTitle}
         icon={icon}
+        type={type}
         tooltip={tooltip}
       />
     </MenuItem>

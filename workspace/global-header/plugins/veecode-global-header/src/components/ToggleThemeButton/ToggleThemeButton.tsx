@@ -3,6 +3,7 @@ import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import { appThemeApiRef, useApi } from '@backstage/core-plugin-api';
 import { IconButtonComponent } from './IconButtonComponent';
+import { useTranslation } from '../../hooks/useTranslation';
 
 import type { CSSProperties } from 'react';
 
@@ -10,17 +11,25 @@ import type { CSSProperties } from 'react';
  * @public
  */
 export interface ToggleThemeProps {
+  title?: string;
+  tooltipLight?: string;
+  tooltipDark?: string;
   layout?: CSSProperties;
 }
 
-export const ToggleThemeButton = ({ layout }: ToggleThemeProps)  => {
-  console.log('ToggleTheme rendering started');
+export const ToggleThemeButton = ({ title, tooltipLight, tooltipDark, layout }: ToggleThemeProps)  => {
+  const { t } = useTranslation();
+  
+  const displayTitle = title || t('toggleTheme.title');
+  const displayTooltipLight = tooltipLight || t('toggleTheme.tooltipLight');
+  const displayTooltipDark = tooltipDark || t('toggleTheme.tooltipDark');
+  
   const appThemeApi = useApi(appThemeApiRef);
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
-  const tooltipTitle = isDarkMode
-    ? 'Select theme Light Theme'
-    : 'Select theme Dark Theme';
+  const tooltip = isDarkMode
+    ? displayTooltipLight
+    : displayTooltipDark
   const themeIds = appThemeApi.getInstalledThemes();
 
   const handleSetTheme = (
@@ -38,10 +47,10 @@ export const ToggleThemeButton = ({ layout }: ToggleThemeProps)  => {
 
   return (
     <IconButtonComponent
-      title={tooltipTitle}
+      title={tooltip}
       handleClick={handleSetTheme}
       color="inherit"
-      label="Toggle-theme"
+      label={displayTitle}
       layout={layout}
     >
       {isDarkMode ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}

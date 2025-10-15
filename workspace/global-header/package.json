@@ -1,6 +1,6 @@
 {
   "name": "root",
-  "version": "1.0.0",
+  "version": "2.7.8",
   "private": true,
   "engines": {
     "node": "20 || 22"
@@ -20,7 +20,10 @@
     "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
-    "new": "backstage-cli new"
+    "new": "backstage-cli new",
+    "update": "yarn backstage-cli versions:bump",
+    "update-backstage": "backstage-cli versions:bump --pattern '@{backstage,roadiehq,backstage-community}/*'",
+    "check-updates": "yarn upgrade-interactive"
   },
   "workspaces": {
     "packages": [

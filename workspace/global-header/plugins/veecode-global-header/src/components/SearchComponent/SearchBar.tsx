@@ -96,6 +96,9 @@ export const SearchBar = (props: SearchBarProps) => {
               '& [class*="MuiAutocomplete-clearIndicator"]': {
                 visibility: query?.term ? 'visible' : 'hidden',
               },
+              borderRadius: '8px',
+              border: `1px solid ${theme.palette.grey[700]}`,
+              padding: '0 .2rem'
             }}
             filterOptions={x => x}
             onKeyDown={event => {

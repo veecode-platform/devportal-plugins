@@ -20,19 +20,34 @@ import {
   useApi,
 } from '@backstage/core-plugin-api';
 
+import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
+
 import { MenuItemLinkContent } from '../MenuItemLink/MenuItemLinkContent';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export const LogoutButton = () => {
   const errorApi = useApi(errorApiRef);
   const identityApi = useApi(identityApiRef);
+  const { t } = useTranslation();
 
   const handleLogout = () => {
     identityApi.signOut().catch(error => errorApi.post(error));
   };
 
   return (
-    <div onClick={handleLogout} style={{ cursor: 'pointer', width: '100%' }}>
-      <MenuItemLinkContent icon="logout" label="Sign out" />
-    </div>
+    <>
+      <Divider />
+      <MenuItem
+        onClick={handleLogout}
+        sx={{
+          cursor: 'pointer',
+          width: '100%',
+          color: 'inherit',
+        }}
+      >
+        <MenuItemLinkContent icon="logout" label={t('profile.signOut')} />
+      </MenuItem>
+    </>
   );
 };

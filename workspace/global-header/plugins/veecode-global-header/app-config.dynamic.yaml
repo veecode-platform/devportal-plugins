@@ -1,24 +1,28 @@
 dynamicPlugins:
   frontend:
+    default.main-menu-items:
+      menuItems:
+        default.create:
+          title: ""
     veecode-platform.plugin-veecode-global-header:
       mountPoints:
         - mountPoint: application/header
           importName: GlobalHeader
           config:
             position: above-sidebar # above-main-content | above-sidebar
-
         - mountPoint: global.header/component
           importName: CompanyLogo
           config:
             priority: 200
             props:
-              to: '/'
-
+              to: "/"
+              logo:
+                light: https://veecode-platform.github.io/support/logos/logo-black.svg
+                dark: https://veecode-platform.github.io/support/logos/logo.svg
         - mountPoint: global.header/component
           importName: SearchComponent
           config:
             priority: 100
-
         - mountPoint: global.header/component
           importName: Spacer
           config:
@@ -31,9 +35,15 @@ dynamicPlugins:
           config:
             priority: 90
             props:
-              title: Create...
+              title: Self-service
+              titleKey: create.title
               icon: add
               to: create
+
+        - mountPoint: global.header/component
+          importName: ToggleThemeButton
+          config:
+            priority: 87
 
         - mountPoint: global.header/component
           importName: StarredDropdown
@@ -52,7 +62,8 @@ dynamicPlugins:
             priority: 150
             props:
               title: Developer Hub
-              icon: developerHub
+              titleKey: applicationLauncher.developerHub
+              type: doc
               link: https://docs.redhat.com/en/documentation/red_hat_developer_hub
 
         - mountPoint: global.header/application-launcher
@@ -62,7 +73,8 @@ dynamicPlugins:
             priority: 100
             props:
               title: RHDH Local
-              icon: developerHub
+              titleKey: applicationLauncher.rhdhLocal
+              type: "extension"
               link: https://github.com/redhat-developer/rhdh-local
 
         - mountPoint: global.header/component
@@ -71,44 +83,41 @@ dynamicPlugins:
             priority: 80
 
         - mountPoint: global.header/help
-          importName: QuickstartButton
-          config:
-            priority: 100
-
-        - mountPoint: global.header/help
           importName: SupportButton
           config:
             priority: 10
+            props:
+              type: support
 
         - mountPoint: global.header/component
           importName: NotificationButton
           config:
             priority: 70
-
-        - mountPoint: global.header/component
-          importName: ToggleThemeButton
-          config:
-            priority: 75
-
         - mountPoint: global.header/component
           importName: Divider
           config:
             priority: 50
-
         - mountPoint: global.header/component
           importName: ProfileDropdown
           config:
             priority: 10
-
         - mountPoint: global.header/profile
           importName: MenuItemLink
           config:
             priority: 100
             props:
               title: Settings
+              titleKey: profile.settings
               link: /settings
-              icon: manageAccounts
-
+              type: settings
+        - mountPoint: global.header/profile
+          importName: MenuItemLink
+          config:
+            priority: 90
+            props:
+              title: My profile
+              titleKey: profile.myProfile
+              type: user
         - mountPoint: global.header/profile
           importName: LogoutButton
           config:

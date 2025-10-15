@@ -18,13 +18,13 @@ import { Link } from '@backstage/core-components';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
 import DefaultLogo from './DefaultLogo';
 import Box from '@mui/material/Box';
-import { useAppBarBackgroundScheme } from '../../hooks/useAppBarBackgroundScheme';
+import { useThemeCurrent } from '@veecode-platform/plugin-veecode-global-header/src/hooks';
 
 const LogoRender = ({
   base64Logo,
   defaultLogo,
-  width = 120,
-  height = 32,
+  width = 160,
+  height = 50,
 }: {
   base64Logo: string | undefined;
   defaultLogo: JSX.Element;
@@ -90,24 +90,22 @@ export interface CompanyLogoProps {
  * Gets a themed image based on the current theme.
  */
 const useFullLogo = (logo: LogoURLs): string | undefined => {
-  const appBarBackgroundScheme = useAppBarBackgroundScheme();
-
+  const theme = useThemeCurrent();
   const configApi = useApi(configApiRef);
 
   /** The fullLogo config specified by app.branding.fullLogo */
-  // const fullLogo = configApi.getOptional<LogoURLs>('app.branding.fullLogo');
-  const fullLogo = configApi.app?.branding?.fullLogo;
+  const fullLogo = theme === "light" ? configApi.getOptional<LogoURLs>('app.branding.fullLogo.light') : configApi.getOptional<LogoURLs>('app.branding.fullLogo.dark');
 
   /** The URI of the logo specified by app.branding.fullLogo */
   const fullLogoURI =
     typeof fullLogo === 'string'
       ? fullLogo
-      : fullLogo?.[appBarBackgroundScheme];
+      : fullLogo?.[theme];
 
   /** The URI of the logo specified by CompanyLogo props */
   const propsLogoURI =
-    typeof logo === 'string' ? logo : logo?.[appBarBackgroundScheme];
-
+    typeof logo === 'string' ? logo : logo?.[theme];
+ 
   return propsLogoURI ?? fullLogoURI ?? undefined;
 };
 
@@ -119,10 +117,10 @@ export const CompanyLogo = ({
 }: CompanyLogoProps) => {
   const logoURL = useFullLogo(logo);
   const configApi = useApi(configApiRef);
-  // const fullLogoWidth = configApi.getOptional<number | string>(
-  //  'app.branding.fullLogoWidth',
-  // );
-  const fullLogoWidth = configApi.app?.branding?.fullLogo; // TODO
+  const fullLogoWidth = configApi.getOptional<number | string>(
+    'app.branding.fullLogoWidth',
+  );
+
   return (
     <Box
       data-testid="global-header-company-logo"

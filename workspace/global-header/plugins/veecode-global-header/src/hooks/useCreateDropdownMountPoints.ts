@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//import { defaultCreateDropdownMountPoints } from '../defaultMountPoints/defaultMountPoints';
+import { defaultCreateDropdownMountPoints } from '../defaultMountPoints/defaultMountPoints';
 import { CreateDropdownMountPoint, ScalprumState } from '../types';
 import { useScalprum } from '@scalprum/react-core';
 
@@ -27,9 +27,9 @@ export const useCreateDropdownMountPoints = ():
     scalprum?.api?.dynamicRootConfig?.mountPoints?.['global.header/create'];
 
   // default profile dropdown components for dev env
-  //if (Object.keys(scalprum?.api || {}).length === 0) {
-  //  return defaultCreateDropdownMountPoints;
-  //}
+  if (Object.keys(scalprum?.api || {}).length === 0) {
+    return defaultCreateDropdownMountPoints;
+  }
 
   return createDropdownMountPoints ?? [];
 };

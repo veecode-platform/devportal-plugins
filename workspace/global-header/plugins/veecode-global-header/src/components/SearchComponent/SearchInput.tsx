@@ -51,8 +51,6 @@ export const SearchInput = ({
       sx={{
         input: { color: 'inherit' },
         button: { color: 'inherit' },
-        borderRadius: 1,
-        backgroundColor: 'rgba(255,255,255,0.05)',
         '& fieldset': { border: 'none' },
       }}
     />

@@ -12,34 +12,31 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
  */
-
-/*
- * This file has been modified by Veecode Platform to define a default
- * behaviour for the Global Header when linked statically.
- * 
- * Modifications are also licensed under the Apache License, Version 2.0.
- */
-
-import type { ComponentType } from 'react';
+import type { CSSProperties, ComponentType } from 'react';
+import { LogoutButton } from '../components/LogoutButton/LogoutButton';
+import { CreateDropdown } from '../components/HeaderDropdownComponent/CreateDropdown';
+import { ProfileDropdown } from '../components/HeaderDropdownComponent/ProfileDropdown';
 import { RegisterAComponentSection } from '../components/HeaderDropdownComponent/RegisterAComponentSection';
 import { SoftwareTemplatesSection } from '../components/HeaderDropdownComponent/SoftwareTemplatesSection';
+import { SearchComponent } from '../components/SearchComponent/SearchComponent';
+import { SupportButton } from '../components/SupportButton/SupportButton';
 import {
+  ApplicationLauncherDropdownMountPoint,
   CreateDropdownMountPoint,
   GlobalHeaderComponentMountPoint,
+  HelpDropdownMountPoint,
   ProfileDropdownMountPoint,
 } from '../types';
-import { Divider } from '../components/Divider/Divider';
-import { CompanyLogo } from '../components/CompanyLogo/CompanyLogo';
 import { NotificationButton } from '../components/NotificationButton/NotificationButton';
-import { StarredDropdown } from '../components/HeaderDropdownComponent/StarredDropdown';
-import { ToggleThemeButton } from '../components/ToggleThemeButton/ToggleThemeButton';
+import { Divider } from '../components/Divider/Divider';
 import { MenuItemLink } from '../components/MenuItemLink/MenuItemLink';
-import { LogoutButton } from '../components/LogoutButton/LogoutButton';
-import { ProfileDropdown } from '../components/HeaderDropdownComponent/ProfileDropdown';
-import { SearchComponent } from '../components/SearchComponent/SearchComponent';
 import { Spacer } from '../components/Spacer/Spacer';
+import { StarredDropdown } from '../components/HeaderDropdownComponent/StarredDropdown';
+import { ApplicationLauncherDropdown } from '../components/HeaderDropdownComponent/ApplicationLauncherDropdown';
+import { CompanyLogo } from '../components/CompanyLogo/CompanyLogo';
+import { HelpDropdown } from '../components/HeaderDropdownComponent/HelpDropdown';
+import { ToggleThemeButton } from '../components/ToggleThemeButton/ToggleThemeButton'
 
 /**
  * default Global Header Components mount points
@@ -48,6 +45,15 @@ import { Spacer } from '../components/Spacer/Spacer';
  */
 export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMountPoint[] =
   [
+    {
+      Component: CompanyLogo,
+      config: {
+        priority: 200,
+        props: {
+          to: '/catalog'
+        },
+      },
+    },
     {
       Component: SearchComponent,
       config: {
@@ -63,53 +69,54 @@ export const defaultGlobalHeaderComponentsMountPoints: GlobalHeaderComponentMoun
         },
       },
     },
+    // Notice: 1.5 ships with a Create link instead of a dropdown!!!
     {
-      Component: CompanyLogo,
+      Component: CreateDropdown,
       config: {
-        priority: 200,
-        props: {
-          to: '/catalog',
-          // logo: {
-          //   light: 'https://veecode-platform.github.io/support/logos/logo.svg',
-          //   dark: 'https://veecode-platform.github.io/support/logos/logo-black.svg',
-          // },
-        },
-      },
-    },
-    {
-      Component: Divider,
-      config: {
-        priority: 55, // the greater the number, the more to the left it will be
-        props: {
-          growFactor: 0,
-        },
-      },
-    },
-    {
-      Component: NotificationButton,
-      config: {
-        priority: 60, // the greater the number, the more to the left it will be
-        props: {
-          growFactor: 0,
-        },
+        priority: 90,
+        layout: {
+          display: {
+            sm: 'none',
+            md: 'block',
+          },
+          mr: 1.5,
+        } as any as CSSProperties, // I don't used MUI v5 specific `sx` types here to allow us changing the implementation later
       },
     },
     {
       Component: StarredDropdown,
       config: {
-        priority: 70, // the greater the number, the more to the left it will be
-        props: {
-          growFactor: 0,
-        },
+        priority: 85,
+      },
+    },
+    {
+      Component: ApplicationLauncherDropdown,
+      config: {
+        priority: 82,
+      },
+    },
+    {
+      Component: HelpDropdown,
+      config: {
+        priority: 80,
+      },
+    },
+    {
+      Component: NotificationButton,
+      config: {
+        priority: 70,
       },
     },
     {
       Component: ToggleThemeButton,
       config: {
-        priority: 75, // the greater the number, the more to the left it will be
-        props: {
-          growFactor: 0,
-        },
+        priority: 75, 
+      },
+    },
+    {
+      Component: Divider,
+      config: {
+        priority: 50,
       },
     },
     {
@@ -141,9 +148,10 @@ export const defaultProfileDropdownMountPoints: ProfileDropdownMountPoint[] = [
     config: {
       priority: 200,
       props: {
-        title: 'profile.settings',
-        icon: 'profile',
+        title: 'Settings',
+        titleKey: 'profile.settings',
         link: '/settings',
+        type: 'settings',
       },
     },
   },
@@ -152,8 +160,8 @@ export const defaultProfileDropdownMountPoints: ProfileDropdownMountPoint[] = [
     config: {
       priority: 150,
       props: {
-        title: 'profile.myProfile',
-        icon: 'person',
+        title: 'My profile',
+        titleKey: 'profile.myProfile',
         type: 'myProfile', // Semantic identifier
       },
     },
@@ -165,3 +173,57 @@ export const defaultProfileDropdownMountPoints: ProfileDropdownMountPoint[] = [
     },
   },
 ];
+
+export const defaultHelpDropdownMountPoints: HelpDropdownMountPoint[] = [
+  {
+    Component: MenuItemLink as ComponentType,
+    config: {
+      priority: 100,
+      props: {
+        title: 'Quick start',
+        titleKey: 'help.quickStart',
+        type: 'extension',
+        link: 'https://docs.redhat.com/en/documentation/red_hat_developer_hub/latest/',
+      },
+    },
+  },
+  {
+    Component: SupportButton,
+    config: {
+      priority: 10,
+      props: {
+        type: 'support',
+      },
+    },
+  },
+];
+
+export const defaultApplicationLauncherDropdownMountPoints: ApplicationLauncherDropdownMountPoint[] =
+  [
+    {
+      Component: MenuItemLink as ComponentType,
+      config: {
+        section: 'applicationLauncher.sections.documentation',
+        priority: 150,
+        props: {
+          title: 'Developer Hub',
+          titleKey: 'applicationLauncher.developerHub',
+          type: 'extension',
+          link: 'https://docs.redhat.com/en/documentation/red_hat_developer_hub',
+        },
+      },
+    },
+    {
+      Component: MenuItemLink as ComponentType,
+      config: {
+        section: 'applicationLauncher.sections.developerTools',
+        priority: 130,
+        props: {
+          title: 'RHDH Local',
+          titleKey: 'applicationLauncher.rhdhLocal',
+          type: 'extension',
+          link: 'https://github.com/redhat-developer/rhdh-local',
+        },
+      },
+    },
+  ];

@@ -15,34 +15,51 @@
  */
 
 import Tooltip from '@mui/material/Tooltip';
+import { useTranslation } from '../../hooks/useTranslation';
 import { MenuItemLinkContent } from './MenuItemLinkContent';
+import { translateWithFallback } from '../../utils/translationUtils';
+import { IconByType } from '../RenderIconByType/RenderIconByType';
 
 /**
  * Header Icon Button properties
  * @public
  */
+export type MenuItemLinkType = IconByType;
 export interface MenuItemLinkProps {
   to: string;
   title?: string;
+  titleKey?: string;
   subTitle?: string;
+  subTitleKey?: string;
   icon?: string;
+  type?:  MenuItemLinkType;
   tooltip?: string;
 }
 
 export const MenuItemLink = ({
   to,
   title,
+  titleKey,
   subTitle,
+  subTitleKey,
   icon,
+  type,
   tooltip,
 }: MenuItemLinkProps) => {
-  const isExternalLink = to.startsWith('http://') || to.startsWith('https://');
+  const { t } = useTranslation();
+  const isExternalLink = Boolean(
+    to && (to.startsWith('http://') || to.startsWith('https://')),
+  );
+ 
+  const translatedTitle = translateWithFallback(t, titleKey, title);
+  const translatedSubTitle = translateWithFallback(t, subTitleKey, subTitle);
 
   const headerLinkContent = () => (
     <MenuItemLinkContent
       icon={icon}
-      label={title}
-      subLabel={subTitle}
+      type={type}
+      label={translatedTitle}
+      subLabel={translatedSubTitle}
       isExternalLink={isExternalLink}
     />
   );

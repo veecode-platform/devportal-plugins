@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /*
  * Copyright Red Hat, Inc.
  *
@@ -28,6 +27,7 @@ import Typography from '@mui/material/Typography';
 
 import { MenuSection } from './MenuSection';
 import { MenuItemLink } from '../MenuItemLink/MenuItemLink';
+import { useTranslation } from '../../hooks/useTranslation';
 
 /**
  * Software Templates Section properties
@@ -44,6 +44,7 @@ export const SoftwareTemplatesSection = ({
   hideDivider,
 }: SoftwareTemplatesSectionProps) => {
   const catalogApi = useApi(catalogApiRef);
+  const { t } = useTranslation();
 
   const [entities, setEntities] = useState<Entity[]>([]);
   // TODO: handle loading
@@ -58,7 +59,7 @@ export const SoftwareTemplatesSection = ({
           limit: 7,
         });
         setEntities(response.items);
-      } catch (err: any) {
+      } catch (err) {
         setError(err);
       } finally {
         setLoading(false);
@@ -82,7 +83,7 @@ export const SoftwareTemplatesSection = ({
     return (
       <Box display="flex" justifyContent="center" alignItems="center" p={2}>
         <Typography variant="body1" color="error">
-          Error fetching templates
+          {t('create.templates.errorFetching')}
         </Typography>
       </Box>
     );
@@ -95,7 +96,7 @@ export const SoftwareTemplatesSection = ({
           variant="body2"
           sx={{ mx: 2, my: 1, color: 'text.disabled' }}
         >
-          No templates available
+          {t('create.templates.noTemplatesAvailable')}
         </Typography>
         {!hideDivider && <Divider sx={{ my: 0.5 }} />}
       </>
@@ -104,9 +105,9 @@ export const SoftwareTemplatesSection = ({
   return (
     <MenuSection
       hideDivider={hideDivider}
-      sectionLabel="Use a template"
+      sectionLabel={t('create.templates.sectionTitle')}
       optionalLink="/create"
-      optionalLinkLabel="All templates"
+      optionalLinkLabel={t('create.templates.allTemplates')}
       items={items}
       handleClose={handleClose}
     />
