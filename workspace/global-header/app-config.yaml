@@ -9,16 +9,14 @@ backend:
   # Used for enabling authentication, secret is shared by all backend plugins
   # See https://backstage.io/docs/auth/service-to-service-auth for
   # information on the format
-  # auth:
-  #   keys:
-  #     - secret: ${BACKEND_SECRET}
   baseUrl: http://localhost:7007
   listen:
     port: 7007
     # Uncomment the following host directive to bind to specific interfaces
     # host: 127.0.0.1
   auth:
-    secret: mysecret
+    keys:
+      - secret: mysecret
     dangerouslyDisableDefaultAuthPolicy: true
     externalAccess:
       - type: static

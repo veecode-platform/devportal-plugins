@@ -13,10 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * This file has been modified by Veecode Platform to define a default
+ * logo to replace the original from Red Hat.
+ * 
+ * Modifications are also licensed under the Apache License, Version 2.0.
+ */
 import type { CSSProperties } from 'react';
 import { Link } from '@backstage/core-components';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
-import DefaultLogo from './DefaultLogo';
+// import DefaultLogo from './DefaultLogo';
+import DefaultLogo from './DefaultVeeCodeLogo';
 import Box from '@mui/material/Box';
 import { useThemeCurrent } from '@veecode-platform/plugin-veecode-global-header/src/hooks';
 

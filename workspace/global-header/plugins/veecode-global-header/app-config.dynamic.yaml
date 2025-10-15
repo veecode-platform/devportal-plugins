@@ -16,9 +16,10 @@ dynamicPlugins:
             priority: 200
             props:
               to: "/"
-              logo:
-                light: https://veecode-platform.github.io/support/logos/logo-black.svg
-                dark: https://veecode-platform.github.io/support/logos/logo.svg
+              # commented to use default logo (VeeCode)
+              #logo:
+              #  light: https://veecode-platform.github.io/support/logos/logo-black.svg
+              #  dark: https://veecode-platform.github.io/support/logos/logo.svg
         - mountPoint: global.header/component
           importName: SearchComponent
           config:

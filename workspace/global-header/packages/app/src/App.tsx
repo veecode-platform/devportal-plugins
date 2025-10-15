@@ -40,9 +40,11 @@ import { SignalsDisplay } from '@backstage/plugin-signals';
 import { UnifiedThemeProvider, themes as builtinThemes } from '@backstage/theme';
 import { ToolboxPage, Tool } from '@drodil/backstage-plugin-toolbox';
 import { BackstageIcons } from './components/toolbox/BackstageIcons';
+import { globalHeaderTranslations } from '@veecode-platform/plugin-veecode-global-header';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ProfileIcon from '@mui/icons-material/ManageAccounts';
 import PersonIcon from '@mui/icons-material/Person';
+import Category from '@mui/icons-material/CategoryOutlined';
 
 const app = createApp({
   apis,
@@ -52,6 +54,11 @@ const app = createApp({
     logout: LogoutIcon,
     profile: ProfileIcon,
     person: PersonIcon,
+    category: Category,
+  },
+  __experimentalTranslations: {
+    availableLanguages: ['en', 'de', 'es', 'fr', 'it', 'pt'],
+    resources: [globalHeaderTranslations],
   },
   bindRoutes({ bind }) {
     bind(catalogPlugin.externalRoutes, {

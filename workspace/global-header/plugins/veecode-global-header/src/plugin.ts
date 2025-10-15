@@ -75,7 +75,7 @@ export { defaultGlobalHeaderComponentsMountPoints } from './defaultMountPoints/d
 export const globalHeaderPlugin = createPlugin({
   id: 'global-header',
   __experimentalTranslations: {
-    availableLanguages: ['en', 'de', 'es', 'fr', 'it'],
+    availableLanguages: ['en', 'de', 'es', 'fr', 'it', 'pt'],
     resources: [globalHeaderTranslationRef],
   },
 } as any);

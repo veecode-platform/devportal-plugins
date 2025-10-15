@@ -49,7 +49,7 @@ export const SoftwareTemplatesSection = ({
   const [entities, setEntities] = useState<Entity[]>([]);
   // TODO: handle loading
   const [_loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     const fetchEntities = async () => {
@@ -60,7 +60,7 @@ export const SoftwareTemplatesSection = ({
         });
         setEntities(response.items);
       } catch (err) {
-        setError(err);
+        setError(err as Error);
       } finally {
         setLoading(false);
       }

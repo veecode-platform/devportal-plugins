@@ -76,6 +76,24 @@ make copy-all-dynamic-plugins
 
 It was becoming increasingly hard to manage too many separate repositories for all DevPortal plugins. This monorepo approach allows us to enforce consistency across plugins, streamline maintenance, and simplify the development and onboarding process.
 
+## Using a private registry
+
+You can run a local Verdaccio registry to validate this process locally:
+
+```bash
+verdaccio -l 0.0.0.0:4873
+```
+
+To use it globally create a `~/.yarnrc.yml` file:
+
+```yaml
+npmRegistryServer: "http://localhost:4873/"
+
+unsafeHttpWhitelist:
+  - "localhost"
+  - "127.0.0.1"
+```
+
 ## Notes
 
 This repository was created based on previous work by Red Hat. It is organized in the same way as the [Red Hat Developer Hub plugins](https://github.com/redhat-developer/rhdh-plugins) repository.
