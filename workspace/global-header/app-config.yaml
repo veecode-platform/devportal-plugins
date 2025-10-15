@@ -2,6 +2,15 @@ app:
   title: Scaffolded Backstage App
   baseUrl: http://localhost:3000
 
+  #branding:
+  #  fullLogo: https://veecode-platform.github.io/support/logos/logo.svg
+  #  fullLogoDark: https://veecode-platform.github.io/support/logos/logo-black.svg
+  #  fullLogo:
+  #    light: https://veecode-platform.github.io/support/logos/logo-black.svg
+  #    dark: https://veecode-platform.github.io/support/logos/logo.svg
+  #  iconLogo: https://veecode-platform.github.io/support/logos/logo-mobile.png
+  #  fullLogoWidth: 150
+
 organization:
   name: My Company
 

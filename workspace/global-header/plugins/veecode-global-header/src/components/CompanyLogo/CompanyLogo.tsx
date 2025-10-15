@@ -101,19 +101,25 @@ const useFullLogo = (logo: LogoURLs): string | undefined => {
   const configApi = useApi(configApiRef);
 
   /** The fullLogo config specified by app.branding.fullLogo */
-  const fullLogo = theme === "light" ? configApi.getOptional<LogoURLs>('app.branding.fullLogo.light') : configApi.getOptional<LogoURLs>('app.branding.fullLogo.dark');
+  const fullLogo = configApi.getOptional<LogoURLs>('app.branding.fullLogo');
+  
+  /** The dark theme logo config specified by app.branding.fullLogoDark */
+  const fullLogoDark = configApi.getOptional<string>('app.branding.fullLogoDark');
 
   /** The URI of the logo specified by app.branding.fullLogo */
   const fullLogoURI =
     typeof fullLogo === 'string'
       ? fullLogo
       : fullLogo?.[theme];
+  
+  /** Use fullLogoDark for dark theme if available, otherwise fall back to fullLogoURI */
+  const configLogoURI = theme === 'dark' && fullLogoDark ? fullLogoDark : fullLogoURI;
 
   /** The URI of the logo specified by CompanyLogo props */
   const propsLogoURI =
     typeof logo === 'string' ? logo : logo?.[theme];
  
-  return propsLogoURI ?? fullLogoURI ?? undefined;
+  return propsLogoURI ?? configLogoURI ?? undefined;
 };
 
 export const CompanyLogo = ({
