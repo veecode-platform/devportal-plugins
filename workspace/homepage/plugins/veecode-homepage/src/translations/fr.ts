@@ -17,27 +17,27 @@
 import { createTranslationMessages } from '@backstage/core-plugin-api/alpha';
 import { homepageTranslationRef } from './ref';
 
-const homepageTranslationPt = createTranslationMessages({
+const homepageTranslationFr = createTranslationMessages({
   ref: homepageTranslationRef,
   messages: {
-    'greeting.welcome': 'Bem-vindo de volta',
-    'greeting.subtitle': 'Vamos começar.',
-    'summary.title': 'Resumo',
-    'summary.resources': 'Recursos',
-    'summary.components': 'Componentes',
+    'greeting.welcome': 'Bon retour',
+    'greeting.subtitle': 'Commençons.',
+    'summary.title': 'Résumé',
+    'summary.resources': 'Ressources',
+    'summary.components': 'Composants',
     'summary.apis': 'APIs',
-    'highlightedCard.title': 'Adicionar novos recursos',
-    'highlightedCard.createButton': 'Criar',
-    'toolkit.docs': 'Documentação',
-    'toolkit.community': 'Comunidade',
-    'toolkit.website': 'Site',
-    'toolkit.support': 'Suporte',
-    'visitedCharts.title': 'Mais Visitados',
+    'highlightedCard.title': 'Ajouter de nouvelles fonctionnalités',
+    'highlightedCard.createButton': 'Créer',
+    'toolkit.docs': 'Documentation',
+    'toolkit.community': 'Communauté',
+    'toolkit.website': 'Site web',
+    'toolkit.support': 'Support',
+    'visitedCharts.title': 'Les plus visités',
     'visitedCharts.total': 'Total',
-    'recentlyVisited.title': 'Visitados Recentemente',
-    'starredEntities.title': 'Suas Entidades Favoritas',
-    'footer.poweredBy': 'Construído com',
+    'recentlyVisited.title': 'Récemment visités',
+    'starredEntities.title': 'Vos entités favorites',
+    'footer.poweredBy': 'Propulsé par',
   },
 });
 
-export default homepageTranslationPt;
+export default homepageTranslationFr;

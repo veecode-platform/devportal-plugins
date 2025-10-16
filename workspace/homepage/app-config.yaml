@@ -24,7 +24,11 @@ organization:
 i18n:
   locales:
     - en
-    - pt      # add the locales you want exposed in Settings
+    - pt
+    # - de
+    # - es
+    # - fr
+    # - it
   defaultLocale: en
   
 backend:

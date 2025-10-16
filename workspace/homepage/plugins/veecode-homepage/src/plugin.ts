@@ -38,7 +38,7 @@ export const veecodeHomepagePlugin = createPlugin({
     }),
   ],
   __experimentalTranslations: {
-    availableLanguages: ['en', 'pt'],
+    availableLanguages: ['en', 'de', 'es', 'fr', 'it', 'pt'],
     resources: [homepageTranslationRef],
   },
 } as any);

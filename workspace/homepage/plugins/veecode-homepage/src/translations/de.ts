@@ -17,27 +17,27 @@
 import { createTranslationMessages } from '@backstage/core-plugin-api/alpha';
 import { homepageTranslationRef } from './ref';
 
-const homepageTranslationPt = createTranslationMessages({
+const homepageTranslationDe = createTranslationMessages({
   ref: homepageTranslationRef,
   messages: {
-    'greeting.welcome': 'Bem-vindo de volta',
-    'greeting.subtitle': 'Vamos começar.',
-    'summary.title': 'Resumo',
-    'summary.resources': 'Recursos',
-    'summary.components': 'Componentes',
+    'greeting.welcome': 'Willkommen zurück',
+    'greeting.subtitle': 'Lass uns anfangen.',
+    'summary.title': 'Zusammenfassung',
+    'summary.resources': 'Ressourcen',
+    'summary.components': 'Komponenten',
     'summary.apis': 'APIs',
-    'highlightedCard.title': 'Adicionar novos recursos',
-    'highlightedCard.createButton': 'Criar',
-    'toolkit.docs': 'Documentação',
-    'toolkit.community': 'Comunidade',
-    'toolkit.website': 'Site',
-    'toolkit.support': 'Suporte',
-    'visitedCharts.title': 'Mais Visitados',
-    'visitedCharts.total': 'Total',
-    'recentlyVisited.title': 'Visitados Recentemente',
-    'starredEntities.title': 'Suas Entidades Favoritas',
-    'footer.poweredBy': 'Construído com',
+    'highlightedCard.title': 'Neue Funktionen hinzufügen',
+    'highlightedCard.createButton': 'Erstellen',
+    'toolkit.docs': 'Dokumentation',
+    'toolkit.community': 'Community',
+    'toolkit.website': 'Webseite',
+    'toolkit.support': 'Support',
+    'visitedCharts.title': 'Meistbesuchte',
+    'visitedCharts.total': 'Gesamt',
+    'recentlyVisited.title': 'Kürzlich besucht',
+    'starredEntities.title': 'Ihre markierten Entitäten',
+    'footer.poweredBy': 'Bereitgestellt von',
   },
 });
 
-export default homepageTranslationPt;
+export default homepageTranslationDe;
