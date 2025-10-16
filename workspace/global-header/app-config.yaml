@@ -14,6 +14,12 @@ app:
 organization:
   name: My Company
 
+i18n:
+  locales:
+    - en
+    - pt      # add the locales you want exposed in Settings
+  defaultLocale: en
+  
 backend:
   # Used for enabling authentication, secret is shared by all backend plugins
   # See https://backstage.io/docs/auth/service-to-service-auth for

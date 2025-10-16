@@ -7,10 +7,12 @@ import { useUserProfile } from '@backstage/plugin-user-settings';
 import Skeleton from '@mui/material/Skeleton';
 import { useEffect, useState } from 'react';
 import WavesImg from '../../assets/waves.svg';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export const HomeGreeting = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const { displayName } = useUserProfile();
+  const { t } = useTranslation();
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
   const configApi = useApi(configApiRef);
@@ -87,7 +89,7 @@ export const HomeGreeting = () => {
           }}
         >
           <Typography variant="h3" color="#FAFAFA">
-            Welcome back
+            {t('greeting.welcome')}
             {loading ? (
               <Skeleton
                 variant="rectangular"
@@ -100,7 +102,7 @@ export const HomeGreeting = () => {
             )}{' '}
           </Typography>
           <Typography variant="h6" color="#FAFAFA">
-            Let's get started.
+            {t('greeting.subtitle')}
           </Typography>
         </Box>
       </Box>

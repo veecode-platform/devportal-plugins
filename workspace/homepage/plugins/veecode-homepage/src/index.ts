@@ -1,1 +1,3 @@
-export { veecodeHomepagePlugin, VeecodeHomepagePage } from './plugin';
+export * from './plugin';
+
+export * from './alpha';

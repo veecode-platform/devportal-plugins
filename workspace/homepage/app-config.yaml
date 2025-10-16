@@ -2,8 +2,8 @@ app:
   title: Scaffolded Backstage App
   baseUrl: http://localhost:3000
   branding:
-    fullLogo: https://veecode-platform.github.io/support/logos/logo.svg
-    fullLogoDark: https://veecode-platform.github.io/support/logos/logo-black.svg
+    #fullLogo: https://veecode-platform.github.io/support/logos/logo.svg
+    #fullLogoDark: https://veecode-platform.github.io/support/logos/logo-black.svg
     iconLogo: https://veecode-platform.github.io/support/logos/logo-mobile.png
     fullLogoWidth: 150
     theme:
@@ -21,6 +21,12 @@ app:
 organization:
   name: My Company
 
+i18n:
+  locales:
+    - en
+    - pt      # add the locales you want exposed in Settings
+  defaultLocale: en
+  
 backend:
   # Used for enabling authentication, secret is shared by all backend plugins
   # See https://backstage.io/docs/auth/service-to-service-auth for

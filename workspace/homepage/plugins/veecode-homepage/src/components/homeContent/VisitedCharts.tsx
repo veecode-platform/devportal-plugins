@@ -14,6 +14,7 @@ import { useApi, configApiRef } from '@backstage/core-plugin-api';
 import { useVisited } from '../../hooks/useVisited';
 import { generateColorVariants } from '../../utils/generateColor';
 import TurnedInNotIcon from '@mui/icons-material/TurnedInNot';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface StyledTextProps {
   variant: 'primary' | 'secondary';
@@ -81,6 +82,7 @@ function PieCenterLabel({ primaryText, secondaryText }: PieCenterLabelProps) {
 
 export default function VisitedCharts() {
   const { total, items, visits } = useVisited();
+  const { t } = useTranslation();
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
   const configApi = useApi(configApiRef);
@@ -108,7 +110,7 @@ export default function VisitedCharts() {
         overfloyY: 'auto',
       }}
     >
-      <CardHeader title="Top Visited" />
+      <CardHeader title={t('visitedCharts.title')} />
       <Divider />
       <CardContent>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -133,7 +135,7 @@ export default function VisitedCharts() {
             width={260}
             hideLegend
           >
-            <PieCenterLabel primaryText={`${total}`} secondaryText="Total" />
+            <PieCenterLabel primaryText={`${total}`} secondaryText={t('visitedCharts.total')} />
           </PieChart>
         </Box>
       </CardContent>

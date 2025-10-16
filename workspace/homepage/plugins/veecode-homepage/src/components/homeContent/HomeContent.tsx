@@ -16,27 +16,30 @@ import SupportLogo from '../../assets/Support';
 import BackstageLogo from '../../assets/backstage.png';
 import PieAnimation from './VisitedCharts';
 import Summary from './Summary';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export const HomeContent = () => {
+  const { t } = useTranslation();
+  
   const tools = [
     {
       url: 'https://docs.platform.vee.codes/',
-      label: 'Docs',
+      label: t('toolkit.docs'),
       icon: <DocsLogo />,
     },
     {
       url: 'https://github.com/orgs/veecode-platform/discussions',
-      label: 'Community',
+      label: t('toolkit.community'),
       icon: <Communitylogo />,
     },
     {
       url: 'https://platform.vee.codes/',
-      label: 'Website',
+      label: t('toolkit.website'),
       icon: <WebsiteLogo />,
     },
     {
       url: 'https://veecode-suporte.freshdesk.com/support/login',
-      label: 'Support',
+      label: t('toolkit.support'),
       icon: <SupportLogo />,
     },
   ];
@@ -54,10 +57,10 @@ export const HomeContent = () => {
                     <Summary />
                   </Grid>
                   <Grid item xs={12} md={12} lg={12}>
-                    <HomePageRecentlyVisited />
+                    <HomePageRecentlyVisited title={t('recentlyVisited.title')} />
                   </Grid>
                   <Grid item xs={12} md={12} lg={12}>
-                    <HomePageStarredEntities />
+                    <HomePageStarredEntities title={t('starredEntities.title')} />
                   </Grid>
                 </Grid>
               </Grid>
@@ -90,7 +93,7 @@ export const HomeContent = () => {
                   fontWeight: 'bold',
                 }}
               >
-                Powered by
+                {t('footer.poweredBy')}
               </Typography>
               <img
                 src={BackstageLogo}

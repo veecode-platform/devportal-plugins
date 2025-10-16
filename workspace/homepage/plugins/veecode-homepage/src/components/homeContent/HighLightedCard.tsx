@@ -6,9 +6,11 @@ import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import Box from '@mui/material/Box';
 import { LinkButton } from '@backstage/core-components';
 import { useTheme } from '@mui/material/styles';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export default function HighlightedCard() {
   const theme = useTheme();
+  const { t } = useTranslation();
   return (
     <Card
       variant="outlined"
@@ -42,7 +44,7 @@ export default function HighlightedCard() {
             gutterBottom
             sx={{ fontWeight: '600' }}
           >
-            Add new features
+            {t('highlightedCard.title')}
           </Typography>
         </Box>
         <Box
@@ -54,7 +56,7 @@ export default function HighlightedCard() {
         >
           <LinkButton variant="contained" to="/create">
             {' '}
-            <AddIcon /> Create
+            <AddIcon /> {t('highlightedCard.createButton')}
           </LinkButton>
         </Box>
       </CardContent>

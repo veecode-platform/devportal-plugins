@@ -12,9 +12,11 @@ import ExtensionIcon from '@mui/icons-material/Extension';
 import { useTheme } from '@mui/material/styles';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
 import { generateColorVariants } from '../../utils/generateColor';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export default function Summary() {
   const { resources, apis, components } = useCatalog();
+  const { t } = useTranslation();
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
   const configApi = useApi(configApiRef);
@@ -22,17 +24,17 @@ export default function Summary() {
   const data = [
     {
       icon: AutoAwesomeMotionIcon,
-      title: 'Resources',
+      title: t('summary.resources'),
       value: resources.length.toString(),
     },
     {
       icon: FolderCopyIcon,
-      title: 'Components',
+      title: t('summary.components'),
       value: components.length.toString(),
     },
     {
       icon: ExtensionIcon,
-      title: 'APIs',
+      title: t('summary.apis'),
       value: apis.length.toString(),
     },
   ];
@@ -56,7 +58,7 @@ export default function Summary() {
         overfloyY: 'auto',
       }}
     >
-      <CardHeader title="Summary" />
+      <CardHeader title={t('summary.title')} />
       <Divider />
       <CardContent>
         <Box

@@ -39,13 +39,17 @@ import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
 import { getAllThemes } from '@red-hat-developer-hub/backstage-plugin-theme';
 
-import { VeecodeHomepagePage } from '@veecode-platform/plugin-veecode-homepage';
+import { VeecodeHomepagePage, homepageTranslations } from '@veecode-platform/plugin-veecode-homepage';
 import { MUI4TestPage } from '@red-hat-developer-hub/backstage-plugin-mui4-test';
 import { MUI5TestPage } from '@red-hat-developer-hub/backstage-plugin-mui5-test';
 
 const app = createApp({
   apis,
   themes: getAllThemes(),
+  __experimentalTranslations: {
+    availableLanguages: ['en', 'pt'],
+    resources: [homepageTranslations],
+  },
   bindRoutes({ bind }) {
     bind(catalogPlugin.externalRoutes, {
       createComponent: scaffolderPlugin.routes.root,

@@ -15,6 +15,7 @@ import {
 } from '@backstage/plugin-home';
 
 import { rootRouteRef } from './routes';
+import { homepageTranslationRef } from './translations';
 
 console.log('[veecode-homepage] Initializing plugin');
 
@@ -36,7 +37,11 @@ export const veecodeHomepagePlugin = createPlugin({
       },
     }),
   ],
-});
+  __experimentalTranslations: {
+    availableLanguages: ['en', 'pt'],
+    resources: [homepageTranslationRef],
+  },
+} as any);
 
 export const VeecodeHomepagePage = veecodeHomepagePlugin.provide(
   createRoutableExtension({
@@ -48,3 +53,10 @@ export const VeecodeHomepagePage = veecodeHomepagePlugin.provide(
     mountPoint: rootRouteRef,
   }),
 );
+
+/**
+ * Translation resource for the veecode-homepage plugin
+ *
+ * @public
+ */
+export { homepageTranslations } from './translations';
