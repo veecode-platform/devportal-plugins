@@ -1,3 +1,4 @@
+import { SelectChangeEvent } from "@mui/material/Select";
 import { WorkflowDispatchParameters } from "../../utils/types";
 
 export type EnvironmentFieldProps = {
@@ -6,7 +7,7 @@ export type EnvironmentFieldProps = {
     value: string | null;
     defaultValue: string | boolean;
     required: boolean;
-    onSelect: (event: React.ChangeEvent<{ name?: string | undefined; value: unknown;}>) => void,
+    onSelect: (event: SelectChangeEvent<any>) => void,
     onTouch: (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement, Element>, required: boolean) => void
   }
 

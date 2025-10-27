@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 import {
-  configApiRef,
   ApiBlueprint,
   createApiFactory,
+  discoveryApiRef,
 } from '@backstage/frontend-plugin-api';
-import { scmAuthApiRef } from '@backstage/integration-react';
 import { githubWorkflowsApiRef, GithubWorkflowsClient } from '../api';
 
 /**
@@ -28,9 +27,9 @@ export const githubWorkflowsApi = ApiBlueprint.make({
   params: {
     factory: createApiFactory({
       api: githubWorkflowsApiRef,
-      deps: { configApi: configApiRef, scmAuthApi: scmAuthApiRef },
-      factory: ({ configApi, scmAuthApi }) =>
-        new GithubWorkflowsClient({ configApi, scmAuthApi }),
+      deps: { discoveryApi: discoveryApiRef },
+      factory: ({ discoveryApi }) =>
+        new GithubWorkflowsClient({ discoveryApi }),
     }),
   },
 });

@@ -20,7 +20,7 @@ export async function createRouter({
     hostname: z.string(),
     githubRepoSlug: z.string(),
     branch: z.string(),
-    filter: z.array(z.string()).optional(),
+    filter: z.string().optional().transform(val => val ? val.split(',') : undefined),
   });
 
   const repoSchema = z.object({
@@ -45,30 +45,35 @@ export async function createRouter({
   const listJobsSchema = z.object({
     hostname: z.string(),
     githubRepoSlug: z.string(),
-    id: z.number(),
-    pageSize: z.number().optional(),
-    page: z.number().optional(),
+    id: z.coerce.number(),
+    pageSize: z.coerce.number().optional(),
+    page: z.coerce.number().optional(),
   });
 
   const getWorkflowRunSchema = z.object({
     hostname: z.string(),
     githubRepoSlug: z.string(),
-    runId: z.number(),
+    runId: z.coerce.number(),
   });
 
   const downloadLogsSchema = z.object({
     hostname: z.string(),
     githubRepoSlug: z.string(),
-    jobId: z.number(),
+    jobId: z.coerce.number(),
   });
 
   // GET /gh-workflows/workflows
   router.get('/workflows', async (req, res) => {
+    console.log('[Backend Router] GET /workflows - Query params:', req.query);
+    
     const parsed = listWorkflowsSchema.safeParse(req.query);
     if (!parsed.success) {
+      console.error('[Backend Router] Validation error:', parsed.error);
       throw new InputError(parsed.error.toString());
     }
 
+    console.log('[Backend Router] Parsed data:', parsed.data);
+    
     const result = await githubWorkflowsService.listWorkflows(
       parsed.data.hostname,
       parsed.data.githubRepoSlug,
@@ -76,6 +81,7 @@ export async function createRouter({
       parsed.data.filter,
     );
 
+    console.log('[Backend Router] Returning result with', result?.length || 0, 'workflows');
     res.json(result);
   });
 
@@ -109,8 +115,8 @@ export async function createRouter({
     res.json(result);
   });
 
-  // POST /gh-workflows/start
-  router.post('/start', async (req, res) => {
+  // POST /gh-workflows/start-workflow
+  router.post('/start-workflow', async (req, res) => {
     const parsed = startWorkflowSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new InputError(parsed.error.toString());
@@ -127,8 +133,8 @@ export async function createRouter({
     res.json({ status: result });
   });
 
-  // POST /gh-workflows/stop
-  router.post('/stop', async (req, res) => {
+  // POST /gh-workflows/stop-workflow
+  router.post('/stop-workflow', async (req, res) => {
     const parsed = stopWorkflowSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new InputError(parsed.error.toString());
@@ -161,13 +167,9 @@ export async function createRouter({
     res.json(result);
   });
 
-  // GET /gh-workflows/run/:id
-  router.get('/run/:id', async (req, res) => {
-    const parsed = getWorkflowRunSchema.safeParse({
-      hostname: req.query.hostname,
-      githubRepoSlug: req.query.githubRepoSlug,
-      runId: parseInt(req.params.id, 10),
-    });
+  // GET /gh-workflows/workflow-run
+  router.get('/workflow-run', async (req, res) => {
+    const parsed = getWorkflowRunSchema.safeParse(req.query);
     if (!parsed.success) {
       throw new InputError(parsed.error.toString());
     }
@@ -181,13 +183,9 @@ export async function createRouter({
     res.json(result);
   });
 
-  // GET /gh-workflows/logs/:jobId
-  router.get('/logs/:jobId', async (req, res) => {
-    const parsed = downloadLogsSchema.safeParse({
-      hostname: req.query.hostname,
-      githubRepoSlug: req.query.githubRepoSlug,
-      jobId: parseInt(req.params.jobId, 10),
-    });
+  // GET /gh-workflows/download-logs
+  router.get('/download-logs', async (req, res) => {
+    const parsed = downloadLogsSchema.safeParse(req.query);
     if (!parsed.success) {
       throw new InputError(parsed.error.toString());
     }

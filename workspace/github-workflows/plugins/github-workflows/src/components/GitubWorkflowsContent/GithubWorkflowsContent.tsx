@@ -1,5 +1,6 @@
-import React from 'react';
-import { Button, Grid } from '@mui/material';
+import { FC, useState, useEffect } from 'react';
+import Button from '@mui/material/Button';
+import Grid from '@mui/material/Grid';
 import {
   GithubWorkflowsProvider,
   useGithuWorkflowsContext,
@@ -20,9 +21,9 @@ import WorkflowsDetails from './WorkflowsDetails/WorkflowsDetails';
 import { addWorkflows } from '../../context/state';
 import { workflowFilter } from '../../utils/helpers/filters';
 
-const WorkflowContent: React.FC<GithubWorkflowsEntityProps> = props => {
+const WorkflowContent: FC<GithubWorkflowsEntityProps> = props => {
   const { cards } = props;
-  const [loadingState, setLoadingState] = React.useState(true);
+  const [loadingState, setLoadingState] = useState(true);
   const {
     setCardsView,
     entity,
@@ -44,13 +45,13 @@ const WorkflowContent: React.FC<GithubWorkflowsEntityProps> = props => {
     await listAllWorkflows(cards ? filters : []);
   }, [entity]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setTimeout(() => {
       setLoadingState(false);
     }, 2000);
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (cards) {
       setCardsView(true);
     }
@@ -115,7 +116,7 @@ const WorkflowContent: React.FC<GithubWorkflowsEntityProps> = props => {
   );
 };
 
-export const GithubWorkflowsContent: React.FC<
+export const GithubWorkflowsContent: FC<
   GithubWorkflowsEntityProps
 > = props => {
   return (

@@ -3,7 +3,7 @@ import {
   createBackendPlugin,
 } from '@backstage/backend-plugin-api';
 import { createRouter } from './router';
-import { githubWorkflowsServiceRef } from './services';
+import { GithubWorkflowsService } from './services/GithubWorkflowsService';
 
 /**
  * githubWorkflowBackendPlugin backend plugin
@@ -17,15 +17,24 @@ export const githubWorkflowBackendPlugin = createBackendPlugin({
       deps: {
         httpAuth: coreServices.httpAuth,
         httpRouter: coreServices.httpRouter,
-        githubWorkflowsService: githubWorkflowsServiceRef,
+        config: coreServices.rootConfig,
+        logger: coreServices.logger,
       },
-      async init({ httpAuth, httpRouter, githubWorkflowsService }) {
-        httpRouter.use(
-          await createRouter({
-            httpAuth,
-            githubWorkflowsService,
-          }),
-        );
+      async init({ httpAuth, httpRouter, config, logger }) {
+        logger.info('Initializing GitHub Workflows backend plugin...');
+        
+        // Create the service instance directly
+        const githubWorkflowsService = new GithubWorkflowsService(config, logger);
+        logger.info('GitHub Workflows service created');
+        
+        const router = await createRouter({
+          httpAuth,
+          githubWorkflowsService,
+        });
+        
+        logger.info('GitHub Workflows router created, registering routes...');
+        httpRouter.use(router);
+        logger.info('GitHub Workflows backend plugin initialized successfully');
       },
     });
   },

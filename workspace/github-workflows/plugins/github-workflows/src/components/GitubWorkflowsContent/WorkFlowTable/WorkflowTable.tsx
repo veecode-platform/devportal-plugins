@@ -1,8 +1,10 @@
-import React from 'react';
+import { FC, useState, memo } from 'react';
 import { Table, TableColumn, Link } from '@backstage/core-components';
 import LanguageIcon from '@mui/icons-material/Language';
 import { WorkFlowActions } from '../WorkFlowActions';
-import { Box, Tooltip, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { WorkflowDispatchParameters } from '../../../utils/types';
 import { truncateString } from '../../../utils/helpers';
 import { useEntityAnnotations } from '../../../hooks';
@@ -22,12 +24,12 @@ import SelectBranch from '../../SelectBranch/SelectBranch';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { WorkFlowStatus } from '../WorkFlowStatus';
 
-const WorkflowTable: React.FC<WorkflowTableProps> = props => {
-  const [showModal, setShowModal] = React.useState<boolean>(false);
-  const [parametersState, setParametersState] = React.useState<
+const WorkflowTable: FC<WorkflowTableProps> = props => {
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [parametersState, setParametersState] = useState<
     WorkflowDispatchParameters[] | null
   >(null);
-  const [loading, setLoading] = React.useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const { entity } = useEntity();
   const { projectName, hostname } = useEntityAnnotations(entity as Entity);
   const navigate = useNavigate();
@@ -211,4 +213,4 @@ const WorkflowTable: React.FC<WorkflowTableProps> = props => {
   );
 };
 
-export default React.memo(WorkflowTable);
+export default memo(WorkflowTable);

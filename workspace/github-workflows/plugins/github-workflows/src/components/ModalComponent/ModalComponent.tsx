@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useEffect, ChangeEvent, FocusEvent } from 'react';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
@@ -6,7 +6,12 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import { Checkbox, FormControl, FormControlLabel, InputLabel, MenuItem, Select } from '@mui/material';
+import Checkbox from '@mui/material/Checkbox';
+import FormControl from '@mui/material/FormControl';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select, { SelectChangeEvent } from '@mui/material/Select';
 import { validateString } from '../../utils/validators';
 import { useGithuWorkflowsContext } from '../../context';
 import { useModalStyles } from './styles';
@@ -16,37 +21,42 @@ import { ModalComponentProps } from './types';
 
 export const ModalComponent = ({open, handleModal, parameters, handleStartWorkflow }:ModalComponentProps) => {
 
-   const [inputWorkflow, setInputWorkflow] = React.useState<Record<string, any>>({});
-  const [errorsState, setErrorsState] = React.useState<Record<string, boolean>>({});
+   const [inputWorkflow, setInputWorkflow] = useState<Record<string, any>>({});
+  const [errorsState, setErrorsState] = useState<Record<string, boolean>>({});
   const {modal,label,formControl,footer} = useModalStyles();
   const { setInputParams, inputsParamsState } = useGithuWorkflowsContext();
 
-  const handleChange = (event: React.ChangeEvent<{ name?: string | undefined; value: unknown; }>, required: boolean, type: string | number | boolean) : void => {
-    if(required){
-      if(type === "string" && validateString(event.target.value as string)){
-        setErrorsState({...errorsState, [event.target.name!] : true });
-        return
-      }
-      if(event.target.value === "") {
-         setErrorsState({...errorsState, [event.target.name!] : true });
-         return
-      }
-   }
+  const handleChange = (event: ChangeEvent<{ name?: string | undefined; value: unknown; }>, required: boolean, type: string | number | boolean) : void => {
     if(event){
+      // Always update the input value first
       setInputWorkflow({...inputWorkflow, [event.target.name!]: event.target.value});
+      
+      // Then validate and set error state
+      if(required){
+        if(type === "string" && validateString(event.target.value as string)){
+          setErrorsState({...errorsState, [event.target.name!] : true });
+          return;
+        }
+        if(event.target.value === "") {
+          setErrorsState({...errorsState, [event.target.name!] : true });
+          return;
+        }
+      }
+      
+      // Clear error state if validation passes
       setErrorsState({...errorsState, [event.target.name!] : false });
     }
     return;
   };
 
-  const handleStateCheckbox = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStateCheckbox = (event: ChangeEvent<HTMLInputElement>) => {
     if(event){
       const isChecked = event.target.checked;
       setInputWorkflow({ ...inputWorkflow, [event.target.name]: isChecked });
     };
   };
 
-  const touchedField = (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement, Element>, required: boolean) => {
+  const touchedField = (event: FocusEvent<HTMLInputElement | HTMLTextAreaElement, Element>, required: boolean) => {
     if (required && event.target.value === "") setErrorsState({ ...errorsState, [event.target.name!]: true })
     return;
   }
@@ -59,13 +69,13 @@ export const ModalComponent = ({open, handleModal, parameters, handleStartWorkfl
     }
   }
 
-  const handleChangeSelect = (event: React.ChangeEvent<{ name?: string | undefined; value: unknown; }>) => {
+  const handleChangeSelect = (event: SelectChangeEvent<any>) => {
    if(event){
-     setInputWorkflow({...inputWorkflow, [event.target.name!]: event.target.value})
+     setInputWorkflow({...inputWorkflow, [event.target.name]: event.target.value})
    }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const data: any = {};
     parameters.forEach(p => {
       data[p.name] = p.default;
@@ -74,7 +84,7 @@ export const ModalComponent = ({open, handleModal, parameters, handleStartWorkfl
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])  
 
-  React.useEffect(()=>{
+  useEffect(()=>{
     if (inputsParamsState) {
       setInputWorkflow(inputsParamsState)
     }

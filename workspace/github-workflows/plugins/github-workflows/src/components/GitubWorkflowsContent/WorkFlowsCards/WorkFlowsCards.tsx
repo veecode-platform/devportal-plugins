@@ -1,5 +1,12 @@
-import React from 'react';
-import { Box, Card, CardContent, CardHeader, CircularProgress, IconButton, Paper, Typography } from '@mui/material';
+import { FC, useState, useEffect, memo } from 'react';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardHeader from '@mui/material/CardHeader';
+import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
 import { WorkFlowItem } from './WorkFlowItem';
 import CachedIcon from '@mui/icons-material/Cached';
 import { StatusWorkflowEnum } from '../../../utils/enums/WorkflowListEnum';
@@ -10,9 +17,9 @@ import SelectBranch from '../../SelectBranch/SelectBranch';
 import { useGithuWorkflowsContext } from '../../../context';
 
 
-const WorkFlowCard : React.FC<CardsProps> = (props) => {
+const WorkFlowCard : FC<CardsProps> = (props) => {
 
-  const [ loading, setLoading] = React.useState<boolean>(false);
+  const [ loading, setLoading] = useState<boolean>(false);
   const {title, options, buttonRefresh,workflowsGroup,loadingComponent,info} = useWorkflowCardStyles();
   const { branch } = useGithuWorkflowsContext();
   const { items, updateData } = props;
@@ -23,7 +30,7 @@ const WorkFlowCard : React.FC<CardsProps> = (props) => {
     setTimeout(()=> setLoading(false), 1500);
   }
 
-  React.useEffect(()=>{
+  useEffect(()=>{
     updateData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[branch])
@@ -89,4 +96,4 @@ const WorkFlowCard : React.FC<CardsProps> = (props) => {
   )
 }
 
-export default React.memo(WorkFlowCard)
+export default memo(WorkFlowCard)

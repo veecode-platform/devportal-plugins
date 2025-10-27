@@ -1,360 +1,137 @@
-import { ConfigApi } from "@backstage/core-plugin-api";
-import { ScmAuthApi } from "@backstage/integration-react";
-import { Octokit, RestEndpointMethodTypes } from "@octokit/rest";
+import { DiscoveryApi } from "@backstage/core-plugin-api";
 import { GithubWorkflowsApi } from "./GithubWorkflowsApi";
-import { regexFileName } from "../utils/helpers";
-import YAML from "js-yaml"
-import { WorkflowDispatchParameters } from "../utils/types";
-import { GithubFileResponse, Options, Workflows } from "./types";
-import { StatusWorkflowEnum } from "../utils/enums/WorkflowListEnum";
-import { readGithubIntegrationConfigs } from "@backstage/integration";
+import { Options, Workflows } from "./types";
 
 
- /**
+/**
  * 
- * New implementation
+ * HTTP Client implementation - calls backend API instead of using Octokit directly
+ * All GitHub authentication is handled by the backend.
  * @public
  * 
  */ 
 
 class Client {
-  private readonly configApi: ConfigApi;
-  private readonly scmAuthApi: ScmAuthApi;
+  private readonly discoveryApi: DiscoveryApi;
 
   constructor(options: Options) {
-    this.configApi = options.configApi;
-    this.scmAuthApi = options.scmAuthApi;
+    this.discoveryApi = options.discoveryApi;
   }
 
-  private async getToken(hostname:string){
-    const { token } = await this.scmAuthApi.getCredentials({
-      url: `https://${hostname}/`,
-      additionalScope: {
-        customScopes: {
-          github: ['repo'],
-        },
-      },
-    });
-    return token
-  }
-
-  private getBaseUrl(hostname:string){
-    const configs = readGithubIntegrationConfigs(
-      this.configApi.getOptionalConfigArray('integrations.github') ?? [],
-    );
-    const githubIntegrationConfig = configs.find(v => v.host === hostname);
-    const baseUrl = githubIntegrationConfig?.apiBaseUrl;
-    return baseUrl
-  }
-
-  private async getOctokit(hostname: string = 'github.com'):Promise<Octokit>{  
-    const token = await this.getToken(hostname);
-    const baseUrl = this.getBaseUrl(hostname);
-    return new Octokit({ auth: token, baseUrl });
-
-  }
-
-  private parseRepo(githubRepoSlug:string) : {repo:string, owner: string}{
-    const parse = githubRepoSlug.split('/');
-    return {owner: parse[0], repo: parse[1]}
-  } 
-
-  async listWorkflows(hostname: string,githubRepoSlug: string, filter?: string[]): Promise<RestEndpointMethodTypes['actions']['listRepoWorkflows']['response']['data']['workflows']>{
-    const octokit = await this.getOctokit(hostname);
-    const {owner, repo} = this.parseRepo(githubRepoSlug);
-    const response = await octokit.actions.listRepoWorkflows({
-      owner,
-      repo
-    });
-    if(!filter || filter.length === 0) return response.data.workflows;
-    const filteredWorkflows = response.data.workflows.filter(workflow => 
-      filter.includes(regexFileName(workflow.path))
-    )
-    return filteredWorkflows;
-  };
-
-  async listWorkflowRuns(hostname:string, githubRepoSlug:string, branch:string):Promise<RestEndpointMethodTypes['actions']['listWorkflowRuns']['response']['data']['workflow_runs']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const response = await octokit.actions.listWorkflowRunsForRepo({
-      owner,
-      repo,
-      branch
-    });
-    return response.data.workflow_runs
-  }
-
-  async listWorkflowRunsTotalCount(hostname:string, githubRepoSlug:string, workflowId:number):Promise<RestEndpointMethodTypes['actions']['listWorkflowRuns']['response']['data']['total_count']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const response = await octokit.actions.listWorkflowRuns({
-      owner,
-      repo,
-      workflow_id: workflowId
-    });
-    return response.data.total_count
-  }
-
-  async listBranchesFromRepo(hostname: string, githubRepoSlug: string): Promise<RestEndpointMethodTypes['repos']['listBranches']['response']['data']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-
-    const response = await octokit.rest.repos.listBranches({
-      owner,
-      repo
-    });
-    return response.data;
-  }
-
-  async getBranchDefaultFromRepo(hostname: string, githubRepoSlug: string):Promise<RestEndpointMethodTypes['repos']['get']['response']['data']['default_branch']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const response = await octokit.rest.repos.get({
-      owner,
-      repo
-    });
-    return response.data.default_branch;
-  }
-
-  async startWorkflowRun(hostname:string, githubRepoSlug: string, workflowId: number, branch: string, inputs?: {[key: string]: unknown}): Promise<RestEndpointMethodTypes['actions']['createWorkflowDispatch']['response']['status']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const inputsParams = inputs || {};
+  private async fetchFromBackend<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
+    const baseUrl = await this.discoveryApi.getBaseUrl('github-workflow-backend');
+    const queryString = new URLSearchParams(params).toString();
+    const url = `${baseUrl}/${endpoint}${queryString ? `?${queryString}` : ''}`;
     
-    const totalWorkflowRunsBefore = await this.listWorkflowRunsTotalCount(
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  private async postToBackend<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
+    const baseUrl = await this.discoveryApi.getBaseUrl('github-workflow-backend');
+    const url = `${baseUrl}/${endpoint}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  async listWorkflows(hostname: string, githubRepoSlug: string, branch: string, filter?: string[]): Promise<Workflows[]>{
+    const params = {
+      hostname,
+      githubRepoSlug,
+      branch,
+      ...(filter && filter.length > 0 && { filter: filter.join(',') })
+    };
+    
+    return this.fetchFromBackend<Workflows[]>('workflows', params);
+  }
+
+  async listBranchesFromRepo(hostname: string, githubRepoSlug: string): Promise<any[]>{
+    const params = { hostname, githubRepoSlug };
+    return this.fetchFromBackend<any[]>('branches', params);
+  }
+
+  async getBranchDefaultFromRepo(hostname: string, githubRepoSlug: string):Promise<string>{
+    const params = { hostname, githubRepoSlug };
+    return this.fetchFromBackend<string>('default-branch', params);
+  }
+
+  async startWorkflowRun(hostname:string, githubRepoSlug: string, workflowId: number, branch: string, inputs?: {[key: string]: unknown}): Promise<number>{
+    const body = {
       hostname,
       githubRepoSlug,
       workflowId,
-    );
-    let totalWorkflowRunsAfter = totalWorkflowRunsBefore;
-    const loadTime = 1500;
-
-    const response = await octokit.actions.createWorkflowDispatch({
-      owner,
-      repo,
-      workflow_id: workflowId,
-      ref: branch,
-      inputs: inputsParams
-    }); 
-
-    while (totalWorkflowRunsAfter === totalWorkflowRunsBefore) {
-      await this.waitTime(loadTime);
-      totalWorkflowRunsAfter = await this.listWorkflowRunsTotalCount(
-        hostname,
-        githubRepoSlug,
-        workflowId,
-      );
-    }
-
+      branch,
+      ...(inputs && { inputs })
+    };
+    
+    const response = await this.postToBackend<{ status: number }>('start-workflow', body);
     return response.status;
   }
 
-  async waitTime(time: number) {
-    return await new Promise(r => setTimeout(r, time));
+  async stopWorkflowRun(hostname:string,githubRepoSlug: string, runId: number):Promise<number>{
+    const body = {
+      hostname,
+      githubRepoSlug,
+      runId
+    };
+    
+    const response = await this.postToBackend<{ status: number }>('stop-workflow', body);
+    return response.status;
   }
 
-  async stopWorkflowRun(hostname:string,githubRepoSlug: string, runId: number):Promise<RestEndpointMethodTypes['actions']['cancelWorkflowRun']['response']['status']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const response = await octokit.actions.cancelWorkflowRun({
-      owner,
-      repo,
-      run_id: runId
-    }); 
-    return response.status
+  async listJobsForWorkflowRun(hostname: string, githubRepoSlug: string, id: number, pageSize?: number, page?: number): Promise<any>{
+    const params = {
+      hostname,
+      githubRepoSlug,
+      id: id.toString(),
+      ...(pageSize && { pageSize: pageSize.toString() }),
+      ...(page && { page: page.toString() })
+    };
+    
+    return this.fetchFromBackend<any>('jobs', params);
   }
 
-  async getLatestWorkflowRun(hostname:string, workflowId: number, githubRepoSlug: string):Promise<RestEndpointMethodTypes['actions']['listWorkflowRuns']['response']['data']['workflow_runs'][0]>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const response = await octokit.actions.listWorkflowRuns({
-      owner,
-      repo,
-      workflow_id: workflowId
-    });
-
-    return response.data.workflow_runs[0]
+  async getWorkflowRunById(hostname:string, githubRepoSlug: string, runId: number):Promise<any>{
+    const params = {
+      hostname,
+      githubRepoSlug,
+      runId: runId.toString()
+    };
+    
+    return this.fetchFromBackend<any>('workflow-run', params);
   }
 
-  async listJobsForWorkflowRun(hostname: string, githubRepoSlug: string, id: number,pageSize?:number,page?:number): Promise<RestEndpointMethodTypes['actions']['listJobsForWorkflowRun']['response']['data']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const jobs = await octokit.actions.listJobsForWorkflowRun({
-      owner,
-      repo,
-      run_id: id,
-      per_page: pageSize,
-      page
-    });
-    return jobs.data
+  async downloadJobLogsForWorkflowRun(hostname:string, githubRepoSlug: string, jobId: number): Promise<string>{
+    const params = {
+      hostname,
+      githubRepoSlug,
+      jobId: jobId.toString()
+    };
+    
+    return this.fetchFromBackend<string>('download-logs', params);
   }
 
-  async getWorkflowRunById(hostname:string, githubRepoSlug: string, runId: number):Promise<RestEndpointMethodTypes['actions']['getWorkflowRun']['response']['data']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const workflow = await octokit.actions.getWorkflowRun({
-      owner,
-      repo,
-      run_id: runId
-    });
-    return workflow.data
-  }
-
-  async getFileContentFromPath(hostname:string, githubRepoSlug:string, filePath: string, branch:string):Promise<any>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const response = await octokit.repos.getContent({
-      owner,
-      repo,
-      path: filePath,
-      ref: branch
-    });
-
-    const data : GithubFileResponse = response.data as GithubFileResponse;
-
-    const yamlContent = YAML.load(
-      Buffer.from(data.content, 'base64').toString('utf8'),
-    ) as any;
-
-    return yamlContent;
-
-  }
-
-
-  async listWorkflowsDispatchParameters(hostname:string, githubRepoSlug:string, filePath: string, branch:string):Promise<WorkflowDispatchParameters[]>{
-      
-    const dynamicWorkflow = filePath.startsWith("dynamic/");
-    const yamlContent = dynamicWorkflow ? [] : await this.getFileContentFromPath(hostname, githubRepoSlug, filePath, branch);
-
-    if (!yamlContent.on?.workflow_dispatch?.inputs) return [];
-    const inputs = yamlContent.on.workflow_dispatch?.inputs;
-
-    const mapedInputs: WorkflowDispatchParameters[] = Object.keys(inputs).map(
-      input => {
-        const currentInput = inputs[input];
-        const result: WorkflowDispatchParameters = {
-          name: input,
-          description: currentInput.description ?? '',
-          default: currentInput.default ?? '',
-          required: currentInput.required ?? false,
-          type: currentInput.type ?? 'string',
-        };
-        if (currentInput.type === 'choice') {
-          result.options = currentInput.options;
-        }
-        return result;
-      },
-    );
-    return mapedInputs;
-  }
-
-  async listWorkflowsResponse(hostname: string, githubRepoSlug: string, branch: string, filter?: string[]): Promise<Workflows[]>{
-    const workflows = await this.listWorkflows(hostname, githubRepoSlug, filter);
-    const response = await Promise.all(
-      workflows.map(async (workflow): Promise<Workflows> => {
-        const latestWorkflowRun = await this.getLatestWorkflowRun(
-          hostname,
-          workflow.id,
-          githubRepoSlug,
-        );
-        const dispatchParameters = await this.listWorkflowsDispatchParameters(
-          hostname,
-          githubRepoSlug,
-          workflow.path,
-          branch,
-        );
-        const latestWorkflowRunData = latestWorkflowRun
-          ? {
-              id: latestWorkflowRun.id,
-              status: latestWorkflowRun.status ?? undefined,
-              conclusion: latestWorkflowRun.conclusion ?? undefined,
-            }
-          : {
-              status: StatusWorkflowEnum.completed,
-              conclusion: StatusWorkflowEnum.failure,
-            };
-
-        return {
-          workflow: {
-            id: workflow.id,
-            name: workflow.name,
-            state: workflow.state,
-            url: workflow.html_url,
-            path: workflow.path,
-            createdAt: workflow.created_at,
-            updatedAt: workflow.updated_at,
-          },
-          latestRun: {
-            ...latestWorkflowRunData,
-            status: workflow.path.startsWith("dynamic/") ? StatusWorkflowEnum.actionRequired : latestWorkflowRunData.status,
-          },
-          parameters: dispatchParameters,
-        };
-      }),
-    );
-    return response;
-  }
-
-  async downloadJobLogsForWorkflowRun (hostname:string, githubRepoSlug: string, jobId: number): Promise<RestEndpointMethodTypes['actions']['downloadJobLogsForWorkflowRun']['response']['data']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const workflow = await octokit.actions.downloadJobLogsForWorkflowRun({
-      owner,
-      repo,
-      job_id: jobId,
-    });
-
-    return workflow.data;
-  }
-
-  async getEnvironmentsList(hostname:string,githubRepoSlug: string) : Promise<RestEndpointMethodTypes['repos']['getAllEnvironments']['response']['data']>{
-    const octokit = await this.getOctokit(hostname);
-    const { owner, repo } = this.parseRepo(githubRepoSlug);
-    const environments = await octokit.repos.getAllEnvironments({
-      owner,
-      repo
-    });
-    return environments.data
+  async getEnvironmentsList(hostname:string,githubRepoSlug: string): Promise<any>{
+    const params = { hostname, githubRepoSlug };
+    return this.fetchFromBackend<any>('environments', params);
   }
 }
 
-export class GithubWorkflowsClient implements GithubWorkflowsApi {
-
-  private readonly client : Client;
-
-  constructor(opts: Options) {
-    this.client = new Client(opts);
-  }
-
-  async listWorkflows(hostname:string, githubRepoSlug:string,branch: string, filter?: string[]): Promise<Workflows[]>{
-    return this.client.listWorkflowsResponse(hostname, githubRepoSlug,branch,filter)
-  }
-
-  async listBranchesFromRepo(hostname:string, githubRepoSlug: string): Promise<RestEndpointMethodTypes['repos']['listBranches']['response']['data']> {
-    return this.client.listBranchesFromRepo(hostname,githubRepoSlug)
-  }
-
-  async getBranchDefaultFromRepo(hostname:string,githubRepoSlug:string):Promise<RestEndpointMethodTypes['repos']['get']['response']['data']['default_branch']>{
-    return this.client.getBranchDefaultFromRepo(hostname,githubRepoSlug)
-  }
-
-  async startWorkflowRun(hostname:string, githubRepoSlug: string, workflowId: number, branch: string, inputs?: {[key: string]: unknown}): Promise<RestEndpointMethodTypes['actions']['createWorkflowDispatch']['response']['status']>{
-    return this.client.startWorkflowRun(hostname,githubRepoSlug, workflowId, branch, inputs)
-  }
-
-  async stopWorkflowRun(hostname: string, githubRepoSlug: string, runId: number, ): Promise<RestEndpointMethodTypes['actions']['cancelWorkflowRun']['response']['status']> {
-    return this.client.stopWorkflowRun(hostname, githubRepoSlug, runId )
-  }
-  async listJobsForWorkflowRun(hostname:string,githubRepoSlug: string, id: number,pageSize?:number,page?:number): Promise<RestEndpointMethodTypes['actions']['listJobsForWorkflowRun']['response']['data']>{
-    return this.client.listJobsForWorkflowRun(hostname,githubRepoSlug, id, pageSize,page)
-  }
-  async getWorkflowRunById(hostname:string, githubRepoSlug: string, runId: number):Promise<RestEndpointMethodTypes['actions']['getWorkflowRun']['response']['data']> {
-    return this.client.getWorkflowRunById(hostname,githubRepoSlug,runId)
-  }
-  async downloadJobLogsForWorkflowRun(hostname:string, githubRepoSlug: string, jobId: number): Promise<RestEndpointMethodTypes['actions']['downloadJobLogsForWorkflowRun']['response']['data']>{
-    return this.client.downloadJobLogsForWorkflowRun(hostname,githubRepoSlug,jobId)
-  }
-  async getEnvironmentsList(hostname:string, githubRepoSlug: string):Promise<RestEndpointMethodTypes['repos']['getAllEnvironments']['response']['data']>{
-    return this.client.getEnvironmentsList(hostname,githubRepoSlug)
-  }
-}
+// Export Client as GithubWorkflowsClient for backwards compatibility
+export class GithubWorkflowsClient extends Client implements GithubWorkflowsApi {}

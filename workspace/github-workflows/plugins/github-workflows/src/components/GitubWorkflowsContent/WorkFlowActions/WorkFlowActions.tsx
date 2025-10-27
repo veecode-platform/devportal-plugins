@@ -1,9 +1,9 @@
-import React from 'react';
+import { FC, useState, useCallback, useEffect } from 'react';
 import { StatusWorkflowEnum } from '../../../utils/enums/WorkflowListEnum';
 import SyncIcon from '@mui/icons-material/Sync';
 import ReplayIcon from '@mui/icons-material/Replay';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { Tooltip } from '@mui/material';
+import Tooltip from '@mui/material/Tooltip';
 import { WorkflowResultsProps } from '../../../utils/types';
 import { errorApiRef, useApi } from '@backstage/core-plugin-api';
 import { ModalComponent } from '../../ModalComponent';
@@ -13,10 +13,10 @@ import { WorkFlowActionsProps } from './types';
 import { useGithuWorkflowsContext } from '../../../context';
 import { updateWorkflows } from '../../../context/state';
 
-export const WorkFlowActions: React.FC<WorkFlowActionsProps> = props => {
-  const [showModal, setShowModal] = React.useState<boolean>(false);
+export const WorkFlowActions: FC<WorkFlowActionsProps> = props => {
+  const [showModal, setShowModal] = useState<boolean>(false);
   const [workFlowSelected, setWorkFlowSelected] =
-    React.useState<WorkflowResultsProps>();
+    useState<WorkflowResultsProps>();
   const {
     cardsView,
     workflowsByAnnotation,
@@ -34,7 +34,7 @@ export const WorkFlowActions: React.FC<WorkFlowActionsProps> = props => {
     : [];
   const { workflowId, status, conclusion, parameters } = props;
 
-  const handleShowModal = React.useCallback(() => {
+  const handleShowModal = useCallback(() => {
     setShowModal(!showModal);
   }, [showModal]);
 
@@ -126,7 +126,7 @@ export const WorkFlowActions: React.FC<WorkFlowActionsProps> = props => {
     return Promise.resolve();
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const workFlowFilter = allWorkflowsState.find(
       (w: WorkflowResultsProps) => w.id === workflowId,
     );

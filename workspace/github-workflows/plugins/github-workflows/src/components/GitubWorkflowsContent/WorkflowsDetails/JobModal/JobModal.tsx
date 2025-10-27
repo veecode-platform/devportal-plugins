@@ -1,6 +1,18 @@
 import '../../../shared/globalstyle.css';
-import React from 'react';
-import { Accordion, AccordionSummary, Box, CircularProgress, Fade, List, ListItem, ListItemAvatar, ListItemText, Modal, Tooltip, Typography, Zoom } from '@mui/material'
+import { FC, useState } from 'react';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Fade from '@mui/material/Fade';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemAvatar from '@mui/material/ListItemAvatar';
+import ListItemText from '@mui/material/ListItemText';
+import Modal from '@mui/material/Modal';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import Zoom from '@mui/material/Zoom';
 import { useModalStyles } from './styles'
 import { WorkFlowStatus } from '../../WorkFlowStatus'
 import dayjs from 'dayjs';
@@ -22,7 +34,7 @@ import { useGithuWorkflowsContext } from '../../../../context';
 dayjs.extend(relativeTime);
 dayjs.extend(duration);
 
-const HeaderComponent : React.FC<HeaderComponentProps> = (props) => {
+const HeaderComponent : FC<HeaderComponentProps> = (props) => {
     const {jobName, jobStatus, jobConclusion, jobStartedAt, jobCompletedAt } = props;
     const { modalHeader,subtitle } = useModalStyles();
     return (
@@ -40,7 +52,7 @@ const HeaderComponent : React.FC<HeaderComponentProps> = (props) => {
     )
 }
 
-const StepsListComponent : React.FC<StepsListComponentsProps> = (props) => {
+const StepsListComponent : FC<StepsListComponentsProps> = (props) => {
     const {steps} = props;
     const {jobsList,jobListItem} = useModalStyles();
     return (
@@ -64,10 +76,10 @@ const StepsListComponent : React.FC<StepsListComponentsProps> = (props) => {
     );
 }
 
-const JobLogsComponent : React.FC<JobLogsComponentProps> = (props) => {
+const JobLogsComponent : FC<JobLogsComponentProps> = (props) => {
 
-    const [jobLogs,setJobLogs] = React.useState<string>('No Values Found');
-    const [open, setOpen] = React.useState(false);
+    const [jobLogs,setJobLogs] = useState<string>('No Values Found');
+    const [open, setOpen] = useState(false);
     const {jobId,running } = props;
     const {downloadJobLogs} = useGithuWorkflowsContext();
   
@@ -136,7 +148,7 @@ const JobLogsComponent : React.FC<JobLogsComponentProps> = (props) => {
     )
 }
 
-export const JobModal : React.FC<JobModalProps> = (props) => {
+export const JobModal : FC<JobModalProps> = (props) => {
   const { job, show, handleCloseModal } = props;
   const { modalOnBlur,modalContent} = useModalStyles();
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC } from 'react';
 import { Loading } from './loading';
 import { Queued } from './queued';
 import { StatusWorkflowEnum } from '../../../utils/enums/WorkflowListEnum';
@@ -18,7 +18,7 @@ const styles = {
   gap: '.7rem',
 };
 
-export const WorkFlowStatus: React.FC<WorkFlowStatusProps> = props => {
+export const WorkFlowStatus: FC<WorkFlowStatusProps> = props => {
   const { status, conclusion, icon } = props;
 
   if (!status) return null;

@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useEffect, useReducer, memo } from 'react';
 import { Select, SelectedItems } from '@backstage/core-components';
 import { useApi, errorApiRef, } from '@backstage/core-plugin-api';
 import { useEntityAnnotations } from '../../hooks/useEntityAnnotations';
@@ -9,13 +9,12 @@ import { githubWorkflowsApiRef } from '../../api';
 import { addBranches, branchesReducer, initialBranchesState } from './state';
 import { Branch } from '../../utils/types';
 import { initialOptionsState, optionsReducer } from './state/options/reducer';
-import { addOptions } from './state/options/actions';
 
 const SelectBranch = () => {
   
-  const [branchesState, dispatchBranches ] = React.useReducer(branchesReducer,initialBranchesState);
-  const [optionsState, dispatchOptions] = React.useReducer(optionsReducer, initialOptionsState);
-  const [branchDefault, setBranchDefault ] = React.useState<string>('');
+  const [branchesState, dispatchBranches ] = useReducer(branchesReducer,initialBranchesState);
+  const [optionsState, dispatchOptions] = useReducer(optionsReducer, initialOptionsState);
+  const [branchDefault, setBranchDefault ] = useState<string>('');
   const { branch, setBranchState } = useGithuWorkflowsContext();
   const api = useApi(githubWorkflowsApiRef);
   const errorApi = useApi(errorApiRef);
@@ -42,17 +41,17 @@ const SelectBranch = () => {
     setBranchState(selectedValue as string); 
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     getBranches();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectName, entity]);
 
-  React.useEffect(()=>{
+  useEffect(()=>{
     setBranchState(branchDefault)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[branchDefault])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (branchesState) {
       const newOptions = branchesState.map((item) => {
         return {
@@ -60,8 +59,12 @@ const SelectBranch = () => {
           value: item.name,
         };
       });
-      dispatchOptions(addOptions(newOptions));
+      dispatchOptions({
+        type: 'ADD_OPTIONS',
+        payload: newOptions,
+      });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchesState]);
 
   return (
@@ -77,4 +80,4 @@ const SelectBranch = () => {
 };
 
 
-export default React.memo(SelectBranch)
+export default memo(SelectBranch)

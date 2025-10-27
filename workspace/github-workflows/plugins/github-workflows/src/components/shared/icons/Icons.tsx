@@ -1,4 +1,3 @@
-import React from 'react';
 import ErrorIcon from '@mui/icons-material/Error';
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';

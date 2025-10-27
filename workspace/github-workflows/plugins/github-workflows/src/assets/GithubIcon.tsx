@@ -1,5 +1,5 @@
 import { makeStyles } from '@mui/styles';
-import React from 'react';
+import { FC } from 'react';
 
 
 const useStyles = makeStyles(theme => ({

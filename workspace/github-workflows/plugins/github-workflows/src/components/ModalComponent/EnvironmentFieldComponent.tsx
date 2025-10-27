@@ -1,5 +1,8 @@
-import React, { memo } from 'react';
-import { FormControl,InputLabel, MenuItem, Select} from '@mui/material';
+import { FC, memo } from 'react';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import { useGithuWorkflowsContext } from '../../context';
 import useAsync from 'react-use/lib/useAsync';
 import { useModalStyles } from './styles';
@@ -8,7 +11,7 @@ import { InfoBox } from '../shared';
 import { EnvironmentFieldProps } from './types';
 
 
-const EnvironmentFieldComponent : React.FC<EnvironmentFieldProps> = ({name,description,value, defaultValue, required,onSelect,onTouch})=> {
+const EnvironmentFieldComponent : FC<EnvironmentFieldProps> = ({name,description,value, defaultValue, required,onSelect,onTouch})=> {
 
     const { listAllEnvironments } = useGithuWorkflowsContext();
     const {label,formControl} = useModalStyles();

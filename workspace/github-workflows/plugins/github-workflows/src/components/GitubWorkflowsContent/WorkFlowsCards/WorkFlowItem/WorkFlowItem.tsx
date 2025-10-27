@@ -1,5 +1,7 @@
-import React from 'react';
-import { Box, Tooltip, Typography } from '@mui/material';
+import { FC, useState } from 'react';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { truncateString } from '../../../../utils/helpers';
 import { WorkFlowActions } from '../../WorkFlowActions';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -11,8 +13,8 @@ import { WorkFlowStatus } from '../../WorkFlowStatus';
 import { useGithuWorkflowsContext } from '../../../../context';
 import { WorkflowAnnotation } from '../../../../utils/types';
 
-export const WorkFlowItem: React.FC<WorkFlowItemProps> = (props) => {
-  const [showModal, setShowModal] = React.useState<boolean>(false);
+export const WorkFlowItem: FC<WorkFlowItemProps> = (props) => {
+  const [showModal, setShowModal] = useState<boolean>(false);
   const { entity, workflowsByAnnotation } = useGithuWorkflowsContext();
   const classes = useWorkflowItemStyles();
   const { id, status, conclusion, workflowName, parameters, lastRunId, path } = props;

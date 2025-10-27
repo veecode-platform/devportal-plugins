@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC, useCallback , useReducer, useState, ReactNode, useEffect, useContext } from 'react';
 import { GithubWorkflowsContext } from './GithubWorkflowsContext';
 import { errorApiRef, useApi } from '@backstage/core-plugin-api';
 import { githubWorkflowsApiRef } from '../api';
@@ -13,16 +13,16 @@ import { addInputsParams, removeInputsParams } from './state/inputParamsState/ac
 import { workflowFilter } from '../utils/helpers/filters';
 
 interface GithubWorkflowsProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 
-export const GithubWorkflowsProvider: React.FC<GithubWorkflowsProviderProps> = ({ children }) => {
+export const GithubWorkflowsProvider: FC<GithubWorkflowsProviderProps> = ({ children }) => {
   
-  const [cardsView, setCardsView] = React.useState<boolean>(false);
-  const [branch, setBranch] = React.useState<string>('');
-  const [allWorkflowsState, dispatchWorkflows] = React.useReducer(WorkflowsReducer, initialWorkflowsState);
-  const [ inputsParamsState, dispatchInputsParams ] = React.useReducer(InputsParamsReducer,initialInputsParamsState);
+  const [cardsView, setCardsView] = useState<boolean>(false);
+  const [branch, setBranch] = useState<string>('');
+  const [allWorkflowsState, dispatchWorkflows] = useReducer(WorkflowsReducer, initialWorkflowsState);
+  const [ inputsParamsState, dispatchInputsParams ] = useReducer(InputsParamsReducer,initialInputsParamsState);
   const { entity } = useEntity();
   const { projectName,hostname,workflowsByAnnotation } = useEntityAnnotations(entity as Entity);
   const api = useApi(githubWorkflowsApiRef);
@@ -33,7 +33,7 @@ export const GithubWorkflowsProvider: React.FC<GithubWorkflowsProviderProps> = (
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const setBranchState = React.useCallback((branchState: string) => setBranch(branchState),[branch])
+  const setBranchState = useCallback((branchState: string) => setBranch(branchState),[branch])
 
   const resetInputs = () => {
     dispatchInputsParams(removeInputsParams())
@@ -148,7 +148,7 @@ export const GithubWorkflowsProvider: React.FC<GithubWorkflowsProviderProps> = (
     }
   }
 
-  React.useEffect(()=>{
+  useEffect(()=>{
     if(branch && workflowsByAnnotation){
       resetInputs();
       const filters = workflowFilter(workflowsByAnnotation)
@@ -189,4 +189,4 @@ export const GithubWorkflowsProvider: React.FC<GithubWorkflowsProviderProps> = (
   );
 };
 
-export const useGithuWorkflowsContext = () => React.useContext(GithubWorkflowsContext)
+export const useGithuWorkflowsContext = () => useContext(GithubWorkflowsContext)

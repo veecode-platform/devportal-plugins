@@ -1,9 +1,11 @@
-import React from 'react'
+import { FC, useState, useEffect, useReducer } from 'react';
 import { useRouteRefParams } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
 import { Progress, ResponseErrorPanel } from '@backstage/core-components';
 import { useWorkflowDetailsStyles } from './styles';
-import { Button, Grid, Tooltip } from '@mui/material';
+import Button from '@mui/material/Button';
+import Grid from '@mui/material/Grid';
+import Tooltip from '@mui/material/Tooltip';
 import { DetailsComponent } from './DetailsComponent';
 import {JobsComponent} from './JobsComponent/JobsComponent';
 import KeyboardReturnIcon from '@mui/icons-material/KeyboardReturn';
@@ -15,8 +17,8 @@ import { WorkflowRun } from '../../../utils/types';
 
 const WorkflowsDetails = () => {
 
-  const [workflowRunState,dispatchWorkflowRun] = React.useReducer(WorkflowRunReducer,initialWorkflowRunState);
-  const [jobsRunState, dispatchJobs] = React.useReducer(JobsReducer,initialJobsState);
+  const [workflowRunState,dispatchWorkflowRun] = useReducer(WorkflowRunReducer,initialWorkflowRunState);
+  const [jobsRunState, dispatchJobs] = useReducer(JobsReducer,initialJobsState);
   const { id } = useRouteRefParams(buildRouteRef);
   const { getWorkflowById,listJobsForWorkflowRun } = useGithuWorkflowsContext();
   const { root,container,footer } = useWorkflowDetailsStyles();
