@@ -1,0 +1,14 @@
+integrations:
+  github:
+    - host: github.com
+      apps:
+        - appId: ${GITHUB_APP_ID}
+          clientId: ${GITHUB_CLIENT_ID}
+          clientSecret: ${GITHUB_CLIENT_SECRET}
+          privateKey: |
+            ${GITHUB_PRIVATE_KEY}
+      #token: ${GITHUB_TOKEN}
+    # For GitHub Enterprise:
+    # - host: github.yourcompany.com
+    #   token: ${GITHUB_ENTERPRISE_TOKEN}
+    #   apiBaseUrl: https://github.yourcompany.com/api/v3

@@ -1,0 +1,114 @@
+import { PropsWithChildren } from 'react';
+import { makeStyles } from '@mui/styles';
+import HomeIcon from '@mui/icons-material/Home';
+import ExtensionIcon from '@mui/icons-material/Extension';
+import LibraryBooks from '@mui/icons-material/LibraryBooks';
+import CreateComponentIcon from '@mui/icons-material/AddCircleOutline';
+import LogoFull from './LogoFull';
+import LogoIcon from './LogoIcon';
+import {
+  Settings as SidebarSettings,
+  UserSettingsSignInAvatar,
+} from '@backstage/plugin-user-settings';
+import { SidebarSearchModal } from '@backstage/plugin-search';
+import {
+  Sidebar,
+  sidebarConfig,
+  SidebarDivider,
+  SidebarGroup,
+  SidebarItem,
+  SidebarPage,
+  SidebarScrollWrapper,
+  SidebarSpace,
+  useSidebarOpenState,
+  Link,
+} from '@backstage/core-components';
+import MenuIcon from '@mui/icons-material/Menu';
+import SearchIcon from '@mui/icons-material/Search';
+import { MyGroupsSidebarItem } from '@backstage/plugin-org';
+import GroupIcon from '@mui/icons-material/People';
+import { NotificationsSidebarItem } from '@backstage/plugin-notifications';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { identityApiRef, useApi } from '@backstage/core-plugin-api';
+
+const useSidebarLogoStyles = makeStyles({
+  root: {
+    width: sidebarConfig.drawerWidthClosed,
+    height: 3 * sidebarConfig.logoHeight,
+    display: 'flex',
+    flexFlow: 'row nowrap',
+    alignItems: 'center',
+    marginBottom: -14,
+  },
+  link: {
+    width: sidebarConfig.drawerWidthClosed,
+    marginLeft: 24,
+  },
+});
+
+const SidebarLogo = () => {
+  const classes = useSidebarLogoStyles();
+  const { isOpen } = useSidebarOpenState();
+
+  return (
+    <div className={classes.root}>
+      <Link to="/" underline="none" className={classes.link} aria-label="Home">
+        {isOpen ? <LogoFull /> : <LogoIcon />}
+      </Link>
+    </div>
+  );
+};
+
+export const Root = ({ children }: PropsWithChildren<{}>) => {
+  const identityApi = useApi(identityApiRef);
+
+  const handleSignOut = async () => {
+    await identityApi.signOut();
+  };
+
+  return (
+    <SidebarPage>
+      <Sidebar>
+        <SidebarLogo />
+        <SidebarGroup label="Search" icon={<SearchIcon />} to="/search">
+          <SidebarSearchModal />
+        </SidebarGroup>
+        <SidebarDivider />
+        <SidebarGroup label="Menu" icon={<MenuIcon />}>
+          {/* Global nav, not org-specific */}
+          <SidebarItem icon={HomeIcon} to="catalog" text="Home" />
+          <MyGroupsSidebarItem
+            singularTitle="My Group"
+            pluralTitle="My Groups"
+            icon={GroupIcon}
+          />
+          <SidebarItem icon={ExtensionIcon} to="api-docs" text="APIs" />
+          <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
+          <SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />
+          {/* End global nav */}
+          <SidebarDivider />
+          <SidebarScrollWrapper>
+            {/* Items in this group will be scrollable if they run out of space */}
+          </SidebarScrollWrapper>
+        </SidebarGroup>
+        <SidebarSpace />
+        <SidebarDivider />
+        <NotificationsSidebarItem />
+        <SidebarDivider />
+        <SidebarGroup
+          label="Settings"
+          icon={<UserSettingsSignInAvatar />}
+          to="/settings"
+        >
+          <SidebarSettings />
+          <SidebarItem
+            icon={LogoutIcon}
+            text="Sign Out"
+            onClick={handleSignOut}
+          />
+        </SidebarGroup>
+      </Sidebar>
+      {children}
+    </SidebarPage>
+  );
+};
