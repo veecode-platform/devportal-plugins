@@ -3,52 +3,11 @@ import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
 import { ScmIntegrations, DefaultGithubCredentialsProvider } from '@backstage/integration';
 import YAML from 'js-yaml';
 import { LoggerService } from '@backstage/backend-plugin-api';
-
-export interface GithubFileResponse {
-  type: 'dir' | 'file' | 'submodule' | 'symlink';
-  encoding: string;
-  size: number;
-  name: string;
-  path: string;
-  content: string;
-  sha: string;
-  url: string;
-  git_url: string;
-  html_url: string;
-  download_url: string;
-  _links: {
-    git: string;
-    self: string;
-    html: string;
-  };
-}
-
-export interface WorkflowDispatchParameters {
-  name: string;
-  description: string;
-  default: string;
-  required: boolean;
-  type: string;
-  options?: string[];
-}
-
-export interface Workflows {
-  workflow: {
-    id: number;
-    name: string;
-    state: string;
-    url: string;
-    path: string;
-    createdAt: string;
-    updatedAt: string;
-  };
-  latestRun: {
-    id?: number;
-    status?: string;
-    conclusion?: string;
-  };
-  parameters: WorkflowDispatchParameters[];
-}
+import { 
+  GithubFileResponse, 
+  WorkflowDispatchParameters, 
+  Workflows 
+} from '@veecode-platform/github-workflows-common';
 
 export class GithubWorkflowsService {
   private readonly integrations: ScmIntegrations;
