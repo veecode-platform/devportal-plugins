@@ -12,7 +12,10 @@ DYNAMIC_PLUGIN_ROOT ?= $(DEVPORTAL_BASE_PATH)/dynamic-plugins-root
 GLOBAL_HEADER_DYNAMIC_PLUGIN := $(PWD)/workspace/global-header/plugins/veecode-global-header/dist-dynamic
 HOMEPAGE_DYNAMIC_PLUGIN := $(PWD)/workspace/homepage/plugins/veecode-homepage/dist-dynamic
 
-.PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header echo-paths
+# Version for github-workflows packages (common, frontend, backend)
+GH_WORKFLOWS_VERSION ?= 1.3.0
+
+.PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin build-github-workflows-common pack-github-workflows-common publish-github-workflows-common build-github-workflows build-github-workflows-dynamic build-github-workflows-backend build-github-workflows-backend-dynamic pack-github-workflows-backend-plugin pack-github-workflows-backend-plugin-dynamic clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header publish-github-workflows publish-github-workflows-dynamic publish-github-workflows-backend publish-github-workflows-backend-dynamic set-github-workflows-version echo-paths
 
 start-global-header-app:
 	cd workspace/global-header && \
@@ -25,6 +28,16 @@ start-homepage-app:
 echo-paths:
 	@echo "DYNAMIC_PLUGIN_ROOT: $(DYNAMIC_PLUGIN_ROOT)"
 	@echo "GLOBAL_HEADER_DYNAMIC_PLUGIN: $(GLOBAL_HEADER_DYNAMIC_PLUGIN)"
+
+# Set version for all github-workflows packages (common, frontend, backend)
+# Usage: make set-github-workflows-version GH_WORKFLOWS_VERSION=1.4.0
+set-github-workflows-version:
+	@echo "Setting github-workflows packages to version $(GH_WORKFLOWS_VERSION)..."
+	@sed -i '' 's/"version": "[^"]*"/"version": "$(GH_WORKFLOWS_VERSION)"/' workspace/github-workflows/plugins/github-workflows-common/package.json
+	@sed -i '' 's/"version": "[^"]*"/"version": "$(GH_WORKFLOWS_VERSION)"/' workspace/github-workflows/plugins/github-workflows/package.json
+	@sed -i '' 's/"version": "[^"]*"/"version": "$(GH_WORKFLOWS_VERSION)"/' workspace/github-workflows/plugins/github-workflow-backend/package.json
+	@echo "✅ All packages updated to version $(GH_WORKFLOWS_VERSION)"
+	@echo "Note: Dependencies using 'workspace:*' will be resolved during publish"
 
 copy-dynamic-global-header-plugin: echo-paths
 	@echo "Copying dynamic global-header plugin to DYNAMIC_PLUGIN_ROOT"
@@ -67,6 +80,37 @@ build-global-header-dynamic: build-global-header
 	cd workspace/global-header/plugins/veecode-global-header && \
 	npx @red-hat-developer-hub/cli@latest plugin export
 
+# Build the github-workflows-common package
+build-github-workflows-common:
+	cd workspace/github-workflows/plugins/github-workflows-common && yarn install && yarn build
+
+# Create npm package for github-workflows-common
+pack-github-workflows-common:
+	cd workspace/github-workflows/plugins/github-workflows-common && npm pack
+
+# Publish github-workflows-common package
+publish-github-workflows-common: build-github-workflows-common
+	cd workspace/github-workflows/plugins/github-workflows-common && \
+	npm publish
+
+# Build the github-workflows plugin
+build-github-workflows:
+	cd workspace/github-workflows && yarn install && yarn build:all
+
+# Build the dynamic github-workflows plugin
+build-github-workflows-dynamic: build-github-workflows
+	cd workspace/github-workflows/plugins/github-workflows && \
+	npx @red-hat-developer-hub/cli@latest plugin export
+
+# Build the github-workflows backend plugin
+build-github-workflows-backend:
+	cd workspace/github-workflows && yarn install && yarn build:all
+
+# Build the dynamic github-workflows backend plugin
+build-github-workflows-backend-dynamic: build-github-workflows-backend
+	cd workspace/github-workflows/plugins/github-workflow-backend && \
+	npx @red-hat-developer-hub/cli@latest plugin export
+
 # Create npm package for global-header plugin
 pack-global-header-plugin:
 	cd workspace/global-header/plugins/veecode-global-header && npm pack
@@ -74,6 +118,14 @@ pack-global-header-plugin:
 # Create npm package for dynamic global-header plugin
 pack-global-header-plugin-dynamic:
 	cd workspace/global-header/plugins/veecode-global-header/dist-dynamic && npm pack
+
+# Create npm package for github-workflows backend plugin
+pack-github-workflows-backend-plugin:
+	cd workspace/github-workflows/plugins/github-workflow-backend && npm pack
+
+# Create npm package for dynamic github-workflows backend plugin
+pack-github-workflows-backend-plugin-dynamic:
+	cd workspace/github-workflows/plugins/github-workflow-backend/dist-dynamic && npm pack
 
 build-all: build-homepage build-global-header
 	echo "All static plugins built."
@@ -151,8 +203,28 @@ publish-global-header-dynamic:
 	cd workspace/global-header/plugins/veecode-global-header/dist-dynamic && \
 	npm publish
 
-publish-all: publish-homepage publish-global-header
+# Publish github-workflows plugin (static)
+publish-github-workflows: build-github-workflows
+	cd workspace/github-workflows/plugins/github-workflows && \
+	npm publish
+
+# Publish dynamic github-workflows plugin
+publish-github-workflows-dynamic: build-github-workflows-dynamic
+	cd workspace/github-workflows/plugins/github-workflows/dist-dynamic && \
+	npm publish
+
+# Publish github-workflows backend plugin
+publish-github-workflows-backend: build-github-workflows-backend
+	cd workspace/github-workflows/plugins/github-workflow-backend && \
+	npm publish
+
+# Publish dynamic github-workflows backend plugin
+publish-github-workflows-backend-dynamic: build-github-workflows-backend-dynamic
+	cd workspace/github-workflows/plugins/github-workflow-backend/dist-dynamic && \
+	npm publish
+
+publish-all: publish-homepage publish-global-header publish-github-workflows-common publish-github-workflows publish-github-workflows-backend
 	echo "All static plugins published."
 
-publish-all-dynamic: publish-homepage-dynamic publish-global-header-dynamic
+publish-all-dynamic: publish-homepage-dynamic publish-global-header-dynamic publish-github-workflows-dynamic publish-github-workflows-backend-dynamic
 	echo "All dynamic plugins published."
