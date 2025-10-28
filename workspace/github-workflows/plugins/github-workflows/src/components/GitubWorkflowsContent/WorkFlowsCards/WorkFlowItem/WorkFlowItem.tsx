@@ -8,7 +8,6 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import { ModalComponent } from '../../../ModalComponent';
 import { StatusWorkflowEnum } from '../../../../utils/enums/WorkflowListEnum';
 import { WorkFlowItemProps } from './types';
-import { useWorkflowItemStyles } from './styles';
 import { WorkFlowStatus } from '../../WorkFlowStatus';
 import { useGithuWorkflowsContext } from '../../../../context';
 import { WorkflowAnnotation } from '../../../../utils/types';
@@ -16,7 +15,6 @@ import { WorkflowAnnotation } from '../../../../utils/types';
 export const WorkFlowItem: FC<WorkFlowItemProps> = (props) => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const { entity, workflowsByAnnotation } = useGithuWorkflowsContext();
-  const classes = useWorkflowItemStyles();
   const { id, status, conclusion, workflowName, parameters, lastRunId, path } = props;
 
   const workflow = (path && workflowsByAnnotation)
@@ -35,7 +33,22 @@ export const WorkFlowItem: FC<WorkFlowItemProps> = (props) => {
 
   return (
     <>
-      <Box className={classes.workflow}>
+      <Box
+        sx={{
+          padding: '.8rem 3rem',
+          background: 'transparent',
+          border: theme => `1px solid ${theme.palette.divider}`,
+          borderRadius: '30px',
+          fontSize: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1rem',
+          color: 'text.primary',
+          minWidth: '235px',
+          minHeight: '56px',
+        }}
+      >
         <WorkFlowStatus
           status={status}
           conclusion={conclusion ? conclusion : ''}
@@ -45,20 +58,35 @@ export const WorkFlowItem: FC<WorkFlowItemProps> = (props) => {
         <Tooltip title={workflow?.tooltip ?? workflowName} placement="top">
           <Typography
             onClick={() => handleCICDLogs(lastRunId as string)}
-            className={classes.name}
+            sx={{ cursor: 'pointer' }}
           >
             {truncateString(workflow?.label ?? workflowName, 12)}
           </Typography>
         </Tooltip>
 
-        <Box role="button" className={classes.clickable}>
+        <Box
+          role="button"
+          sx={{
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '.7rem',
+          }}
+        >
           {parameters &&
            parameters.length > 0 &&
            status !== StatusWorkflowEnum.queued && (
             <Tooltip title="Add Parameters" placement="top">
               <Box
                 role="button"
-                className={classes.clickable}
+                sx={{
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '.7rem',
+                }}
                 onClick={handleShowModal}
               >
                 <SettingsIcon />

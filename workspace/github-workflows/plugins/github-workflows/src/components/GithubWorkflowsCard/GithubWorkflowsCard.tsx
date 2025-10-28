@@ -16,50 +16,12 @@ import SelectBranch from '../SelectBranch/SelectBranch';
 import { WorkFlowItem } from '../GitubWorkflowsContent/WorkFlowsCards/WorkFlowItem';
 import { StatusWorkflowEnum } from '../../utils/enums/WorkflowListEnum';
 import GithubIcon from '../../assets/GithubIcon';
-import { makeStyles } from '@mui/styles';
 import { WorkflowResultsProps } from '../../utils/types';
 import { workflowFilter } from '../../utils/helpers/filters';
 import { addWorkflows } from '../../context/state';
 
-const useStyles = makeStyles((theme: any) => ({
-  title: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1),
-    fontWeight: 600,
-  },
-  options: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: theme.spacing(1),
-  },
-  buttonRefresh: {
-    padding: theme.spacing(1),
-  },
-  workflowsGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: theme.spacing(1),
-    minHeight: 100,
-  },
-  loadingComponent: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 100,
-  },
-  info: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    color: theme.palette.text.secondary,
-    padding: theme.spacing(2),
-  },
-}));
-
 const CardContentComponent: FC = () => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const classes = useStyles();
   const {
     entity,
     branch,
@@ -104,21 +66,28 @@ const CardContentComponent: FC = () => {
   const workflows = allWorkflowsState || [];
 
   const TitleBar = (
-    <Typography className={classes.title}>
+    <Typography
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        fontWeight: 600,
+      }}
+    >
       <GithubIcon />
       Workflows
     </Typography>
   );
 
   const ActionsCard = (
-    <Box className={classes.options}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       <SelectBranch />
       <IconButton
         aria-label="Refresh"
         title="Refresh workflows"
         onClick={handleRefresh}
         disabled={refreshing}
-        className={classes.buttonRefresh}
+        sx={{ padding: 1 }}
       >
         <CachedIcon />
       </IconButton>
@@ -129,13 +98,37 @@ const CardContentComponent: FC = () => {
     <Paper>
       <Card>
         <CardHeader title={TitleBar} action={ActionsCard} />
-        <CardContent className={classes.workflowsGroup}>
+        <CardContent
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+            minHeight: 100,
+          }}
+        >
           {refreshing ? (
-            <Box className={classes.loadingComponent}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minHeight: 100,
+              }}
+            >
               <CircularProgress />
             </Box>
           ) : workflows.length === 0 ? (
-            <div className={classes.info}>No records to display</div>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                color: 'text.secondary',
+                padding: 2,
+              }}
+            >
+              No records to display
+            </Box>
           ) : (
             workflows.map(item => (
               <WorkFlowItem

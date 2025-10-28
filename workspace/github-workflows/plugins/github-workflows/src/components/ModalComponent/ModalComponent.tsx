@@ -14,7 +14,6 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import { validateString } from '../../utils/validators';
 import { useGithuWorkflowsContext } from '../../context';
-import { useModalStyles } from './styles';
 import EnvironmentFieldComponent from './EnvironmentFieldComponent';
 import { ModalComponentProps } from './types';
 
@@ -23,7 +22,6 @@ export const ModalComponent = ({open, handleModal, parameters, handleStartWorkfl
 
    const [inputWorkflow, setInputWorkflow] = useState<Record<string, any>>({});
   const [errorsState, setErrorsState] = useState<Record<string, boolean>>({});
-  const {modal,label,formControl,footer} = useModalStyles();
   const { setInputParams, inputsParamsState } = useGithuWorkflowsContext();
 
   const handleChange = (event: ChangeEvent<{ name?: string | undefined; value: unknown; }>, required: boolean, type: string | number | boolean) : void => {
@@ -94,7 +92,17 @@ export const ModalComponent = ({open, handleModal, parameters, handleStartWorkfl
   return (
       <Dialog open={open} onClose={handleModal} aria-labelledby="form-dialog-title">
         <DialogTitle id="form-dialog-title">Workflows Parameters</DialogTitle>
-        <DialogContent className={modal}>
+        <DialogContent
+          sx={{
+            padding: '2rem',
+            borderTop: theme => `1px solid ${theme.palette.divider}`,
+            display: 'flex',
+            alignItems: 'stretch',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: '1rem',
+          }}
+        >
           <DialogContentText>
           Fill in the fields according to the values set in the project workflow.
           </DialogContentText>
@@ -136,8 +144,8 @@ export const ModalComponent = ({open, handleModal, parameters, handleStartWorkfl
               />
               )}
               {p.type === "choice" && (
-                  <FormControl variant="outlined" className={formControl} >
-                    <InputLabel className={label} id={p.name}>{p.description}</InputLabel>
+                  <FormControl variant="outlined" sx={{ width: '100%' }}>
+                    <InputLabel sx={{ marginLeft: '-.7rem' }} id={p.name}>{p.description}</InputLabel>
                     <Select
                       labelId={p.name}
                       id="select-outlined"
@@ -187,7 +195,7 @@ export const ModalComponent = ({open, handleModal, parameters, handleStartWorkfl
             ))
           }
         </DialogContent>
-        <DialogActions className={footer}>
+        <DialogActions sx={{ paddingBottom: '1rem' }}>
           <Button onClick={handleModal} color="primary">
             Cancel
           </Button>
