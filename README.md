@@ -94,6 +94,20 @@ unsafeHttpWhitelist:
   - "127.0.0.1"
 ```
 
+## Releasing github-workflows plugins
+
+Edit the GH_WORKFLOWS_VERSION in the Makefile and run:
+
+```bash
+make set-github-workflows-version
+make clean-github-workflows-dynamic
+make publish-github-workflows-common
+make publish-github-workflows
+make publish-github-workflows-backend
+make publish-github-workflows-dynamic
+make publish-github-workflows-backend-dynamic
+```
+
 ## Notes
 
 This repository was created based on previous work by Red Hat. It is organized in the same way as the [Red Hat Developer Hub plugins](https://github.com/redhat-developer/rhdh-plugins) repository.
