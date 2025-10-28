@@ -4,7 +4,7 @@ export const useWorkflowItemStyles = makeStyles(theme => ({
     workflow: {
       padding: '.8rem 3rem',
       background: 'transparent',
-      border: `1px solid ${theme.palette.border}`,
+      border: `1px solid ${theme.palette.divider}`,
       borderRadius: '30px',
       fontSize: '1rem',
       display: 'flex',

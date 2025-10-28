@@ -1,0 +1,25 @@
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  - package: ./dynamic-plugins/dist/backstage-community-plugin-github-actions-dynamic
+    disabled: false
+  - package: "@veecode-platform/backstage-plugin-github-workflows-backend-dynamic@${VERSION}"
+    integrity: $BACKEND_INTEGRITY
+    disabled: false
+  - package: "@veecode-platform/backstage-plugin-github-workflows-dynamic@${VERSION}"
+    integrity: $FRONTEND_INTEGRITY
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-github-workflows:
+            mountPoints:
+              - mountPoint: entity.page.overview/cards
+                importName: GithubWorkflowsOverviewContent
+                config:
+                  layout:
+                    gridRowStart:
+                      lg: "3"
+                    gridColumnStart:
+                      lg: "-1"      

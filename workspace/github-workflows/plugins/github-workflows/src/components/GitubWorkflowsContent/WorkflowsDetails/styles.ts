@@ -49,10 +49,10 @@ export const useWorkflowDetailsStyles = makeStyles<Theme>(theme=>({
       gap: '.5rem'
     },
     link:{
-      color: theme.palette.link,
+      color: theme.palette.primary.main,
       textAlign: 'center',
-      hover:{
-        color: theme.palette.linkHover
+      '&:hover':{
+        color: theme.palette.primary.dark
       }
     },
     footer:{

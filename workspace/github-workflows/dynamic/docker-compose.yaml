@@ -1,0 +1,15 @@
+services:
+  devportal:
+    image: veecode/devportal:1.2.0
+    ports:
+      - "7007:7007"
+    environment:
+      - DEVELOPMENT=true
+      - LOG_LEVEL=info
+      - GITHUB_CLIENT_ID
+      - GITHUB_CLIENT_SECRET
+      - GITHUB_APP_ID
+      - GITHUB_PRIVATE_KEY
+    volumes:
+      - ./app-config.yaml:/app/app-config.local.yaml:ro
+      - ./dynamic-plugins.local.yaml:/app/dynamic-plugins.yaml:ro
