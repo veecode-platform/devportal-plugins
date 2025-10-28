@@ -15,7 +15,6 @@
  */
 import {
   ApiBlueprint,
-  createApiFactory,
   discoveryApiRef,
 } from '@backstage/frontend-plugin-api';
 import { githubWorkflowsApiRef, GithubWorkflowsClient } from '../api';
@@ -24,12 +23,10 @@ import { githubWorkflowsApiRef, GithubWorkflowsClient } from '../api';
  * @alpha
  */
 export const githubWorkflowsApi = ApiBlueprint.make({
-  params: {
-    factory: createApiFactory({
-      api: githubWorkflowsApiRef,
-      deps: { discoveryApi: discoveryApiRef },
-      factory: ({ discoveryApi }) =>
-        new GithubWorkflowsClient({ discoveryApi }),
-    }),
-  },
+  params: defineParams => defineParams({
+    api: githubWorkflowsApiRef,
+    deps: { discoveryApi: discoveryApiRef },
+    factory: ({ discoveryApi }) =>
+      new GithubWorkflowsClient({ discoveryApi }),
+  }),
 });

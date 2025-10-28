@@ -83,7 +83,7 @@ const JobLogsComponent : FC<JobLogsComponentProps> = (props) => {
     const {jobId,running } = props;
     const {downloadJobLogs} = useGithuWorkflowsContext();
   
-    const {AccordionLogs,button,modalLog,modalLogContainer,log,normalLogContainer} = useModalStyles();
+    const {AccordionLogs,modalLog,modalLogContainer,log,normalLogContainer} = useModalStyles();
 
     const { loading, error } = useAsync(async (): Promise<void> => {
         const logs = await downloadJobLogs(jobId);
@@ -107,9 +107,6 @@ const JobLogsComponent : FC<JobLogsComponentProps> = (props) => {
         <Accordion TransitionProps={{ unmountOnExit: true }} disabled={running} className={AccordionLogs}>
             <AccordionSummary
               expandIcon={<ExpandMoreIcon />}
-              IconButtonProps={{
-                className: button,
-              }}
             >
             <Typography variant="button">
                 {loading ? <CircularProgress /> : `Job Log`}

@@ -12,7 +12,7 @@ yarn-error.log*
 coverage
 
 # Dependencies
-node_modules/
+**/node_modules
 
 # Yarn files
 .pnp.*

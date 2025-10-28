@@ -1,4 +1,4 @@
-import { FC, useState, useEffect, useReducer } from 'react';
+import { useReducer } from 'react';
 import { useRouteRefParams } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
 import { Progress, ResponseErrorPanel } from '@backstage/core-components';

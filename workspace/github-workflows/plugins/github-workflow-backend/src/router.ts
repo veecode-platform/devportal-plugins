@@ -6,7 +6,7 @@ import Router from 'express-promise-router';
 import { GithubWorkflowsService } from './services/GithubWorkflowsService';
 
 export async function createRouter({
-  httpAuth,
+  httpAuth: _httpAuth,
   githubWorkflowsService,
 }: {
   httpAuth: HttpAuthService;

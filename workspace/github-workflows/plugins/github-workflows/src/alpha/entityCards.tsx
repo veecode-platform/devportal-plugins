@@ -20,7 +20,8 @@ import { isGithubWorkflowsAvailable } from '../hooks';
 /**
  * @alpha
  */
-export const GithubWorkflowsOverviewContent = EntityCardBlueprint.make({
+// eslint-disable-next-line @backstage/no-undeclared-imports
+export const GithubWorkflowsOverviewContent: any = EntityCardBlueprint.make({
   name: 'workflows-cards',
   params: {
     filter: isGithubWorkflowsAvailable,

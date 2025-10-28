@@ -25,7 +25,7 @@ import { rootRouteRef } from './routes';
  * @alpha
  */
 export default createFrontendPlugin({
-  id: 'github-workflows',
+  pluginId: 'github-workflows',
   routes: convertLegacyRouteRefs({
     entityContent: rootRouteRef,
   }),

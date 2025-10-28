@@ -22,11 +22,12 @@ import { isGithubAvailable } from '../hooks';
 /**
  * @alpha
  */
-export const GithubWorkflowsTabContent = EntityContentBlueprint.make({
+// eslint-disable-next-line @backstage/no-undeclared-imports
+export const GithubWorkflowsTabContent: any = EntityContentBlueprint.make({
   name: 'entity',
   params: {
-    defaultPath: 'github-workflows',
-    defaultTitle: 'GitHub Actions',
+    path: 'github-workflows',
+    title: 'GitHub Actions',
     filter: isGithubAvailable,
     routeRef: convertLegacyRouteRef(rootRouteRef),
     loader: () =>

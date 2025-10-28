@@ -32,7 +32,7 @@ export const DetailsComponent: FC<WorkflowDetailsProps> = (props) => {
                 <a href={`https://github.com/${repo}/commit/${headCommit}`} target="_blank" className={link}>
                   {truncateString(headCommit, 7)}
                 </a>
-                <Chip variant='default' label={branch}/>
+                <Chip variant='filled' label={branch}/>
               </div>
           </div>
         </Grid>

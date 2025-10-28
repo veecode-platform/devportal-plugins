@@ -20,7 +20,7 @@ const EnvironmentFieldComponent : FC<EnvironmentFieldProps> = ({name,description
         const data = await listAllEnvironments();
         const environmentOptions : string[] = [''];
         if(data && data.environments){
-            data.environments.map(environment => environmentOptions.push(environment.name))
+            data.environments.map((environment: { name: string }) => environmentOptions.push(environment.name))
         }
         return environmentOptions
     })
