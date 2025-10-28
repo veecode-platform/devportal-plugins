@@ -1,17 +1,8 @@
-import { makeStyles } from '@mui/styles';
-import { Theme } from "@mui/material/styles";
-
-const useStyles = makeStyles((theme: Theme) => ({
-    icon: {
-     marginRight: '1rem'
-    },
-    fill:{
-     fill: theme.palette.action.active
-    }
-}))
+import { useTheme } from '@mui/material/styles';
 
 const GithubIcon = () => {
-  const classes  = useStyles();
+  const theme = useTheme();
+  
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -23,11 +14,11 @@ const GithubIcon = () => {
       width="48"
       height="48"
       id="github"
-      className={classes.icon}
+      style={{ marginRight: '1rem' }}
     >
       <path fill="none" d="M0 0h64v64H0z"/>
       <path
-        className={classes.fill}
+        fill={theme.palette.action.active}
         d="M26.968 42.73A5.978 5.978 0 0 0 26 46c-2 1-5 1-6 0-1.269-1.269-1-2-4-4a3.813 3.813 0 0 0-1.721-.633.737.737 0 0 0-.374 1.286c.781.606 1.824 1.534 2.095 2.347 1 3 3 5 6 5 1.81 0 3.096-.262 4-.597v4.467a4.002 4.002 0 0 1-5.663 3.639C10.708 53.044 4 43.299 4 32 4 16.546 16.546 4 32 4s28 12.546 28 28c0 11.299-6.708 21.044-16.356 25.468a3.958 3.958 0 0 1-5.6-3.598C38 50.185 38 46 38 46a6 6 0 0 0-.969-3.27C44.536 41.812 48 38.408 48 30.5c0-2.723-.924-4.985-2.411-6.802.772-2.083.966-4.568.626-6.692a1 1 0 0 0-1.219-.781c-2.608.645-4.658 1.638-6.174 2.965A20.723 20.723 0 0 0 32 18c-2.19 0-4.576.392-6.822 1.19-1.516-1.327-3.566-2.32-6.174-2.965a1 1 0 0 0-1.219.781c-.34 2.124-.146 4.609.626 6.692C16.924 25.515 16 27.777 16 30.5c0 7.907 3.464 11.311 10.968 12.23Z"
       />
       <path

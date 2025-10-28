@@ -40,7 +40,9 @@ const CardContentComponent: FC = () => {
   };
 
   const { loading } = useAsync(async (): Promise<void> => {
-    await listAllWorkflows(filters);
+    if (entity) {
+      await listAllWorkflows(filters);
+    }
   }, [entity]);
 
   useEffect(() => {
@@ -49,7 +51,9 @@ const CardContentComponent: FC = () => {
   }, []);
 
   useEffect(() => {
-    updateData();
+    if (branch && entity) {
+      updateData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch]);
 
@@ -59,7 +63,7 @@ const CardContentComponent: FC = () => {
     setTimeout(() => setRefreshing(false), 1500);
   };
 
-  if (loading) {
+  if (!entity || loading || !setCardsView || !listAllWorkflows) {
     return <Progress />;
   }
 
@@ -79,25 +83,26 @@ const CardContentComponent: FC = () => {
     </Typography>
   );
 
-  const ActionsCard = (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <SelectBranch />
-      <IconButton
-        aria-label="Refresh"
-        title="Refresh workflows"
-        onClick={handleRefresh}
-        disabled={refreshing}
-        sx={{ padding: 1 }}
-      >
-        <CachedIcon />
-      </IconButton>
-    </Box>
-  );
-
   return (
     <Paper>
       <Card>
-        <CardHeader title={TitleBar} action={ActionsCard} />
+        <CardHeader 
+          title={TitleBar} 
+          action={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <SelectBranch />
+              <IconButton
+                aria-label="Refresh"
+                title="Refresh workflows"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                sx={{ padding: 1 }}
+              >
+                <CachedIcon />
+              </IconButton>
+            </Box>
+          }
+        />
         <CardContent
           sx={{
             display: 'flex',

@@ -12,4 +12,8 @@ services:
       - GITHUB_PRIVATE_KEY
     volumes:
       - ./app-config.yaml:/app/app-config.local.yaml:ro
-      - ./dynamic-plugins.local.yaml:/app/dynamic-plugins.yaml:ro
+      #- ./dynamic-plugins.local.yaml:/app/dynamic-plugins.yaml:ro
+      - ./dynamic-plugins.yaml:/app/dynamic-plugins.yaml:ro
+      # mounting dist-dynamic directly, no need to npm publish
+      - ../plugins/github-workflows/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-dynamic:ro
+      - ../plugins/github-workflow-backend/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-backend-dynamic:ro

@@ -13,7 +13,7 @@ GLOBAL_HEADER_DYNAMIC_PLUGIN := $(PWD)/workspace/global-header/plugins/veecode-g
 HOMEPAGE_DYNAMIC_PLUGIN := $(PWD)/workspace/homepage/plugins/veecode-homepage/dist-dynamic
 
 # Version for github-workflows packages (common, frontend, backend)
-GH_WORKFLOWS_VERSION ?= 1.3.4
+GH_WORKFLOWS_VERSION ?= 1.3.5
 
 .PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin build-github-workflows-common pack-github-workflows-common publish-github-workflows-common build-github-workflows build-github-workflows-dynamic build-github-workflows-backend build-github-workflows-backend-dynamic pack-github-workflows-backend-plugin pack-github-workflows-backend-plugin-dynamic clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header publish-github-workflows publish-github-workflows-dynamic publish-github-workflows-backend publish-github-workflows-backend-dynamic set-github-workflows-version clean-github-workflows-dynamic echo-paths
 

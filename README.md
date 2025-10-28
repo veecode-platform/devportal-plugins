@@ -106,6 +106,18 @@ make publish-github-workflows
 make publish-github-workflows-backend
 make publish-github-workflows-dynamic
 make publish-github-workflows-backend-dynamic
+# check published versions, all 4 must return same version
+make get-github-workflows-version
+```
+
+## Testing dynamic plugins without publishing
+
+We have made a `docker compose` setup that mounts the dist-dynamic folders from plugins to the devportal container.
+
+```bash
+make clean-github-workflows-dynamic
+make build-github-workflows-dynamic
+make build-github-workflows-backend-dynamic
 ```
 
 ## Notes
