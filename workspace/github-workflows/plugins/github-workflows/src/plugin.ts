@@ -30,49 +30,43 @@ export const githubWorkflowsPlugin = createPlugin({
 });
 
 /**
- *  @public
+ * Entity tab component for GitHub Workflows with full table view and routing
+ * @public
  */
-
-export const GithubWorkflowsContent = githubWorkflowsPlugin.provide(
+export const EntityGithubWorkflowsContent = githubWorkflowsPlugin.provide(
   createRoutableExtension({
-    name: 'GithubWorkflowsContent',
+    name: 'EntityGithubWorkflowsContent',
     component: () =>
-      import('./components/GitubWorkflowsContent').then(
-        m => m.GithubWorkflowsContent as any,
+      import('./components/GithubWorkflowsTab').then(
+        m => m.GithubWorkflowsTab as any,
       ),
     mountPoint: rootRouteRef,
   }),
 );
 
 /**
- *  Dynamic export - Component extension for cards
- *  @public
+ * Card component for GitHub Workflows summary (overview page)
+ * Shows workflow status summary with branch selector
+ * @public
  */
-
-export const GithubWorkflowsOverviewContent = githubWorkflowsPlugin.provide(
+export const EntityGithubWorkflowsCard = githubWorkflowsPlugin.provide(
   createComponentExtension({
-    name: 'GithubWorkflowsOverviewContent',
+    name: 'EntityGithubWorkflowsCard',
     component: {
       lazy: () =>
-        import('./components/GitubWorkflowsContent').then(
-          m => m.GithubWorkflowsOverviewContent as any,
+        import('./components/GithubWorkflowsCard').then(
+          m => m.GithubWorkflowsCard as any,
         ),
     },
   }),
 );
 
-/**
- *  Dynamic export
- *  @public
- */
+// Legacy exports for backward compatibility
+// @deprecated Use EntityGithubWorkflowsContent instead
+export const GithubWorkflowsContent = EntityGithubWorkflowsContent;
 
-export const GithubWorkflowsTabContent = githubWorkflowsPlugin.provide(
-  createRoutableExtension({
-    name: 'GithubWorkflowsTabContent',
-    component: () =>
-      import('./components/GitubWorkflowsContent').then(
-        m => m.GithubWorkflowsTabContent as any,
-      ),
-    mountPoint: rootRouteRef,
-  }),
-);
+// @deprecated Use EntityGithubWorkflowsCard instead
+export const GithubWorkflowsOverviewContent = EntityGithubWorkflowsCard;
+
+// @deprecated Use EntityGithubWorkflowsContent instead
+export const GithubWorkflowsTabContent = EntityGithubWorkflowsContent;

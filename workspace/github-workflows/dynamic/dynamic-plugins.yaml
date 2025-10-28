@@ -16,7 +16,7 @@ plugins:
           veecode-platform.backstage-plugin-github-workflows:
             mountPoints:
               - mountPoint: entity.page.overview/cards
-                importName: GithubWorkflowsOverviewContent
+                importName: EntityGithubWorkflowsCard
                 config:
                   layout:
                     gridRowStart:

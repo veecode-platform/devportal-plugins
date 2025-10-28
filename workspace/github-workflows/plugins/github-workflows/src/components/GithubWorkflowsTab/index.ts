@@ -1,0 +1,1 @@
+export { GithubWorkflowsTab } from './GithubWorkflowsTab';
