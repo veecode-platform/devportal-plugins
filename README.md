@@ -32,8 +32,11 @@ Workspaces mantained in this repository:
 
 - homepage: Contains the homepage plugin for DevPortal
 - global-header: Contains the global header plugin for DevPortal
+- github-workflows: Contains the github workflows plugin for DevPortal
 
-## Icons
+## Extra Notes
+
+### Icons
 
 Notice the `defaultMountPoints.tsx` file in "global-header" workspace - it shows how a custom plugin refers to icons using a name (string). This reproduces this plugin's dynamic configuration (wich can also set custom plugins).
 
@@ -45,32 +48,9 @@ In the case of VeeCode DevPortal, due to its support for dynamic plugins, any pl
 
 We have included a "Show icons" button in the global header hosting app to help you debug icon loading issues.
 
-## Makefile
+### Makefile
 
 The root project has a Makefile that helps you manage your releases separately for each workspace. We recommend using a local registry like Verdaccio to validate this process locally.
-
-A few Makefile targets are show below:
-
-```bash
-# Build the global-header plugin
-make build-global-header
-# Build the homepage plugin
-make build-homepage
-# Build the dynamic version of global-header plugin
-make build-global-header-dynamic
-# Build the dynamic version of homepage plugin
-make build-homepage-dynamic
-# Publish the global-header plugin
-make publish-global-header
-# Publish the homepage plugin
-make publish-homepage
-# Publish the dynamic version of global-header plugin
-make publish-global-header-dynamic
-# Publish the dynamic version of homepage plugin
-make publish-homepage-dynamic
-# Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT
-make copy-all-dynamic-plugins
-```
 
 ## Why we do this
 
@@ -94,7 +74,34 @@ unsafeHttpWhitelist:
   - "127.0.0.1"
 ```
 
-## Releasing github-workflows plugins
+## Releases
+
+Releasing plugins is still a "manual" process based on Makefile targets.
+
+### Releasing home and header plugins
+
+```bash
+# Build the global-header plugin
+make build-global-header
+# Build the homepage plugin
+make build-homepage
+# Build the dynamic version of global-header plugin
+make build-global-header-dynamic
+# Build the dynamic version of homepage plugin
+make build-homepage-dynamic
+# Publish the global-header plugin
+make publish-global-header
+# Publish the homepage plugin
+make publish-homepage
+# Publish the dynamic version of global-header plugin
+make publish-global-header-dynamic
+# Publish the dynamic version of homepage plugin
+make publish-homepage-dynamic
+# Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT
+make copy-all-dynamic-plugins
+```
+
+### Releasing github-workflows plugins
 
 Edit the GH_WORKFLOWS_VERSION in the Makefile and run:
 
@@ -122,4 +129,4 @@ make build-github-workflows-backend-dynamic
 
 ## Notes
 
-This repository was created based on previous work by Red Hat. It is organized in the same way as the [Red Hat Developer Hub plugins](https://github.com/redhat-developer/rhdh-plugins) repository.
+This repository was created based on previous work by Red Hat. It is organized in the same way as the [Red Hat Developer Hub plugins](https://github.com/redhat-developer/rhdh-plugins) repository. The dynamic plugins feature is also based on Red Hat's work.

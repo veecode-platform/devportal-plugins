@@ -1,46 +1,57 @@
 # Github Workflows Plugin
 
-The GithubWorkflows plugin provides an alternative for manually triggering GitHub workflows from within your Backstage component.
+The Github Workflows plugin enables manual triggering and monitoring of GitHub Actions workflows directly from Backstage components.
 
-The plugin offers two distinct approaches to integrate with your component:
+## Features
 
-- On-demand workflows, which are configured via annotations in your project's `catalog-info.yaml`.
-- A complete listing of the workflows available in your project.
+- **Complete Workflow Listing**: View all workflows in your repository with status, branch filtering, and execution history
+- **On-Demand Workflows**: Configure specific workflows via annotations in your `catalog-info.yaml`
+- **Workflow Parameters**: Support for workflows with input parameters
+- **Detailed Logs**: View workflow execution details, job steps, and logs
+- **Multiple Views**: Table view for full listings or card view for overview pages
 
-## Our community
+## Our Community
 
-> 💬  **Join Us**
+> 💬 **Join Us**
 >
 > Join our community to resolve questions about our **Plugins**. We look forward to welcoming you!
 >
-> [Check our Community  🚀](https://github.com/orgs/veecode-platform/discussions)
+> [Check our Community 🚀](https://github.com/orgs/veecode-platform/discussions)
 
-## Getting Started
+## Prerequisites
 
-Before installing the plugin, there are some prerequisites to ensure its functionality:
+Before installing the plugin, ensure you have:
 
-- Have a working Backstage project you can build with this plugin *or* a working Backstage instance compatible with dynamic plugins (like VeeCode DevPortal or RHDH).
-- Set up the catalog and integrate with GitHub with a `Personal Access Token`  or `Github App`. You can read [How to configure the integration](https://backstage.io/docs/integrations/) for more details.
-- Configure GitHub authentication. You can read [How to configure authentication](https://backstage.io/docs/auth/).
-- Configure the default GitHub Actions plugin, :heavy_check_mark: [Documentation of the Github actions plugin :page_with_curl:](https://github.com/backstage/backstage/tree/master/plugins/github-actions) .
+- A working Backstage project (for static installation) **or** a Backstage instance compatible with dynamic plugins (VeeCode DevPortal or Red Hat Developer Hub)
+- **Backend Plugin**: The GitHub Workflows backend plugin must be installed and configured. See the [backend plugin documentation](../github-workflows-backend/README.md)
+- GitHub integration configured with a `Personal Access Token` or `GitHub App`. See [Backstage GitHub Integration](https://backstage.io/docs/integrations/)
+- GitHub authentication configured. See [GitHub Auth Provider](https://backstage.io/docs/auth/github/provider)
+
+> ⚠️ **Important**: This is a **frontend plugin** that requires the corresponding **backend plugin** to function. The GitHub token/app configuration is used by the backend plugin.
 
 ## Installation
 
-This plugin is compatible with both static linking (the usual Backstage way) and dynamic linking (currently supported by VeeCode DevPortal and Red Hat Developer Hub).
+This plugin supports both **static linking** (traditional Backstage) and **dynamic plugin loading** (VeeCode DevPortal and Red Hat Developer Hub).
+
+> ⚠️ **Backend Plugin Required**: Before installing the frontend plugin, ensure the GitHub Workflows backend plugin is installed. See the [backend plugin documentation](../github-workflows-backend/README.md) for installation instructions.
 
 ### Static Installation
 
-If you wish to statically load the plugin (the usual Backstage way), just add the plugin import to the frontend app:
+Add the frontend plugin package to your Backstage app:
 
 ```bash
 yarn workspace app add @veecode-platform/backstage-plugin-github-workflows
 ```
 
-TODO: describe how the new FE system loads it
+> ⚠️ **Note**: The new Backstage frontend system is not yet supported (Work in Progress). The plugin currently uses the legacy frontend system.
 
-### Dynamic Installation (VeeCode DevPortal)
+### Dynamic Installation
 
-This plugin is already bundled in VeeCode DevPortal with a sensible default configuration, so you don't need to install it, just enabled it in the `dynamic-plugins.yaml` file:
+Dynamic plugin installation is available for both **VeeCode DevPortal** and **Red Hat Developer Hub (RHDH)**.
+
+#### VeeCode DevPortal
+
+The plugin is **bundled in the file system** and ready to use. Enable it in `dynamic-plugins.yaml`:
 
 ```yaml
 plugins:
@@ -48,417 +59,437 @@ plugins:
     disabled: false
 ```
 
-### Dynamic Installation (RHDH)
+#### Red Hat Developer Hub (RHDH)
 
-This plugin can be downloaded by RHDH during start time, just add the plugin to the `dynamic-plugins.yaml` file (check versions available):
+RHDH can **download the plugin at runtime** using NPM. Add it to `dynamic-plugins.yaml`:
 
 ```yaml
 plugins:
-  - package: @veecode-platform/backstage-plugin-github-workflows@x.y.z
+  - package: '@veecode-platform/backstage-plugin-github-workflows-dynamic@^1.0.0'
     disabled: false
-    integrity: sha512-xxxxxx
-      pluginConfig:
-        dynamicPlugins:
-          frontend:
-            veecode-platform.backstage-plugin-github-workflows:
-              # mountpoints, etc.
+    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-github-workflows:
+            appIcons:
+              - name: githubWorkflowsIcon
+                module: GithubWorkflowsPlugin
+                importName: GithubWorkflowsIcon
 ```
+
+> 💡 **Tip**: Check the [npm registry](https://www.npmjs.com/package/@veecode-platform/backstage-plugin-github-workflows-dynamic) for the latest version and integrity hash.
 
 ## Configuration
 
-This plugin relies on the common Github integration and auth provider configrations.
+Configuration is divided into two parts: **Static Configuration** (required for all installations) and **Dynamic Configuration** (specific to dynamic plugin loading).
 
-### GitHub Token
+### Static Configuration
 
-When using GitHub Tokens configure it correctly in `app-config.yaml` under `integrations`, as below:
+These settings are required regardless of installation method and must be configured in your `app-config.yaml`.
+
+> 💡 **Note**: The GitHub integration settings below are used by the **backend plugin**. Ensure the backend plugin is properly installed and configured.
+
+#### GitHub Integration
+
+Configure GitHub integration with either a Personal Access Token or GitHub App credentials (used by the backend plugin):
+
+##### Option 1: Personal Access Token
 
 ```yaml
 integrations:
   github:
     - host: github.com
       token: ${GITHUB_TOKEN}
-      # if using GHE inform your URL
-      # apiBaseUrl: https://api.github.com/
+      # For GitHub Enterprise, specify your URL:
+      # apiBaseUrl: https://api.your-ghe-instance.com/
 ```
 
-This is the simplest way to configure the plugin, but it is subject to GitHub rate limits. Please refer to [GitHub Access Configuration](https://docs.platform.vee.codes/devportal/installation-guide/local-setup/github) on VeeCode DevPortal on how to properly create and authorize a GitHub Access token.
+> ⚠️ **Note**: This method is subject to GitHub rate limits. For production use, consider using a GitHub App. See [GitHub Access Configuration](https://docs.platform.vee.codes/devportal/installation-guide/local-setup/github).
 
-### Github App
-
-Make sure you have an github auth provider in your devportal. See how [Add Github Auth Provider 📃](https://backstage.io/docs/auth/github/provider)
+##### Option 2: GitHub App (Recommended for production)
 
 ```yaml
 auth:
-  environment: development
+  environment: production
   providers: 
     github:
-      development:
+      production:
         clientId: ${AUTH_GITHUB_CLIENT_ID}
         clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
 ```
 
-3- To trigger workflows directly from our component, it's important to add the ` workflow_dispatch:` step in our GitHub workflow, like this:
+See [Add GitHub Auth Provider](https://backstage.io/docs/auth/github/provider) for detailed setup instructions.
 
-```diff
-# Workflow Example
+#### GitHub Workflows Setup
 
-name: Deploy Next.js site to Pages
+To enable manual triggering, add `workflow_dispatch:` to your GitHub workflow files:
+
+```yaml
+name: Deploy Application
 
 on:
   push:
-    branches: ["master"]
-+ workflow_dispatch:
-
- ....
+    branches: ["main"]
+  workflow_dispatch:  # Required for manual triggering
+    inputs:  # Optional: define input parameters
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
 ```
 
+> 💡 **Workflow Parameters**: The plugin automatically detects and renders input forms for workflows with parameters. Required parameters must be provided before triggering.
 
-Even if no parameters are passed to this key, it must be present in the file to enable event triggering through the Backstage component.
+#### Catalog Annotations
 
-
->
->
->#####  Parameters
->
->:information_source: It's possible to set parameters in the workflow as well, and the plugin understands them. Actions will only be triggered if the required parameters are sent.
->
->
-
-
-
-
-
-4- We need a primary annotation, commonly used by all Backstage components,`github.com/project-slug`, where the project name is set.
-
-As a main prerequisite, this annotation must be declared in the `catalog-info.yaml`of the component that will receive this functionality.
-
-
-```diff
-apiVersion: backstage.io/v1alpha1
-kind: Component
-metadata:
-  name: "Example Component"
-  description: "An example Backstage Components"
-  links:
-    - title: Website
-      url: http://backstage.io
-    - title: Documentation
-      url: https://backstage.io/docs
-    - title: Storybook
-      url: https://backstage.io/storybook
-    - title: Discord Chat
-      url: https://discord.com/invite/EBHEGzX
-  annotations:
-+    github.com/project-slug: owner/repo
-    backstage.io/techdocs-ref: dir:.
-   
-spec:
-  type: website
-  lifecycle: experimental
-  owner: default
-```
-
-
-
-* * *
-
- 
-
-### Workflows Table View
-
-
-
-
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/8e8e0e74-7a3e-4128-b7c6-ed9e90e28bb5)
-
-
-
-
-
-
-The component essentially lists all the workflows available in the repository.
-In its header, we highlight the select that filters all available branches in the project and the refresh button to update the workflow states.
-
-The table is divided by workflow name, status, action, and link to the repository.
-
-In some cases, to trigger an action, it may require parameters, as configured in your workflow. Instead of an action button, a modal is displayed to set the requested parameters:
-
-
-
-![image2](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/06390934-c04e-4059-bf01-551a467a294a)
-
-
-
-When an event is triggered in the workflow, the status is updated, and the conclusion is returned after refreshing the table.
-
-
-
-![image3](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/9b92c472-45de-4e64-9618-b96cc8a574c3)
-
-
-
-**Example of adding the new tab to a serviceEntityPage**
-`packages/app/src/components/catalog/EntityPage.tsx`
-
-
-
-```diff
-+ import { GithubWorkflowsContent, isGithubAvailable } from '@veecode-platform/backstage-plugin-github-workflows'
-...
-
-+ const cicdContent = (
-+  <EntitySwitch>
-+    <EntitySwitch.Case if={isGithubActionsAvailable}>
-+      <GithubWorkflowsContent/>
-+    </EntitySwitch.Case>
-+
-+    <EntitySwitch.Case>
-+      <EmptyState
-+        title="No CI/CD available for this entity"
-+        missing="info"
-+        description="You need to add an annotation to your component if you want to enable CI/CD for it. You can read more
-+        about annotations in Backstage by clicking the button below."
-+        action={
-+          <Button
-+            variant="contained"
-+            color="primary"
-+            href="https://backstage.io/docs/features/software-catalog/well-known-annotations"
-+          >
-+            Read more
-+          </Button>
-+        }
-+      />
-+    </EntitySwitch.Case>
-+  </EntitySwitch>
-+ );
-
-...
-
-```
-
-
-
-* * *
-
-
-
-### Workflow Cards View
-
-For this component, we need to add a special annotation, `github.com/workflows`, like this:
-
-
-
-```diff
-apiVersion: backstage.io/v1alpha1
-kind: Component
-metadata:
-  name: "Example Component"
-  description: "An example Backstage Components"
-  links:
-    - title: Website
-      url: http://backstage.io
-    - title: Documentation
-      url: https://backstage.io/docs
-    - title: Storybook
-      url: https://backstage.io/storybook
-    - title: Discord Chat
-      url: https://discord.com/invite/EBHEGzX
-  annotations:
-    github.com/project-slug: owner/repo
-    backstage.io/techdocs-ref: dir:.
-+   github.com/workflows: fileName.yml
-   
-spec:
-  type: website
-  lifecycle: experimental
-  owner: default
-```
-
-The composition of the **annotation** works like this:
-
-
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/290fc11a-020f-449d-bdf7-a0829c452666)
-
-
-
-:information_source:  It's important to note that you can add multiple **workflow paths**, separated by commas, like this:
-
+Add the required annotation to your component's `catalog-info.yaml`:
 
 ```yaml
-github.com/workflows: filePath.yml,filePath2.yml,filePath3.yml,
-```
-
-
-The functionality is identical to the workflow listing component, with the main difference being that only the workflows passed via annotation are listed, instead of all the workflows in the repository.
-
-
-
-
-
-![image5](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/39ff37fa-6ca6-4a8e-9f23-499353801b53)
-
-
-The above approach guarantees the rendering of a card with a button to trigger the workflow provided in the component overview. There is also the possibility of customizing the card's label and the tooltip message that appears when you hover the mouse over the card, adding it via annotation:
-
-```diff
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: "Example Component"
-  description: "An example Backstage Components"
-  links:
-    - title: Website
-      url: http://backstage.io
-    - title: Documentation
-      url: https://backstage.io/docs
-    - title: Storybook
-      url: https://backstage.io/storybook
-    - title: Discord Chat
-      url: https://discord.com/invite/EBHEGzX
+  name: my-service
   annotations:
-    github.com/project-slug: owner/repo
-    backstage.io/techdocs-ref: dir:.
--   github.com/workflows: fileName.yml
-+   github.com/workflows: |
-+      [
-+        {
-+          "workflow": "fileName.yml",
-+          "label": "Start",
-+          "tooltip": "click here and start the workflow process"
-+        }
-+      ]
-   
+    github.com/project-slug: owner/repository  # Required
 spec:
-  type: website
-  lifecycle: experimental
-  owner: default
+  type: service
+  owner: team-a
+  lifecycle: production
 ```
 
+#### CSP Configuration (Optional)
 
-> ℹ️ This way we can add a personalized label to the card and also a more detailed message when hovering over the card. Remember that both approaches are valid and if no custom information is added, the default behavior is for the card label to be the name defined in the workflow header and the tooltip will also receive this name from the workflow.
+To display GitHub user avatars, allow the GitHub avatars domain:
 
+```yaml
+backend:
+  csp:
+    connect-src: ["'self'", 'http:', 'https:']
+    script-src: ["'self'", "'unsafe-eval'"]
+    img-src: ["'self'", 'data:', 'https://avatars.githubusercontent.com/']
+```
 
+### Dynamic Configuration
 
-<br>
+When using dynamic plugin loading, additional configuration may be needed depending on your platform.
 
+#### VeeCode DevPortal Configuration
 
-To use the `cards view` variant, simply add the `cards` property to our `GithubWorkflowsContent` component:
+No additional configuration is required beyond enabling the plugin in `dynamic-plugins.yaml`. The plugin uses the static configuration from `app-config.yaml`.
 
-`packages/app/src/components/catalog/EntityPage.tsx`
+```yaml
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-dynamic
+    disabled: false
+```
 
+#### Red Hat Developer Hub (RHDH) Configuration
 
-```diff
-+ import { isGithubWorkflowsAvailable, GithubWorkflowsContent } from '@veecode-platform/backstage-plugin-github-workflows'
+RHDH may require additional mountpoint configuration:
 
-....
+```yaml
+plugins:
+  - package: '@veecode-platform/backstage-plugin-github-workflows-dynamic@^1.0.0'
+    disabled: false
+    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-github-workflows:
+            dynamicRoutes:
+              - path: /github-workflows
+                importName: GithubWorkflowsPage
+                menuItem:
+                  text: 'GitHub Workflows'
+                  icon: githubWorkflowsIcon
+            appIcons:
+              - name: githubWorkflowsIcon
+                module: GithubWorkflowsPlugin
+                importName: GithubWorkflowsIcon
+            mountPoints:
+              - mountPoint: entity.page.ci/cards
+                importName: EntityGithubWorkflowsCard
+                config:
+                  layout:
+                    gridColumnEnd:
+                      lg: 'span 4'
+                      md: 'span 6'
+                      xs: 'span 12'
+              - mountPoint: entity.page.ci
+                importName: EntityGithubWorkflowsContent
+                config:
+                  if:
+                    allOf:
+                      - isGithubActionsAvailable
+```
+
+## Usage (Static Installation)
+
+> **Note**: This section applies only to static installations. For dynamic installations, use the mountpoint configuration shown in the Dynamic Configuration section above.
+
+### Exported Components
+
+The plugin exports the following components:
+
+#### Current Components
+
+- **`EntityGithubWorkflowsContent`** - Full workflow listing with table view and routing support for details pages (use in entity tabs)
+- **`EntityGithubWorkflowsCard`** - Workflow summary card for overview pages (use in entity overview)
+- **`isGithubActionsAvailable`** - Conditional function to check if the entity has GitHub Actions configured
+
+#### Legacy Components (Deprecated)
+
+The following exports are maintained for backward compatibility but are deprecated:
+
+- `GithubWorkflowsContent` → Use `EntityGithubWorkflowsContent`
+- `GithubWorkflowsOverviewContent` → Use `EntityGithubWorkflowsCard`
+- `GithubWorkflowsTabContent` → Use `EntityGithubWorkflowsContent`
+
+### Adding to Entity Pages
+
+Edit your `packages/app/src/components/catalog/EntityPage.tsx`:
+
+#### Table View (CI/CD Tab)
+
+Add a complete workflow listing to a dedicated CI/CD tab:
+
+```tsx
+import { 
+  EntityGithubWorkflowsContent, 
+  isGithubActionsAvailable 
+} from '@veecode-platform/backstage-plugin-github-workflows';
+import { EntitySwitch } from '@backstage/plugin-catalog';
+import { EmptyState } from '@backstage/core-components';
+
+const cicdContent = (
+  <EntitySwitch>
+    <EntitySwitch.Case if={isGithubActionsAvailable}>
+      <EntityGithubWorkflowsContent />
+    </EntitySwitch.Case>
+    <EntitySwitch.Case>
+      <EmptyState
+        title="No CI/CD available for this entity"
+        missing="info"
+        description="Add the github.com/project-slug annotation to your component to enable CI/CD."
+      />
+    </EntitySwitch.Case>
+  </EntitySwitch>
+);
+
+// Add to your entity page:
+const serviceEntityPage = (
+  <EntityLayout>
+    {/* ... other tabs ... */}
+    <EntityLayout.Route path="/ci-cd" title="CI/CD">
+      {cicdContent}
+    </EntityLayout.Route>
+  </EntityLayout>
+);
+```
+
+#### Card View (Overview Page)
+
+Add workflow cards to the entity overview page:
+
+```tsx
+import { 
+  EntityGithubWorkflowsCard, 
+  isGithubActionsAvailable 
+} from '@veecode-platform/backstage-plugin-github-workflows';
+import { EntitySwitch } from '@backstage/plugin-catalog';
+import { Grid } from '@material-ui/core';
 
 const overviewContent = (
-  <Grid container spacing={3} alignItems="stretch">
-    {entityWarningContent}
+  <Grid container spacing={3}>
     <Grid item md={6}>
-      <EntityAboutCard variant="gridItem" />
+      <EntityAboutCard />
     </Grid>
-    <Grid item md={6} xs={12}>
-      <EntityCatalogGraphCard variant="gridItem" height={400} />
-    </Grid>
-
-+    <EntitySwitch>
-+      <EntitySwitch.Case if={isGithubWorkflowsAvailable}>
-+        <Grid item lg={8} xs={12}>
-+            <GithubWorkflowsContent cards />
-+        </Grid>
-+      </EntitySwitch.Case>
-+    </EntitySwitch>
     
-    <Grid item md={4} xs={12}>
-      <EntityLinksCard />
-    </Grid>
-    <Grid item md={8} xs={12}>
-      <EntityHasSubcomponentsCard variant="gridItem" />
-    </Grid> 
+    <EntitySwitch>
+      <EntitySwitch.Case if={isGithubActionsAvailable}>
+        <Grid item lg={8} xs={12}>
+          <EntityGithubWorkflowsCard />
+        </Grid>
+      </EntitySwitch.Case>
+    </EntitySwitch>
+    
+    {/* ... other cards ... */}
   </Grid>
 );
 ```
-> ℹ️ It is important to note that for the **cards** variant, we can pass the filter of which workflows we want to view, through the annotation `github.com/workflows`, but if the annotation is not passed, all the workflows in the repository will be listed, as it will assume the default behavior followed by the default component.
 
+## Workflow Annotations
 
-It works like this:
+The plugin supports filtering which workflows to display using the `github.com/workflows` annotation.
 
+### Basic Usage
 
+Filter specific workflows by filename:
 
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: my-service
+  annotations:
+    github.com/project-slug: owner/repo
+    github.com/workflows: deploy.yml  # Single workflow
+spec:
+  type: service
+  owner: team-a
+```
 
-![image6](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/34593129-68bc-44a0-aee7-b1d8c7d12743)
+### Multiple Workflows
 
+List multiple workflows separated by commas:
 
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: my-service
+  annotations:
+    github.com/project-slug: owner/repo
+    github.com/workflows: deploy.yml,test.yml,build.yml
+spec:
+  type: service
+  owner: team-a
+```
 
+### Custom Labels and Tooltips
 
+Customize card labels and tooltips using JSON format:
 
-In its header we have the select of the repository branches and a refresh button.
+```yaml
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: my-service
+  annotations:
+    github.com/project-slug: owner/repo
+    github.com/workflows: |
+      [
+        {
+          "workflow": "deploy-prod.yml",
+          "label": "Deploy to Production",
+          "tooltip": "Trigger production deployment"
+        },
+        {
+          "workflow": "deploy-staging.yml",
+          "label": "Deploy to Staging",
+          "tooltip": "Trigger staging deployment"
+        }
+      ]
+spec:
+  type: service
+  owner: team-a
+```
 
-In its body, the workflows that were added via annotation, and each card has its status, workflow name as label and the action button.
+> 💡 **Note**: If no `github.com/workflows` annotation is provided, all workflows in the repository will be displayed.
 
-As with the Workflow list, there are cases of workflows that trigger parameters before releasing their actions, and the card has the same behavior as the Workflow list, it triggers a modal so that the inputs are set:
+## Features Overview
 
+### Workflow Table View
 
+![Workflow Table](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/8e8e0e74-7a3e-4128-b7c6-ed9e90e28bb5)
 
+The table view provides:
 
-![Captura de tela de 2023-08-14 10-30-03](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/83d16247-3b7a-4939-9736-af9ff6a89ae7)
+- Complete list of all workflows in the repository
+- Branch selector to view workflows on different branches
+- Refresh button to update workflow states
+- Status indicators for each workflow
+- Action buttons to trigger workflow execution
+- Direct links to GitHub repository
 
+### Workflow Parameters
 
+For workflows requiring input parameters, a modal dialog is automatically displayed:
 
+![Workflow Parameters Modal](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/06390934-c04e-4059-bf01-551a467a294a)
 
+### Workflow Execution Status
 
-![image8](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/4051b0d1-a51a-40ae-9924-081d283e3662)
+Status updates in real-time as workflows execute:
 
+![Workflow Status](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/9b92c472-45de-4e64-9618-b96cc8a574c3)
 
+### Workflow Card View
 
+![Workflow Cards](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/34593129-68bc-44a0-aee7-b1d8c7d12743)
 
+Card view features:
 
-The functioning of the actions is also similar, when you click on the action button, it updates the status according to the github response:
+- Branch selector and refresh button
+- Status indicators for each workflow
+- Custom labels and tooltips
+- Action buttons for workflow execution
 
+### Parameter Input for Cards
 
+![Card Parameters](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/83d16247-3b7a-4939-9736-af9ff6a89ae7)
 
+![Card Execution](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/4051b0d1-a51a-40ae-9924-081d283e3662)
 
-![image9](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/f9f9e2ad-70ff-468e-b45c-7d5e1f2dc60d)
+### Workflow Status Updates
 
-
-
-
-
+![Status Updates](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/f9f9e2ad-70ff-468e-b45c-7d5e1f2dc60d)
 
 ### Workflow Details & Logs
 
-In the Workflows List component, clicking on the Logs column:
+Access detailed workflow information by clicking:
 
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/3a74f198-f6d0-4552-9810-71ce1a8f6849)
+- **Table View**: Click the workflow name or logs icon in the table
+- **Card View**: Click anywhere on the workflow card
 
+![Workflow Logs Access - Table](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/3a74f198-f6d0-4552-9810-71ce1a8f6849)
 
-In the Card component, clicking under the component label:
+![Workflow Logs Access - Card](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/a02b88f2-40fc-4281-a88f-44d903a57930)
 
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/a02b88f2-40fc-4281-a88f-44d903a57930)
+#### Workflow Run Details
 
+The details page displays comprehensive information about the workflow execution:
 
-The Details component is then rendered with information about the last time the workflow was run, it stores information about the author of the commit, the commit id with link to github, the status and duration of the workflow in total.
+- Commit author with avatar
+- Commit ID with link to GitHub
+- Workflow status and duration
+- Workflow name and file path
+- Trigger event information
 
-In addition, in the body of the page, it contains the name and filePath of the workflow and how it was executed, followed by the jobs:
+![Workflow Details](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/31363776-44bb-4e20-8bdf-766919677910)
 
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/31363776-44bb-4e20-8bdf-766919677910)
+#### Job Steps and Logs
 
-In each Job we have the steps executed and at the end we have the log of that job, which can be rendered in the component itself or expanded to a new modal:
+Each job shows:
 
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/87c83b09-300e-4103-90f2-5cc965ff593c)
+- Individual step execution status
+- Step duration
+- Complete job logs (viewable inline or in expanded modal)
 
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/f671c396-7215-44e7-bfd4-d51c684633e2)
+![Job Steps](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/87c83b09-300e-4103-90f2-5cc965ff593c)
 
-![image](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/aadd7f14-a76a-4d93-9f07-f64630a8f5b7)
+![Inline Logs](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/f671c396-7215-44e7-bfd4-d51c684633e2)
 
+![Expanded Logs Modal](https://github.com/veecode-platform/platform-backstage-plugins/assets/84424883/aadd7f14-a76a-4d93-9f07-f64630a8f5b7)
 
- ℹ️ **For github profile avatars to render, add this url to be allowed in your `app-config.yaml`**
- 
+## Troubleshooting
 
- ```diff
-   csp:
-    connect-src: ["'self'", 'http:', 'https:']
-    script-src: ["'self'", "'unsafe-eval'"]
-+   img-src: ["'self'", 'data:','https://avatars.githubusercontent.com/']
-```
+### GitHub Avatars Not Displaying
+
+If GitHub user avatars are not rendering, ensure the CSP configuration allows GitHub's avatar domain (see [CSP Configuration](#csp-configuration-optional) above).
+
+## Support
+
+For questions, issues, or feature requests:
+
+- [GitHub Discussions](https://github.com/orgs/veecode-platform/discussions)
+- [Report an Issue](https://github.com/veecode-platform/devportal-plugins/issues)
+
+## License
+
+This plugin is licensed under the Apache License 2.0. See the [LICENSE](../../LICENSE) file for details.

@@ -1,6 +1,8 @@
-# github-workflow-backend
+# GitHub Workflows Backend Plugin
 
-This plugin provides GitHub workflows API endpoints for Backstage, moving GitHub API interactions from the frontend to the backend for better security, CORS handling, and potential caching.
+This backend plugin provides secure GitHub workflows API endpoints for Backstage, moving GitHub API interactions from the frontend to the backend for better security, CORS handling, and potential caching.
+
+> 💡 **Frontend Plugin**: This backend plugin is required by the [GitHub Workflows frontend plugin](../github-workflows/README.md). Install both plugins to enable GitHub workflow management in Backstage.
 
 ## Features
 
@@ -19,7 +21,11 @@ This plugin provides GitHub workflows API endpoints for Backstage, moving GitHub
 
 ## Installation
 
-This plugin is installed via the `@veecode-platform/backstage-plugin-github-workflows-backend` package. To install it to your backend package, run the following command:
+This plugin supports both **static linking** (traditional Backstage) and **dynamic plugin loading** (VeeCode DevPortal and Red Hat Developer Hub).
+
+### Static Installation
+
+Install the backend plugin package:
 
 ```bash
 # From your root directory
@@ -34,9 +40,36 @@ const backend = createBackend();
 backend.add(import('@veecode-platform/backstage-plugin-github-workflows-backend'));
 ```
 
+### Dynamic Installation
+
+Dynamic plugin installation is available for both **VeeCode DevPortal** and **Red Hat Developer Hub (RHDH)**.
+
+#### VeeCode DevPortal
+
+The plugin is **bundled in the file system** and ready to use. Enable it in `dynamic-plugins.yaml`:
+
+```yaml
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-backend-dynamic
+    disabled: false
+```
+
+#### Red Hat Developer Hub (RHDH)
+
+RHDH can **download the plugin at runtime** using NPM. Add it to `dynamic-plugins.yaml`:
+
+```yaml
+plugins:
+  - package: '@veecode-platform/backstage-plugin-github-workflows-backend-dynamic@^1.0.0'
+    disabled: false
+    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+> 💡 **Tip**: Check the [npm registry](https://www.npmjs.com/package/@veecode-platform/backstage-plugin-github-workflows-backend-dynamic) for the latest version and integrity hash.
+
 ## Configuration
 
-Add the following configuration to your `app-config.yaml`:
+The following configuration applies to all installation methods and must be added to your `app-config.yaml`:
 
 ### Option 1: GitHub App (Recommended)
 
@@ -77,6 +110,13 @@ integrations:
             ${GITHUB_PRIVATE_KEY}
       apiBaseUrl: https://github.yourcompany.com/api/v3
 ```
+
+**Required Permissions:**
+
+This GitHub App must have the following permissions on repos:
+
+- Actions: Read and write
+- Contents: Read-only
 
 **How to verify GitHub App authentication:**
 
@@ -168,16 +208,29 @@ curl -X POST "http://localhost:7007/api/github-workflow-backend/stop" \
 
 ## API Endpoints
 
-The plugin exposes the following endpoints under `/gh-workflows`:
+The plugin exposes the following endpoints under `/api/github-workflow-backend`:
 
-- `GET /workflows` - List workflows
+- `GET /workflows` - List workflows for a repository
 - `GET /branches` - List repository branches  
-- `GET /default-branch` - Get default branch
+- `GET /default-branch` - Get the default branch
 - `POST /start` - Start a workflow run
 - `POST /stop` - Stop a workflow run
 - `GET /jobs` - List jobs for a workflow run
 - `GET /run/:id` - Get workflow run details
 - `GET /logs/:jobId` - Download job logs
-- `GET /environments` - List environments
+- `GET /environments` - List repository environments
+
+## Full Stack Development
 
 If you want to run the entire project, including the frontend, run `yarn start` from the root directory.
+
+## Summary
+
+This backend plugin is a critical component of the GitHub Workflows integration:
+
+- **Static Installation**: Install via yarn and add to `packages/backend/src/index.ts`
+- **Dynamic Installation**:
+  - **VeeCode DevPortal**: Bundled in file system, enable in `dynamic-plugins.yaml`
+  - **RHDH**: Downloaded at runtime via NPM, configure in `dynamic-plugins.yaml`
+- **Configuration**: GitHub App (recommended) or Personal Access Token in `app-config.yaml`
+- **Frontend**: Works with the [GitHub Workflows frontend plugin](../github-workflows/README.md)
