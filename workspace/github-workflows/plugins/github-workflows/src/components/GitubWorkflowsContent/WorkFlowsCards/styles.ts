@@ -1,6 +1,7 @@
 import { makeStyles } from "@mui/styles";
+import { Theme } from "@mui/material/styles";
 
-export const useWorkflowCardStyles = makeStyles(theme => ({
+export const useWorkflowCardStyles = makeStyles((theme: Theme) => ({
     title: {
       paddingLeft: '1.5rem',
       fontSize: '1.5rem',

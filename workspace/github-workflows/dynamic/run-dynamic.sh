@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # get the current release version from backend package.json
-VERSION=$(cat ../plugins/github-workflow-backend/package.json | grep version | cut -d '"' -f 4)
+export VERSION=$(cat ../plugins/github-workflow-backend/package.json | grep version | cut -d '"' -f 4)
 echo "Using version $VERSION"
 
 export BACKEND_INTEGRITY=$(npm view @veecode-platform/backstage-plugin-github-workflows-backend-dynamic@${VERSION} dist.integrity)

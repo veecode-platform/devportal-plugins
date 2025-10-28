@@ -20,6 +20,6 @@ plugins:
                 config:
                   layout:
                     gridRowStart:
-                      lg: "3"
+                      lg: "4"
                     gridColumnStart:
-                      lg: "-1"      
+                      lg: "1"      

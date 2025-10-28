@@ -1,6 +1,7 @@
 import { makeStyles } from "@mui/styles";
+import { Theme } from "@mui/material/styles";
 
-export const useModalStyles = makeStyles(theme=>({
+export const useModalStyles = makeStyles((theme: Theme) => ({
     modal: {
         padding: '2rem',
         borderTop: `1px solid ${theme.palette.divider}`,

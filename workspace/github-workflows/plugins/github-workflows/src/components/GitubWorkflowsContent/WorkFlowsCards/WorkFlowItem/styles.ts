@@ -1,6 +1,7 @@
 import { makeStyles } from "@mui/styles";
+import { Theme } from "@mui/material/styles";
 
-export const useWorkflowItemStyles = makeStyles(theme => ({
+export const useWorkflowItemStyles = makeStyles((theme: Theme) => ({
     workflow: {
       padding: '.8rem 3rem',
       background: 'transparent',

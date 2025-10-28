@@ -1,5 +1,6 @@
 import {
   createApiFactory,
+  createComponentExtension,
   createPlugin,
   createRoutableExtension,
   discoveryApiRef,
@@ -44,18 +45,19 @@ export const GithubWorkflowsContent = githubWorkflowsPlugin.provide(
 );
 
 /**
- *  Dynamic export
+ *  Dynamic export - Component extension for cards
  *  @public
  */
 
 export const GithubWorkflowsOverviewContent = githubWorkflowsPlugin.provide(
-  createRoutableExtension({
+  createComponentExtension({
     name: 'GithubWorkflowsOverviewContent',
-    component: () =>
-      import('./components/GitubWorkflowsContent').then(
-        m => m.GithubWorkflowsOverviewContent as any,
-      ),
-    mountPoint: rootRouteRef,
+    component: {
+      lazy: () =>
+        import('./components/GitubWorkflowsContent').then(
+          m => m.GithubWorkflowsOverviewContent as any,
+        ),
+    },
   }),
 );
 

@@ -60,7 +60,7 @@ import {
 
 import { 
   isGithubWorkflowsAvailable, 
-  GithubWorkflowsContent 
+  GithubWorkflowsOverviewContent 
 } from '@veecode-platform/backstage-plugin-github-workflows'
 
 const techdocsContent = (
@@ -142,7 +142,7 @@ const overviewContent = (
     <EntitySwitch>
       <EntitySwitch.Case if={isGithubWorkflowsAvailable}>
         <Grid item lg={8} xs={12}>
-            <GithubWorkflowsContent cards />
+            <GithubWorkflowsOverviewContent />
         </Grid>
       </EntitySwitch.Case>
     </EntitySwitch>

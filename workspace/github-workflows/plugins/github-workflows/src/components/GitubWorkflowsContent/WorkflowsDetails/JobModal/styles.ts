@@ -1,6 +1,7 @@
 import { makeStyles } from "@mui/styles";
+import { Theme } from "@mui/material/styles";
 
-export const useModalStyles = makeStyles(theme=>({
+export const useModalStyles = makeStyles((theme: Theme) => ({
    modalOnBlur:{
     width: '100%',
     height: '100%',
