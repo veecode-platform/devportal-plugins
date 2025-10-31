@@ -1,0 +1,143 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: kong-gateway-from-openapi
+  title: Kong Gateway from OpenAPI
+  description: "Scaffold a repo that generates Kong Services/Routes from an OpenAPI spec using decK, and syncs to Kong."
+  tags: [kong, deck, openapi, gateway, k8s, kic, gitops]
+spec:
+  owner: group:default/admins
+  type: service
+
+  # These parameters are used to generate the input form in the frontend, and are
+  # used to gather input data for the execution of the template.
+  parameters:
+    - title: Fill in some steps
+      required:
+        - name
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Unique name of the component
+          ui:autofocus: true
+          ui:options:
+            rows: 5
+        description:
+          title: Description
+          type: string
+          default: "Kong config generated from OAS via decK"
+    - title: Choose a location
+      required:
+        - publishDestination
+      properties:
+        publishDestination:
+          title: Publish Destination
+          type: string
+          enum: [github, local]
+          enumNames: ['GitHub Repository', 'Local Folder']
+          default: github
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+            allowedOwners:
+              - veecode-demos
+
+    - title: Inputs for generation & sync
+      required: [openapiSourceType, upstreamUrl]
+      properties:
+        openapiSourceType:
+          title: OpenAPI source type
+          type: string
+          enum: [url, inline]
+          default: url
+        openapiUrl:
+          title: OpenAPI URL
+          type: string
+          description: "HTTPS URL to openapi.yaml/json (used if source type = url)"
+        openapiInline:
+          title: Inline OpenAPI (YAML or JSON)
+          type: string
+          description: "Paste OpenAPI spec content (used if source type = inline)"
+          ui:widget: textarea
+        upstreamUrl:
+          title: Upstream service URL (servers:)
+          type: string
+          description: "e.g. https://backend.veecode.local:8443"
+        removePathEOLAnchor:
+          title: Remove end-of-line anchor from paths
+          type: boolean
+          description: "Remove trailing $ from route paths in generated Kong config"
+          default: true
+  steps:
+    - id: fetch-base
+      name: Fetch skeleton
+      action: fetch:template
+      input:
+        url: ./content
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          openapiSourceType: ${{ parameters.openapiSourceType }}
+          openapiUrl: ${{ parameters.openapiUrl }}
+          upstreamUrl: ${{ parameters.upstreamUrl }}
+          openapiInline: ${{ parameters.openapiInline }}
+
+    - id: test-kong-connection
+      name: Test Kong Connection
+      action: veecode:kong:deck:ping
+      input: {}
+      
+    - id: deck-generate
+      name: Generate Kong config using deck
+      action: veecode:kong:deck:generate
+      input:
+        openapiSpec: ${{ parameters.openapiInline }}
+        outputPath: kong.yaml
+        deckTag: veecode-${{ parameters.name }}
+        removePathEOLAnchor: ${{ parameters.removePathEOLAnchor }}
+    
+    - id: sync-to-kong
+      name: Sync to Kong Gateway
+      action: veecode:kong:deck:sync
+      input:
+        kongConfigPath: kong.yaml
+        deckTag: veecode-${{ parameters.name }}
+
+    - id: publish-github
+      name: Publish to GitHub
+      if: ${{ parameters.publishDestination === 'github' }}
+      action: publish:github
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        description: ${{ parameters.description }}
+
+    - id: register
+      name: Register in Backstage
+      if: ${{ parameters.publishDestination === 'github' }}
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-github'].output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      # - title: Exported Zip File
+      #   url: file:///tmp/backstage-scaffolder-exports/${{ parameters.name }}.zip
+      - title: Repository
+        url: ${{ steps['publish-github'].output.remoteUrl }}
+        if: ${{ parameters.publishDestination === 'github' }}
+      - title: Local Folder
+        url: file:///tmp/backstage-scaffolder/${{ parameters.name }}
+        if: ${{ parameters.publishDestination === 'local' }}
+      - title: Open in Backstage
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
+        if: ${{ parameters.publishDestination === 'github' }}
+      - title: Open in Kong Manager
+        url: "http://manager.localhost:8000/manager/services"
+        

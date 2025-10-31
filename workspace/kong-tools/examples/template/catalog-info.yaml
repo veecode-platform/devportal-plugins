@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: example-openapi-template
+  title: Example OpenAPI Template
+  description: An example template for the scaffolder that creates a simple OpenAPI spec and endpoint
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  lifecycle: experimental
+  owner: admins
+  system: examples

@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ${{ values.name | dump }}
+  description: Some grpc api
+spec:
+  type: openapi
+  owner: group:default/admins
+  lifecycle: production
+  system: examples
+  definition: |
+    ${{ values.openapiInline | indent(4) }}
