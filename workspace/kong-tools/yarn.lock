@@ -13772,6 +13772,9 @@ __metadata:
     "@backstage/cli": "npm:^0.34.4"
     "@backstage/plugin-scaffolder-node": "npm:^0.12.0"
     "@backstage/plugin-scaffolder-node-test-utils": "npm:^0.3.4"
+  peerDependencies:
+    "@backstage/backend-plugin-api": ^1.4.4
+    "@backstage/plugin-scaffolder-node": ^0.12.0
   languageName: unknown
   linkType: soft
 

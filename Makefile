@@ -15,7 +15,7 @@ HOMEPAGE_DYNAMIC_PLUGIN := $(PWD)/workspace/homepage/plugins/veecode-homepage/di
 # Version for github-workflows packages (common, frontend, backend)
 GH_WORKFLOWS_VERSION ?= 1.3.5
 
-.PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin build-github-workflows-common pack-github-workflows-common publish-github-workflows-common build-github-workflows build-github-workflows-dynamic build-github-workflows-backend build-github-workflows-backend-dynamic pack-github-workflows-backend-plugin pack-github-workflows-backend-plugin-dynamic clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header publish-github-workflows publish-github-workflows-dynamic publish-github-workflows-backend publish-github-workflows-backend-dynamic set-github-workflows-version clean-github-workflows-dynamic echo-paths
+.PHONY: build-homepage pack-homepage-plugin build-global-header pack-global-header-plugin build-github-workflows-common pack-github-workflows-common publish-github-workflows-common build-github-workflows build-github-workflows-dynamic build-github-workflows-backend build-github-workflows-backend-dynamic pack-github-workflows-backend-plugin pack-github-workflows-backend-plugin-dynamic clean cleanup-homepage cleanup-global-header cleanup-all publish-homepage publish-global-header publish-github-workflows publish-github-workflows-dynamic publish-github-workflows-backend publish-github-workflows-backend-dynamic set-github-workflows-version clean-github-workflows-dynamic echo-paths build-kong-scaffolder publish-kong-scaffolder
 
 start-global-header-app:
 	cd workspace/global-header && \
@@ -266,3 +266,12 @@ get-github-workflows-version:
 	@npm view @veecode-platform/backstage-plugin-github-workflows-backend version
 	@echo "backstage-plugin-github-workflows-backend-dynamic version:"
 	@npm view @veecode-platform/backstage-plugin-github-workflows-backend-dynamic version
+
+# Build the kong-scaffolder plugin (static only)
+build-kong-scaffolder:
+	cd workspace/kong-tools && yarn install && yarn tsc && yarn build:all
+
+# Publish kong-scaffolder plugin (static)
+publish-kong-scaffolder: build-kong-scaffolder
+	cd workspace/kong-tools/plugins/scaffolder-backend-module-kong && \
+	npm publish

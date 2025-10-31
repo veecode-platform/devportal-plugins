@@ -2,18 +2,27 @@
   "name": "@veecode-platform/plugin-scaffolder-backend-module-kong",
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "private": true,
   "description": "The kong scaffolder actions module for @backstage/plugin-scaffolder-backend",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.cjs.js",
+  "types": "dist/index.d.ts",
   "publishConfig": {
-    "access": "public",
-    "main": "dist/index.cjs.js",
-    "types": "dist/index.d.ts"
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.cjs.js"
+    },
+    "./package.json": "./package.json"
   },
   "backstage": {
     "role": "backend-plugin-module",
-    "pluginId": "scaffolder"
+    "pluginId": "scaffolder",
+    "pluginPackage": "@backstage/plugin-scaffolder-backend",
+    "features": {
+      ".": "@backstage/BackendFeature"
+    }
   },
   "scripts": {
     "start": "backstage-cli package start",
@@ -24,15 +33,27 @@
     "prepack": "backstage-cli package prepack",
     "postpack": "backstage-cli package postpack"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@backstage/backend-plugin-api": "^1.4.4",
     "@backstage/plugin-scaffolder-node": "^0.12.0"
   },
   "devDependencies": {
+    "@backstage/backend-plugin-api": "^1.4.4",
     "@backstage/cli": "^0.34.4",
+    "@backstage/plugin-scaffolder-node": "^0.12.0",
     "@backstage/plugin-scaffolder-node-test-utils": "^0.3.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "files": [
     "dist"
-  ]
+  ],
+  "typesVersions": {
+    "*": {
+      "package.json": [
+        "package.json"
+      ]
+    }
+  }
 }
