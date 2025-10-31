@@ -33,6 +33,7 @@ node_modules/
 # Build output
 dist
 dist-types
+**/package.json-prepack
 
 # Temporary change files created by Vim
 *.swp
