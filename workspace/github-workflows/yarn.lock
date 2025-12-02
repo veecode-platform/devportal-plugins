@@ -15909,7 +15909,7 @@ __metadata:
     "@red-hat-developer-hub/cli": "npm:latest"
     "@types/express": "npm:^4.17.6"
     "@types/supertest": "npm:^2.0.12"
-    "@veecode-platform/github-workflows-common": "workspace:*"
+    "@veecode-platform/github-workflows-common": "npm:^1.3.6"
     express: "npm:^4.17.1"
     express-promise-router: "npm:^4.1.0"
     js-yaml: "npm:^4.1.0"
@@ -15946,7 +15946,7 @@ __metadata:
     "@testing-library/user-event": "npm:^14.0.0"
     "@types/git-url-parse": "npm:^9.0.3"
     "@types/node": "npm:*"
-    "@veecode-platform/github-workflows-common": "workspace:*"
+    "@veecode-platform/github-workflows-common": "npm:^1.3.6"
     dayjs: "npm:^1.11.9"
     git-url-parse: "npm:^14.0.0"
     js-yaml: "npm:^4.1.0"
@@ -15959,7 +15959,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@veecode-platform/github-workflows-common@workspace:*, @veecode-platform/github-workflows-common@workspace:plugins/github-workflows-common":
+"@veecode-platform/github-workflows-common@npm:^1.3.6, @veecode-platform/github-workflows-common@workspace:plugins/github-workflows-common":
   version: 0.0.0-use.local
   resolution: "@veecode-platform/github-workflows-common@workspace:plugins/github-workflows-common"
   dependencies:

@@ -6,7 +6,9 @@
 *.iml
 
 # Visual Studio Code
-.vscode/
+**/.vscode/*
+!**/.vscode/launch.json
+
 .vsls.json
 
 # Logs
@@ -37,6 +39,9 @@ node_modules/
 !**/.yarn/releases
 !**/.yarn/sdks
 !**/.yarn/versions
+
+# yarn auth secrets (.yarnrc.yaml is NOT ignored, so using this)
+**/.npmrc
 
 # Node version directives
 .nvmrc
