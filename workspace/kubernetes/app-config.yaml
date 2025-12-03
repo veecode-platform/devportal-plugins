@@ -1,0 +1,141 @@
+app:
+  title: Scaffolded Backstage App
+  baseUrl: http://localhost:3000
+  
+  # Enable experimental feature discovery - auto-discovers plugins from package.json:
+  packages: all
+    
+  # New Frontend System - Extension Configuration
+  extensions:
+    # Enable the Kubernetes tab on entity pages
+    - entity-content:kubernetes/kubernetes:
+        config:
+          # Show the Kubernetes tab for Components and Resources
+          # Filter by kind AND labels
+          filter: 'kind:component,resource'
+    # - api:kubernetes/auth-providers:
+    #     config:
+    #       name: veecodeauth        
+    
+    # Enable sidebar navigation items
+    - nav-item:catalog
+    - nav-item:catalog/groups
+    - nav-item:setting
+
+organization:
+  name: My Kubernetes
+
+backend:
+  # Used for enabling authentication, secret is shared by all backend plugins
+  # See https://backstage.io/docs/auth/service-to-service-auth for
+  # information on the format
+  # auth:
+  #   keys:
+  #     - secret: ${BACKEND_SECRET}
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+    # Uncomment the following host directive to bind to specific interfaces
+    # host: 127.0.0.1
+  csp:
+    connect-src: ["'self'", 'http:', 'https:']
+    # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
+    # Default Helmet Content-Security-Policy values can be removed by setting the key to false
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  # This is for local development only, it is not recommended to use this in production
+  # The production database configuration is stored in app-config.production.yaml
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+  # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
+
+auth:
+  environment: development
+  # see https://backstage.io/docs/auth/ to learn about auth providers
+  providers:
+    # See https://backstage.io/docs/auth/guest/provider
+    #guest: {}
+    guest:
+      userEntityRef: user:default/admin
+      ownershipEntityRefs: [group:default/admins]
+      dangerouslyAllowOutsideDevelopment: true
+
+techdocs:
+  builder: 'local' # Alternatives - 'external'
+  generator:
+    runIn: 'local' # Alternatives - 'local'
+  publisher:
+    type: 'local' # Alternatives - 'googleGcs' or 'awsS3'. Read documentation for using alternatives.
+
+catalog:
+  import:
+    entityFilename: catalog-info.yaml
+    pullRequestBranchName: backstage-integration
+  rules:
+    - allow: [Component, System, API, Resource, Location]
+  locations:
+    # Local example data, file locations are relative to the backend process, typically `packages/backend`
+    - type: file
+      target: ../../examples/entities.yaml
+    # Local example template
+    - type: file
+      target: ../../examples/template/template.yaml
+      rules:
+        - allow: [Template]
+    # Local example organizational data
+    - type: file
+      target: ../../examples/org.yaml
+      rules:
+        - allow: [User, Group]
+    # Local example cluster data
+    - type: file
+      target: ../../examples/clusters.yaml
+      rules:
+        - allow: [Resource]
+
+kubernetes:
+  # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
+  serviceLocatorMethod:
+    type: 'singleTenant'
+  clusterLocatorMethods:
+    # Catalog-based discovery - enables per-entity cluster filtering via backstage.io/kubernetes-id
+    - type: 'catalog'
+    
+    # Config-based clusters - provides credentials for serviceAccount auth provider
+    # These must match the cluster names in the catalog entities
+    - type: 'config'
+      clusters:
+        - name: vkdr-config-cluster
+          url: https://127.0.0.1:9000
+          authProvider: 'serviceAccount'
+          skipTLSVerify: true
+          caData: ${K8S_CA_DATA}
+          serviceAccountToken: ${K8S_SA_TOKEN}
+        - name: vkdr-catalog-cluster
+          url: https://127.0.0.1:9000
+          authProvider: 'serviceAccount'
+          skipTLSVerify: true
+          caData: ${K8S_CA_DATA}
+          authMetadata:
+            secretName: "mysecret"
+            # source: secret (k8s secret), env (env var), file (file)
+            source: secret
+            namespace: default
+
+# see https://backstage.io/docs/permissions/getting-started for more on the permission framework
+permission:
+  # setting this to `false` will disable permissions
+  enabled: false
+
+veecode:
+  kubernetes:
+    # when adding our custom auth strategy, set this to true IF you want to keep the 
+    # default auth strategies, or they will be removed
+    # NOTE: our custom auth strategy will override the default serviceAccount auth strategy
+    # but will invoke normally it if the cluster does not have a secretName in the authMetadata
+    addDefaultKubernetesAuthStrategies: false
+    # avoid using @kubernetes/client-node to fetch secrets
+    fetchSecretWithRawHttps: false

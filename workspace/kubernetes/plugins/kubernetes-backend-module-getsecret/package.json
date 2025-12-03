@@ -1,0 +1,58 @@
+{
+  "name": "@veecode-platform/plugin-kubernetes-backend-module-getsecret",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "description": "The getsecret backend module for the kubernetes plugin.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "publishConfig": {
+    "access": "public",
+    "main": "dist/index.cjs.js",
+    "types": "dist/index.d.ts"
+  },
+  "backstage": {
+    "role": "backend-plugin-module",
+    "pluginId": "kubernetes",
+    "pluginPackage": "@backstage/plugin-kubernetes-backend",
+    "features": {
+      ".": "@backstage/BackendModule"
+    }
+  },
+  "scripts": {
+    "start": "backstage-cli package start",
+    "build": "backstage-cli package build",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "clean": "backstage-cli package clean",
+    "prepack": "backstage-cli package prepack",
+    "postpack": "backstage-cli package postpack",
+    "export-dynamic": "rhdh-cli plugin export",
+    "export-dynamic:clean": "run export-dynamic --clean",
+    "dev": "backstage-cli package start"
+  },
+  "dependencies": {
+    "@kubernetes/client-node": "^1.4.0"
+  },
+  "peerDependencies": {
+    "@backstage/backend-plugin-api": "^1.4.4",
+    "@backstage/plugin-kubernetes-backend": "^0.20.3",
+    "@backstage/plugin-kubernetes-common": "^0.9.7",
+    "@backstage/plugin-kubernetes-node": "^0.3.5"
+  },
+  "devDependencies": {
+    "@backstage/backend-plugin-api": "^1.4.4",
+    "@backstage/backend-test-utils": "^1.9.1",
+    "@backstage/cli": "^0.34.4",
+    "@backstage/plugin-kubernetes-backend": "^0.20.3",
+    "@backstage/plugin-kubernetes-common": "^0.9.7",
+    "@backstage/plugin-kubernetes-node": "^0.3.5",
+    "@red-hat-developer-hub/cli": "latest"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

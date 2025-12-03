@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+    
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Yarn Debug",
+            "runtimeExecutable": "yarn",
+            "runtimeArgs": [
+                "debug"
+            ],
+            "autoAttachChildProcesses": true,
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "node",
+            "request": "attach",
+            "name": "Attach Backstage (port 9229)",
+            "address": "localhost",
+            "port": 9229,
+            "restart": true,
+            "sourceMaps": true,
+            "timeout": 60000,
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "localRoot": "${workspaceFolder}/plugins/kubernetes-backend-module-getsecret/dist-dynamic",
+            "remoteRoot": "/app/dynamic-plugins/dist/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic"
+        }
+    ]
+}

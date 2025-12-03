@@ -1,0 +1,98 @@
+#
+# Starts DevPortal with pretty logging:
+#
+# docker compose up --no-log-prefix
+#
+
+services:
+  devportal:
+    image: veecode/devportal:latest
+    # start only after kubecfg finishes
+    # depends_on:
+      # kubecfg:
+      #   condition: service_completed_successfully
+    ports:
+      - "7007:7007"
+      - "9229:9229"
+    environment:
+      - DEVELOPMENT=true
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - DEBUG_PORT=9229
+      # will use shell value
+      - VEECODE_PROFILE=local
+      # one cluster uses K8S_SA_TOKEN, the other fetches from secret
+      - K8S_SA_TOKEN
+      # both need this
+      - K8S_CA_DATA
+      # for fetching secrets
+      - KUBECONFIG=/opt/app-root/src/.kube/config
+      # avoid tls errors due to self sogned certs
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      # Red Hat hardened image crypto compatibility
+      # - OPENSSL_CONF=/etc/pki/tls/openssl.cnf
+      # Test different crypto providers
+      #- NODE_OPTIONS=--openssl-legacy-provider
+    volumes:
+      # your config will add/override the default image config
+      - ./app-config.yaml:/app/app-config.local.yaml:ro
+      # dynamic plugins config (just enable/disable plugins)
+      - ./dynamic-plugins.yaml:/app/dynamic-plugins.yaml:ro      
+      # examples folder
+      - ../examples:/app/examples:ro
+      # mount kube conf (hack)
+      #- ~/.kube/config:/opt/app-root/src/.kube/config:ro
+      # plugin hack folder
+      - ../plugins/kubernetes-backend-module-getsecret/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic
+      # kube config
+      #- $HOME/.kube:/opt/app-root/src/.kube:ro
+      # mount certs
+      #- ./certs:/opt/certs:ro
+      # mount proxy config
+      - ./proxy-config.yaml:/opt/app-root/src/.kube/config:ro
+      # - kubevol:/opt/app-root/src/.kube
+    extra_hosts:
+      - "kubernetes.default:host-gateway"
+
+
+  # runs kubectl proxy in the container
+  kubectl-cli:
+    # image with kubectl
+    image: alpine/kubectl:latest
+    entrypoint: ["/bin/sh", "-c"]
+    # replaces "0.0.0.0" with "kubernetes.default"
+    command:
+      - |
+        mkdir -p /root/.kube
+        sed 's/server: https:\/\/0\.0\.0\.0:\([0-9]*\)/server: https:\/\/kubernetes.default:\1/' /opt/.kube/config | sed '/server: https:\/\/host.docker.internal:/a\    insecure-skip-tls-verify: false' > /root/.kube/config
+        exec kubectl proxy -p 8001
+    volumes:
+      - $HOME/.kube:/opt/.kube:ro
+    network_mode: service:devportal
+
+
+  # socat:
+  #   image: alpine/socat:latest
+  #   # exposes host-gateway:9000 as 127.0.0.1:9000 using socat
+  #   command:
+  #     - TCP-LISTEN:9000,fork,reuseaddr
+  #     - TCP:host.docker.internal:9000
+  #   network_mode: service:devportal
+
+#   kubecfg:
+#     image: alpine:latest
+#     entrypoint: ["/bin/sh", "-c"]
+#     # replaces "0.0.0.0" with "kubernetes.default"
+#     command:
+#       - |
+#         mkdir -p /opt/app-root/src/.kube
+#         cp /opt/.kube/config /opt/app-root/src/.kube/config
+#         chown 1001:1001 /opt/app-root/src/.kube/config
+#         # sed 's/server: https:\/\/0\.0\.0\.0:\([0-9]*\)/server: https:\/\/kubernetes.default:\1/' /opt/.kube/config > /opt/app-root/src/.kube/config
+#         # echo "Generated kubeconfig:"
+#         # cat /opt/app-root/src/.kube/config
+#     volumes:
+#       - $HOME/.kube:/opt/.kube:ro
+#       - kubevol:/opt/app-root/src/.kube
+# volumes:
+#   kubevol:

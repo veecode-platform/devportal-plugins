@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Config
+
+clusters:
+- name: via-proxy
+  cluster:
+    server: http://127.0.0.1:8001
+    insecure-skip-tls-verify: true
+
+users:
+- name: proxy-user
+  user:
+    # No credentials required — kubectl proxy performs auth for us
+    token: ""
+
+contexts:
+- name: proxy-context
+  context:
+    cluster: via-proxy
+    user: proxy-user
+
+current-context: proxy-context

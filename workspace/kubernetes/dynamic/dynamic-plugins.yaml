@@ -1,0 +1,8 @@
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-dynamic
+    disabled: false
+  - package: ./dynamic-plugins/dist/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic
+    disabled: false
