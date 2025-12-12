@@ -1,0 +1,60 @@
+{
+  "name": "@veecode-platform/backstage-plugin-ldap-auth-backend",
+  "description": "Backstage LDAP Authentication plugin, this packages adds backend authentication and token generation/validation/management (fork from @immobiliarelabs original plugin)",
+  "version": "1.0.0",
+  "main": "dist/index.cjs.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:veecode-platform/devportal-plugins.git",
+    "directory": "workspace/ldap-auth/plugins/ldap-auth-backend"
+  },
+  "backstage": {
+    "role": "backend-plugin-module",
+    "pluginId": "auth",
+    "pluginPackage": "@backstage/plugin-auth-backend"
+  },
+  "scripts": {
+    "start": "backstage-cli package start",
+    "tsc": "tsc",
+    "build": "backstage-cli package build",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "test:ci": "backstage-cli package test --watch false",
+    "clean": "backstage-cli package clean",
+    "prepack": "backstage-cli package prepack",
+    "postpack": "backstage-cli package postpack"
+  },
+  "dependencies": {
+    "@backstage/backend-plugin-api": "^1.5.0",
+    "@backstage/core-plugin-api": "^1.12.0",
+    "@backstage/errors": "^1.2.7",
+    "@backstage/plugin-auth-backend": "^0.25.6",
+    "@backstage/plugin-auth-node": "^0.6.9",
+    "keyv": "^4.3.3",
+    "ldap-authentication": "^3.2.2",
+    "ldap-escape": "^2.0.6",
+    "ldapjs": "^3.0.7"
+  },
+  "peerDependencies": {
+    "react": "^16.13.1 || ^17.0.0"
+  },
+  "devDependencies": {
+    "@aws-sdk/middleware-sdk-sts": "^3.616.0",
+    "@backstage/backend-test-utils": "^1.10.1",
+    "@backstage/cli": "^0.34.5",
+    "@types/ldap-escape": "^2.0.2",
+    "@types/ldapjs": "^2.2.4",
+    "@types/node": "^20.5.9",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^6.3.4",
+    "typescript": "^5.5.3"
+  },
+  "files": [
+    "dist"
+  ]
+}

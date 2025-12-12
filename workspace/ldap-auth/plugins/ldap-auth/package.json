@@ -1,0 +1,65 @@
+{
+  "name": "@veecode-platform/backstage-plugin-ldap-auth",
+  "description": "Backstage LDAP Authentication plugin, this packages adds frontend login page and token management (fork from @immobiliarelabs original plugin)",
+  "version": "1.0.0",
+  "main": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "backstage": {
+    "role": "frontend-plugin",
+    "pluginId": "ldap-auth",
+    "pluginPackages": [
+      "@veecode-platform/backstage-plugin-ldap-auth"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:veecode-platform/devportal-plugins.git",
+    "directory": "workspace/ldap-auth/plugins/ldap-auth"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "start": "backstage-cli package start",
+    "tsc": "tsc",
+    "build": "backstage-cli package build",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "test:ci": "backstage-cli package test --watch false",
+    "clean": "backstage-cli package clean",
+    "prepack": "backstage-cli package prepack",
+    "postpack": "backstage-cli package postpack"
+  },
+  "dependencies": {
+    "@backstage/core-components": "^0.18.3",
+    "@backstage/core-plugin-api": "^1.12.0",
+    "@backstage/theme": "^0.7.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "@mui/material": "^5.15.0",
+    "@react-hookz/web": "^23.0.0",
+    "password-validator": "^5.3.0",
+    "typescript": "~5.8.0",
+    "zod": "^3.17.3"
+  },
+  "peerDependencies": {
+    "react": "^16.13.1 || ^17.0.0"
+  },
+  "devDependencies": {
+    "@backstage/cli": "^0.34.5",
+    "@backstage/dev-utils": "^1.1.17",
+    "@testing-library/jest-dom": "^5.10.1",
+    "@types/jest": "^29.0.3",
+    "@types/node": "^20.5.9",
+    "cross-fetch": "^3.1.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router": "^6.4.5",
+    "react-router-dom": "^6.4.5"
+  },
+  "files": [
+    "dist"
+  ]
+}
