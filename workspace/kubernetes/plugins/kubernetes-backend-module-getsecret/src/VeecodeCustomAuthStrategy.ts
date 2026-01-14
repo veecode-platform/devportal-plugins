@@ -21,46 +21,82 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
     this.logger.debug('VEECODE: VeecodeCustomAuthStrategy constructor');
   }
 
+  /**
+   * Helper to read authMetadata supporting both:
+   * - Config-based clusters: unprefixed keys (secretName, namespace, source, tokenName)
+   * - Catalog-based clusters: prefixed keys (vee.codes/secret-name, vee.codes/secret-namespace, etc.)
+   */
+  private getAuthMetadataValue(authMetadata: AuthMetadata, key: string, defaultValue?: string): string | undefined {
+    // Try prefixed version first (catalog annotations)
+    const prefixedKey = `vee.codes/${key}`;
+    const prefixedValue = authMetadata[prefixedKey];
+    if (prefixedValue !== undefined) {
+      return prefixedValue;
+    }
+    
+    // Fall back to unprefixed version (config authMetadata)
+    const unprefixedValue = authMetadata[key];
+    if (unprefixedValue !== undefined) {
+      return unprefixedValue;
+    }
+    
+    return defaultValue;
+  }
+
   public async getCredential(
     clusterDetails: ClusterDetails,
   ): Promise<KubernetesCredential> {
     this.logger.debug(`VEECODE: Getting credentials for cluster: ${JSON.stringify(clusterDetails)}`);
-    // decide if will our custom auth or inherited behavior
-    if (clusterDetails.authMetadata?.secretName) {
-      this.logger.debug("VEECODE: Getting credentials using custom VeecodeCustomAuthStrategy behavior");
-      let token: string = "";
-      // read secretName, namespace and source from authMetadata
-      const secretName = clusterDetails.authMetadata.secretName;
-      const namespace = clusterDetails.authMetadata?.namespace ?? 'default';
-      const source = clusterDetails.authMetadata?.source ?? 'secret';
-      const tokenName = clusterDetails.authMetadata?.tokenName ?? 'token';
-      switch (source) {
-        case 'secret':
-          // test if fetchSecretWithRawHttps was passed to constructor
-          if (this.fetchSecretWithRawHttps) {
-            token = await this.getTokenFromSecretWithRawHttps(secretName, namespace, tokenName);
-          } else {
-            token = await this.getTokenFromSecret(secretName, namespace, tokenName);
-          }
-          break;
-        case 'env':
-          token = this.getTokenFromEnv(secretName);
-          break;
-        case 'file':
-          token = await this.getTokenFromFile(secretName);
-          break;
-        default:
-          this.logger.debug("VEECODE: Source ${source} not supported (must be secret, env or file). Getting credentials using default (inherited) ServiceAccountStrategy behavior");
-          return super.getCredential(clusterDetails);
-      }
-      return {
-        type: 'bearer token',
-        token: token,
-      };      
-    } else {
-      this.logger.debug("VEECODE: Getting credentials using default (inherited) ServiceAccountStrategy behavior");
+    
+    // Read secretName from both prefixed and unprefixed locations
+    const secretName = this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'kubernetes-secret-name') 
+      || this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'secretName');
+    
+    // If no secretName, use default (inherited) ServiceAccountStrategy behavior
+    if (!secretName) {
+      this.logger.debug("VEECODE: No secretName found, using default (inherited) ServiceAccountStrategy behavior");
       return super.getCredential(clusterDetails);
     }
+    
+    // Use custom VeecodeCustomAuthStrategy behavior
+    this.logger.debug("VEECODE: Getting credentials using custom VeecodeCustomAuthStrategy behavior");
+    let token: string = "";
+    
+    // read namespace, source and tokenName from authMetadata (supporting both prefixed and unprefixed)
+    const namespace = this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'kubernetes-secret-namespace')
+      || this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'namespace', 'default')
+      || 'default';
+    const source = this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'kubernetes-secret-source')
+      || this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'source', 'secret')
+      || 'secret';
+    const tokenName = this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'kubernetes-token-name')
+      || this.getAuthMetadataValue(clusterDetails.authMetadata ?? {}, 'tokenName', 'token')
+      || 'token';
+    
+    switch (source) {
+      case 'secret':
+        // test if fetchSecretWithRawHttps was passed to constructor
+        if (this.fetchSecretWithRawHttps) {
+          token = await this.getTokenFromSecretWithRawHttps(secretName, namespace, tokenName);
+        } else {
+          token = await this.getTokenFromSecret(secretName, namespace, tokenName);
+        }
+        break;
+      case 'env':
+        token = this.getTokenFromEnv(secretName);
+        break;
+      case 'file':
+        token = await this.getTokenFromFile(secretName);
+        break;
+      default:
+        this.logger.debug("VEECODE: Source ${source} not supported (must be secret, env or file). Getting credentials using default (inherited) ServiceAccountStrategy behavior");
+        return super.getCredential(clusterDetails);
+    }
+
+    return {
+      type: 'bearer token',
+      token: token,
+    };
   }
 
   async getTokenFromSecret(secretName: string, namespace: string, tokenName: string): Promise<string> {
@@ -84,10 +120,12 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
         this.logger.debug(`VEECODE: Loading kubeconfig from default location`);
         kc.loadFromDefault();
       }
-      const ctx = kc.getCurrentContext();
       const cluster = kc.getCurrentCluster();
       const user = kc.getCurrentUser();
 
+      // uncomment for desperate debugging
+      /*
+      const ctx = kc.getCurrentContext();
       this.logger.debug('VEECODE: kubeconfig context details', {
         currentContext: ctx,
         cluster: {
@@ -108,17 +146,12 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
           keyFile: (user as any)?.keyFile,
         },
       });
-      // if (cluster) {
-      //   this.logger.warn(
-      //     'VEECODE: Forcing skipTLSVerify=true for Kubernetes client (DEV ONLY!)',
-      //   );
-      //   (cluster as any).skipTLSVerify = true;
-      // }
+      */
 
-      const caData = cluster?.caData ? cluster.caData.substring(0, 10) + '...' : 'UNDEFINED';
-      this.logger.debug('VEECODE: Current cluster config where devportal runs', {
+      const caDataPreview = cluster?.caData ? cluster.caData.substring(0, 10) + '...' : 'UNDEFINED';
+      this.logger.debug('VEECODE: Current kube config used to fetch secret', {
         server: cluster?.server,
-        caData: caData,
+        caData: caDataPreview,
         skipTLSVerify: cluster?.skipTLSVerify,
         user: user?.name
       });
@@ -154,7 +187,7 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
       // return tokenData[tokenName];
     } catch (error: any) {
       // If it's an error we already formatted, just re-throw it
-      if (error.message?.startsWith('Secret ')) {
+      if (error.message?.startsWith('VEECODE: Secret ')) {
         throw error;
       }
       
@@ -196,13 +229,15 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
         this.logger.debug(`VEECODE: Loading kubeconfig from default location`);
         kc.loadFromDefault();
       }
-      const ctx = kc.getCurrentContext();
       const cluster = kc.getCurrentCluster();
       const user = kc.getCurrentUser();
       const caDataSample = cluster?.caData ? cluster.caData.substring(0, 10) + '...' + cluster.caData.slice(-10) : 'UNDEFINED';
       const userCertSample = user?.certData ? user.certData.substring(0, 10) + '...' + user.certData.slice(-10) : 'UNDEFINED';
       const userKeySample = user?.keyData ? user.keyData.substring(0, 10) + '...' + user.keyData.slice(-10) : 'UNDEFINED';
 
+      // desperate debugging
+      /*
+      const ctx = kc.getCurrentContext();
       this.logger.debug('VEECODE: kubeconfig context details', {
         currentContext: ctx,
         cluster: {
@@ -228,6 +263,7 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
           keyFile: (user as any)?.keyFile,
         },
       });
+      */
       // if (cluster) {
       //   this.logger.warn(
       //     'VEECODE: Forcing skipTLSVerify=true for Kubernetes client (DEV ONLY!)',
@@ -235,7 +271,7 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
       //   (cluster as any).skipTLSVerify = true;
       // }
 
-      this.logger.debug('VEECODE: Current cluster config where devportal runs', {
+      this.logger.debug('VEECODE: Current kube config used to fetch secret', {
         server: cluster?.server,
         caData: caDataSample,
         userCert: userCertSample,
@@ -490,7 +526,7 @@ export class VeecodeCustomAuthStrategy extends ServiceAccountStrategy {
 
   public presentAuthMetadata(authMetadata: AuthMetadata): AuthMetadata {
     // Return the authMetadata as-is since we're using the secret-token from it
-    this.logger.debug(`VEECODE: Presenting auth metadata for cluster: ${JSON.stringify(authMetadata)}`);
+    // this.logger.debug(`VEECODE: Presenting auth metadata for cluster: ${JSON.stringify(authMetadata)}`);
     return super.presentAuthMetadata(authMetadata);
   }
 

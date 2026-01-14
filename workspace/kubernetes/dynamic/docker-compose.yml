@@ -19,6 +19,8 @@ services:
       - NODE_ENV=development
       - LOG_LEVEL=debug
       - DEBUG_PORT=9229
+      # cloudflare tunnel URL
+      - TUNNEL_URL
       # will use shell value
       - VEECODE_PROFILE=local
       # one cluster uses K8S_SA_TOKEN, the other fetches from secret
@@ -26,20 +28,20 @@ services:
       # both need this
       - K8S_CA_DATA
       # for fetching secrets
-      - KUBECONFIG=/opt/app-root/src/.kube/config
+      # - KUBECONFIG=/opt/app-root/src/.kube/config
       # avoid tls errors due to self sogned certs
-      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      # - NODE_TLS_REJECT_UNAUTHORIZED=0
       # Red Hat hardened image crypto compatibility
       # - OPENSSL_CONF=/etc/pki/tls/openssl.cnf
       # Test different crypto providers
       #- NODE_OPTIONS=--openssl-legacy-provider
     volumes:
       # your config will add/override the default image config
-      - ./app-config.yaml:/app/app-config.local.yaml:ro
+      - ./app-config.yaml:/app/app-config.local.yaml
       # dynamic plugins config (just enable/disable plugins)
-      - ./dynamic-plugins.yaml:/app/dynamic-plugins.yaml:ro      
+      - ./dynamic-plugins.yaml:/app/dynamic-plugins.yaml
       # examples folder
-      - ../examples:/app/examples:ro
+      - ./examples:/app/examples
       # mount kube conf (hack)
       #- ~/.kube/config:/opt/app-root/src/.kube/config:ro
       # plugin hack folder

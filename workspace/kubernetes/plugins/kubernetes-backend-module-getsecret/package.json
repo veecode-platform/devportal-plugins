@@ -1,8 +1,7 @@
 {
   "name": "@veecode-platform/plugin-kubernetes-backend-module-getsecret",
-  "version": "0.1.0",
+  "version": "1.0.2",
   "license": "Apache-2.0",
-  "private": true,
   "description": "The getsecret backend module for the kubernetes plugin.",
   "main": "src/index.ts",
   "types": "src/index.ts",

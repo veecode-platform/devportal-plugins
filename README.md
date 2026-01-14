@@ -4,9 +4,11 @@
 
 This repository hosts plugins developed by VeeCode. The processes, tooling, and workflows are based on those in [backstage/community-plugins](https://github.com/backstage/community-plugins).
 
-Plugins in this repository will be published to the `@veecode-platform` public npm namespace.
+Plugins in this repository will be published to the `@veecode-platform` public npm namespace, usually on both static and dynamic forms.
 
-All VeeCode DevPortal plugins that are bundled with the standard DevPortal container image will eventually be moved into this repository.
+All VeeCode DevPortal plugins will eventually be moved into this repository (and deleted from the old repo).
+
+All these plugins should be compatible with any Backstage build (and with RHDH too). In VeeCode DevPortal case they are already bundled into the image as static or dynamic plugins.
 
 ## Plugins Workflow
 
@@ -14,7 +16,7 @@ The `devportal-plugins` repository is organized into multiple workspaces, with e
 
 ### Plugins requirements
 
-All plugins in this repository must meet the following requirements:
+All plugins in this repository should meet the following requirements:
 
 - Keep a proper README.md file to display useful info in npm registries (it can be minimal and refer to VeeCode main documentation site).
 - Static linking to a companion Backstage vanilla app (for development and testing purposes).
@@ -33,6 +35,7 @@ Workspaces mantained in this repository:
 - homepage: Contains the homepage plugin for DevPortal
 - global-header: Contains the global header plugin for DevPortal
 - github-workflows: Contains the github workflows plugin for DevPortal
+- ldap-auth: Contains the ldap auth plugin for DevPortal (port from @immobiliarelabs)
 
 ## Extra Notes
 

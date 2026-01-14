@@ -2,7 +2,11 @@
 
 This repo contains a few Backstage plugins and plugin extensions for Kubernetes-related funcionalities. It also contains a Backstage hosting application ("app" and "backend" packages) to host and test those plugins.
 
-## Kubernetes Secret Auth Module
+This document also helps you start a local temporary Kubernetes cluster to test the plugin connection against it in several scenarios.
+
+You can also build a dynamic version of this module and test its behavior as a dynamic plugin without the need to push it into NPM. Check the [DYNAMIC.md](./dynamic/DYNAMIC.md) file for more information.
+
+## Custom Secret Auth Module (Kubernetes Plugin Extension)
 
 This project contains a plugin for a custom [Backstage](https://backstage.io) Kubernetes authentication module and a hosting app to run it.
 
@@ -12,9 +16,16 @@ The module provides an alternate Kubernetes authentication module that extends t
 - `env`: fetches the token from an environment variable
 - `file`: fetches the token from a file
 
-This document also helps you start a local temporary Kubernetes cluster to test the plugin connection against it in several scenarios.
+## Custom Catalog Locator (Kubernetes Plugin Extension)
 
-You can also build a dynamic version of this module and test its behavior as a dynamic plugin without the need to push it into NPM. Check the [DYNAMIC.md](./dynamic/DYNAMIC.md) file for more information.
+The project includes an enhanced catalog-based cluster discovery system that extends the default Backstage Kubernetes plugin with additional capabilities:
+
+- **Catalog-Driven Clusters**: Define Kubernetes clusters entirely through catalog entities without app-config changes
+- **Flexible Authentication**: Fetch service account tokens from Kubernetes secrets, environment variables, or files at runtime
+- **Cluster Enhancement**: Automatically enrich clusters with default values and custom metadata
+- **Unified View**: Seamlessly merge catalog-based clusters with traditional config-based clusters
+
+This allows organizations to manage Kubernetes cluster definitions through the catalog while maintaining secure token management outside of configuration files.
 
 ### What is hard to understand
 
@@ -93,4 +104,48 @@ To start the Backstage hosting app, run:
 ```sh
 yarn install
 yarn start
+```
+
+## Publishing a Release
+
+### Set release version
+
+Define the release version editing the Makefile itself (KUBERNETES_VERSION variable) and call:
+
+```sh
+make set-version
+```
+
+Or just bump it (it will do `set-version` too):
+
+```sh
+make bump-version
+```
+
+### Publish Static plugin
+
+Just run the `publish` task to release the static plugin:
+
+```sh
+make publish
+```
+
+You can test this against a local registry (like Verdaccio):
+
+```sh
+make publish NPM_REGISTRY=http://localhost:4873
+```
+
+### Publish Dynamic plugin
+
+Just run the `publish` task to release the static plugin:
+
+```sh
+make publish-dynamic
+```
+
+You can test this against a local registry (like Verdaccio):
+
+```sh
+make publish-dynamic NPM_REGISTRY=http://localhost:4873
 ```

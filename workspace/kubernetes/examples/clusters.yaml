@@ -56,6 +56,10 @@ metadata:
     kubernetes.io/api-server-certificate-authority: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJkakNDQVIyZ0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQWpNU0V3SHdZRFZRUUREQmhyTTNNdGMyVnkKZG1WeUxXTmhRREUzTmpNeE1UTXdPRFF3SGhjTk1qVXhNVEUwTURrek9EQTBXaGNOTXpVeE1URXlNRGt6T0RBMApXakFqTVNFd0h3WURWUVFEREJock0zTXRjMlZ5ZG1WeUxXTmhRREUzTmpNeE1UTXdPRFF3V1RBVEJnY3Foa2pPClBRSUJCZ2dxaGtqT1BRTUJCd05DQUFUeFMwNFQyR0QrK3pSTEorbFkzTW1sVVZrNEZId0hScWg3V0N5Q1A0Ym8KNm5jVzRMcTZlMDFRVjBBQlZJTTZhdzZ5TW82VXIxZzdzL2xmT2s4M3RnMytvMEl3UURBT0JnTlZIUThCQWY4RQpCQU1DQXFRd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBZEJnTlZIUTRFRmdRVTh1ZDF1dUNTaUFnZVU5UWkvd3VXCi80eGFyT0l3Q2dZSUtvWkl6ajBFQXdJRFJ3QXdSQUlnZUgxeC9KUGh5TXVXdHg0VFU3WFRpNmJuWEpKZFh6K0wKVUI0NVhVekVHNlFDSUFoMGJtcVRhVUh2dVBEWVJDYWhMaitYWnV5NnQwYUFkUXM3OUYvY05GZEIKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
     # Optional: Filter resources by label
     backstage.io/kubernetes-label-selector: "vee.codes/cluster=vkdr-catalog-cluster"
+    # Custom Veecode auth metadata (using vee.codes/ prefix)
+    vee.codes/kubernetes-secret-name: "mysecret"
+    vee.codes/kubernetes-secret-source: "secret"  # Options: secret (k8s secret), env (env var), file (file)
+    vee.codes/kubernetes-secret-namespace: "default"
 spec:
   type: kubernetes-cluster
   lifecycle: experimental

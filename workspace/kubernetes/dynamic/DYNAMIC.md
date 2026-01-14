@@ -1,5 +1,7 @@
 # Dynamic Loading Test
 
+TODO: simplify this somehow.
+
 In order to test the dynamic loading of this kubernetes plugin **before creating a public release on NPM**, we need a little hack to use our distro mounting folder.
 
 ## Build the plugin

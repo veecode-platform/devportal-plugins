@@ -37,7 +37,32 @@ import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
-import { getAllThemes } from '@red-hat-developer-hub/backstage-plugin-theme';
+import { getThemes } from '@red-hat-developer-hub/backstage-plugin-theme';
+
+// Suppress defaultProps warnings from material-table components
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  if (
+    typeof args[0] === 'string' &&
+    args[0].includes('Support for defaultProps will be removed from function components') &&
+    args[0].includes('MTable')
+  ) {
+    return;
+  }
+  if (
+    typeof args[0] === 'string' &&
+    args[0].includes('The columns provided to material table are static, but contain functions which update on every render')
+  ) {
+    return;
+  }
+  if (
+    typeof args[0] === 'string' &&
+    args[0].includes('findDOMNode is deprecated and will be removed in the next major release')
+  ) {
+    return;
+  }
+  originalConsoleError.apply(console, args);
+};
 
 import { VeecodeHomepagePage, homepageTranslations } from '@veecode-platform/plugin-veecode-homepage';
 import { MUI4TestPage } from '@red-hat-developer-hub/backstage-plugin-mui4-test';
@@ -45,7 +70,7 @@ import { MUI5TestPage } from '@red-hat-developer-hub/backstage-plugin-mui5-test'
 
 const app = createApp({
   apis,
-  themes: getAllThemes(),
+  themes: getThemes(),
   __experimentalTranslations: {
     availableLanguages: ['en', 'de', 'es', 'fr', 'it', 'pt'],
     resources: [homepageTranslations],

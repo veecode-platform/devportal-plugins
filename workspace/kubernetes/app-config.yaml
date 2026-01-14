@@ -124,6 +124,10 @@ kubernetes:
             # source: secret (k8s secret), env (env var), file (file)
             source: secret
             namespace: default
+        - name: vkdr-yet-another-cluster
+          url: https://127.0.0.1:9000
+          authProvider: 'serviceAccount'
+          caData: ${K8S_CA_DATA}
 
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:

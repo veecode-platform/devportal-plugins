@@ -39,13 +39,13 @@ kubernetes:
     - type: 'config'
       clusters:
         - name: vkdr-config-cluster
-          url: https://kubernetes.default:9000
+          url: ${TUNNEL_URL} 
           authProvider: 'serviceAccount'
           skipTLSVerify: false
           caData: ${K8S_CA_DATA}
           serviceAccountToken: ${K8S_SA_TOKEN}
         - name: vkdr-catalog-cluster
-          url: https://kubernetes.default:9000
+          url: ${TUNNEL_URL} 
           authProvider: 'serviceAccount'
           skipTLSVerify: false
           caData: ${K8S_CA_DATA}
@@ -54,6 +54,10 @@ kubernetes:
             # source: secret (k8s secret), env (env var), file (file)
             source: secret
             namespace: default
+        - name: vkdr-yet-another-cluster
+          url: ${TUNNEL_URL} 
+          caData: ${K8S_CA_DATA}
+          authProvider: 'serviceAccount'
 
 veecode:
   kubernetes:

@@ -47,7 +47,7 @@
     "@mui/material": "^5.18.0",
     "@red-hat-developer-hub/backstage-plugin-mui4-test": "workspace:^",
     "@red-hat-developer-hub/backstage-plugin-mui5-test": "workspace:^",
-    "@red-hat-developer-hub/backstage-plugin-theme": "^0.10.0",
+    "@red-hat-developer-hub/backstage-plugin-theme": "^0.10.1",
     "@veecode-platform/plugin-veecode-homepage": "workspace:^",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
