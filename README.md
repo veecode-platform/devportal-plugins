@@ -6,25 +6,9 @@ This repository hosts plugins developed by VeeCode. The processes, tooling, and 
 
 Plugins in this repository will be published to the `@veecode-platform` public npm namespace, usually on both static and dynamic forms.
 
-All VeeCode DevPortal plugins will eventually be moved into this repository (and deleted from the old repo).
+All VeeCode DevPortal plugins will eventually be moved into this repository (and deleted from the old repositories at [veecode-platform/backstage-plugins](https://github.com/veecode-platform/backstage-plugins) and [veecode-platform/dynamic-plugins](https://github.com/veecode-platform/dynamic-plugins)).
 
 All these plugins should be compatible with any Backstage build (and with RHDH too). In VeeCode DevPortal case they are already bundled into the image as static or dynamic plugins.
-
-## Plugins Workflow
-
-The `devportal-plugins` repository is organized into multiple workspaces, with each workspace containing a plugin or a set of related plugins. Each workspace operates independently, with its own release cycle and dependencies managed via npm.
-
-### Plugins requirements
-
-All plugins in this repository should meet the following requirements:
-
-- Keep a proper README.md file to display useful info in npm registries (it can be minimal and refer to VeeCode main documentation site).
-- Static linking to a companion Backstage vanilla app (for development and testing purposes).
-- Static linking documentation in its README.md file (or refer to this info elsewhere).
-- Dynamic linking documentation in its README.md file (or refer to this info elsewhere).
-- Sensible defaults that work out of the box and avoid errors (e.g., good default configuration options).
-
-DON'T BREAK Backstage with bad defaults in a plugin, this is HARD to debug.
 
 ## Workspaces
 
@@ -37,25 +21,36 @@ Workspaces mantained in this repository:
 - github-workflows: Contains the github workflows plugin for DevPortal
 - ldap-auth: Contains the ldap auth plugin for DevPortal (port from @immobiliarelabs)
 
+### Plugin Workspace Structure
+
+This repository is organized into multiple workspaces:
+
+- Each workspace contains a plugin or a set of related plugins.
+- Each workspace operates independently, with its own release cycle and dependencies.
+- Each workspace has its own documentation and context.
+- Each workspace has its own Makefile with common commands for building, packaging, testing and releasing the plugins.
+- Each workspace has a Backstage "hosting app" (a vanilla Backstage app) to test the plugins with static linking.
+
+### Plugins requirements
+
+All plugins in this repository should meet the following requirements:
+
+- Keep a proper README.md file to display useful info in npm registries (it can be minimal and refer to VeeCode main documentation site).
+- Static linking documentation in its README.md file (or refer to this info elsewhere).
+- Dynamic linking documentation in its README.md file (or refer to this info elsewhere).
+- Sensible defaults that work out of the box and avoid errors (e.g., good default configuration options).
+
+DON'T BREAK Backstage with bad defaults in a plugin, this is HARD to debug.
+
 ## Extra Notes
-
-### Icons
-
-Notice the `defaultMountPoints.tsx` file in "global-header" workspace - it shows how a custom plugin refers to icons using a name (string). This reproduces this plugin's dynamic configuration (wich can also set custom plugins).
-
-Backstage "vanilla" includes a set of system icons that can be used by plugins and referenced by a name. Check [Backstage default system icons](https://github.com/backstage/backstage/blob/master/packages/app-defaults/src/defaults/icons.tsx) for the default icon list.
-
-However, any Backstage distro can define its own set of icons. VeeCode DevPortal includes a few more plugins to this list.
-
-In the case of VeeCode DevPortal, due to its support for dynamic plugins, any plugin can also add its own icons to the system without the need for a new DevPortal build.
-
-We have included a "Show icons" button in the global header hosting app to help you debug icon loading issues.
 
 ### Makefile
 
-The root project has a Makefile that helps you manage your releases separately for each workspace. We recommend using a local registry like Verdaccio to validate this process locally.
+The root project has a Makefile with tasks that must be moved to each workspace's Makefile.
 
-## Why we do this
+TODO: fix this.
+
+### Why this repo exists
 
 It was becoming increasingly hard to manage too many separate repositories for all DevPortal plugins. This monorepo approach allows us to enforce consistency across plugins, streamline maintenance, and simplify the development and onboarding process.
 
@@ -77,11 +72,15 @@ unsafeHttpWhitelist:
   - "127.0.0.1"
 ```
 
+TODO: find a way to use Verdaccio in a more automated way, specially for testing. Ideally even the "publish" tasks could be testable using a local Verdaccio instance.
+
 ## Releases
 
 Releasing plugins is still a "manual" process based on Makefile targets.
 
 ### Releasing home and header plugins
+
+TODO: move these tasks to each workspace's Makefile.
 
 ```bash
 # Build the global-header plugin
@@ -104,32 +103,6 @@ make publish-homepage-dynamic
 make copy-all-dynamic-plugins
 ```
 
-### Releasing github-workflows plugins
-
-Edit the GH_WORKFLOWS_VERSION in the Makefile and run:
-
-```bash
-make set-github-workflows-version
-make clean-github-workflows-dynamic
-make publish-github-workflows-common
-make publish-github-workflows
-make publish-github-workflows-backend
-make publish-github-workflows-dynamic
-make publish-github-workflows-backend-dynamic
-# check published versions, all 4 must return same version
-make get-github-workflows-version
-```
-
-## Testing dynamic plugins without publishing
-
-We have made a `docker compose` setup that mounts the dist-dynamic folders from plugins to the devportal container.
-
-```bash
-make clean-github-workflows-dynamic
-make build-github-workflows-dynamic
-make build-github-workflows-backend-dynamic
-```
-
 ## Notes
 
-This repository was created based on previous work by Red Hat. It is organized in the same way as the [Red Hat Developer Hub plugins](https://github.com/redhat-developer/rhdh-plugins) repository. The dynamic plugins feature is also based on Red Hat's work.
+A lot in this repository was created based on previous work by Red Hat. It is organized in the same way as the [Red Hat Developer Hub plugins](https://github.com/redhat-developer/rhdh-plugins) repository. The dynamic plugins feature is also based on Red Hat's work.
