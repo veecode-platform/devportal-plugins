@@ -15,52 +15,59 @@ Each workspace is self-contained. Navigate to the workspace first:
 ```bash
 cd workspace/<workspace-name>
 yarn install
-yarn start           # Start the Backstage dev server
 yarn tsc             # TypeScript check
 yarn build:all       # Build all packages
-yarn test            # Run tests
+yarn test:all        # Run tests
 yarn lint:all        # Lint all files
 ```
 
-### Root-Level Makefile Commands
-
-Build plugins:
+To start the Backstage hosting app, run:
 
 ```bash
-make build-homepage
-make build-global-header
-make build-homepage-dynamic    # Uses @red-hat-developer-hub/cli
-make build-global-header-dynamic
+yarn start
 ```
 
-Publish plugins (uses npm publish):
+### Workspace Makefiles
+
+Each workspace has its own Makefile with build, publish, and utility commands:
 
 ```bash
-make publish-homepage
-make publish-global-header
-make publish-homepage-dynamic
-make publish-global-header-dynamic
+cd workspace/<workspace-name>
+make help            # Shows all available commands
+make build           # Build the plugin(s)
+make build-dynamic   # Build dynamic plugin(s)
+make publish         # Publish static plugin(s)
+make publish-dynamic # Publish dynamic plugin(s)
+make set-version VERSION=x.x.x  # Set version
+make cleanup         # Clean build artifacts
+make get-version     # Get published version from npm
 ```
 
-Cleanup:
+For homepage workspace:
 
 ```bash
-make cleanup-homepage
-make cleanup-global-header
-make cleanup-all
+cd workspace/homepage
+make help
+make set-version HOMEPAGE_VERSION=1.0.2
 ```
 
-### Workspace-Specific Makefiles
+For global-header workspace:
+
+```bash
+cd workspace/global-header
+make help
+make set-version GLOBAL_HEADER_VERSION=1.0.3
+```
 
 For github-workflows workspace:
 
 ```bash
 cd workspace/github-workflows
-make help                         # Shows all available commands
+make help
 make build-all                    # Build common, frontend, backend
-make set-version GH_WORKFLOWS_VERSION=1.4.0  # Set version for all packages
-make publish-all                  # Publish all static packages
-make publish-all-dynamic          # Publish all dynamic packages
+make set-version GH_WORKFLOWS_VERSION=1.4.0
+make publish-all
+make publish-all-dynamic
 ```
 
 For ldap-auth workspace:
@@ -71,6 +78,18 @@ make help
 make build-all
 make set-version LDAP_AUTH_VERSION=1.0.0
 make publish-all
+```
+
+### Root-Level Makefile
+
+The root Makefile provides cross-workspace utilities:
+
+```bash
+make help                  # List available commands
+make echo-paths            # Show dynamic plugin paths
+make copy-dynamic-plugins  # Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT
+make build-kong-scaffolder # Build kong-scaffolder plugin
+make publish-kong-scaffolder
 ```
 
 ## Architecture
@@ -112,6 +131,6 @@ Plugins within the same workspace may use `workspace:*` for internal dependencie
 
 ## Key Files
 
-- `/Makefile` - Root-level build/publish tasks (homepage, global-header)
-- `/workspace/<name>/Makefile` - Workspace-specific tasks with more options
+- `/Makefile` - Root-level cross-workspace utilities
+- `/workspace/<name>/Makefile` - Workspace-specific build/publish tasks
 - `/workspace/<name>/app-config.yaml` - Backstage config for local development

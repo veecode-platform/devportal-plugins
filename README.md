@@ -44,12 +44,6 @@ DON'T BREAK Backstage with bad defaults in a plugin, this is HARD to debug.
 
 ## Extra Notes
 
-### Makefile
-
-The root project has a Makefile with tasks that must be moved to each workspace's Makefile.
-
-TODO: fix this.
-
 ### Why this repo exists
 
 It was becoming increasingly hard to manage too many separate repositories for all DevPortal plugins. This monorepo approach allows us to enforce consistency across plugins, streamline maintenance, and simplify the development and onboarding process.
@@ -76,31 +70,27 @@ TODO: find a way to use Verdaccio in a more automated way, specially for testing
 
 ## Releases
 
-Releasing plugins is still a "manual" process based on Makefile targets.
-
-### Releasing home and header plugins
-
-TODO: move these tasks to each workspace's Makefile.
+Releasing plugins is a manual process based on Makefile targets. Each workspace has its own Makefile:
 
 ```bash
-# Build the global-header plugin
-make build-global-header
-# Build the homepage plugin
-make build-homepage
-# Build the dynamic version of global-header plugin
-make build-global-header-dynamic
-# Build the dynamic version of homepage plugin
-make build-homepage-dynamic
-# Publish the global-header plugin
-make publish-global-header
-# Publish the homepage plugin
-make publish-homepage
-# Publish the dynamic version of global-header plugin
-make publish-global-header-dynamic
-# Publish the dynamic version of homepage plugin
-make publish-homepage-dynamic
-# Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT
-make copy-all-dynamic-plugins
+cd workspace/<workspace-name>
+make help  # Shows all available commands
+```
+
+Example for homepage plugin:
+
+```bash
+cd workspace/homepage
+make build           # Build static plugin
+make build-dynamic   # Build dynamic plugin
+make publish         # Publish static plugin
+make publish-dynamic # Publish dynamic plugin
+```
+
+To copy dynamic plugins to a local devportal-base for testing:
+
+```bash
+make copy-dynamic-plugins
 ```
 
 ## Notes
