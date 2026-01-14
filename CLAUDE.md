@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is a single repository for several Backstage plugin projects (VeeCode DevPortal plugins). Each workspace is itself a Backstage hosting app composed by yarn workspaces:
+This is a monorepo for VeeCode DevPortal plugins (Backstage plugins). Each workspace is itself a Backstage hosting app with yarn workspaces:
 
-- The Backstage hosting app is at root (see `package.json` and `app-config*.yaml` files)
-- The Backstage hosting app frontend at `packages/app`
-- The Backstage hosting app frontend at `packages/app`
-- The Plugins being developed are under `plugins/*`.
+- The Backstage hosting app root (see `package.json` and `app-config*.yaml`)
+- The Backstage frontend at `packages/app`
+- The Backstage backend at `packages/backend`
+- The plugins being developed at `plugins/*`
 
-The reason for this structure is to allow for easy development and testing of the plugins independently. It is important to understand that the "release" for each workspace are the plugind themselves, not the hosting app.
+The hosting app exists for development and testing. The actual releases are the plugins themselves, not the hosting app.
 
 ## Common Commands
 
@@ -28,9 +28,7 @@ yarn test:all        # Run tests
 yarn lint:all        # Lint all files
 ```
 
-This should build all packages in the workspace, including the Backstage hosting app and all workspace plugins.
-
-To start the Backstage hosting app, run:
+To start the Backstage hosting app:
 
 ```bash
 yarn start
@@ -52,50 +50,14 @@ make cleanup         # Clean build artifacts
 make get-version     # Get published version from npm
 ```
 
-For homepage workspace:
+Version variable names vary by workspace:
 
-```bash
-cd workspace/homepage
-make help
-make set-version HOMEPAGE_VERSION=1.0.2
-```
-
-For global-header workspace:
-
-```bash
-cd workspace/global-header
-make help
-make set-version GLOBAL_HEADER_VERSION=1.0.3
-```
-
-For github-workflows workspace:
-
-```bash
-cd workspace/github-workflows
-make help
-make build-all                    # Build common, frontend, backend
-make set-version GH_WORKFLOWS_VERSION=1.4.0
-make publish-all
-make publish-all-dynamic
-```
-
-For ldap-auth workspace:
-
-```bash
-cd workspace/ldap-auth
-make help
-make build-all
-make set-version LDAP_AUTH_VERSION=1.0.0
-make publish-all
-```
-
-For kong-tools workspace:
-
-```bash
-cd workspace/kong-tools
-make help
-make set-version KONG_TOOLS_VERSION=0.2.0
-```
+- homepage: `HOMEPAGE_VERSION`
+- global-header: `GLOBAL_HEADER_VERSION`
+- github-workflows: `GH_WORKFLOWS_VERSION`
+- ldap-auth: `LDAP_AUTH_VERSION`
+- kong-tools: `KONG_TOOLS_VERSION`
+- kubernetes: `KUBERNETES_VERSION`
 
 ### Root-Level Makefile
 
@@ -116,12 +78,14 @@ workspace/
 ├── homepage/              # veecode-homepage plugin
 ├── global-header/         # veecode-global-header plugin
 ├── github-workflows/      # github-workflows frontend + backend + common
-├── ldap-auth/            # ldap-auth frontend + backend
-├── kong-tools/           # kong-scaffolder plugin
-└── kubernetes/           # kubernetes plugin
+├── ldap-auth/             # ldap-auth frontend + backend
+├── kong-tools/            # scaffolder-backend-module-kong plugin
+├── kubernetes/            # kubernetes plugin (WIP)
+├── about/                 # about plugin (WIP - no hosting app yet)
+└── support/               # support plugin (WIP - no hosting app yet)
 ```
 
-Each workspace contains:
+Each complete workspace contains:
 
 - `packages/app` - Backstage frontend app (for testing)
 - `packages/backend` - Backstage backend app (for testing)
@@ -138,7 +102,7 @@ Dynamic plugin builds create a `dist-dynamic/` directory within each plugin.
 
 ### Package Namespacing
 
-All plugins are published to `@veecode-platform/*` npm namespace.
+All plugins are published to the `@veecode-platform/*` npm namespace.
 
 ### Yarn Workspace Dependencies
 
