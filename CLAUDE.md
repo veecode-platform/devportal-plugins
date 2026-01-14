@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is a monorepo for VeeCode DevPortal plugins (Backstage plugins). Each workspace is an independent Backstage app with its own plugins, using Yarn workspaces internally.
+This is a single repository for several Backstage plugin projects (VeeCode DevPortal plugins). Each workspace is itself a Backstage hosting app composed by yarn workspaces:
+
+- The Backstage hosting app is at root (see `package.json` and `app-config*.yaml` files)
+- The Backstage hosting app frontend at `packages/app`
+- The Backstage hosting app frontend at `packages/app`
+- The Plugins being developed are under `plugins/*`.
+
+The reason for this structure is to allow for easy development and testing of the plugins independently. It is important to understand that the "release" for each workspace are the plugind themselves, not the hosting app.
 
 ## Common Commands
 
@@ -20,6 +27,8 @@ yarn build:all       # Build all packages
 yarn test:all        # Run tests
 yarn lint:all        # Lint all files
 ```
+
+This should build all packages in the workspace, including the Backstage hosting app and all workspace plugins.
 
 To start the Backstage hosting app, run:
 
@@ -80,6 +89,14 @@ make set-version LDAP_AUTH_VERSION=1.0.0
 make publish-all
 ```
 
+For kong-tools workspace:
+
+```bash
+cd workspace/kong-tools
+make help
+make set-version KONG_TOOLS_VERSION=0.2.0
+```
+
 ### Root-Level Makefile
 
 The root Makefile provides cross-workspace utilities:
@@ -88,8 +105,6 @@ The root Makefile provides cross-workspace utilities:
 make help                  # List available commands
 make echo-paths            # Show dynamic plugin paths
 make copy-dynamic-plugins  # Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT
-make build-kong-scaffolder # Build kong-scaffolder plugin
-make publish-kong-scaffolder
 ```
 
 ## Architecture

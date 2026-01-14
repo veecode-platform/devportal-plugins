@@ -9,14 +9,14 @@
 # - global-header:    cd workspace/global-header && make help
 # - github-workflows: cd workspace/github-workflows && make help
 # - ldap-auth:        cd workspace/ldap-auth && make help
-# - kong-tools:       (uses root Makefile tasks below)
+# - kong-tools:       cd workspace/kong-tools && make help
 #
 
 # For copying dynamic plugins to a local devportal-base
 DEVPORTAL_BASE_PATH ?= $(HOME)/projetos/veecode/devportal-base
 DYNAMIC_PLUGIN_ROOT ?= $(DEVPORTAL_BASE_PATH)/dynamic-plugins-root
 
-.PHONY: help echo-paths copy-dynamic-plugins build-kong-scaffolder publish-kong-scaffolder
+.PHONY: help echo-paths copy-dynamic-plugins
 
 help:
 	@echo "DevPortal Plugins Monorepo"
@@ -28,12 +28,11 @@ help:
 	@echo "  cd workspace/global-header && make help"
 	@echo "  cd workspace/github-workflows && make help"
 	@echo "  cd workspace/ldap-auth && make help"
+	@echo "  cd workspace/kong-tools && make help"
 	@echo ""
 	@echo "Root-level commands:"
 	@echo "  make echo-paths              - Show dynamic plugin paths"
 	@echo "  make copy-dynamic-plugins    - Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT"
-	@echo "  make build-kong-scaffolder   - Build kong-scaffolder plugin"
-	@echo "  make publish-kong-scaffolder - Publish kong-scaffolder plugin"
 
 echo-paths:
 	@echo "DEVPORTAL_BASE_PATH: $(DEVPORTAL_BASE_PATH)"
@@ -53,12 +52,3 @@ copy-dynamic-plugins: echo-paths
 		echo "Copied homepage dynamic plugin"; \
 	fi
 	@echo "Done."
-
-# Build the kong-scaffolder plugin (static only)
-build-kong-scaffolder:
-	cd workspace/kong-tools && yarn install && yarn tsc && yarn build:all
-
-# Publish kong-scaffolder plugin (static)
-publish-kong-scaffolder: build-kong-scaffolder
-	cd workspace/kong-tools/plugins/scaffolder-backend-module-kong && \
-	npm publish
