@@ -1,8 +1,8 @@
 import { TestApiProvider, renderInTestApp } from '@backstage/test-utils';
 import { fetchApiRef } from '@backstage/core-plugin-api';
-import { ExampleFetchComponent } from './ExampleFetchComponent';
+import { DummyFetchComponent } from './DummyFetchComponent';
 
-describe('ExampleFetchComponent', () => {
+describe('DummyFetchComponent', () => {
   it('renders the teams table from the backend', async () => {
     const mockFetchApi = {
       fetch: jest.fn().mockResolvedValue({
@@ -20,7 +20,7 @@ describe('ExampleFetchComponent', () => {
 
     const { findByRole, findByText } = await renderInTestApp(
       <TestApiProvider apis={[[fetchApiRef, mockFetchApi]]}>
-        <ExampleFetchComponent />
+        <DummyFetchComponent />
       </TestApiProvider>,
     );
 

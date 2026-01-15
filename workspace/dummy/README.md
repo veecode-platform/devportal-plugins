@@ -1,6 +1,6 @@
 # Dummy Plugin
 
-This repo contains several dummy plugins for demonstration purposes. The intent is to test frontend and backend plugin loading, error handling, and other related functionalities in a controlled environment.
+This workspace contains dummy plugin pair (frontend + backend) for demonstration purposes. The intent is to test frontend and backend plugin loading, error handling, and other related functionalities in a controlled environment.
 
 To start the app, run:
 
@@ -9,17 +9,22 @@ yarn install
 yarn start
 ```
 
-## Static Plugin
+## Dummy Backend Plugin
 
-The Backstage hosting app is configured to load the plugins in the "normal" way.
+A simple backend plugin demonstrating core Backstage backend functionality including HTTP API endpoints, service architecture, and dependency injection patterns.
 
-The frontend plugin presents itself in 3 ways:
+Implements a `/teams` endpoint returning mock soccer data for testing plugin loading and integration.
 
-- As a route with a link at the sidebar
-- As a card in the overview tab of the entity page
-- As a tab in the entity page
+Backend plugin documentation is available at [plugins/dummy-backend/README.md](plugins/dummy-backend/README.md).
 
-## Dynamic Plugin
+## Dummy Frontend Plugin
 
-This plugin is exported as a dynamic plugin. See the Makefile for more details on the build/package process.
+A comprehensive frontend plugin demonstrating UI integration patterns, API communication, and component composition. Provides a full-page interface, entity integration as card/tab, and displays data fetched from the backend plugin in structured tables.
 
+Frontend plugin documentation is available at [plugins/dummy/README.md](plugins/dummy/README.md).
+
+## Static and Dynamic Loading
+
+Both plugins are available as static "normal" plugins and as a dynamic plugins. See [Backstage Plugins](https://docs.platform.vee.codes/devportal/plugins/) page for more details on plugin types and loading.
+
+See the [Makefile](Makefile) for more details on the build/package process.

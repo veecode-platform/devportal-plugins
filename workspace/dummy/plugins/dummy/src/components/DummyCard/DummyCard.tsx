@@ -1,10 +1,10 @@
 import { InfoCard } from '@backstage/core-components';
-import { ExampleFetchComponent } from '../ExampleFetchComponent';
+import { DummyFetchComponent } from '../DummyFetchComponent';
 
 export const DummyCard = () => {
   return (
     <InfoCard title="Dummy Plugin">
-      <ExampleFetchComponent />
+      <DummyFetchComponent />
     </InfoCard>
   );
 };

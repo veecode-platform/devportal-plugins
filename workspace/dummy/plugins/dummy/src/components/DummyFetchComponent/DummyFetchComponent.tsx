@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import {
   Table,
   TableColumn,
@@ -16,13 +17,28 @@ type SoccerTeam = {
 
 type SoccerTeamsResponse = {
 	teams: SoccerTeam[];
+	totalCount: number;
+	limit: number;
+	offset: number;
 };
 
 type DenseTableProps = {
 	teams: SoccerTeam[];
+	totalCount: number;
+	page: number;
+	pageSize: number;
+	onPageChange: (page: number) => void;
+	onRowsPerPageChange: (rowsPerPage: number) => void;
 };
 
-export const DenseTable = ({ teams }: DenseTableProps) => {
+export const DenseTable = ({
+	teams,
+	totalCount,
+	page,
+	pageSize,
+	onPageChange,
+	onRowsPerPageChange,
+}: DenseTableProps) => {
 	const columns: TableColumn[] = [
 		{ title: 'Team', field: 'name' },
 		{ title: 'Country', field: 'country' },
@@ -36,20 +52,33 @@ export const DenseTable = ({ teams }: DenseTableProps) => {
 	return (
 		<Table
 			title="Soccer Teams (from backend plugin)"
-			options={{ search: false, paging: false }}
+			options={{
+				search: false,
+				paging: true,
+				pageSize,
+				pageSizeOptions: [5, 10, 25],
+			}}
 			columns={columns}
 			data={data}
+			page={page}
+			totalCount={totalCount}
+			onPageChange={onPageChange}
+			onRowsPerPageChange={onRowsPerPageChange}
 		/>
 	);
 };
 
-export const ExampleFetchComponent = () => {
+export const DummyFetchComponent = () => {
 	const discoveryApi = useApi(discoveryApiRef);
 	const fetchApi = useApi(fetchApiRef);
 
-	const { value, loading, error } = useAsync(async (): Promise<SoccerTeam[]> => {
+	const [page, setPage] = useState(0);
+	const [pageSize, setPageSize] = useState(5);
+
+	const { value, loading, error } = useAsync(async (): Promise<SoccerTeamsResponse> => {
 		const baseUrl = await discoveryApi.getBaseUrl('plugin-dummy-backend');
-		const url = `${baseUrl}/teams`;
+		const offset = page * pageSize;
+		const url = `${baseUrl}/teams?limit=${pageSize}&offset=${offset}`;
 		const response = await fetchApi.fetch(url);
 		if (!response.ok) {
 			throw new Error(
@@ -65,9 +94,17 @@ export const ExampleFetchComponent = () => {
 			);
 		}
 
-		const data = (await response.json()) as SoccerTeamsResponse;
-		return data.teams;
-	}, [discoveryApi, fetchApi]);
+		return (await response.json()) as SoccerTeamsResponse;
+	}, [discoveryApi, fetchApi, page, pageSize]);
+
+	const handlePageChange = useCallback((newPage: number) => {
+		setPage(newPage);
+	}, []);
+
+	const handleRowsPerPageChange = useCallback((rowsPerPage: number) => {
+		setPageSize(rowsPerPage);
+		setPage(0);
+	}, []);
 
 	if (loading) {
 		return <Progress />;
@@ -75,5 +112,14 @@ export const ExampleFetchComponent = () => {
 		return <ResponseErrorPanel error={error} />;
 	}
 
-	return <DenseTable teams={value ?? []} />;
+	return (
+		<DenseTable
+			teams={value?.teams ?? []}
+			totalCount={value?.totalCount ?? 0}
+			page={page}
+			pageSize={pageSize}
+			onPageChange={handlePageChange}
+			onRowsPerPageChange={handleRowsPerPageChange}
+		/>
+	);
 };

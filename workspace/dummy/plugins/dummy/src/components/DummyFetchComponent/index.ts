@@ -1,0 +1,1 @@
+export { DummyFetchComponent } from './DummyFetchComponent';

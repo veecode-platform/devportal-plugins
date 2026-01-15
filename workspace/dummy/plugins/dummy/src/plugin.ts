@@ -16,7 +16,7 @@ export const DummyPage = dummyPlugin.provide(
   createRoutableExtension({
     name: 'DummyPage',
     component: () =>
-      import('./components/ExampleComponent').then(m => m.ExampleComponent),
+      import('./components/DummyComponent').then(m => m.DummyComponent),
     mountPoint: rootRouteRef,
   }),
 );

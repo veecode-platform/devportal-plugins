@@ -12,8 +12,16 @@ export type SoccerTeam = {
   country: string;
 };
 
+export type PaginationOptions = {
+  limit?: number;
+  offset?: number;
+};
+
 export type SoccerTeamsResponse = {
   teams: SoccerTeam[];
+  totalCount: number;
+  limit: number;
+  offset: number;
 };
 
 export class SoccerListService {
@@ -27,22 +35,53 @@ export class SoccerListService {
     this.#logger = logger;
   }
 
-  async listTeams(): Promise<SoccerTeamsResponse> {
-    const result: SoccerTeamsResponse = {
-      teams: [
+  async listTeams(options?: PaginationOptions): Promise<SoccerTeamsResponse> {
+    const limit = options?.limit ?? 10;
+    const offset = options?.offset ?? 0;
+
+    const allTeams: SoccerTeam[] = [
         { id: 'arsenal', name: 'Arsenal', country: 'England' },
         { id: 'barcelona', name: 'FC Barcelona', country: 'Spain' },
         { id: 'bayern', name: 'FC Bayern München', country: 'Germany' },
         { id: 'flamengo', name: 'Flamengo', country: 'Brazil' },
         { id: 'juventus', name: 'Juventus', country: 'Italy' },
-      ],
-    };
+        { id: 'realmadrid', name: 'Real Madrid', country: 'Spain' },
+        { id: 'manchester', name: 'Manchester United', country: 'England' },
+        { id: 'liverpool', name: 'Liverpool', country: 'England' },
+        { id: 'chelsea', name: 'Chelsea', country: 'England' },
+        { id: 'mancity', name: 'Manchester City', country: 'England' },
+        { id: 'psg', name: 'Paris Saint-Germain', country: 'France' },
+        { id: 'lyon', name: 'Olympique Lyonnais', country: 'France' },
+        { id: 'marseille', name: 'Olympique Marseille', country: 'France' },
+        { id: 'inter', name: 'Inter Milan', country: 'Italy' },
+        { id: 'milan', name: 'AC Milan', country: 'Italy' },
+        { id: 'napoli', name: 'Napoli', country: 'Italy' },
+        { id: 'dortmund', name: 'Borussia Dortmund', country: 'Germany' },
+        { id: 'leipzig', name: 'RB Leipzig', country: 'Germany' },
+        { id: 'atalanta', name: 'Atalanta', country: 'Italy' },
+        { id: 'ajax', name: 'Ajax Amsterdam', country: 'Netherlands' },
+        { id: 'portugal', name: 'FC Porto', country: 'Portugal' },
+        { id: 'benfica', name: 'SL Benfica', country: 'Portugal' },
+        { id: 'river', name: 'River Plate', country: 'Argentina' },
+        { id: 'boca', name: 'Boca Juniors', country: 'Argentina' },
+        { id: 'palmeiras', name: 'Palmeiras', country: 'Brazil' },
+    ];
+
+    const paginatedTeams = allTeams.slice(offset, offset + limit);
 
     this.#logger.info('Returned soccer teams list', {
-      teamCount: result.teams.length,
+      totalCount: allTeams.length,
+      limit,
+      offset,
+      returnedCount: paginatedTeams.length,
     });
 
-    return result;
+    return {
+      teams: paginatedTeams,
+      totalCount: allTeams.length,
+      limit,
+      offset,
+    };
   }
 }
 

@@ -7,9 +7,9 @@ import {
   HeaderLabel,
   SupportButton,
 } from '@backstage/core-components';
-import { ExampleFetchComponent } from '../ExampleFetchComponent';
+import { DummyFetchComponent } from '../DummyFetchComponent';
 
-export const ExampleComponent = () => (
+export const DummyComponent = () => (
   <Page themeId="tool">
     <Header title="Welcome to dummy!" subtitle="Optional subtitle">
       <HeaderLabel label="Owner" value="Team X" />
@@ -21,7 +21,7 @@ export const ExampleComponent = () => (
       </ContentHeader>
       <Grid container spacing={3} direction="column">
         <Grid item>
-          <ExampleFetchComponent />
+          <DummyFetchComponent />
         </Grid>
       </Grid>
     </Content>
