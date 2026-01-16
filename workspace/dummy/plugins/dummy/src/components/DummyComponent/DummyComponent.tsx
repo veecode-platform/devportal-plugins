@@ -16,7 +16,7 @@ export const DummyComponent = () => (
       <HeaderLabel label="Lifecycle" value="Alpha" />
     </Header>
     <Content>
-      <ContentHeader title="Plugin title">
+      <ContentHeader title="Dummy Plugin">
         <SupportButton>A description of your plugin goes here.</SupportButton>
       </ContentHeader>
       <Grid container spacing={3} direction="column">
