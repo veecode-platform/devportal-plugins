@@ -20,20 +20,32 @@
 
 We will start with the dummy workspace ("./workspace/dummy"), as it is the most basic example of a Backstage plugin and it is intended to become a reference implementation for other workspaces.
 
-- [ ] **1.1** Create Makefile for dummy workspace
-  - [ ] Follow the standards defined in most other workspaces
-  - [ ] Comment the Makefile to make it LLM friendly (so it bocemos the standard from now on)
-- [ ] **1.2** Review and improve dummy workspace structure
-  - [ ] Check package.json for Backstage standards
-  - [ ] Make sure there is an "update-backstage" script (`"update-backstage": "backstage-cli versions:bump"` entry under "scripts")
+- [x] **1.1** Create Makefile for dummy workspace
+  - [x] Follow the standards defined in most other workspaces
+  - [x] Comment the Makefile to make it LLM friendly (so it becomos the standard from now on)
+- [x] **1.2** Review and improve dummy workspace structure
+  - [x] Check package.json for Backstage standards
+  - [x] Make sure there is an "update-backstage" script (`"update-backstage": "backstage-cli versions:bump"` entry under "scripts")
 - [ ] **1.3** Add/improve tests and test patterns
-  - [ ] Understand current test patterns (the hosting app was generated with many testing patterns in place)
-  - [ ] Check package.json for Backstage testing standards (ex: use the `backstage-cli repo test` command if it makes sense)
-  - [ ] Make sure tests are simple and cover basic functionality (DO NOT be overzealous with unit tests)
-  - [ ] Backend plugins and modules can be tested using the the `@backstage/backend-test-utils` package (see in [Testing Backend Plugins and Modules](https://backstage.io/docs/backend-system/building-plugins-and-modules/testing/))
+  - [ ] **Plugin Tests** (inside `plugins/*`)
+    - [ ] Frontend plugins: component rendering tests using `@backstage/test-utils`
+    - [ ] Backend plugins: use `@backstage/backend-test-utils` (see [Testing Backend Plugins and Modules](https://backstage.io/docs/backend-system/building-plugins-and-modules/testing/))
+    - [ ] Keep tests simple - focus on basic functionality, avoid over-testing
+  - [ ] **Hosting App Wiring Tests** (inside `packages/app` and `packages/backend`)
+    - [ ] Verify plugins are correctly registered and exported
+    - [ ] Test that plugin routes/pages are accessible
+    - [ ] Test backend plugin endpoints respond correctly
+  - [ ] **Test Infrastructure**
+    - [ ] Review existing test patterns in the generated hosting app
+    - [ ] Ensure `yarn test:all` runs all plugin and wiring tests
+    - [ ] Document test commands in workspace README
 - [ ] **1.4** Dynamic plugin testing
-  - [ ] TODO
-- [ ] **1.5** Document reference patterns in dummy README.md
+  - [x] Create the required files for dynamic plugin testing:
+    - [x] docker-compose.yaml (mounts dynamic plugins and config files)
+    - [x] app-config.dynamic.yaml (usually minimal or even empty)
+    - [x] dynamic-plugins.yaml (enables the dynamic plugins)
+  - [ ] Create tests to validate dynamic plugin functionality (runs against the container)
+- [ ] **1.5** Check if documents like README.md are up to date
 
 ### Phase 2: Document Reference Implementation
 
