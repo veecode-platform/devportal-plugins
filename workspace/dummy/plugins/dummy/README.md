@@ -25,6 +25,7 @@ This plugin serves as a reference implementation for frontend-backend communicat
 - **DummyFetchComponent**: Handles API communication and data display with table rendering
 - **DummyCard**: Entity card wrapper for displaying content in overview sections
 - **DummyContent**: Grid layout component for entity tab presentations
+- **DummyIcon**: Re-exported MUI icon for use in sidebar navigation and other UI elements
 
 ## Frontend Elements
 
@@ -85,12 +86,33 @@ import { DummyContent } from '@veecode-platform/backstage-plugin-dummy';
 To add navigation to the sidebar, edit `packages/app/src/components/Root/Root.tsx`:
 
 ```tsx
-import CategoryIcon from '@material-ui/icons/Category';
+import { DummyIcon } from '@veecode-platform/backstage-plugin-dummy';
 
 // Add inside <SidebarGroup>
-<SidebarItem icon={CategoryIcon} to="dummy" text="Dummy" />
+<SidebarItem icon={DummyIcon} to="dummy" text="Dummy" />
 ```
 
 ## Dynamic Plugin Wiring
 
-TODO: show import command and frontend wiring for each component.
+**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
+
+This plugin can be dynamically downloaded and installed from the public npm registry, as well as its UI elements can be configured:
+
+```yaml
+plugins:
+  - package: @veecode-platform/backstage-plugin-dummy-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-dummy:
+            # more configs...
+```
+
+VeeCode DevPortal already bundles the dynamic plugin as a pre-installed plugin, so it can be loaded using a local path. Notice that pre-installed plugins come with good defaults, so yo usually just have to enable them.
+
+```yaml
+plugins:
+  - package: ./dynamic-plugins/dist/backstage-plugin-dummy-dynamic
+    disabled: false
+```

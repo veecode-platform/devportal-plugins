@@ -1,0 +1,37 @@
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-dummy-backend-dynamic
+    disabled: false
+  #
+  # mounts plugin exported elements as:
+  # 1. sidebar link, dynamic route and page
+  # 2. entity tab with cards
+  #
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-dummy-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-dummy:
+            appIcons:
+              - name: dummyIcon # unique icon name
+                importName: DummyIcon
+            dynamicRoutes: # exposes full routes
+              - path: /dummy # unique path in the app, can override `/`
+                importName: DummyPage # optional, actual component name that should be rendered
+                menuItem: # optional, allows you to populate main sidebar navigation
+                  icon: dummyIcon # imported icon
+                  text: Dummy # menu item text
+                  enabled: true
+            entityTabs:
+              - path: /dummy-tab
+                title: Dummy
+                mountPoint: entity.page.dummy
+            mountPoints:
+              - mountPoint: entity.page.dummy/cards
+                importName: DummyCard
+                config:
+                  layout:
+                    gridColumn: "1 / -1"

@@ -27,4 +27,6 @@ Frontend plugin documentation is available at [plugins/dummy/README.md](plugins/
 
 Both plugins are available as static "normal" plugins and as a dynamic plugins. See [Backstage Plugins](https://docs.platform.vee.codes/devportal/plugins/) page for more details on plugin types and loading.
 
+## Building and Publishing
+
 See the [Makefile](Makefile) for more details on the build/package process.

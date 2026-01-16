@@ -55,12 +55,34 @@ backend.add(import('@veecode-platform/backstage-plugin-dummy-backend'));
 
 ## Dynamic Plugin Wiring
 
-TODO: show dynamic plugin wiring for backend.
+**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
+
+This plugin can be dynamically downloaded and installed from the public npm registry:
+
+```yaml
+plugins:
+  - package: @veecode-platform/backstage-plugin-dummy-backend-dynamic
+    disabled: false
+```
+
+VeeCode DevPortal already bundles the dynamic plugin as a pre-installed plugin, so it can be loaded using a local path:
+
+```yaml
+plugins:
+  - package: ./dynamic-plugins/dist/backstage-plugin-dummy-backend-dynamic
+    disabled: false
+```
 
 ## Development
 
-This plugin backend can be started in a standalone mode from directly in this
-package with `yarn start`. It is a limited setup that is most convenient when
-developing the plugin backend itself.
+This backend plugin can be started in a standalone mode directly from the command-line:
 
-If you want to run the entire project, including the frontend, run `yarn start` from the root directory.
+```bash
+yarn start
+```
+
+It is a very convenient way to run the backend plugin in isolation during development. You can use `curl` to test the backend API endpoint:
+
+```bash
+curl http://localhost:7007/api/plugin-dummy-backend/teams
+```
