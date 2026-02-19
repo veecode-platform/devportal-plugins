@@ -17,7 +17,7 @@ describe('LDAP authentication', () => {
             authFunc
         );
 
-        expect(authFunc).toBeCalled();
+        expect(authFunc).toHaveBeenCalled();
         expect(out).toEqual({ uid: UID });
     });
 
@@ -34,8 +34,8 @@ describe('LDAP authentication', () => {
             authFunc
         );
 
-        expect(authFunc).toBeCalled();
-        expect(out).rejects.toEqual(new Error(AUTH_USER_DATA_ERROR));
+        expect(authFunc).toHaveBeenCalled();
+        await expect(out).rejects.toEqual(new Error(AUTH_USER_DATA_ERROR));
     });
 });
 
@@ -53,6 +53,6 @@ describe('LDAP check user exists', () => {
             defaultCheckUserExists(options, authFunc)
         ).resolves.toEqual(true);
 
-        expect(authFunc).toBeCalledWith({ ...options, verifyUserExists: true });
+        expect(authFunc).toHaveBeenCalledWith({ ...options, verifyUserExists: true });
     });
 });

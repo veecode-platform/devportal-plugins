@@ -5,7 +5,7 @@
 #
 
 # Version for ldap-auth packages (frontend, backend)
-LDAP_AUTH_VERSION ?= 1.0.0
+LDAP_AUTH_VERSION ?= 1.1.0
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 

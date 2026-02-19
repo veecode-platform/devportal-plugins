@@ -308,7 +308,7 @@ describe('LdapAuthProvider token invalidation tests', () => {
         await expect(
             provider.refresh(reqMock as any, resMock as any)
         ).resolves.toEqual(undefined);
-        expect(resMock.json).lastCalledWith({
+        expect(resMock.json).toHaveBeenLastCalledWith({
             backstageIdentity: {
                 identity: {
                     ownershipEntityRefs: [],

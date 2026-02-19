@@ -50,7 +50,7 @@ make cleanup         # Clean build artifacts
 make get-version     # Get published version from npm
 ```
 
-Version variable names vary by workspace:
+Version variable names may vary by workspace, but we may change to use the same variable name `PLUGIN_VERSION` for all workspaces (setting a value for each run):
 
 - homepage: `HOMEPAGE_VERSION`
 - global-header: `GLOBAL_HEADER_VERSION`
@@ -107,6 +107,16 @@ All plugins are published to the `@veecode-platform/*` npm namespace.
 ### Yarn Workspace Dependencies
 
 Plugins within the same workspace may use `workspace:*` for internal dependencies. Before publishing, these must be replaced with actual version numbers (handled by Makefile targets like `replace-workspace`).
+
+### Yarn Workspace Upgrading
+
+Plugins should have an `update-backstage` section for upgrading the Backstage hosting app:
+
+```json
+"scripts": {
+  "update-backstage": "backstage-cli versions:bump"
+}
+```
 
 ## Key Files
 

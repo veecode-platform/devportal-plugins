@@ -8,6 +8,7 @@ import request from 'supertest';
 import { COOKIE_FIELD_KEY, JWTTokenValidator } from './jwt';
 import Keyv from 'keyv';
 import { createBackendModule } from '@backstage/backend-plugin-api';
+import authBackend from '@backstage/plugin-auth-backend';
 
 describe('ldapProvider new backend system', () => {
     it('extension point should work', async () => {
@@ -48,7 +49,7 @@ describe('ldapProvider new backend system', () => {
         };
         const { server } = await startTestBackend({
             features: [
-                import('@backstage/plugin-auth-backend'),
+                authBackend,
                 ldapAuthModule,
                 createBackendModule({
                     pluginId: 'auth',
@@ -115,7 +116,7 @@ describe('ldapProvider new backend system', () => {
         };
         const { server } = await startTestBackend({
             features: [
-                import('@backstage/plugin-auth-backend'),
+                authBackend,
                 ldapAuthModule,
                 tokenValidatorFactory({ createTokenValidator }),
                 mockServices.rootConfig.factory({
