@@ -20,7 +20,8 @@
     "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
-    "new": "backstage-cli new"
+    "new": "backstage-cli new",
+    "update-backstage": "backstage-cli versions:bump --pattern '@{backstage,roadiehq,backstage-community,veecode-platform}/*'"
   },
   "workspaces": {
     "packages": [
@@ -29,8 +30,8 @@
     ]
   },
   "devDependencies": {
-    "@backstage/cli": "^0.34.4",
-    "@backstage/e2e-test-utils": "^0.1.1",
+    "@backstage/cli": "^0.35.4",
+    "@backstage/e2e-test-utils": "^0.1.2",
     "@playwright/test": "^1.32.3",
     "node-gyp": "^10.0.0",
     "prettier": "^2.3.2",
