@@ -2,124 +2,52 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository Overview
+**Claude MUST follow all rules in AGENTS.md.**
 
-This is a monorepo for VeeCode DevPortal plugins (Backstage plugins). Each workspace is itself a Backstage hosting app with yarn workspaces:
+In case of conflict, AGENTS.md takes precedence unless explicitly stated here.
 
-- The Backstage hosting app root (see `package.json` and `app-config*.yaml`)
-- The Backstage frontend at `packages/app`
-- The Backstage backend at `packages/backend`
-- The plugins being developed at `plugins/*`
+## Browser Automation
 
-The hosting app exists for development and testing. The actual releases are the plugins themselves, not the hosting app.
+Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
 
-## Common Commands
+Core workflow:
 
-### Per-Workspace Development
+1. `agent-browser open <url>` - Navigate to page
+2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
+3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
+4. Re-snapshot after page changes
 
-Each workspace is self-contained. Navigate to the workspace first:
+<!-- CODEGRAPH_START -->
+## CodeGraph
 
-```bash
-cd workspace/<workspace-name>
-yarn install
-yarn tsc             # TypeScript check
-yarn build:all       # Build all packages
-yarn test:all        # Run tests
-yarn lint:all        # Lint all files
-```
+CodeGraph builds a semantic knowledge graph of codebases for faster, smarter code exploration.
 
-To start the Backstage hosting app:
+### If `.codegraph/` exists in the project
 
-```bash
-yarn start
-```
+**Use codegraph tools for faster exploration.** These tools provide instant lookups via the code graph instead of scanning files:
 
-### Workspace Makefiles
+| Tool | Use For |
+|------|---------|
+| `codegraph_search` | Find symbols by name (functions, classes, types) |
+| `codegraph_context` | Get relevant code context for a task |
+| `codegraph_callers` | Find what calls a function |
+| `codegraph_callees` | Find what a function calls |
+| `codegraph_impact` | See what's affected by changing a symbol |
+| `codegraph_node` | Get details + source code for a symbol |
 
-Each workspace has its own Makefile with build, publish, and utility commands:
+**When spawning Explore agents in a codegraph-enabled project:**
 
-```bash
-cd workspace/<workspace-name>
-make help            # Shows all available commands
-make build           # Build the plugin(s)
-make build-dynamic   # Build dynamic plugin(s)
-make publish         # Publish static plugin(s)
-make publish-dynamic # Publish dynamic plugin(s)
-make set-version VERSION=x.x.x  # Set version
-make cleanup         # Clean build artifacts
-make get-version     # Get published version from npm
-```
+Tell the Explore agent to use codegraph tools for faster exploration.
 
-Version variable names may vary by workspace, but we may change to use the same variable name `PLUGIN_VERSION` for all workspaces (setting a value for each run):
+**For quick lookups in the main session:**
 
-- homepage: `HOMEPAGE_VERSION`
-- global-header: `GLOBAL_HEADER_VERSION`
-- github-workflows: `GH_WORKFLOWS_VERSION`
-- ldap-auth: `LDAP_AUTH_VERSION`
-- kong-tools: `KONG_TOOLS_VERSION`
-- kubernetes: `KUBERNETES_VERSION`
+- Use `codegraph_search` instead of grep for finding symbols
+- Use `codegraph_callers`/`codegraph_callees` to trace code flow
+- Use `codegraph_impact` before making changes to see what's affected
 
-### Root-Level Makefile
+### If `.codegraph/` does NOT exist
 
-The root Makefile provides cross-workspace utilities:
+At the start of a session, ask the user if they'd like to initialize CodeGraph:
 
-```bash
-make help                  # List available commands
-make echo-paths            # Show dynamic plugin paths
-make copy-dynamic-plugins  # Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT
-```
-
-## Architecture
-
-### Workspace Structure
-
-```pre
-workspace/
-├── homepage/              # veecode-homepage plugin
-├── global-header/         # veecode-global-header plugin
-├── github-workflows/      # github-workflows frontend + backend + common
-├── ldap-auth/             # ldap-auth frontend + backend
-├── kong-tools/            # scaffolder-backend-module-kong plugin
-├── kubernetes/            # kubernetes plugin (WIP)
-├── about/                 # about plugin (WIP - no hosting app yet)
-└── support/               # support plugin (WIP - no hosting app yet)
-```
-
-Each complete workspace contains:
-
-- `packages/app` - Backstage frontend app (for testing)
-- `packages/backend` - Backstage backend app (for testing)
-- `plugins/` - The actual plugin packages to publish
-
-### Plugin Variants
-
-Plugins are published in two forms:
-
-- **Static**: Regular npm packages for standard Backstage integration
-- **Dynamic**: Built with `@red-hat-developer-hub/cli plugin export` for RHDH dynamic loading
-
-Dynamic plugin builds create a `dist-dynamic/` directory within each plugin.
-
-### Package Namespacing
-
-All plugins are published to the `@veecode-platform/*` npm namespace.
-
-### Yarn Workspace Dependencies
-
-Plugins within the same workspace may use `workspace:*` for internal dependencies. Before publishing, these must be replaced with actual version numbers (handled by Makefile targets like `replace-workspace`).
-
-### Yarn Workspace Upgrading
-
-Plugins should have an `update-backstage` section for upgrading the Backstage hosting app:
-
-```json
-"scripts": {
-  "update-backstage": "backstage-cli versions:bump"
-}
-```
-
-## Key Files
-
-- `/Makefile` - Root-level cross-workspace utilities
-- `/workspace/<name>/Makefile` - Workspace-specific build/publish tasks
-- `/workspace/<name>/app-config.yaml` - Backstage config for local development
+"I notice this project doesn't have CodeGraph initialized. Would you like me to run `codegraph init -i` to build a code knowledge graph?"
+<!-- CODEGRAPH_END -->
