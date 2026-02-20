@@ -11,9 +11,11 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: example-website
+  name: example-kong-service
+  annotations:
+    kong-manager/service-name: example-service
 spec:
-  type: website
+  type: service
   lifecycle: experimental
   owner: guests
   system: examples
