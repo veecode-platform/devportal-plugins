@@ -143,14 +143,19 @@ All endpoints are served under `/api/kong-service-manager-backend`.
 
 ## RBAC note
 
-Role-Based Access Control (RBAC) is a **Kong Enterprise** feature available on
-Kong Gateway (Enterprise) and Kong Konnect, but **not** on Kong OSS. If your
-Kong Admin API is protected by RBAC, the token supplied in `auth.kongAdmin` (or
+Role-Based Access Control (RBAC) and workspaces are **Kong Enterprise** features.
+They are available on Kong Gateway (Enterprise) and Kong Konnect, but **not** on Kong OSS.
+If your Kong Admin API is protected by RBAC, the token supplied in `auth.kongAdmin` (or
 the custom header) must carry the appropriate permissions for the endpoints this
 plugin calls.
 
 See the [Kong RBAC documentation](https://developer.konghq.com/gateway/entities/rbac/)
 for details on configuring roles and permissions.
+
+You can leave them both empty if your Kong Admin API does not require authentication (as in Kong OSS).
+
+**Note:** it is custom practice to create Kong service and routes for the Admin API itself,
+so that you can control access to it via "homemade" RBAC using the bundled OSS plugins. This strategy can be refined to the point of partially exposing the Admin API, but we will not cover this in this documentation.
 
 ## Development
 
