@@ -107,10 +107,7 @@ catalog:
 kong:
   instances:
     - id: default
-      apiBaseUrl: ${KONG_ADMIN_URL}
-      # workspace: default
-      auth:
-        kongAdmin: ${KONG_ADMIN_TOKEN}
+      apiBaseUrl: http://manager.localhost:8000
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
