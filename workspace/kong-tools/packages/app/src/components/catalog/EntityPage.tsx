@@ -58,6 +58,9 @@ import {
   isKubernetesAvailable,
 } from '@backstage/plugin-kubernetes';
 
+import { KongServiceManagerContent } from '@veecode-platform/backstage-plugin-kong-service-manager';
+import { isKongServiceManagerAvailable } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+
 const techdocsContent = (
   <EntityTechdocsContent>
     <TechDocsAddons>
@@ -181,6 +184,14 @@ const serviceEntityPage = (
           <EntityDependsOnResourcesCard variant="gridItem" />
         </Grid>
       </Grid>
+    </EntityLayout.Route>
+
+    <EntityLayout.Route
+      path="/kong"
+      title="Kong"
+      if={isKongServiceManagerAvailable}
+    >
+      <KongServiceManagerContent />
     </EntityLayout.Route>
 
     <EntityLayout.Route path="/docs" title="Docs">

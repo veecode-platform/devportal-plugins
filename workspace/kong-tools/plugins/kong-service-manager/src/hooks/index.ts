@@ -1,0 +1,1 @@
+export { useEntityAnnotations } from './useEntityAnnotations';

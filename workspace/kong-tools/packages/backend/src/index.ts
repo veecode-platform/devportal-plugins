@@ -64,4 +64,10 @@ backend.add(import('@backstage/plugin-notifications-backend'));
 backend.add(import('@backstage/plugin-signals-backend'));
 
 backend.add(import('@veecode-platform/plugin-scaffolder-backend-module-kong'));
+
+// kong service manager plugin
+backend.add(
+  import('@veecode-platform/backstage-plugin-kong-service-manager-backend'),
+);
+
 backend.start();
