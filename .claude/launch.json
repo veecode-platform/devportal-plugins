@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kong-tools-tsc",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["--cwd", "workspace/kong-tools", "tsc"],
+      "port": 0
+    },
+    {
+      "name": "kong-tools-dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["BROWSER=none", "yarn", "--cwd", "workspace/kong-tools", "start"],
+      "port": 3000
+    }
+  ]
+}
