@@ -1,46 +1,137 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
-  CardHeader,
-  Chip,
   CircularProgress,
+  InputAdornment,
+  Skeleton,
+  TextField,
   Typography,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  IconButton,
-  Tooltip,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import SearchIcon from '@mui/icons-material/Search';
+import {
+  CardTab,
+  ItemCardGrid,
+  TabbedCard,
+} from '@backstage/core-components';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { PluginCard } from './PluginCard';
+import type { PluginPerCategory } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
-type PluginsListProps = {
-  onEditPlugin?: (pluginId: string, pluginName: string) => void;
-  onRemovePlugin?: (pluginId: string, pluginName: string) => void;
+const CATEGORY_LABELS: Record<string, string> = {
+  ai: 'AI',
+  authentication: 'Authentication',
+  security: 'Security',
+  'traffic-control': 'Traffic Control',
+  serverless: 'Serverless',
+  transformation: 'Transformations',
+  logging: 'Logging',
+  analytics: 'Analytics & Monitoring',
 };
 
-export function PluginsList({ onEditPlugin, onRemovePlugin }: PluginsListProps) {
-  const { state, fetchAssociatedPlugins } = useKongServiceManager();
-  const { associatedPlugins, loading, error, instance, serviceName } = state;
+function formatCategory(slug: string): string {
+  return (
+    CATEGORY_LABELS[slug] ??
+    slug
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase())
+  );
+}
+
+function PluginCardSkeleton() {
+  return (
+    <ItemCardGrid>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton
+          key={i}
+          variant="rectangular"
+          height={220}
+          sx={{ borderRadius: '8px' }}
+        />
+      ))}
+    </ItemCardGrid>
+  );
+}
+
+type PluginsListProps = {
+  onEnablePlugin: (pluginSlug: string) => void;
+  onEditPlugin: (pluginId: string, pluginName: string) => void;
+};
+
+export function PluginsList({ onEnablePlugin, onEditPlugin }: PluginsListProps) {
+  const {
+    state,
+    fetchAssociatedPlugins,
+    fetchAvailablePlugins,
+    removeServicePlugin,
+  } = useKongServiceManager();
+
+  const {
+    associatedPlugins,
+    availablePlugins,
+    loading,
+    error,
+    instance,
+    serviceName,
+  } = state;
+
+  const [search, setSearch] = useState('');
+  const [disablingId, setDisablingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (instance && serviceName) {
       fetchAssociatedPlugins();
+      fetchAvailablePlugins();
     }
-  }, [instance, serviceName, fetchAssociatedPlugins]);
+  }, [instance, serviceName, fetchAssociatedPlugins, fetchAvailablePlugins]);
 
-  if (loading && associatedPlugins.length === 0) {
-    return (
-      <Box display="flex" justifyContent="center" p={4}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const associatedMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of associatedPlugins) {
+      map.set(p.name, p.id);
+    }
+    return map;
+  }, [associatedPlugins]);
+
+  const handleDisable = useCallback(
+    async (pluginId: string, _pluginName: string) => {
+      setDisablingId(pluginId);
+      try {
+        await removeServicePlugin(pluginId);
+      } finally {
+        setDisablingId(null);
+      }
+    },
+    [removeServicePlugin],
+  );
+
+  const filterCategories = useCallback(
+    (categories: PluginPerCategory[], onlyAssociated: boolean) => {
+      const term = search.toLowerCase();
+      return categories
+        .map(cat => ({
+          ...cat,
+          plugins: cat.plugins.filter(p => {
+            if (onlyAssociated && !p.associated) return false;
+            if (term && !p.name.toLowerCase().includes(term) && !p.slug.toLowerCase().includes(term)) {
+              return false;
+            }
+            return true;
+          }),
+        }))
+        .filter(cat => cat.plugins.length > 0);
+    },
+    [search],
+  );
+
+  const allFiltered = useMemo(
+    () => filterCategories(availablePlugins, false),
+    [availablePlugins, filterCategories],
+  );
+
+  const associatedFiltered = useMemo(
+    () => filterCategories(availablePlugins, true),
+    [availablePlugins, filterCategories],
+  );
 
   if (error) {
     return (
@@ -50,101 +141,72 @@ export function PluginsList({ onEditPlugin, onRemovePlugin }: PluginsListProps) 
     );
   }
 
-  if (associatedPlugins.length === 0) {
-    return (
-      <Card variant="outlined">
-        <CardContent>
-          <Typography color="text.secondary">
-            No plugins associated with this service.
-          </Typography>
-        </CardContent>
-      </Card>
-    );
-  }
+  const renderCategories = (categories: PluginPerCategory[]) => {
+    if (loading && availablePlugins.length === 0) {
+      return <PluginCardSkeleton />;
+    }
+
+    if (categories.length === 0) {
+      return (
+        <Box p={4} textAlign="center">
+          <Typography color="text.secondary">No plugins to display</Typography>
+        </Box>
+      );
+    }
+
+    return categories.map(cat => (
+      <Box key={cat.category} mb={3}>
+        <Typography variant="h6" sx={{ mb: 1.5 }}>
+          {formatCategory(cat.category)}
+        </Typography>
+        <ItemCardGrid>
+          {cat.plugins.map(plugin => (
+            <PluginCard
+              key={plugin.slug}
+              plugin={plugin}
+              associatedId={associatedMap.get(plugin.slug)}
+              disabling={disablingId === associatedMap.get(plugin.slug)}
+              onEnable={onEnablePlugin}
+              onEdit={onEditPlugin}
+              onDisable={handleDisable}
+            />
+          ))}
+        </ItemCardGrid>
+      </Box>
+    ));
+  };
 
   return (
-    <Card variant="outlined">
-      <CardHeader
-        title="Associated Plugins"
-        subheader={`${associatedPlugins.length} plugin(s)`}
-      />
-      <CardContent>
-        {associatedPlugins.map(plugin => (
-          <Accordion key={plugin.id} variant="outlined" sx={{ mb: 1 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Box
-                display="flex"
-                alignItems="center"
-                gap={1}
-                width="100%"
-                pr={1}
-              >
-                <PowerSettingsNewIcon
-                  fontSize="small"
-                  color={plugin.enabled ? 'success' : 'disabled'}
-                />
-                <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
-                  {plugin.name}
-                </Typography>
-                <Chip
-                  label={plugin.enabled ? 'enabled' : 'disabled'}
-                  size="small"
-                  color={plugin.enabled ? 'success' : 'default'}
-                />
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box>
-                <Typography variant="caption" color="text.secondary">
-                  ID: {plugin.id}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  component="pre"
-                  sx={{
-                    mt: 1,
-                    p: 1,
-                    bgcolor: 'action.hover',
-                    borderRadius: 1,
-                    overflow: 'auto',
-                    fontSize: '0.75rem',
-                    maxHeight: 300,
-                  }}
-                >
-                  {JSON.stringify(plugin.config, null, 2)}
-                </Typography>
-                {(onEditPlugin || onRemovePlugin) && (
-                  <Box display="flex" gap={1} mt={1} justifyContent="flex-end">
-                    {onEditPlugin && (
-                      <Tooltip title="Edit plugin">
-                        <IconButton
-                          size="small"
-                          onClick={() => onEditPlugin(plugin.id, plugin.name)}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    {onRemovePlugin && (
-                      <Tooltip title="Remove plugin">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() =>
-                            onRemovePlugin(plugin.id, plugin.name)
-                          }
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                )}
-              </Box>
-            </AccordionDetails>
-          </Accordion>
-        ))}
-      </CardContent>
-    </Card>
+    <Box>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+        <Typography variant="h5">Kong Plugins</Typography>
+        <Box display="flex" alignItems="center" gap={1}>
+          {loading && <CircularProgress size={20} />}
+          <TextField
+            size="small"
+            placeholder="Search plugins..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ width: 240 }}
+          />
+        </Box>
+      </Box>
+
+      <TabbedCard title="">
+        <CardTab label="All Plugins">
+          <Box p={2}>{renderCategories(allFiltered)}</Box>
+        </CardTab>
+        <CardTab label="Associated Plugins">
+          <Box p={2}>{renderCategories(associatedFiltered)}</Box>
+        </CardTab>
+      </TabbedCard>
+    </Box>
   );
 }

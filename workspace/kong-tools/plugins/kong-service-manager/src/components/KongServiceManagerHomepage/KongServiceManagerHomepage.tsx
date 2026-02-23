@@ -32,15 +32,18 @@ export function KongServiceManagerHomepage() {
     }
   }, [serviceName, setServiceName]);
 
+  const handleEnablePlugin = useCallback((pluginSlug: string) => {
+    setDrawerPluginId(undefined);
+    setDrawerPluginName(pluginSlug);
+    setDrawerConfig(undefined);
+    setDrawerOpen(true);
+  }, []);
+
   const handleEditPlugin = useCallback((pluginId: string, pluginName: string) => {
     setDrawerPluginId(pluginId);
     setDrawerPluginName(pluginName);
     setDrawerConfig(undefined);
     setDrawerOpen(true);
-  }, []);
-
-  const handleRemovePlugin = useCallback((_pluginId: string, _pluginName: string) => {
-    // handled by PluginsList internally via context
   }, []);
 
   const handleEditRoute = useCallback((route: RouteResponse) => {
@@ -69,8 +72,8 @@ export function KongServiceManagerHomepage() {
 
       {tabIndex === 1 && (
         <PluginsList
+          onEnablePlugin={handleEnablePlugin}
           onEditPlugin={handleEditPlugin}
-          onRemovePlugin={handleRemovePlugin}
         />
       )}
 

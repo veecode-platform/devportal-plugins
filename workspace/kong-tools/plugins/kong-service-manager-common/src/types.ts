@@ -118,7 +118,7 @@ export type SchemaField = {
     type: string;
     required?: boolean;
     default?: unknown;
-    elements?: { type: string };
+    elements?: { type: string; fields?: SchemaField[]; one_of?: unknown[] };
     fields?: SchemaField[];
     one_of?: unknown[];
     between?: [number, number];
