@@ -100,6 +100,7 @@ export function KongServiceManagerHomepage() {
       />
 
       <RouteForm
+        key={editingRoute?.id ?? 'new'}
         open={routeFormOpen}
         onClose={() => setRouteFormOpen(false)}
         editingRoute={editingRoute}
