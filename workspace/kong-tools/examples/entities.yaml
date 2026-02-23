@@ -13,7 +13,8 @@ kind: Component
 metadata:
   name: example-kong-service
   annotations:
-    kong-manager/service-name: example-service
+    kong-manager/service-name: default.cep.80
+    kong-manager/instance: default
 spec:
   type: service
   lifecycle: experimental
