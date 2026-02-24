@@ -24,14 +24,16 @@ import {
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ExtensionIcon from '@mui/icons-material/Extension';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
 import type { RouteResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 type RoutesListProps = {
   onEditRoute?: (route: RouteResponse) => void;
+  onManagePlugins?: (route: RouteResponse) => void;
 };
 
-export function RoutesList({ onEditRoute }: RoutesListProps) {
+export function RoutesList({ onEditRoute, onManagePlugins }: RoutesListProps) {
   const { state, fetchRoutes, removeRoute } = useKongServiceManager();
   const { routes, loading, error, instance, serviceName } = state;
   const [deleteTarget, setDeleteTarget] = useState<RouteResponse | null>(null);
@@ -122,6 +124,16 @@ export function RoutesList({ onEditRoute }: RoutesListProps) {
                       </TableCell>
                       <TableCell align="right">
                         <Box display="flex" justifyContent="flex-end" gap={0.5}>
+                          {onManagePlugins && (
+                            <Tooltip title="Manage plugins">
+                              <IconButton
+                                size="small"
+                                onClick={() => onManagePlugins(route)}
+                              >
+                                <ExtensionIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                           {onEditRoute && (
                             <Tooltip title="Edit route">
                               <IconButton

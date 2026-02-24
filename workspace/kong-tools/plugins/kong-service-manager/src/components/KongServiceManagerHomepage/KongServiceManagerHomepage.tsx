@@ -9,6 +9,7 @@ import { PluginsList } from '../PluginsList/PluginsList';
 import { PluginConfigDrawer } from '../PluginConfigDrawer/PluginConfigDrawer';
 import { RoutesList } from '../RoutesList/RoutesList';
 import { RouteForm } from '../RouteForm/RouteForm';
+import { RoutePluginsDrawer } from '../RoutePluginsDrawer';
 import type { RouteResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 export function KongServiceManagerHomepage() {
@@ -21,10 +22,15 @@ export function KongServiceManagerHomepage() {
   const [drawerPluginName, setDrawerPluginName] = useState('');
   const [drawerPluginId, setDrawerPluginId] = useState<string | undefined>();
   const [drawerConfig, setDrawerConfig] = useState<Record<string, unknown> | undefined>();
+  const [drawerScope, setDrawerScope] = useState<'service' | 'route'>('service');
+  const [drawerRouteId, setDrawerRouteId] = useState<string | undefined>();
 
   // Route form state
   const [routeFormOpen, setRouteFormOpen] = useState(false);
   const [editingRoute, setEditingRoute] = useState<RouteResponse | undefined>();
+
+  // Route plugins drawer state
+  const [routePluginsRoute, setRoutePluginsRoute] = useState<RouteResponse | null>(null);
 
   useEffect(() => {
     if (serviceName) {
@@ -36,6 +42,8 @@ export function KongServiceManagerHomepage() {
     setDrawerPluginId(undefined);
     setDrawerPluginName(pluginSlug);
     setDrawerConfig(undefined);
+    setDrawerScope('service');
+    setDrawerRouteId(undefined);
     setDrawerOpen(true);
   }, []);
 
@@ -43,6 +51,30 @@ export function KongServiceManagerHomepage() {
     setDrawerPluginId(pluginId);
     setDrawerPluginName(pluginName);
     setDrawerConfig(undefined);
+    setDrawerScope('service');
+    setDrawerRouteId(undefined);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleManageRoutePlugins = useCallback((route: RouteResponse) => {
+    setRoutePluginsRoute(route);
+  }, []);
+
+  const handleEnableRoutePlugin = useCallback((routeId: string, pluginSlug: string) => {
+    setDrawerPluginId(undefined);
+    setDrawerPluginName(pluginSlug);
+    setDrawerConfig(undefined);
+    setDrawerScope('route');
+    setDrawerRouteId(routeId);
+    setDrawerOpen(true);
+  }, []);
+
+  const handleEditRoutePlugin = useCallback((routeId: string, pluginId: string, pluginName: string) => {
+    setDrawerPluginId(pluginId);
+    setDrawerPluginName(pluginName);
+    setDrawerConfig(undefined);
+    setDrawerScope('route');
+    setDrawerRouteId(routeId);
     setDrawerOpen(true);
   }, []);
 
@@ -89,16 +121,25 @@ export function KongServiceManagerHomepage() {
               Create Route
             </Button>
           </Box>
-          <RoutesList onEditRoute={handleEditRoute} />
+          <RoutesList onEditRoute={handleEditRoute} onManagePlugins={handleManageRoutePlugins} />
         </Box>
       )}
+
+      <RoutePluginsDrawer
+        open={!!routePluginsRoute}
+        route={routePluginsRoute}
+        onClose={() => setRoutePluginsRoute(null)}
+        onEnablePlugin={handleEnableRoutePlugin}
+        onEditPlugin={handleEditRoutePlugin}
+      />
 
       <PluginConfigDrawer
         open={drawerOpen}
         pluginName={drawerPluginName}
         pluginId={drawerPluginId}
         existingConfig={drawerConfig}
-        scope="service"
+        scope={drawerScope}
+        routeId={drawerRouteId}
         onClose={() => setDrawerOpen(false)}
       />
 
