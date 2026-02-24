@@ -1,6 +1,6 @@
 {
   "name": "@veecode-platform/plugin-scaffolder-backend-module-kong",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "license": "Apache-2.0",
   "description": "The kong scaffolder actions module for @backstage/plugin-scaffolder-backend",
   "main": "src/index.ts",
