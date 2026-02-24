@@ -1,0 +1,22 @@
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-backend-dynamic
+    disabled: false
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-kong-service-manager:
+            entityTabs:
+              - path: /kong
+                title: Kong
+                mountPoint: entity.page.kong
+            mountPoints:
+              - mountPoint: entity.page.kong/cards
+                importName: KongServiceManagerContent
+                config:
+                  layout:
+                    gridColumn: "1 / -1"

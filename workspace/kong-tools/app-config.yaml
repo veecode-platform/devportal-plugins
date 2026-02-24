@@ -108,10 +108,7 @@ catalog:
 kong:
   instances:
     - id: default
-      apiBaseUrl: http://manager.localhost:8000
-
-kubernetes:
-  # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
+      apiBaseUrl: http://manager.localdomain:8000
 
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:
