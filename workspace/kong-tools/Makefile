@@ -6,7 +6,7 @@
 #
 
 # Version for kong-tools packages
-KONG_TOOLS_VERSION ?= 0.1.0
+KONG_TOOLS_VERSION ?= 1.0.1
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 

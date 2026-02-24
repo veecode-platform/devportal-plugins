@@ -6,6 +6,29 @@ This repository contains a Backstage hosting app for development of Kong-related
 
 This workspace structure is based on the sibling "dummy" workspace, which is a simplified reference workspace containing a frontend plugin, a backend plugin and a backstage hosting app.
 
+## Pre-requisites
+
+Start Kong Gateway with Manager (Admin UI) enabled:
+
+```sh
+vkdr infra up
+vkdr kong install --default-ic -t 3.9.1 -m standard -d localdomain
+```
+
+After Kong starts, deploy a sample service:
+
+```sh
+kubectl apply -f examples/k8s/
+```
+
+You can test the created service and routes by running:
+
+```sh
+curl localhost:8000/cep/88080700/json
+```
+
+**Note:** Make sure to set the `manager.localdomain` name to resolve to `127.0.0.1` in your `/etc/hosts` file.
+
 ## How to start
 
 To start the app, run:
