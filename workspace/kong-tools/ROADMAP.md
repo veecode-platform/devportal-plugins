@@ -61,33 +61,33 @@ Manage plugins scoped to individual routes.
 | Backend: route-scoped plugin endpoints | ✅ |
 | Frontend: route plugin management in UI | ✅ |
 
-## Phase 5 - Testing, Docs & Polish (v0.5.0) 🔜 NEXT
+## Phase 5 - Testing, Docs & Polish (v0.5.0) ✅ DONE
 
 Harden the implementation before adding new features.
 
 | Deliverable | Status |
 |---|---|
-| Frontend plugin README | 🔜 |
-| Common library README | 🔜 |
-| Backend unit tests (router, service) | 🔲 |
-| Frontend unit tests (components, context, client) | 🔲 |
-| Integration tests with mock Kong | 🔲 |
-| Error handling review and UX improvements | 🔲 |
-| Loading states and skeleton screens | 🔲 |
-| Empty states for no routes/plugins | 🔲 |
-| Accessibility audit (a11y) | 🔲 |
+| Frontend plugin README | ✅ |
+| Common library README | ✅ |
+| Backend unit tests (router, service) | ✅ |
+| Frontend unit tests (components, context, client) | ✅ |
+| Integration tests with mock Kong | ⏭️ skipped |
+| Error handling review and UX improvements | ✅ |
+| Loading states and skeleton screens | ✅ |
+| Empty states for no routes/plugins | ✅ |
+| Accessibility audit (a11y) | ⏭️ deferred |
 
-## Phase 6 - Permission Enforcement (v0.6.0)
+## Phase 6 - Permission Enforcement (v0.6.0) ✅ DONE
 
 Wire permissions into the backend router and frontend UI.
 
 | Deliverable | Status |
 |---|---|
-| Backend: permission checks on mutation endpoints | 🔲 |
-| Frontend: hide/disable actions based on permissions | 🔲 |
-| Documentation on RBAC setup | 🔲 |
+| Backend: permission checks on all endpoints | ✅ |
+| Frontend: hide/disable actions based on permissions | ✅ |
+| Documentation on RBAC setup | ⏭️ deferred |
 
-## Phase 7 - OpenAPI Spec Integration (v0.7.0)
+## Phase 7 - OpenAPI Spec Integration (v0.7.0) 🔜 NEXT
 
 Migrate the spec viewing and Git-based spec management from the old plugin.
 
