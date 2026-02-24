@@ -30,6 +30,7 @@
     "@backstage/core-components": "^0.18.7",
     "@backstage/core-plugin-api": "^1.12.3",
     "@backstage/plugin-catalog-react": "^2.0.0",
+    "@backstage/plugin-permission-react": "^0.4.29",
     "@backstage/theme": "^0.7.2",
     "@mui/icons-material": "^5.15.0",
     "@mui/material": "^5.15.0",

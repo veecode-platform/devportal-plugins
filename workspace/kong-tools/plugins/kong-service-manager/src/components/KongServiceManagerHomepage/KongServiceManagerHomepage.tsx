@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Box, Snackbar, Tab, Tabs, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import { useEntityAnnotations } from '../../hooks';
+import { useEntityAnnotations, useKongPermissions } from '../../hooks';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
 import { SelectInstance } from '../SelectInstance/SelectInstance';
 import { ServicePage } from '../ServicePage/ServicePage';
@@ -15,6 +15,7 @@ import type { RouteResponse } from '@veecode-platform/backstage-plugin-kong-serv
 export function KongServiceManagerHomepage() {
   const { serviceName } = useEntityAnnotations();
   const { state, setServiceName } = useKongServiceManager();
+  const permissions = useKongPermissions();
   const [tabIndex, setTabIndex] = useState(0);
 
   // Plugin drawer state
@@ -110,25 +111,32 @@ export function KongServiceManagerHomepage() {
           onEnablePlugin={handleEnablePlugin}
           onEditPlugin={handleEditPlugin}
           onPluginDisabled={name => setSuccessMessage(`Plugin "${name}" disabled`)}
+          canEnable={permissions.canAddServicePlugin}
+          canDisable={permissions.canDisableServicePlugin}
+          canEdit={permissions.canUpdateServicePlugin}
         />
       )}
 
       {tabIndex === 2 && (
         <Box>
-          <Box display="flex" justifyContent="flex-end" mb={1}>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              onClick={handleCreateRoute}
-              size="small"
-            >
-              Create Route
-            </Button>
-          </Box>
+          {permissions.canCreateRoute && (
+            <Box display="flex" justifyContent="flex-end" mb={1}>
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={handleCreateRoute}
+                size="small"
+              >
+                Create Route
+              </Button>
+            </Box>
+          )}
           <RoutesList
             onEditRoute={handleEditRoute}
             onManagePlugins={handleManageRoutePlugins}
             onRouteDeleted={() => setSuccessMessage('Route deleted')}
+            canEdit={permissions.canUpdateRoute}
+            canDelete={permissions.canDeleteRoute}
           />
         </Box>
       )}
@@ -139,6 +147,9 @@ export function KongServiceManagerHomepage() {
         onClose={() => setRoutePluginsRoute(null)}
         onEnablePlugin={handleEnableRoutePlugin}
         onEditPlugin={handleEditRoutePlugin}
+        canEnable={permissions.canAddRoutePlugin}
+        canDisable={permissions.canDisableRoutePlugin}
+        canEdit={permissions.canUpdateRoutePlugin}
       />
 
       <PluginConfigDrawer

@@ -32,9 +32,11 @@ type RoutesListProps = {
   onEditRoute?: (route: RouteResponse) => void;
   onManagePlugins?: (route: RouteResponse) => void;
   onRouteDeleted?: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 };
 
-export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted }: RoutesListProps) {
+export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEdit = true, canDelete = true }: RoutesListProps) {
   const { state, fetchRoutes, removeRoute } = useKongServiceManager();
   const { routes, loading, instance, serviceName } = state;
   const [deleteTarget, setDeleteTarget] = useState<RouteResponse | null>(null);
@@ -157,7 +159,7 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted }: Rou
                               </IconButton>
                             </Tooltip>
                           )}
-                          {onEditRoute && (
+                          {onEditRoute && canEdit && (
                             <Tooltip title="Edit route">
                               <IconButton
                                 size="small"
@@ -167,15 +169,17 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted }: Rou
                               </IconButton>
                             </Tooltip>
                           )}
-                          <Tooltip title="Delete route">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => setDeleteTarget(route)}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {canDelete && (
+                            <Tooltip title="Delete route">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => setDeleteTarget(route)}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </Box>
                       </TableCell>
                     </TableRow>

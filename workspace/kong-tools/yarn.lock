@@ -4603,7 +4603,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-permission-react@npm:^0.4.40":
+"@backstage/plugin-permission-react@npm:^0.4.29, @backstage/plugin-permission-react@npm:^0.4.40":
   version: 0.4.40
   resolution: "@backstage/plugin-permission-react@npm:0.4.40"
   dependencies:
@@ -16653,6 +16653,7 @@ __metadata:
     "@backstage/core-plugin-api": "npm:^1.12.3"
     "@backstage/dev-utils": "npm:^1.1.20"
     "@backstage/plugin-catalog-react": "npm:^2.0.0"
+    "@backstage/plugin-permission-react": "npm:^0.4.29"
     "@backstage/test-utils": "npm:^1.7.15"
     "@backstage/theme": "npm:^0.7.2"
     "@mui/icons-material": "npm:^5.15.0"

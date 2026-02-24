@@ -1,20 +1,48 @@
-import { HttpAuthService } from '@backstage/backend-plugin-api';
-import { InputError } from '@backstage/errors';
+import { HttpAuthService, PermissionsService } from '@backstage/backend-plugin-api';
+import { InputError, NotAllowedError } from '@backstage/errors';
+import { AuthorizeResult, type BasicPermission } from '@backstage/plugin-permission-common';
 import { z } from 'zod';
 import express from 'express';
 import Router from 'express-promise-router';
 import type { CreateRoute } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+import {
+  kongServiceReadPermission,
+  kongPluginsReadPermission,
+  kongRoutesReadPermission,
+  kongApplyPluginServicePermission,
+  kongUpdateServicePluginPermission,
+  kongDisableServicePluginPermission,
+  kongRouteCreatePermission,
+  kongRouteUpdatePermission,
+  kongRouteDeletePermission,
+  kongApplyPluginRoutePermission,
+  kongUpdateRoutePluginPermission,
+  kongDisableRoutePluginPermission,
+} from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { KongServiceManagerService } from './services/KongServiceManagerService';
 
 export async function createRouter({
-  httpAuth: _httpAuth,
+  httpAuth,
+  permissions,
   kongService,
 }: {
   httpAuth: HttpAuthService;
+  permissions: PermissionsService;
   kongService: KongServiceManagerService;
 }): Promise<express.Router> {
   const router = Router();
   router.use(express.json());
+
+  async function authorize(req: express.Request, permission: BasicPermission) {
+    const credentials = await httpAuth.credentials(req);
+    const decision = await permissions.authorize(
+      [{ permission }],
+      { credentials },
+    );
+    if (decision[0].result !== AuthorizeResult.ALLOW) {
+      throw new NotAllowedError('Permission denied');
+    }
+  }
 
   // --- Validation schemas ---
 
@@ -89,6 +117,8 @@ export async function createRouter({
 
   // GET /:instance/services/:serviceName
   router.get('/:instance/services/:serviceName', async (req, res) => {
+    await authorize(req, kongServiceReadPermission);
+
     const parsed = instanceServiceParams.safeParse(req.params);
     if (!parsed.success) throw new InputError(parsed.error.toString());
 
@@ -103,6 +133,8 @@ export async function createRouter({
   router.get(
     '/:instance/services/:serviceName/plugins/associated',
     async (req, res) => {
+      await authorize(req, kongPluginsReadPermission);
+
       const parsed = instanceServiceParams.safeParse(req.params);
       if (!parsed.success) throw new InputError(parsed.error.toString());
 
@@ -116,6 +148,8 @@ export async function createRouter({
 
   // GET /:instance/plugins
   router.get('/:instance/plugins', async (req, res) => {
+    await authorize(req, kongPluginsReadPermission);
+
     const instance = z.string().safeParse(req.params.instance);
     if (!instance.success) throw new InputError(instance.error.toString());
 
@@ -129,6 +163,8 @@ export async function createRouter({
   router.get(
     '/:instance/services/plugins/:pluginName/fields',
     async (req, res) => {
+      await authorize(req, kongPluginsReadPermission);
+
       const parsed = z
         .object({ instance: z.string(), pluginName: z.string() })
         .safeParse(req.params);
@@ -148,6 +184,8 @@ export async function createRouter({
   router.post(
     '/:instance/services/:serviceName/plugins',
     async (req, res) => {
+      await authorize(req, kongApplyPluginServicePermission);
+
       const params = instanceServiceParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
@@ -167,6 +205,8 @@ export async function createRouter({
   router.patch(
     '/:instance/services/:serviceName/plugins/:pluginId',
     async (req, res) => {
+      await authorize(req, kongUpdateServicePluginPermission);
+
       const params = instanceServicePluginParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
@@ -187,6 +227,8 @@ export async function createRouter({
   router.delete(
     '/:instance/services/:serviceName/plugins/:pluginId',
     async (req, res) => {
+      await authorize(req, kongDisableServicePluginPermission);
+
       const params = instanceServicePluginParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
@@ -205,6 +247,8 @@ export async function createRouter({
   router.get(
     '/:instance/services/:serviceName/routes',
     async (req, res) => {
+      await authorize(req, kongRoutesReadPermission);
+
       const parsed = instanceServiceParams.safeParse(req.params);
       if (!parsed.success) throw new InputError(parsed.error.toString());
 
@@ -220,6 +264,8 @@ export async function createRouter({
   router.get(
     '/:instance/services/:serviceName/routes/:routeId',
     async (req, res) => {
+      await authorize(req, kongRoutesReadPermission);
+
       const parsed = instanceServiceRouteParams.safeParse(req.params);
       if (!parsed.success) throw new InputError(parsed.error.toString());
 
@@ -236,6 +282,8 @@ export async function createRouter({
   router.post(
     '/:instance/services/:serviceName/routes',
     async (req, res) => {
+      await authorize(req, kongRouteCreatePermission);
+
       const params = instanceServiceParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
@@ -255,6 +303,8 @@ export async function createRouter({
   router.patch(
     '/:instance/services/:serviceName/routes/:routeId',
     async (req, res) => {
+      await authorize(req, kongRouteUpdatePermission);
+
       const params = instanceServiceRouteParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
@@ -275,6 +325,8 @@ export async function createRouter({
   router.delete(
     '/:instance/services/:serviceName/routes/:routeId',
     async (req, res) => {
+      await authorize(req, kongRouteDeletePermission);
+
       const params = instanceServiceRouteParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
@@ -293,6 +345,8 @@ export async function createRouter({
   router.get(
     '/:instance/routes/:routeId/plugins/associated',
     async (req, res) => {
+      await authorize(req, kongPluginsReadPermission);
+
       const parsed = instanceRouteParams.safeParse(req.params);
       if (!parsed.success) throw new InputError(parsed.error.toString());
 
@@ -306,6 +360,8 @@ export async function createRouter({
 
   // POST /:instance/routes/:routeId/plugins
   router.post('/:instance/routes/:routeId/plugins', async (req, res) => {
+    await authorize(req, kongApplyPluginRoutePermission);
+
     const params = instanceRouteParams.safeParse(req.params);
     if (!params.success) throw new InputError(params.error.toString());
 
@@ -324,6 +380,8 @@ export async function createRouter({
   router.patch(
     '/:instance/routes/:routeId/plugins/:pluginId',
     async (req, res) => {
+      await authorize(req, kongUpdateRoutePluginPermission);
+
       const params = instanceRoutePluginParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
@@ -344,6 +402,8 @@ export async function createRouter({
   router.delete(
     '/:instance/routes/:routeId/plugins/:pluginId',
     async (req, res) => {
+      await authorize(req, kongDisableRoutePluginPermission);
+
       const params = instanceRoutePluginParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 

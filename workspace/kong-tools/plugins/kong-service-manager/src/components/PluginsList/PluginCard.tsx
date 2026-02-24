@@ -19,6 +19,9 @@ type PluginCardProps = {
   /** ID from associated plugins list, present when the plugin is enabled */
   associatedId?: string;
   disabling?: boolean;
+  canEnable?: boolean;
+  canDisable?: boolean;
+  canEdit?: boolean;
   onEnable: (pluginSlug: string) => void;
   onEdit: (pluginId: string, pluginName: string) => void;
   onDisable: (pluginId: string, pluginName: string) => void;
@@ -28,6 +31,9 @@ export function PluginCard({
   plugin,
   associatedId,
   disabling,
+  canEnable = true,
+  canDisable = true,
+  canEdit = true,
   onEnable,
   onEdit,
   onDisable,
@@ -52,7 +58,7 @@ export function PluginCard({
           </Typography>
         }
         action={
-          isAssociated ? (
+          isAssociated && canEdit ? (
             <Tooltip title="Edit plugin configuration">
               <IconButton
                 size="small"
@@ -89,24 +95,28 @@ export function PluginCard({
 
       <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
         {isAssociated ? (
-          <Button
-            variant="contained"
-            color="primary"
-            size="small"
-            disabled={disabling}
-            onClick={() => onDisable(associatedId, plugin.slug)}
-          >
-            {disabling ? <CircularProgress size={18} /> : 'Disable'}
-          </Button>
+          canDisable && (
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              disabled={disabling}
+              onClick={() => onDisable(associatedId, plugin.slug)}
+            >
+              {disabling ? <CircularProgress size={18} /> : 'Disable'}
+            </Button>
+          )
         ) : (
-          <Button
-            variant="outlined"
-            color="primary"
-            size="small"
-            onClick={() => onEnable(plugin.slug)}
-          >
-            Enable
-          </Button>
+          canEnable && (
+            <Button
+              variant="outlined"
+              color="primary"
+              size="small"
+              onClick={() => onEnable(plugin.slug)}
+            >
+              Enable
+            </Button>
+          )
         )}
       </CardActions>
     </Card>

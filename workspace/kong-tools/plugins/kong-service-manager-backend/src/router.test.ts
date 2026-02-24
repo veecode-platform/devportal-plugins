@@ -1,5 +1,6 @@
 import { mockErrorHandler } from '@backstage/backend-test-utils';
 import { mockServices } from '@backstage/backend-test-utils';
+import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import express from 'express';
 import request from 'supertest';
 
@@ -41,6 +42,9 @@ describe('createRouter', () => {
 
     const router = await createRouter({
       httpAuth: mockServices.httpAuth(),
+      permissions: mockServices.permissions.mock({
+        authorize: async () => [{ result: AuthorizeResult.ALLOW }],
+      }),
       kongService,
     });
     app = express();
@@ -292,5 +296,25 @@ describe('createRouter', () => {
     expect(res.body).toMatchObject({
       error: { message: 'connection refused' },
     });
+  });
+
+  // --- Permission denied ---
+
+  it('returns 403 when permission is denied', async () => {
+    const permissions = mockServices.permissions.mock({
+      authorize: async () => [{ result: AuthorizeResult.DENY }],
+    });
+
+    const router = await createRouter({
+      httpAuth: mockServices.httpAuth(),
+      permissions,
+      kongService,
+    });
+    const deniedApp = express();
+    deniedApp.use(router);
+    deniedApp.use(mockErrorHandler());
+
+    const res = await request(deniedApp).get('/default/services/my-service');
+    expect(res.status).toBe(403);
   });
 });

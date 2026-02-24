@@ -49,6 +49,9 @@ type RoutePluginsDrawerProps = {
   onClose: () => void;
   onEnablePlugin: (routeId: string, pluginSlug: string) => void;
   onEditPlugin: (routeId: string, pluginId: string, pluginName: string) => void;
+  canEnable?: boolean;
+  canDisable?: boolean;
+  canEdit?: boolean;
 };
 
 export function RoutePluginsDrawer({
@@ -57,6 +60,9 @@ export function RoutePluginsDrawer({
   onClose,
   onEnablePlugin,
   onEditPlugin,
+  canEnable,
+  canDisable,
+  canEdit,
 }: RoutePluginsDrawerProps) {
   const {
     state,
@@ -185,6 +191,9 @@ export function RoutePluginsDrawer({
               plugin={plugin}
               associatedId={associatedMap.get(plugin.slug)}
               disabling={disablingId === associatedMap.get(plugin.slug)}
+              canEnable={canEnable}
+              canDisable={canDisable}
+              canEdit={canEdit}
               onEnable={handleEnable}
               onEdit={handleEdit}
               onDisable={handleDisable}

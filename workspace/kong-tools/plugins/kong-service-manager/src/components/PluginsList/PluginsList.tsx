@@ -56,9 +56,12 @@ type PluginsListProps = {
   onEnablePlugin: (pluginSlug: string) => void;
   onEditPlugin: (pluginId: string, pluginName: string) => void;
   onPluginDisabled?: (pluginName: string) => void;
+  canEnable?: boolean;
+  canDisable?: boolean;
+  canEdit?: boolean;
 };
 
-export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled }: PluginsListProps) {
+export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, canEnable, canDisable, canEdit }: PluginsListProps) {
   const {
     state,
     fetchAssociatedPlugins,
@@ -161,6 +164,9 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled }: 
               plugin={plugin}
               associatedId={associatedMap.get(plugin.slug)}
               disabling={disablingId === associatedMap.get(plugin.slug)}
+              canEnable={canEnable}
+              canDisable={canDisable}
+              canEdit={canEdit}
               onEnable={onEnablePlugin}
               onEdit={onEditPlugin}
               onDisable={handleDisable}

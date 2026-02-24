@@ -19,13 +19,14 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
         httpRouter: coreServices.httpRouter,
         config: coreServices.rootConfig,
         logger: coreServices.logger,
+        permissions: coreServices.permissions,
       },
-      async init({ httpAuth, httpRouter, config, logger }) {
+      async init({ httpAuth, httpRouter, config, logger, permissions }) {
         logger.info('Initializing Kong Service Manager backend plugin...');
 
         const kongService = KongServiceManagerService.create({ logger, config });
 
-        const router = await createRouter({ httpAuth, kongService });
+        const router = await createRouter({ httpAuth, permissions, kongService });
 
         httpRouter.use(router);
         httpRouter.addAuthPolicy({
