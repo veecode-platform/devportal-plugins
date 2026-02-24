@@ -5,13 +5,43 @@ kind: User
 metadata:
   name: guest
 spec:
-  memberOf: [guests]
+  memberOf: [kong-admins]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: operator
+spec:
+  memberOf: [kong-operators]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: viewer
+spec:
+  memberOf: [kong-viewers]
 ---
 # https://backstage.io/docs/features/software-catalog/descriptor-format#kind-group
 apiVersion: backstage.io/v1alpha1
 kind: Group
 metadata:
-  name: guests
+  name: kong-admins
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: kong-operators
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: kong-viewers
 spec:
   type: team
   children: []
