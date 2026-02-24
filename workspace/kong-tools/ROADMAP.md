@@ -85,6 +85,10 @@ Wire permissions into the backend router and frontend UI.
 |---|---|
 | Backend: permission checks on all endpoints | ✅ |
 | Frontend: hide/disable actions based on permissions | ✅ |
+| Backend: permission matrix integration tests (48 cases, 3 roles) | ✅ |
+| Role-based permission policy module (replaces allow-all) | ✅ |
+| Org catalog with admin/operator/viewer users and groups | ✅ |
+| Playwright E2E permission visibility tests | ✅ |
 | Documentation on RBAC setup | ⏭️ deferred |
 
 ## Phase 7 - OpenAPI Spec Integration (v0.7.0) 🔜 NEXT
