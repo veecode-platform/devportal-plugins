@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Box, Tab, Tabs, Button } from '@mui/material';
+import { Alert, Box, Snackbar, Tab, Tabs, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useEntityAnnotations } from '../../hooks';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
@@ -14,7 +14,7 @@ import type { RouteResponse } from '@veecode-platform/backstage-plugin-kong-serv
 
 export function KongServiceManagerHomepage() {
   const { serviceName } = useEntityAnnotations();
-  const { setServiceName } = useKongServiceManager();
+  const { state, setServiceName } = useKongServiceManager();
   const [tabIndex, setTabIndex] = useState(0);
 
   // Plugin drawer state
@@ -31,6 +31,9 @@ export function KongServiceManagerHomepage() {
 
   // Route plugins drawer state
   const [routePluginsRoute, setRoutePluginsRoute] = useState<RouteResponse | null>(null);
+
+  // Snackbar state
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (serviceName) {
@@ -106,6 +109,7 @@ export function KongServiceManagerHomepage() {
         <PluginsList
           onEnablePlugin={handleEnablePlugin}
           onEditPlugin={handleEditPlugin}
+          onPluginDisabled={name => setSuccessMessage(`Plugin "${name}" disabled`)}
         />
       )}
 
@@ -121,7 +125,11 @@ export function KongServiceManagerHomepage() {
               Create Route
             </Button>
           </Box>
-          <RoutesList onEditRoute={handleEditRoute} onManagePlugins={handleManageRoutePlugins} />
+          <RoutesList
+            onEditRoute={handleEditRoute}
+            onManagePlugins={handleManageRoutePlugins}
+            onRouteDeleted={() => setSuccessMessage('Route deleted')}
+          />
         </Box>
       )}
 
@@ -141,14 +149,47 @@ export function KongServiceManagerHomepage() {
         scope={drawerScope}
         routeId={drawerRouteId}
         onClose={() => setDrawerOpen(false)}
+        onSaved={() =>
+          setSuccessMessage(
+            drawerPluginId
+              ? `Plugin "${drawerPluginName}" updated`
+              : `Plugin "${drawerPluginName}" enabled`,
+          )
+        }
       />
 
       <RouteForm
         key={editingRoute?.id ?? 'new'}
         open={routeFormOpen}
         onClose={() => setRouteFormOpen(false)}
+        onSaved={() =>
+          setSuccessMessage(
+            editingRoute ? 'Route updated' : 'Route created',
+          )
+        }
         editingRoute={editingRoute}
       />
+
+      <Snackbar
+        open={!!state.error}
+        autoHideDuration={6000}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" variant="filled">
+          {state.error}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={4000}
+        onClose={() => setSuccessMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

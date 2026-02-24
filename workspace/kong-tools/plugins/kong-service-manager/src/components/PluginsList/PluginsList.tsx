@@ -55,9 +55,10 @@ function PluginCardSkeleton() {
 type PluginsListProps = {
   onEnablePlugin: (pluginSlug: string) => void;
   onEditPlugin: (pluginId: string, pluginName: string) => void;
+  onPluginDisabled?: (pluginName: string) => void;
 };
 
-export function PluginsList({ onEnablePlugin, onEditPlugin }: PluginsListProps) {
+export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled }: PluginsListProps) {
   const {
     state,
     fetchAssociatedPlugins,
@@ -69,7 +70,6 @@ export function PluginsList({ onEnablePlugin, onEditPlugin }: PluginsListProps) 
     associatedPlugins,
     availablePlugins,
     loading,
-    error,
     instance,
     serviceName,
   } = state;
@@ -93,15 +93,18 @@ export function PluginsList({ onEnablePlugin, onEditPlugin }: PluginsListProps) 
   }, [associatedPlugins]);
 
   const handleDisable = useCallback(
-    async (pluginId: string, _pluginName: string) => {
+    async (pluginId: string, pluginName: string) => {
       setDisablingId(pluginId);
       try {
         await removeServicePlugin(pluginId);
+        onPluginDisabled?.(pluginName);
+      } catch {
+        // Error already handled by context (state.error)
       } finally {
         setDisablingId(null);
       }
     },
-    [removeServicePlugin],
+    [removeServicePlugin, onPluginDisabled],
   );
 
   const filterCategories = useCallback(
@@ -132,14 +135,6 @@ export function PluginsList({ onEnablePlugin, onEditPlugin }: PluginsListProps) 
     () => filterCategories(availablePlugins, true),
     [availablePlugins, filterCategories],
   );
-
-  if (error) {
-    return (
-      <Box p={2}>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
 
   const renderCategories = (categories: PluginPerCategory[]) => {
     if (loading && availablePlugins.length === 0) {

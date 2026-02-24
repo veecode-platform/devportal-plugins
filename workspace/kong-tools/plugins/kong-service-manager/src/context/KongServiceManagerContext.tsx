@@ -92,6 +92,7 @@ type KongServiceManagerContextValue = {
   state: State;
   setInstance: (instance: string) => void;
   setServiceName: (serviceName: string) => void;
+  clearError: () => void;
   fetchServiceInfo: () => Promise<void>;
   fetchAssociatedPlugins: () => Promise<void>;
   fetchAvailablePlugins: () => Promise<void>;
@@ -129,6 +130,10 @@ export function KongServiceManagerProvider({
     dispatch({ type: 'SET_SERVICE_NAME', serviceName });
   }, []);
 
+  const clearError = useCallback(() => {
+    dispatch({ type: 'SET_ERROR', error: null });
+  }, []);
+
   const withLoading = useCallback(
     async (fn: () => Promise<void>) => {
       dispatch({ type: 'SET_LOADING', loading: true });
@@ -138,6 +143,7 @@ export function KongServiceManagerProvider({
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         dispatch({ type: 'SET_ERROR', error: msg });
+        throw e;
       } finally {
         dispatch({ type: 'SET_LOADING', loading: false });
       }
@@ -356,6 +362,7 @@ export function KongServiceManagerProvider({
       state,
       setInstance,
       setServiceName,
+      clearError,
       fetchServiceInfo,
       fetchAssociatedPlugins,
       fetchAvailablePlugins,
@@ -377,6 +384,7 @@ export function KongServiceManagerProvider({
       state,
       setInstance,
       setServiceName,
+      clearError,
       fetchServiceInfo,
       fetchAssociatedPlugins,
       fetchAvailablePlugins,

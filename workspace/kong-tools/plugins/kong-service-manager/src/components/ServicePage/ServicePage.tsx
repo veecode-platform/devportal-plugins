@@ -12,7 +12,7 @@ import { useKongServiceManager } from '../../context/KongServiceManagerContext';
 
 export function ServicePage() {
   const { state, fetchServiceInfo } = useKongServiceManager();
-  const { serviceInfo, loading, error, instance, serviceName } = state;
+  const { serviceInfo, loading, instance, serviceName } = state;
 
   useEffect(() => {
     if (instance && serviceName) {
@@ -24,14 +24,6 @@ export function ServicePage() {
     return (
       <Box display="flex" justifyContent="center" p={4}>
         <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box p={2}>
-        <Typography color="error">{error}</Typography>
       </Box>
     );
   }

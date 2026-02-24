@@ -5,8 +5,8 @@ import {
   CardContent,
   CardHeader,
   Chip,
-  CircularProgress,
   IconButton,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -31,11 +31,12 @@ import type { RouteResponse } from '@veecode-platform/backstage-plugin-kong-serv
 type RoutesListProps = {
   onEditRoute?: (route: RouteResponse) => void;
   onManagePlugins?: (route: RouteResponse) => void;
+  onRouteDeleted?: () => void;
 };
 
-export function RoutesList({ onEditRoute, onManagePlugins }: RoutesListProps) {
+export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted }: RoutesListProps) {
   const { state, fetchRoutes, removeRoute } = useKongServiceManager();
-  const { routes, loading, error, instance, serviceName } = state;
+  const { routes, loading, instance, serviceName } = state;
   const [deleteTarget, setDeleteTarget] = useState<RouteResponse | null>(null);
 
   useEffect(() => {
@@ -46,24 +47,46 @@ export function RoutesList({ onEditRoute, onManagePlugins }: RoutesListProps) {
 
   const handleDelete = async () => {
     if (deleteTarget) {
-      await removeRoute(deleteTarget.id);
-      setDeleteTarget(null);
+      try {
+        await removeRoute(deleteTarget.id);
+        setDeleteTarget(null);
+        onRouteDeleted?.();
+      } catch {
+        setDeleteTarget(null);
+      }
     }
   };
 
   if (loading && !routes) {
     return (
-      <Box display="flex" justifyContent="center" p={4}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box p={2}>
-        <Typography color="error">{error}</Typography>
-      </Box>
+      <Card variant="outlined">
+        <CardHeader title="Routes" />
+        <CardContent>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Protocols</TableCell>
+                <TableCell>Methods</TableCell>
+                <TableCell>Paths</TableCell>
+                <TableCell>Hosts</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <TableCell key={j}>
+                      <Skeleton variant="text" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     );
   }
 

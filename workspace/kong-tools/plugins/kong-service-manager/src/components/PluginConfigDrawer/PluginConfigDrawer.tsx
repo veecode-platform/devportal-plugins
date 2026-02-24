@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -9,6 +10,7 @@ import {
   FormControlLabel,
   IconButton,
   MenuItem,
+  Skeleton,
   TextField,
   Typography,
 } from '@mui/material';
@@ -31,6 +33,7 @@ type PluginConfigDrawerProps = {
   scope: 'service' | 'route';
   routeId?: string;
   onClose: () => void;
+  onSaved?: () => void;
 };
 
 export function PluginConfigDrawer({
@@ -41,9 +44,11 @@ export function PluginConfigDrawer({
   scope,
   routeId,
   onClose,
+  onSaved,
 }: PluginConfigDrawerProps) {
   const {
     state,
+    clearError,
     fetchPluginFields,
     addPluginToService,
     editServicePlugin,
@@ -54,6 +59,7 @@ export function PluginConfigDrawer({
   const [configState, setConfigState] = useState<Record<string, unknown>>({});
   const [enabled, setEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Parse schema into config fields
   const configFields: ConfigField[] = useMemo(() => {
@@ -64,6 +70,7 @@ export function PluginConfigDrawer({
   // Fetch schema and seed form state when drawer opens
   useEffect(() => {
     if (open && pluginName) {
+      setSaveError(null);
       fetchPluginFields(pluginName);
     }
   }, [open, pluginName, fetchPluginFields]);
@@ -101,6 +108,7 @@ export function PluginConfigDrawer({
 
   const handleSave = useCallback(async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const plugin: CreatePlugin = {
         name: pluginName,
@@ -122,6 +130,10 @@ export function PluginConfigDrawer({
         }
       }
       onClose();
+      onSaved?.();
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+      clearError();
     } finally {
       setSaving(false);
     }
@@ -137,6 +149,7 @@ export function PluginConfigDrawer({
     addPluginToRoute,
     editRoutePlugin,
     onClose,
+    onSaved,
   ]);
 
   const isEdit = !!pluginId;
@@ -189,8 +202,12 @@ export function PluginConfigDrawer({
           }}
         >
           {isLoading ? (
-            <Box display="flex" justifyContent="center" py={4}>
-              <CircularProgress />
+            <Box display="flex" flexDirection="column" gap={1.5} py={1}>
+              <Skeleton variant="rectangular" height={40} sx={{ borderRadius: 1 }} />
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 1 }} />
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 1 }} />
+              <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 1 }} />
+              <Skeleton variant="rectangular" height={40} sx={{ borderRadius: 1 }} />
             </Box>
           ) : configFields.length === 0 ? (
             <Typography color="text.secondary" textAlign="center" py={4}>
@@ -328,6 +345,12 @@ export function PluginConfigDrawer({
             </FormControl>
           )}
         </Box>
+
+        {saveError && (
+          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
+        )}
 
         {/* Footer actions */}
         <Box display="flex" gap={1.5} justifyContent="flex-end" mt={2}>

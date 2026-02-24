@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -36,12 +37,14 @@ const PROTOCOLS: RouteProtocol[] = [
 type RouteFormProps = {
   open: boolean;
   onClose: () => void;
+  onSaved?: () => void;
   editingRoute?: RouteResponse;
 };
 
-export function RouteForm({ open, onClose, editingRoute }: RouteFormProps) {
-  const { createRoute, editRoute } = useKongServiceManager();
+export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormProps) {
+  const { createRoute, editRoute, clearError } = useKongServiceManager();
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [name, setName] = useState(editingRoute?.name ?? '');
   const [protocols, setProtocols] = useState<string[]>(
@@ -59,6 +62,7 @@ export function RouteForm({ open, onClose, editingRoute }: RouteFormProps) {
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const route: CreateRoute = {
         name: name || undefined,
@@ -81,6 +85,10 @@ export function RouteForm({ open, onClose, editingRoute }: RouteFormProps) {
         await createRoute(route);
       }
       onClose();
+      onSaved?.();
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+      clearError();
     } finally {
       setSaving(false);
     }
@@ -187,6 +195,11 @@ export function RouteForm({ open, onClose, editingRoute }: RouteFormProps) {
             label="Preserve Host"
           />
         </Box>
+        {saveError && (
+          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
