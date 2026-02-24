@@ -47,7 +47,7 @@ and serves as living documentation for the API contract.
 ## ADR-004: Defer Permission Enforcement
 
 **Date:** 2025-01
-**Status:** Accepted
+**Status:** Superseded by ADR-010
 
 The 12 core permissions are **defined** in the common library but are **not
 enforced** in the backend router yet. Enforcement is planned for Phase 6.
@@ -120,3 +120,35 @@ package.
 **Rationale:** The plugin is self-contained. There is no need for other
 plugins to consume its hooks or context. A single package is simpler to
 publish and consume.
+
+## ADR-010: Permission Enforcement and Role-Based Policy
+
+**Date:** 2025-02
+**Status:** Accepted (supersedes ADR-004)
+
+All 12 core permissions are now **enforced** in the backend router via an
+`authorize()` helper that checks each request against the Backstage permission
+system. The frontend uses a `useKongPermissions` hook to conditionally
+render mutation buttons.
+
+A custom `KongPermissionPolicy` replaces the default allow-all policy. It maps
+three user profiles (admin, operator, viewer) to three role groups
+(kong-admins, kong-operators, kong-viewers) with increasing restrictions.
+
+**Rationale:** The core CRUD is stable and tested. Adding enforcement now
+completes the security model before moving to spec/Git integration.
+
+## ADR-011: DEVPORTAL_USER Env Var for Local Profile Switching
+
+**Date:** 2025-02
+**Status:** Accepted
+
+The guest auth provider is configured with
+`userEntityRef: user:default/${DEVPORTAL_USER:-admin}`, allowing developers to
+impersonate any user profile by setting a single environment variable.
+
+**Rationale:** No real auth backend exists in the dev workspace. Rather than
+building multi-user auth infrastructure, a simple env var lets developers
+test all three permission profiles with a backend restart. The permission
+policy, catalog entities, and auth identity all use the same user references,
+so the full chain works end-to-end.
