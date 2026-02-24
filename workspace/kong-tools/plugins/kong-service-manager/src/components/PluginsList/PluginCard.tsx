@@ -11,8 +11,8 @@ import {
   Typography,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import ExtensionIcon from '@mui/icons-material/Extension';
 import type { PluginCard as PluginCardType } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+import { getPluginImage } from '../../assets/pluginImages';
 
 type PluginCardProps = {
   plugin: PluginCardType;
@@ -66,10 +66,16 @@ export function PluginCard({
       />
 
       <Box display="flex" justifyContent="center" py={1}>
-        <ExtensionIcon
+        <Box
+          component="img"
+          src={getPluginImage(plugin.slug)}
+          alt={plugin.name}
           sx={{
-            fontSize: 56,
-            color: isAssociated ? 'primary.main' : 'action.disabled',
+            width: 60,
+            height: 60,
+            borderRadius: '4px',
+            objectFit: 'contain',
+            filter: isAssociated ? 'none' : 'grayscale(100%)',
             opacity: isAssociated ? 1 : 0.4,
           }}
         />

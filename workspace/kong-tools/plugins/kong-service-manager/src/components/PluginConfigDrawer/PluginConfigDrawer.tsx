@@ -13,8 +13,8 @@ import {
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import ExtensionIcon from '@mui/icons-material/Extension';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { getPluginImage } from '../../assets/pluginImages';
 import type { CreatePlugin } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
   parseConfigFields,
@@ -165,7 +165,12 @@ export function PluginConfigDrawer({
           mb={2}
         >
           <Box display="flex" alignItems="center" gap={2}>
-            <ExtensionIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+            <Box
+              component="img"
+              src={getPluginImage(pluginName)}
+              alt={pluginName}
+              sx={{ width: 50, height: 50, borderRadius: '4px', objectFit: 'contain' }}
+            />
             <Typography variant="h5">{pluginName} Plugin</Typography>
           </Box>
           <IconButton onClick={onClose} size="small">
