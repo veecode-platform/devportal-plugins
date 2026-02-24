@@ -32,7 +32,7 @@ export function PluginCard({
   onEdit,
   onDisable,
 }: PluginCardProps) {
-  const isAssociated = plugin.associated && !!associatedId;
+  const isAssociated = !!associatedId;
 
   return (
     <Card

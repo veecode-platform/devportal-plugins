@@ -111,7 +111,7 @@ export function PluginsList({ onEnablePlugin, onEditPlugin }: PluginsListProps) 
         .map(cat => ({
           ...cat,
           plugins: cat.plugins.filter(p => {
-            if (onlyAssociated && !p.associated) return false;
+            if (onlyAssociated && !associatedMap.has(p.slug)) return false;
             if (term && !p.name.toLowerCase().includes(term) && !p.slug.toLowerCase().includes(term)) {
               return false;
             }
@@ -120,7 +120,7 @@ export function PluginsList({ onEnablePlugin, onEditPlugin }: PluginsListProps) 
         }))
         .filter(cat => cat.plugins.length > 0);
     },
-    [search],
+    [search, associatedMap],
   );
 
   const allFiltered = useMemo(
