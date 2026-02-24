@@ -17,7 +17,7 @@ import type {
 type Role = 'kong-admins' | 'kong-operators' | 'kong-viewers';
 
 const USER_ROLES: Record<string, Role> = {
-  'user:default/guest': 'kong-admins',
+  'user:default/admin': 'kong-admins',
   'user:default/operator': 'kong-operators',
   'user:default/viewer': 'kong-viewers',
 };
