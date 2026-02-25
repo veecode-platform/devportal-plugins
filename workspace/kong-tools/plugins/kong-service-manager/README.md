@@ -107,6 +107,42 @@ The plugin renders a tabbed interface on the entity page:
 | `KongServiceManagerClient` | Class | Default API client implementation. |
 | `useEntityAnnotations` | Hook | Reads Kong annotations from the current entity. |
 
+## Dynamic Plugin Wiring
+
+**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
+
+This plugin can be dynamically downloaded and installed from the public npm registry, as well as its UI elements can be configured without any source code changes:
+
+```yaml
+plugins:
+  - package: @veecode-platform/backstage-plugin-kong-service-manager-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-kong-service-manager:
+            entityTabs:
+              - path: /kong
+                title: Kong
+                mountPoint: entity.page.kong
+            mountPoints:
+              - mountPoint: entity.page.kong/cards
+                importName: KongServiceManagerContent
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+```
+
+**VeeCode DevPortal** already bundles the dynamic plugin as a pre-installed plugin with default configs, so it can be alternatively be loaded just using a local path:
+
+```yaml
+plugins:
+  - package: ./dynamic-plugins/dist/backstage-plugin-kong-service-manager-dynamic
+    disabled: false
+  - package: ./dynamic-plugins/dist/backstage-plugin-kong-service-manager-backend-dynamic
+    disabled: false
+```
+
 ## License
 
 Apache-2.0

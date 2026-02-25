@@ -157,6 +157,26 @@ You can leave them both empty if your Kong Admin API does not require authentica
 **Note:** it is custom practice to create Kong service and routes for the Admin API itself,
 so that you can control access to it via "homemade" RBAC using the bundled OSS plugins. This strategy can be refined to the point of partially exposing the Admin API, but we will not cover this in this documentation.
 
+## Dynamic Plugin Wiring
+
+**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
+
+This plugin can be dynamically downloaded and installed from the public npm registry, as well as its UI elements can be configured without any source code changes:
+
+```yaml
+plugins:
+  - package: @veecode-platform/backstage-plugin-kong-service-manager-backend-dynamic
+    disabled: false
+```
+
+**VeeCode DevPortal** already bundles the dynamic plugin as a pre-installed plugin with default configs, so it can be alternatively be loaded just using a local path:
+
+```yaml
+plugins:
+  - package: ./dynamic-plugins/dist/backstage-plugin-kong-service-manager-backend-dynamic
+    disabled: false
+```
+
 ## Development
 
 Start the plugin in standalone mode for local development:
