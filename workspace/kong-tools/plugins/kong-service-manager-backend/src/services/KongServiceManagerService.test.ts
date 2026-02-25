@@ -185,6 +185,48 @@ describe('KongServiceManagerService', () => {
     expect(headers['Content-Type']).toBe('application/json');
   });
 
+  // --- getInstances ---
+
+  it('getInstances returns ids and URLs without auth credentials', () => {
+    const config = new ConfigReader({
+      kong: {
+        instances: [
+          {
+            id: 'default',
+            apiBaseUrl: 'http://kong:8001',
+            auth: { kongAdmin: 'my-token' },
+          },
+          {
+            id: 'staging',
+            apiBaseUrl: 'http://kong-staging:8001',
+            workspace: 'dev',
+            auth: {
+              custom: { header: 'X-Api-Key', value: 'secret' },
+            },
+          },
+        ],
+      },
+    });
+    const svc = createService(config);
+
+    const instances = svc.getInstances();
+
+    expect(instances).toEqual([
+      { id: 'default', apiBaseUrl: 'http://kong:8001', workspace: undefined },
+      { id: 'staging', apiBaseUrl: 'http://kong-staging:8001', workspace: 'dev' },
+    ]);
+    // Verify no auth data leaked
+    for (const inst of instances) {
+      expect(inst).not.toHaveProperty('auth');
+    }
+  });
+
+  it('getInstances returns empty array when no instances configured', () => {
+    const config = new ConfigReader({});
+    const svc = createService(config);
+    expect(svc.getInstances()).toEqual([]);
+  });
+
   // --- no instances configured ---
 
   it('initializes with empty instances when none configured', () => {

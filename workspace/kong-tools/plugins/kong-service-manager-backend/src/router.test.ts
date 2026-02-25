@@ -38,6 +38,7 @@ describe('createRouter', () => {
       addPluginToRoute: jest.fn(),
       editRoutePlugin: jest.fn(),
       removeRoutePlugin: jest.fn(),
+      getInstances: jest.fn(),
     } as unknown as jest.Mocked<KongServiceManagerService>;
 
     const router = await createRouter({
@@ -58,6 +59,39 @@ describe('createRouter', () => {
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  // --- Instances ---
+
+  it('GET /instances returns configured instances', async () => {
+    const instances = [
+      { id: 'default', apiBaseUrl: 'http://kong:8001' },
+      { id: 'staging', apiBaseUrl: 'http://kong-staging:8001', workspace: 'dev' },
+    ];
+    kongService.getInstances.mockReturnValue(instances);
+
+    const res = await request(app).get('/instances');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(instances);
+    expect(kongService.getInstances).toHaveBeenCalled();
+  });
+
+  it('GET /instances returns 403 when permission denied', async () => {
+    const permissions = mockServices.permissions.mock({
+      authorize: async () => [{ result: AuthorizeResult.DENY }],
+    });
+
+    const router = await createRouter({
+      httpAuth: mockServices.httpAuth(),
+      permissions,
+      kongService,
+    });
+    const deniedApp = express();
+    deniedApp.use(router);
+    deniedApp.use(mockErrorHandler());
+
+    const res = await request(deniedApp).get('/instances');
+    expect(res.status).toBe(403);
   });
 
   // --- Service info ---

@@ -138,6 +138,16 @@ export class KongServiceManagerService {
     return response.json() as Promise<T>;
   }
 
+  // --- Instance operations ---
+
+  getInstances(): Array<{ id: string; apiBaseUrl: string; workspace?: string }> {
+    return this.#instances.map(i => ({
+      id: i.id,
+      apiBaseUrl: i.apiBaseUrl,
+      workspace: i.workspace,
+    }));
+  }
+
   // --- Service operations ---
 
   async getServiceInfo(

@@ -18,6 +18,7 @@ import {
   kongApplyPluginRoutePermission,
   kongUpdateRoutePluginPermission,
   kongDisableRoutePluginPermission,
+  kongInstancesReadPermission,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { KongServiceManagerService } from './services/KongServiceManagerService';
 
@@ -111,6 +112,13 @@ export async function createRouter({
 
   router.get('/health', async (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // --- Instances ---
+
+  router.get('/instances', async (req, res) => {
+    await authorize(req, kongInstancesReadPermission);
+    res.json(kongService.getInstances());
   });
 
   // --- Service routes (Phase 1) ---

@@ -54,6 +54,12 @@ export const kongRouteDeletePermission = createPermission({
   attributes: { action: 'delete' },
 });
 
+/** Permission to list available Kong instances */
+export const kongInstancesReadPermission = createPermission({
+  name: 'kong.instances.read',
+  attributes: { action: 'read' },
+});
+
 /** Permission to add a plugin to a Kong route */
 export const kongApplyPluginRoutePermission = createPermission({
   name: 'kong.plugin.route.apply',
@@ -86,4 +92,5 @@ export const kongPermissions = [
   kongApplyPluginRoutePermission,
   kongUpdateRoutePluginPermission,
   kongDisableRoutePluginPermission,
+  kongInstancesReadPermission,
 ];
