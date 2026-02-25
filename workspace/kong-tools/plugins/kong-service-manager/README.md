@@ -1,5 +1,7 @@
 # Kong Service Manager
 
+<!-- markdownlint-disable MD033 -->
+
 Backstage frontend plugin for managing
 [Kong Gateway](https://konghq.com/products/kong-gateway) services, routes,
 and plugins directly from the catalog.
@@ -13,6 +15,30 @@ and plugins directly from the catalog.
 - Dynamic plugin configuration based on Kong schema introspection
 - Multi-instance support with an instance selector dropdown
 - Plugin categorization (AI, Authentication, Security, Traffic Control, etc.)
+
+## Screenshots
+
+<div class="screenshot-carousel">
+  <img src="../../docs/screenshots/01-service-tab.png" alt="Service Tab" />
+  <img src="../../docs/screenshots/02-plugins-tab.png" alt="Plugins Tab" />
+  <img src="../../docs/screenshots/03-routes-tab.png" alt="Routes Tab" />
+</div>
+
+<style>
+.screenshot-carousel {
+  display: flex;
+  overflow-x: auto;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+.screenshot-carousel img {
+  flex: 0 0 auto;
+  max-width: 420px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+</style>
 
 ## Installation
 
@@ -142,7 +168,3 @@ plugins:
   - package: ./dynamic-plugins/dist/backstage-plugin-kong-service-manager-backend-dynamic
     disabled: false
 ```
-
-## License
-
-Apache-2.0
