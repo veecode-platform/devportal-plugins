@@ -1,6 +1,8 @@
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
+import { Config } from '@backstage/config';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { resolveKongInstance } from './kongConfig';
 
 const execAsync = promisify(exec);
 
@@ -14,12 +16,16 @@ const execAsync = promisify(exec);
  *
  * @public
  */
-export function createDeckPingAction() {
+export function createDeckPingAction(options: { config: Config }) {
   return createTemplateAction({
     id: 'veecode:kong:deck:ping',
     description: 'Tests connectivity to Kong Gateway control plane using deck gateway ping',
     schema: {
       input: {
+        kongInstance: z =>
+          z.string({
+            description: 'Kong instance ID from kong.instances config (takes priority over kongAddr)',
+          }).optional(),
         kongAddr: z =>
           z.string({
             description: 'Kong Admin API address (if not provided, deck uses env vars like DECK_KONG_ADDR)',
@@ -41,14 +47,25 @@ export function createDeckPingAction() {
       },
     },
     async handler(ctx) {
-      const { 
+      const {
+        kongInstance,
         kongAddr,
         deckFlags = ''
       } = ctx.input;
-      
+
       ctx.logger.info('Starting Kong deck ping operation');
-      if (kongAddr) {
-        ctx.logger.info(`Testing connection to Kong Admin API at: ${kongAddr}`);
+
+      // Resolve Kong connection: kongInstance > kongAddr > env vars
+      let resolvedAddr = kongAddr;
+      let resolvedHeaders = '';
+
+      if (kongInstance) {
+        const resolved = resolveKongInstance(options.config, kongInstance);
+        resolvedAddr = resolved.kongAddr;
+        resolvedHeaders = resolved.headers;
+        ctx.logger.info(`Resolved Kong instance '${kongInstance}' → ${resolvedAddr}`);
+      } else if (resolvedAddr) {
+        ctx.logger.info(`Testing connection to Kong Admin API at: ${resolvedAddr}`);
       } else {
         ctx.logger.info('Testing connection using deck default Kong Admin API address (from env vars like DECK_KONG_ADDR)');
       }
@@ -61,14 +78,15 @@ export function createDeckPingAction() {
       }
 
       // Validate kongAddr to prevent command injection
-      if (kongAddr && /[;|&$`()<>]/.test(kongAddr)) {
+      if (resolvedAddr && /[;|&$`()<>]/.test(resolvedAddr)) {
         throw new Error('kongAddr contains forbidden shell metacharacters (;|&$`()<>)');
       }
 
       try {
         // Construct the deck command
-        const addrFlag = kongAddr ? `--kong-addr ${kongAddr}` : '';
-        const fullCommand = `deck gateway ping ${addrFlag} ${deckFlags}`.trim();
+        const addrFlag = resolvedAddr ? `--kong-addr ${resolvedAddr}` : '';
+        const headersFlag = resolvedHeaders ? `--headers "${resolvedHeaders}"` : '';
+        const fullCommand = `deck gateway ping ${addrFlag} ${headersFlag} ${deckFlags}`.trim();
         
         ctx.logger.info(`Executing deck command: ${fullCommand}`);
         

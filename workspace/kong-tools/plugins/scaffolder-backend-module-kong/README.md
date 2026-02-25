@@ -40,19 +40,58 @@ RUN curl -L https://deckrun.com/install-cli.sh | sh && \
 
 ### Kong Connectivity
 
-You need **Kong Gateway** (or **Kong Konnect**) accessible from your Backstage backend (for the sync action)
+You need **Kong Gateway** (or **Kong Konnect**) accessible from your Backstage backend (for the sync and ping actions).
 
-We are not providing (for now) entries for Kong Admin API connectivity in the Backstage configuration, so you need to satisfy `deck` with environment variables. Each `deck` argument can be replaced by an [environment variable](https://developer.konghq.com/deck/configuration/#environment-variables) in caps with `DECK_` prefix.
+There are two ways to configure Kong connectivity:
 
-For Kong Gateway connectivity, you can use the following environment variables:
+#### Option 1: `kong.instances` in `app-config.yaml` (Recommended)
 
-- DECK_KONG_ADDR (example: "http://localhost:8001")
-- DECK_HEADERS (example: "Kong-Admin-Token:$MY_TOKEN_HERE")
+If you already use the `kong-service-manager` plugins, the scaffolder actions can reuse the same `kong.instances` config. Pass the `kongInstance` input parameter to the sync or ping action and it will resolve the address and auth headers automatically.
 
-For Kong Konnect connectivity, you can use the following environment variables:
+```yaml
+# app-config.yaml
+kong:
+  instances:
+    - id: development
+      apiBaseUrl: http://kong-admin:8001
+      workspace: default
+      auth:
+        kongAdmin: ${KONG_ADMIN_TOKEN}
+    - id: production
+      apiBaseUrl: https://kong-admin.prod.internal:8444
+      auth:
+        custom:
+          header: X-Api-Key
+          value: ${KONG_PROD_API_KEY}
+```
 
-- DECK_KONNECT_CONTROL_PLANE_NAME
-- DECK_KONNECT_TOKEN
+Then reference the instance in your template step:
+
+```yaml
+- id: sync-to-kong
+  action: veecode:kong:deck:sync
+  input:
+    kongInstance: development
+    kongConfigPath: kong.yaml
+```
+
+#### Option 2: Environment variables (deck defaults)
+
+Each `deck` argument can be replaced by an [environment variable](https://developer.konghq.com/deck/configuration/#environment-variables) in caps with `DECK_` prefix.
+
+For Kong Gateway connectivity:
+
+- `DECK_KONG_ADDR` (example: `http://localhost:8001`)
+- `DECK_HEADERS` (example: `Kong-Admin-Token:$MY_TOKEN_HERE`)
+
+For Kong Konnect connectivity:
+
+- `DECK_KONNECT_CONTROL_PLANE_NAME`
+- `DECK_KONNECT_TOKEN`
+
+#### Priority
+
+When multiple sources are provided, the resolution order is: **`kongInstance`** > **`kongAddr` input** > **environment variables** (deck defaults).
 
 ## Installation
 
@@ -116,6 +155,7 @@ Syncs a Kong declarative configuration file to a Kong Gateway instance using dec
 |-----------|------|----------|---------|-------------|
 | `kongConfigPath` | `string` | ❌ | `kong.yaml` | The path to the Kong YAML file to sync (relative to workspace) |
 | `deckCommand` | `string` | ❌ | `deck gateway sync` | The deck command to run |
+| `kongInstance` | `string` | ❌ | - | Kong instance ID from `kong.instances` config. Takes priority over `kongAddr` |
 | `kongAddr` | `string` | ❌ | - | Kong Admin API address (e.g., `http://localhost:8001`). If not provided, deck uses environment variables like `DECK_KONG_ADDR` |
 | `deckFlags` | `string` | ❌ | `''` | Additional flags to pass to deck command |
 | `deckTag` | `string` | ❌ | `veecode-default` | Tag to filter Kong entities (passed to `--select-tag`) |
@@ -136,6 +176,7 @@ Tests connectivity to a Kong Gateway control plane using deck gateway ping. This
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
+| `kongInstance` | `string` | ❌ | - | Kong instance ID from `kong.instances` config. Takes priority over `kongAddr` |
 | `kongAddr` | `string` | ❌ | - | Kong Admin API address (e.g., `http://localhost:8001`). If not provided, deck uses environment variables like `DECK_KONG_ADDR` |
 | `deckFlags` | `string` | ❌ | `''` | Additional flags to pass to deck gateway ping command |
 
@@ -208,12 +249,14 @@ spec:
     - id: test-kong-connection
       name: Test Kong Connection
       action: veecode:kong:deck:ping
-      input: {}
-    
+      input:
+        kongInstance: development
+
     - id: sync-to-kong
       name: Sync to Kong Gateway
       action: veecode:kong:deck:sync
       input:
+        kongInstance: development
         kongConfigPath: ${{ steps['generate-kong-config'].output.kongConfigPath }}
         deckTag: ${{ parameters.serviceName }}
     
@@ -246,9 +289,34 @@ spec:
 
 ## Configuration
 
+### `kong.instances` (Recommended)
+
+Define Kong instances in `app-config.yaml`. This is the same config used by the `kong-service-manager` plugins, giving you a single source of truth:
+
+```yaml
+kong:
+  instances:
+    - id: development
+      apiBaseUrl: http://kong-admin:8001
+      workspace: default
+      auth:
+        kongAdmin: ${KONG_ADMIN_TOKEN}
+    - id: production
+      apiBaseUrl: https://kong-admin.prod.internal:8444
+      auth:
+        custom:
+          header: X-Api-Key
+          value: ${KONG_PROD_API_KEY}
+```
+
+The `kongInstance` input on the sync and ping actions resolves:
+
+- `apiBaseUrl` + optional `workspace` into the `--kong-addr` flag
+- `auth.kongAdmin` or `auth.custom` into the `--headers` flag
+
 ### Environment Variables
 
-The deck CLI can be configured using environment variables:
+The deck CLI can also be configured using environment variables (used as fallback when `kongInstance` is not provided):
 
 | Variable | Description |
 |----------|-------------|
@@ -257,18 +325,6 @@ The deck CLI can be configured using environment variables:
 | `DECK_SKIP_WORKSPACE_CRUD` | Skip workspace creation (Kong Enterprise) |
 
 Set these in your Backstage backend configuration or container environment.
-
-### Example Backend Configuration
-
-In `app-config.yaml` or `app-config.production.yaml`:
-
-```yaml
-# You can set environment variables for the backend
-backend:
-  # ... other config
-  env:
-    DECK_KONG_ADDR: http://kong-admin.internal:8001
-```
 
 Or in your Kubernetes/Docker deployment:
 
@@ -289,8 +345,9 @@ steps:
   - id: test-connection
     name: Test Kong Connection
     action: veecode:kong:deck:ping
-    input: {}
-  
+    input:
+      kongInstance: development
+
   - id: generate
     name: Generate Kong Config
     action: veecode:kong:deck:generate
@@ -298,11 +355,12 @@ steps:
       openapiSpec: ${{ parameters.openapi }}
       outputPath: kong.yaml
       deckTag: ${{ parameters.name }}
-  
+
   - id: sync
     name: Sync to Kong
     action: veecode:kong:deck:sync
     input:
+      kongInstance: development
       kongConfigPath: ${{ steps.generate.output.kongConfigPath }}
       deckTag: ${{ parameters.name }}
 ```
@@ -320,11 +378,12 @@ steps:
       openapiSpec: ${{ parameters.openapi }}
       outputPath: kong.yaml
       deckTag: ${{ parameters.name }}
-  
+
   - id: sync
     name: Sync to Kong
     action: veecode:kong:deck:sync
     input:
+      kongInstance: development
       kongConfigPath: ${{ steps.generate.output.kongConfigPath }}
       deckTag: ${{ parameters.name }}
 ```

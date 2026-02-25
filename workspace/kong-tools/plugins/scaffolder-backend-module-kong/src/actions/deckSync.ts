@@ -1,7 +1,9 @@
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
+import { Config } from '@backstage/config';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join } from 'path';
+import { resolveKongInstance } from './kongConfig';
 
 const execAsync = promisify(exec);
 
@@ -15,7 +17,7 @@ const execAsync = promisify(exec);
  *
  * @public
  */
-export function createDeckSyncAction() {
+export function createDeckSyncAction(options: { config: Config }) {
   return createTemplateAction({
     id: 'veecode:kong:deck:sync',
     description: 'Syncs a Kong YAML configuration to Kong Gateway using deck',
@@ -29,6 +31,10 @@ export function createDeckSyncAction() {
           z.string({
             description: 'The deck command to run',
           }).optional().default('deck gateway sync'),
+        kongInstance: z =>
+          z.string({
+            description: 'Kong instance ID from kong.instances config (takes priority over kongAddr)',
+          }).optional(),
         kongAddr: z =>
           z.string({
             description: 'Kong Admin API address (if not provided, deck uses its own defaults/env vars)',
@@ -50,17 +56,28 @@ export function createDeckSyncAction() {
       },
     },
     async handler(ctx) {
-      const { 
+      const {
         kongConfigPath = 'kong.yaml',
         deckCommand = 'deck gateway sync',
+        kongInstance,
         kongAddr,
         deckFlags = '',
         deckTag = 'veecode-default'
       } = ctx.input;
-      
+
       ctx.logger.info('Starting Kong deck sync operation');
-      if (kongAddr) {
-        ctx.logger.info(`Using Kong Admin API at: ${kongAddr}`);
+
+      // Resolve Kong connection: kongInstance > kongAddr > env vars
+      let resolvedAddr = kongAddr;
+      let resolvedHeaders = '';
+
+      if (kongInstance) {
+        const resolved = resolveKongInstance(options.config, kongInstance);
+        resolvedAddr = resolved.kongAddr;
+        resolvedHeaders = resolved.headers;
+        ctx.logger.info(`Resolved Kong instance '${kongInstance}' → ${resolvedAddr}`);
+      } else if (resolvedAddr) {
+        ctx.logger.info(`Using Kong Admin API at: ${resolvedAddr}`);
       } else {
         ctx.logger.info('Using deck default Kong Admin API address (from env vars like DECK_KONG_ADDR or defaults)');
       }
@@ -78,7 +95,7 @@ export function createDeckSyncAction() {
       }
 
       // Validate kongAddr to prevent command injection
-      if (kongAddr && /[;|&$`()<>]/.test(kongAddr)) {
+      if (resolvedAddr && /[;|&$`()<>]/.test(resolvedAddr)) {
         throw new Error('kongAddr contains forbidden shell metacharacters (;|&$`()<>)');
       }
 
@@ -89,8 +106,9 @@ export function createDeckSyncAction() {
 
         // Construct the deck command
         const tagFlag = deckTag ? `--select-tag ${deckTag}` : '';
-        const addrFlag = kongAddr ? `--kong-addr ${kongAddr}` : '';
-        const fullCommand = `${deckCommand} ${configPath} ${addrFlag} ${tagFlag} ${deckFlags}`.trim();
+        const addrFlag = resolvedAddr ? `--kong-addr ${resolvedAddr}` : '';
+        const headersFlag = resolvedHeaders ? `--headers "${resolvedHeaders}"` : '';
+        const fullCommand = `${deckCommand} ${configPath} ${addrFlag} ${headersFlag} ${tagFlag} ${deckFlags}`.trim();
         
         ctx.logger.info(`Executing deck command: ${fullCommand}`);
         

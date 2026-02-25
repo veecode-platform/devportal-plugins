@@ -19,8 +19,8 @@ export const scaffolderModule = createBackendModule({
       async init({ scaffolderActions, config }) {
         scaffolderActions.addActions(
           createDeckGenerateAction({ config }),
-          createDeckSyncAction(),
-          createDeckPingAction()
+          createDeckSyncAction({ config }),
+          createDeckPingAction({ config })
         );
       }
     });
