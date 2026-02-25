@@ -109,6 +109,8 @@ kong:
   instances:
     - id: default
       apiBaseUrl: http://manager.localdomain:8000
+    - id: another
+      apiBaseUrl: http://manager.localdomain:8000
 
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:

@@ -47,6 +47,16 @@ spec:
             allowedOwners:
               - veecode-demos
 
+    - title: Kong Instance
+      required:
+        - kongInstance
+      properties:
+        kongInstance:
+          title: Kong Instance
+          type: string
+          description: Select the Kong gateway instance to deploy to
+          ui:field: KongInstancePicker
+
     - title: Inputs for generation & sync
       required: [openapiSourceType, upstreamUrl]
       properties:
@@ -90,12 +100,14 @@ spec:
     - id: test-kong-connection
       name: Test Kong Connection
       action: veecode:kong:deck:ping
-      input: {}
+      input:
+        kongInstance: ${{ parameters.kongInstance }}
       
     - id: deck-generate
       name: Generate Kong config using deck
       action: veecode:kong:deck:generate
       input:
+        kongInstance: ${{ parameters.kongInstance }}
         openapiSpec: ${{ parameters.openapiInline }}
         outputPath: kong.yaml
         deckTag: veecode-${{ parameters.name }}
@@ -105,6 +117,7 @@ spec:
       name: Sync to Kong Gateway
       action: veecode:kong:deck:sync
       input:
+        kongInstance: ${{ parameters.kongInstance }}
         kongConfigPath: kong.yaml
         deckTag: veecode-${{ parameters.name }}
 

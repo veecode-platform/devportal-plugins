@@ -1,0 +1,1 @@
+export { KongInstancePickerExtension } from './plugin';

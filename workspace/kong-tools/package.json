@@ -21,7 +21,7 @@
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
     "new": "backstage-cli new",
-    "update-backstage": "backstage-cli versions:bump --pattern '@{backstage,roadiehq,backstage-community,veecode-platform}/*'"
+    "update-backstage": "backstage-cli versions:bump --pattern '@{backstage,roadiehq,backstage-community}/*'"
   },
   "workspaces": {
     "packages": [
