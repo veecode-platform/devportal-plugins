@@ -27,6 +27,7 @@ const READ_PERMISSIONS = new Set([
   'kong.service.read',
   'kong.plugins.read',
   'kong.routes.read',
+  'kong.instances.read',
 ]);
 
 const PLUGIN_MUTATION_PERMISSIONS = new Set([
@@ -82,6 +83,7 @@ function createKongServiceMock(): jest.Mocked<KongServiceManagerService> {
     addPluginToRoute: jest.fn(),
     editRoutePlugin: jest.fn(),
     removeRoutePlugin: jest.fn(),
+    getInstances: jest.fn(),
   } as unknown as jest.Mocked<KongServiceManagerService>;
 }
 
@@ -105,6 +107,9 @@ async function buildApp(role: Role) {
   kongService.addPluginToRoute.mockResolvedValue(mockCreatedPlugin);
   kongService.editRoutePlugin.mockResolvedValue(mockCreatedPlugin);
   kongService.removeRoutePlugin.mockResolvedValue(undefined);
+  kongService.getInstances.mockReturnValue([
+    { id: 'default', apiBaseUrl: 'http://kong:8001' },
+  ]);
 
   const router = await createRouter({
     httpAuth: mockServices.httpAuth(),
@@ -138,6 +143,13 @@ interface Endpoint {
 
 const endpoints: Endpoint[] = [
   // --- Read endpoints ---
+  {
+    label: 'GET instances',
+    method: 'get',
+    path: '/instances',
+    category: 'read',
+    expectedSuccess: 200,
+  },
   {
     label: 'GET service info',
     method: 'get',

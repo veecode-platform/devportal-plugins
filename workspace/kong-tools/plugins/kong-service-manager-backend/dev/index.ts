@@ -1,10 +1,12 @@
 import { createBackend } from '@backstage/backend-defaults';
 import { mockServices } from '@backstage/backend-test-utils';
+import { AuthorizeResult } from '@backstage/plugin-permission-common';
 
 // Start up the backend by running `yarn start` in the package directory.
 //
 // curl examples:
 //   curl http://localhost:7007/api/kong-service-manager-backend/health
+//   curl http://localhost:7007/api/kong-service-manager-backend/instances
 //   curl http://localhost:7007/api/kong-service-manager-backend/default/plugins
 
 if (!process.env.KONG_ADMIN_URL) {
@@ -23,13 +25,14 @@ function printCurlHelp() {
   const base = `http://${host}:${port}/api/kong-service-manager-backend`;
 
   // eslint-disable-next-line no-console
-  console.log(`\nCurl tests:\n  curl ${base}/health\n  curl ${base}/default/plugins\n`);
+  console.log(`\nCurl tests:\n  curl ${base}/health\n  curl ${base}/instances\n  curl ${base}/default/plugins\n`);
 }
 
 const backend = createBackend();
 
 backend.add(mockServices.auth.factory());
 backend.add(mockServices.httpAuth.factory());
+backend.add(mockServices.permissions.factory({ result: AuthorizeResult.ALLOW }));
 
 // Provide kong.instances config via env vars or override here for local dev.
 // By default reads from app-config.yaml in the workspace root.

@@ -183,7 +183,7 @@ Start the plugin in standalone mode for local development:
 
 ```bash
 cd workspace/kong-tools
-yarn start --filter=kong-service-manager-backend
+yarn --cwd plugins/kong-service-manager-backend start
 ```
 
 The standalone server reads configuration from `app-config.yaml` and starts
