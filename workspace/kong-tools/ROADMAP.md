@@ -134,3 +134,4 @@ Category-level plugin permissions from the old implementation.
 - Dashboard with service health metrics
 - Plugin configuration templates / presets
 - Bulk operations (enable/disable multiple plugins)
+- `KongInstancePicker` scaffolder field extension (dropdown backed by `GET /instances`)
