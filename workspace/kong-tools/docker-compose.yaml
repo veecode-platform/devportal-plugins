@@ -13,5 +13,6 @@ services:
       # mounting dist-dynamic directly, no need to npm publish
       - ./plugins/kong-service-manager-backend/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-backend-dynamic:ro
       - ./plugins/kong-service-manager/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-dynamic:ro
+      - ./plugins/scaffolder-field-extensions-kong/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-scaffolder-field-extensions-kong-dynamic:ro
     extra_hosts:
       - "manager.localdomain:host-gateway"

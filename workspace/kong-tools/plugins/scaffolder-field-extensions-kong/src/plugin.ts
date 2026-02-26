@@ -3,7 +3,7 @@ import { createScaffolderFieldExtension } from '@backstage/plugin-scaffolder-rea
 import KongInstancePicker from './components/KongInstancePicker/KongInstancePicker';
 
 export const KongInstancePickerSchema = {
-  returnValue: { type: 'string' },
+  returnValue: { type: 'string' as const },
 };
 
 export const KongInstancePickerExtension = scaffolderPlugin.provide(

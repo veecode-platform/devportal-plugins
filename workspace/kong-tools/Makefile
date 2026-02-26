@@ -15,8 +15,9 @@ SCAFFOLDER_MODULE_DIR = plugins/scaffolder-backend-module-kong
 KSM_COMMON_DIR = plugins/kong-service-manager-common
 KSM_BACKEND_DIR = plugins/kong-service-manager-backend
 KSM_FRONTEND_DIR = plugins/kong-service-manager
+KSM_SCAFFOLDER_EXT_DIR = plugins/scaffolder-field-extensions-kong
 
-ALL_PLUGIN_DIRS = $(SCAFFOLDER_MODULE_DIR) $(KSM_COMMON_DIR) $(KSM_BACKEND_DIR) $(KSM_FRONTEND_DIR)
+ALL_PLUGIN_DIRS = $(SCAFFOLDER_MODULE_DIR) $(KSM_COMMON_DIR) $(KSM_BACKEND_DIR) $(KSM_FRONTEND_DIR) $(KSM_SCAFFOLDER_EXT_DIR)
 
 .PHONY: help build pack publish publish-all set-version get-version unpublish cleanup \
 	build-dynamic pack-dynamic publish-dynamic
@@ -69,11 +70,13 @@ pack:
 build-dynamic: build
 	cd $(KSM_BACKEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
 	cd $(KSM_FRONTEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(KSM_SCAFFOLDER_EXT_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
 
 # Pack dynamic variants
 pack-dynamic:
 	cd $(KSM_BACKEND_DIR)/dist-dynamic && npm pack
 	cd $(KSM_FRONTEND_DIR)/dist-dynamic && npm pack
+	cd $(KSM_SCAFFOLDER_EXT_DIR)/dist-dynamic && npm pack
 
 # Helper: publish a single plugin if not already published
 define publish_plugin
@@ -94,12 +97,14 @@ publish: build
 	$(call publish_plugin,$(SCAFFOLDER_MODULE_DIR))
 	$(call publish_plugin,$(KSM_BACKEND_DIR))
 	$(call publish_plugin,$(KSM_FRONTEND_DIR))
+	$(call publish_plugin,$(KSM_SCAFFOLDER_EXT_DIR))
 
 # Publish dynamic variants
 publish-dynamic: build-dynamic
 	@echo "Publishing dynamic variants..."
 	@cd $(KSM_BACKEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
 	@cd $(KSM_FRONTEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
+	@cd $(KSM_SCAFFOLDER_EXT_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
 
 # Cleanup workspace
 cleanup:

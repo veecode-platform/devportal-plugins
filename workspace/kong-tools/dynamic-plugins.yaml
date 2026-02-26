@@ -20,3 +20,11 @@ plugins:
                 config:
                   layout:
                     gridColumn: "1 / -1"
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-scaffolder-field-extensions-kong-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-scaffolder-field-extensions-kong:
+            scaffolderFieldExtensions:
+              - importName: KongInstancePickerExtension
