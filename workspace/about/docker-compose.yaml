@@ -1,0 +1,12 @@
+services:
+  devportal:
+    image: veecode/devportal:latest
+    ports:
+      - "7007:7007"
+    environment:
+      - DEVELOPMENT=true
+      - LOG_LEVEL=info
+    volumes:
+      - ./dynamic-plugins.yaml:/app/dynamic-plugins.yaml:ro
+      # mounting dist-dynamic directly, no need to npm publish
+      # - ./plugins/kong-service-manager-backend/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-backend-dynamic:ro

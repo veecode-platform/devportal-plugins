@@ -1,6 +1,5 @@
 import { Header, InfoCard, Page, Progress, TabbedLayout } from '@backstage/core-components'
 import { Avatar, Box, Chip, Grid, List, ListItem, ListItemAvatar, ListItemText } from '@mui/material';
-import React from 'react';
 import { VeecodeLogoIcon } from './DevportalIcon';
 import { BackstageLogoIcon } from './BackstageLogoIcon';
 import { Alert } from '@mui/material';

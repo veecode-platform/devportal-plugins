@@ -18,8 +18,6 @@ import { Theme } from '@mui/material';
 import Icon from '@mui/material/Icon';
 import { makeStyles } from '@mui/styles';
 
-import React from 'react';
-
 const useStyles = makeStyles((theme:Theme) => ({
     imageIcon: {
       display: 'flex',
