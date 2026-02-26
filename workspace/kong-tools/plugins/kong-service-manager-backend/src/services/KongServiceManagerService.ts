@@ -22,6 +22,7 @@ export type KongInstanceConfig = {
   id: string;
   apiBaseUrl: string;
   workspace?: string;
+  description?: string;
   auth:
     | { kongAdmin: string }
     | { custom: { header: string; value: string } };
@@ -54,6 +55,7 @@ export class KongServiceManagerService {
       const id = c.getString('id');
       const apiBaseUrl = c.getString('apiBaseUrl');
       const workspace = c.getOptionalString('workspace');
+      const description = c.getOptionalString('description');
 
       let auth: KongInstanceConfig['auth'];
       if (c.has('auth.kongAdmin')) {
@@ -69,7 +71,7 @@ export class KongServiceManagerService {
         auth = { kongAdmin: '' };
       }
 
-      return { id, apiBaseUrl, workspace, auth };
+      return { id, apiBaseUrl, workspace, description, auth };
     });
   }
 
@@ -140,11 +142,12 @@ export class KongServiceManagerService {
 
   // --- Instance operations ---
 
-  getInstances(): Array<{ id: string; apiBaseUrl: string; workspace?: string }> {
+  getInstances(): Array<{ id: string; apiBaseUrl: string; workspace?: string; description?: string }> {
     return this.#instances.map(i => ({
       id: i.id,
       apiBaseUrl: i.apiBaseUrl,
       workspace: i.workspace,
+      description: i.description,
     }));
   }
 

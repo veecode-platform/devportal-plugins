@@ -4,6 +4,7 @@ export type KongInstance = {
   id: string;
   apiBaseUrl: string;
   workspace?: string;
+  description?: string;
 };
 
 export async function fetchKongInstances(options: {

@@ -1,1 +1,1 @@
-export { KongInstancePickerExtension } from './plugin';
+export { KongInstancePickerExtension, KongInstancePickerSchema } from './plugin';
