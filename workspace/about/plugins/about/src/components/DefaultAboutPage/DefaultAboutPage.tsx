@@ -8,39 +8,8 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import MemoryIcon from '@mui/icons-material/Memory';
 import DeveloperBoardIcon from '@mui/icons-material/DeveloperBoard';
 
-import { makeStyles } from '@mui/styles';
-
-const useStyles = makeStyles(theme => ({
-  paperStyle: {
-    marginBottom: theme.spacing(2),
-  },
-  flexContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    padding: 0,
-    '& > :nth-child(odd)': {
-      backgroundColor: theme.palette.background.default,
-      borderRadius: '4px'
-    },
-  },
-  badgeChip: {
-    height: '24px',
-    minWidth: '24px',
-    fontSize: '0.75rem',
-    backgroundColor: '#B8B344',
-    marginLeft: theme.spacing(1),
-    alignSelf: 'flex-end',
-    transform: 'translateY(3px)',
-  },
-  badgeContainer: {
-    display: 'flex',
-    alignItems: 'center',
-  }
-}))
-
 export const DefaultAboutPage = () => {
 
-  const classes = useStyles();
   const { about, loading, error } = useInfo();
   const { lastVersion } = useSpec();
 
@@ -64,7 +33,15 @@ export const DefaultAboutPage = () => {
           <Grid container direction="row" spacing={3}>
             <Grid item xs={12} md={12}>
               <InfoCard title="Details">
-                <List className={classes.flexContainer}>
+                <List sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: 0,
+                  '& > :nth-of-type(odd)': {
+                    backgroundColor: 'background.default',
+                    borderRadius: '4px',
+                  },
+                }}>
                   {/**Devportal Version */}
                   <ListItem>
                     <ListItemAvatar>
@@ -72,13 +49,21 @@ export const DefaultAboutPage = () => {
                         <VeecodeLogoIcon/>
                       </Avatar>
                     </ListItemAvatar>
-                    <Box className={classes.badgeContainer}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <ListItemText
                         primary="Devportal Version"
                         secondary={textDevportalVersion()}
                       />
                       {about?.devportalVersion !== lastVersion && (
-                        <Chip label="New" className={classes.badgeChip}/>
+                        <Chip label="New" sx={{
+                          height: '24px',
+                          minWidth: '24px',
+                          fontSize: '0.75rem',
+                          backgroundColor: '#B8B344',
+                          ml: 1,
+                          alignSelf: 'flex-end',
+                          transform: 'translateY(3px)',
+                        }}/>
                       )}
                     </Box>
                   </ListItem>

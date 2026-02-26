@@ -9,4 +9,5 @@ services:
     volumes:
       - ./dynamic-plugins.yaml:/app/dynamic-plugins.yaml:ro
       # mounting dist-dynamic directly, no need to npm publish
-      # - ./plugins/kong-service-manager-backend/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-backend-dynamic:ro
+      - ./plugins/about-backend/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-about-backend-dynamic:ro
+      - ./plugins/about/dist-dynamic:/app/dynamic-plugins/dist/veecode-platform-backstage-plugin-about-dynamic:ro

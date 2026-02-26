@@ -2,3 +2,15 @@ includes:
   - dynamic-plugins.default.yaml
 
 plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-about-backend-dynamic
+    disabled: false
+
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-about-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-about:
+            dynamicRoutes:
+              - path: /about
+                importName: AboutPage

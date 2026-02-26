@@ -14,31 +14,15 @@
  * limitations under the License.
  */
 
-import { Theme } from '@mui/material';
 import Icon from '@mui/material/Icon';
-import { makeStyles } from '@mui/styles';
-
-const useStyles = makeStyles((theme:Theme) => ({
-    imageIcon: {
-      display: 'flex',
-      height: 'inherit',
-      width: 'inherit',
-      marginLeft: '-1px'
-    },
-    iconRoot: {
-        textAlign: 'center'
-      },
-    fill : {
-        fill: theme.palette.background.default
-    }
-  }));
+import { useTheme } from '@mui/material/styles';
 
 export const VeecodeLogoIcon = () => {
 
- const classes = useStyles()
+ const theme = useTheme();
 
  return(
-    <Icon classes={{root: classes.iconRoot}}>
+    <Icon sx={{ textAlign: 'center' }}>
         <svg
         version="1.1"
         id="Layer_1"
@@ -49,7 +33,7 @@ export const VeecodeLogoIcon = () => {
         height="60.000000pt"
         viewBox="0 0 128.000000 147.000000"
         enableBackground="new 0 0 145 137"
-        className={classes.imageIcon}
+        style={{ display: 'flex', height: 'inherit', width: 'inherit', marginLeft: '-1px' }}
         >
         <path
            fill="#ffffff00"
@@ -128,7 +112,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
           //  fill="#0CF4C8"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
@@ -161,7 +145,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
          //   fill="#09F7CA"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
@@ -192,7 +176,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
          //   fill="#06F9CC"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
@@ -217,7 +201,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
          //   fill="#27D8B2"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
@@ -228,7 +212,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
           //  fill="#1CD0AE"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
@@ -239,7 +223,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
           //  fill="#8FD3C6"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
@@ -250,7 +234,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
          //   fill="#1CD0AE"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
@@ -261,7 +245,7 @@ export const VeecodeLogoIcon = () => {
         />
         <path
          //   fill="#1CD0AE"
-            className={classes.fill}
+            fill={theme.palette.background.default}
             opacity="1.000000"
             stroke="none"
             d="
