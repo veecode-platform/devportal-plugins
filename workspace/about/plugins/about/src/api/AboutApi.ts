@@ -15,9 +15,7 @@
  */
 
 import { createApiRef } from '@backstage/core-plugin-api';
-import {
-  DevPortalInfo,
-} from '@internal/plugin-about-backend';
+import { DevPortalInfo } from '../types';
 
 export const aboutApiRef = createApiRef<AboutApi>({
   id: 'plugin.about.service',

@@ -15,9 +15,7 @@
  */
 
 import { DiscoveryApi, IdentityApi } from '@backstage/core-plugin-api';
-import {
-  DevPortalInfo
-} from '@internal/plugin-about-backend';
+import { DevPortalInfo } from '../types';
 import { ResponseError } from '@backstage/errors';
 import { AboutApi } from './AboutApi';
 

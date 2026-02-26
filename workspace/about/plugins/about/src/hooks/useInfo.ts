@@ -16,7 +16,7 @@
 
 import { aboutApiRef } from '../api';
 import { useApi } from '@backstage/core-plugin-api';
-import { DevPortalInfo } from '@internal/plugin-about-backend';
+import { DevPortalInfo } from '../types';
 import useAsync from 'react-use/lib/useAsync';
 
 export function useInfo(): {
