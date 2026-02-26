@@ -108,8 +108,10 @@ catalog:
 kong:
   instances:
     - id: default
+      description: Default Kong instance
       apiBaseUrl: http://manager.localdomain:8000
     - id: another
+      description: Another Kong instance
       apiBaseUrl: http://manager.localdomain:8000
 
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
