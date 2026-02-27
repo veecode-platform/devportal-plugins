@@ -5,7 +5,7 @@
 #
 
 # Version for about packages (frontend, backend)
-ABOUT_VERSION ?= 1.0.1
+ABOUT_VERSION ?= 1.0.2
 NPM_REGISTRY = ""
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
