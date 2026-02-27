@@ -24,13 +24,6 @@ import { DevPortalInfo } from '../utils/types';
 
 /** @public */
 export class AboutBackendApi {
-  public constructor(
- //   private readonly logger: Logger,
- //   private readonly config: Config,
- //   private readonly permissions: PermissionEvaluator
-  ) {}
-
-
   public async listInfo(): Promise<DevPortalInfo> {
     const operatingSystem = `${os.hostname()}: ${os.type} ${os.release} - ${
       os.platform
