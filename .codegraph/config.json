@@ -23,7 +23,9 @@
     "**/*.kts",
     "**/*.dart",
     "**/*.svelte",
-    "**/*.liquid"
+    "**/*.liquid",
+    "**/Makefile",
+    "**/makefile"
   ],
   "exclude": [
     "**/.git/**",
