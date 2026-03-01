@@ -1,276 +1,182 @@
 #
-# Makefile for github-workflows plugins
+# Makefile for github-workflows workspace
 # - Handles common, frontend, and backend plugins
 # - Supports both static and dynamic plugin builds
+# - Has workspace:* dependency handling (replace-workspace/restore-workspace)
 #
 
-# Version for github-workflows packages (common, frontend, backend)
-GH_WORKFLOWS_VERSION ?= 1.3.6
-NPM_REGISTRY = ""
+VERSION ?= 1.3.6
+NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
-.PHONY: help build-common pack-common publish-common build-frontend build-frontend-dynamic build-backend build-backend-dynamic pack-frontend pack-frontend-dynamic pack-backend pack-backend-dynamic publish-frontend publish-frontend-dynamic publish-backend publish-backend-dynamic set-version clean-dynamic echo-paths build-all publish-all publish-all-dynamic get-version unpublish-all
+# Plugin directories
+COMMON_DIR = plugins/github-workflows-common
+FRONTEND_DIR = plugins/github-workflows
+BACKEND_DIR = plugins/github-workflow-backend
+
+ALL_PLUGIN_DIRS = $(COMMON_DIR) $(FRONTEND_DIR) $(BACKEND_DIR)
+
+.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+	set-version get-version unpublish clean clean-dynamic \
+	replace-workspace restore-workspace
 
 help:
-	@echo "GitHub Workflows Plugin Makefile"
-	@echo "==============================="
+	@echo "GitHub Workflows Workspace Makefile"
+	@echo "===================================="
 	@echo ""
 	@echo "Build Commands:"
-	@echo "  make build-all           - Build all packages (common, frontend, backend)"
-	@echo "  make build-common        - Build common package only"
-	@echo "  make build-frontend      - Build frontend plugin only"
-	@echo "  make build-backend       - Build backend plugin only"
-	@echo "  make build-frontend-dynamic - Build dynamic frontend plugin"
-	@echo "  make build-backend-dynamic  - Build dynamic backend plugin"
-	@echo ""
-	@echo "Publish Commands:"
-	@echo "  make publish-all         - Publish all static packages"
-	@echo "  make publish-all-dynamic - Publish all dynamic packages"
-	@echo "  make publish-common      - Publish common package"
-	@echo "  make publish-frontend    - Publish frontend plugin"
-	@echo "  make publish-backend     - Publish backend plugin"
+	@echo "  make build               - Build all static plugins"
+	@echo "  make build-dynamic       - Build all dynamic plugins"
 	@echo ""
 	@echo "Package Commands:"
-	@echo "  make pack-all            - Pack all packages to .tgz files"
-	@echo "  make pack-common         - Pack common package"
-	@echo "  make pack-frontend       - Pack frontend plugin"
-	@echo "  make pack-backend        - Pack backend plugin"
+	@echo "  make pack                - Pack all static plugins to .tgz"
+	@echo "  make pack-dynamic        - Pack all dynamic plugins to .tgz"
+	@echo ""
+	@echo "Publish Commands:"
+	@echo "  make publish             - Publish all static plugins"
+	@echo "  make publish-dynamic     - Publish all dynamic plugins"
 	@echo ""
 	@echo "Utility Commands:"
-	@echo "  make set-version VERSION=1.4.0 - Set version for all packages"
-	@echo "  make clean-dynamic       - Clean dynamic build directories"
-	@echo "  make get-version         - Get latest published versions"
-	@echo "  make echo-paths          - Show current directory and version"
-	@echo "  make unpublish-all       - Unpublish all packages (common last)"
+	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
+	@echo "  make get-version         - Show latest published versions"
+	@echo "  make unpublish           - Unpublish all packages at current version"
+	@echo "  make clean               - Full clean (node_modules, dist, logs, .tgz)"
+	@echo "  make clean-dynamic       - Clean only dist-dynamic directories"
 
-echo-paths:
-	@echo "Current directory: $(PWD)"
-	@echo "Version: $(GH_WORKFLOWS_VERSION)"
-
-# Set version for all github-workflows packages (common, frontend, backend)
-# Usage: make set-version GH_WORKFLOWS_VERSION=1.4.0
-set-version: clean-dynamic
-	@echo "Setting github-workflows packages to version $(GH_WORKFLOWS_VERSION)..."
-	@sed -i '' 's/"version": "[^"]*"/"version": "$(GH_WORKFLOWS_VERSION)"/' plugins/github-workflows-common/package.json
-	@sed -i '' 's/"version": "[^"]*"/"version": "$(GH_WORKFLOWS_VERSION)"/' plugins/github-workflows/package.json
-	@sed -i '' 's/"version": "[^"]*"/"version": "$(GH_WORKFLOWS_VERSION)"/' plugins/github-workflow-backend/package.json
-	@echo "✅ All packages updated to version $(GH_WORKFLOWS_VERSION)"
+# Set version for all github-workflows packages
+# Usage: make set-version VERSION=1.4.0
+set-version:
+	@echo "Setting github-workflows packages to version $(VERSION)..."
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		sed -i '' 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
+		echo "  Updated $$dir"; \
+	done
+	@echo "All packages updated to version $(VERSION)"
 	@yarn install
 	@echo "Note: Dependencies using 'workspace:*' will be resolved during publish"
 
-# Build the github-workflows-common package
-build-common:
-	yarn workspace @veecode-platform/github-workflows-common install && \
-	yarn workspace @veecode-platform/github-workflows-common build
+# Build all static plugins
+build:
+	yarn install && yarn tsc && yarn build:all
 
-# Create npm package for github-workflows-common
-pack-common:
-	yarn workspace @veecode-platform/github-workflows-common pack
+# Build all dynamic plugins (requires common to be published first)
+build-dynamic: build
+	cd $(FRONTEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(BACKEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
 
-# Publish github-workflows-common package
-publish-common: build-common
-	@echo "Checking if github-workflows-common needs to be published..."
-	@cd plugins/github-workflows-common && \
+# Pack all static plugins
+pack:
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		echo "Packing $$dir..."; \
+		cd $$dir && npm pack && cd ../..; \
+	done
+
+# Pack all dynamic plugins
+pack-dynamic:
+	cd $(FRONTEND_DIR)/dist-dynamic && npm pack
+	cd $(BACKEND_DIR)/dist-dynamic && npm pack
+
+# Helper: publish a single plugin if not already published (with workspace:* safety check)
+define publish_plugin_safe
+	@cd $(1) && \
 	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "✅ $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) is already published. Skipping."; \
+	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
+		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
 	else \
-		echo "📦 Publishing $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION)..."; \
+		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
+		npm pack --pack-destination . && \
+		TAR_FILE=$$(echo $$PACKAGE_NAME-$(VERSION).tgz | sed 's/\//-/g' | sed 's/^@//') && \
+		tar -xzf $$TAR_FILE package/package.json && \
+		if grep -q "workspace:" package/package.json; then \
+			echo "Workspace references found in packed package. Please fix dependencies first."; \
+			rm -rf package $$TAR_FILE; \
+			exit 1; \
+		fi && \
+		rm -rf package && \
+		npm publish $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
+		rm $$TAR_FILE; \
+	fi
+endef
+
+# Helper: publish a single plugin if not already published (simple)
+define publish_plugin
+	@cd $(1) && \
+	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
+	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
+		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
+	else \
+		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
 		npm publish $(NPM_REGISTRY_ARGS); \
 	fi
+endef
 
-# Build the github-workflows plugin
-build-frontend:
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows install && \
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows build
+# Publish all static plugins (common first, then replace workspace refs, then frontend/backend)
+publish: replace-workspace build
+	@echo "Publishing github-workflows plugins..."
+	$(call publish_plugin,$(COMMON_DIR))
+	$(call publish_plugin_safe,$(FRONTEND_DIR))
+	$(call publish_plugin_safe,$(BACKEND_DIR))
 
-# Build the dynamic github-workflows plugin
-# NOTE: Requires github-workflows-common to be published first
-build-frontend-dynamic: build-frontend publish-common
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows export-dynamic
+# Publish all dynamic plugins
+publish-dynamic: replace-workspace build-dynamic
+	@echo "Publishing dynamic variants..."
+	@cd $(FRONTEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
+	@cd $(BACKEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
 
-# Build the github-workflows backend plugin
-build-backend: build-common
-	yarn workspace @veecode-platform/github-workflows-common install && \
-	yarn workspace @veecode-platform/github-workflows-common build
+# Get latest versions in npm registry
+get-version:
+	@echo "Getting latest versions in npm registry for github-workflows plugins..."
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
+		echo "$$PACKAGE_NAME:"; \
+		npm view $$PACKAGE_NAME version $(NPM_REGISTRY_ARGS) 2>/dev/null || echo "  Not published yet"; \
+	done
 
-# Build the dynamic github-workflows backend plugin
-# NOTE: Requires github-workflows-common to be published first
-build-backend-dynamic: build-backend publish-common
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows-backend export-dynamic
+# Unpublish all packages (common last since others depend on it)
+unpublish:
+	@echo "Unpublishing github-workflows packages..."
+	@for dir in $(FRONTEND_DIR) $(BACKEND_DIR) $(COMMON_DIR); do \
+		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
+		npm unpublish $$PACKAGE_NAME@$(VERSION) $(NPM_REGISTRY_ARGS) 2>/dev/null || true; \
+		echo "  Unpublished $$PACKAGE_NAME@$(VERSION)"; \
+	done
+	@echo "Packages unpublished."
 
-# Create npm package for github-workflows frontend plugin
-pack-frontend:
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows pack
+# Full clean
+clean:
+	@echo "Cleaning github-workflows workspace..."
+	yarn clean || true
+	rm -rf node_modules
+	rm -rf packages/*/node_modules
+	rm -rf plugins/*/node_modules
+	rm -rf dist-types
+	rm -rf plugins/*/dist
+	rm -rf plugins/*/dist-dynamic
+	rm -rf plugins/*/*.tgz
+	rm -rf packages/*/dist
+	find . -name "*.log" -type f -delete || true
+	find . -name "yarn-error.log" -type f -delete || true
+	find . -name "npm-debug.log*" -type f -delete || true
+	find . -name ".DS_Store" -type f -delete || true
+	@echo "GitHub-workflows workspace clean complete!"
 
-# Create npm package for dynamic github-workflows frontend plugin
-pack-frontend-dynamic:
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows --cwd dist-dynamic pack
-
-# Create npm package for github-workflows backend plugin
-pack-backend:
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows-backend pack
-
-# Create npm package for dynamic github-workflows backend plugin
-pack-backend-dynamic:
-	yarn workspace @veecode-platform/backstage-plugin-github-workflows-backend --cwd dist-dynamic pack
-
-# Pack all github-workflows packages
-pack-all: pack-common pack-frontend pack-backend
-	echo "All github-workflows packages packed."
-
-# Publish github-workflows plugin (static)
-publish-frontend: replace-workspace build-frontend publish-common
-	@echo "Checking if github-workflows frontend needs to be published..."
-	@cd plugins/github-workflows && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "✅ $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) is already published. Skipping."; \
-	else \
-		echo "📦 Publishing $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION)..."; \
-		npm pack --pack-destination . && \
-		TAR_FILE=$$(echo $$PACKAGE_NAME-$(GH_WORKFLOWS_VERSION).tgz | sed 's/\//-/g' | sed 's/^@//') && \
-		echo "Checking $$TAR_FILE content for 'workspace' refs..." && \
-		tar -tzf $$TAR_FILE | grep -q "package.json" && \
-		tar -xzf $$TAR_FILE package/package.json && \
-		if grep -q "workspace:" package/package.json; then \
-			echo "❌ Workspace references found in packed package. Please fix dependencies first."; \
-			rm -rf package $$TAR_FILE; \
-			exit 1; \
-		fi && \
-		rm -rf package && \
-		npm publish $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
-		rm $$TAR_FILE; \
-	fi
-
-# Publish dynamic github-workflows plugin
-publish-frontend-dynamic: replace-workspace build-frontend-dynamic publish-common
-	@echo "Checking if github-workflows frontend dynamic needs to be published..."
-	@cd plugins/github-workflows/dist-dynamic && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "✅ $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) is already published. Skipping."; \
-	else \
-		echo "📦 Publishing $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) dynamic package..."; \
-		npm pack --pack-destination . && \
-		TAR_FILE=$$(echo $$PACKAGE_NAME-$(GH_WORKFLOWS_VERSION).tgz | sed 's/\//-/g' | sed 's/^@//') && \
-		echo "Checking $$TAR_FILE content for 'workspace' refs..." && \
-		tar -tzf $$TAR_FILE | grep -q "package.json" && \
-		tar -xzf $$TAR_FILE package/package.json && \
-		if grep -q "workspace:" package/package.json; then \
-			echo "❌ Workspace references found in packed package. Please fix dependencies first."; \
-			rm -rf package $$TAR_FILE; \
-			exit 1; \
-		fi && \
-		rm -rf package && \
-		npm publish $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
-		rm $$TAR_FILE; \
-	fi
-
-# Publish github-workflows backend plugin
-publish-backend: replace-workspace build-backend publish-common
-	@echo "Checking if github-workflows backend needs to be published..."
-	@cd plugins/github-workflow-backend && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "✅ $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) is already published. Skipping."; \
-	else \
-		echo "📦 Publishing $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION)..."; \
-		npm pack --pack-destination . && \
-		TAR_FILE=$$(echo $$PACKAGE_NAME-$(GH_WORKFLOWS_VERSION).tgz | sed 's/\//-/g' | sed 's/^@//') && \
-		echo "Checking $$TAR_FILE content for 'workspace' refs..." && \
-		tar -tzf $$TAR_FILE | grep -q "package.json" && \
-		tar -xzf $$TAR_FILE package/package.json && \
-		if grep -q "workspace:" package/package.json; then \
-			echo "❌ Workspace references found in packed package. Please fix dependencies first."; \
-			rm -rf package $$TAR_FILE; \
-			exit 1; \
-		fi && \
-		rm -rf package && \
-		npm publish $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
-		rm $$TAR_FILE; \
-	fi
-
-# Publish dynamic github-workflows backend plugin
-publish-backend-dynamic: replace-workspace build-backend-dynamic publish-common
-	@echo "Checking if github-workflows backend dynamic needs to be published..."
-	@cd plugins/github-workflow-backend/dist-dynamic && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "✅ $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) is already published. Skipping."; \
-	else \
-		echo "📦 Publishing $$PACKAGE_NAME@$(GH_WORKFLOWS_VERSION) dynamic package..."; \
-		npm pack --pack-destination . && \
-		TAR_FILE=$$(echo $$PACKAGE_NAME-$(GH_WORKFLOWS_VERSION).tgz | sed 's/\//-/g' | sed 's/^@//') && \
-		echo "Checking $$TAR_FILE content for 'workspace' refs..." && \
-		tar -tzf $$TAR_FILE | grep -q "package.json" && \
-		tar -xzf $$TAR_FILE package/package.json && \
-		if grep -q "workspace:" package/package.json; then \
-			echo "❌ Workspace references found in packed package. Please fix dependencies first."; \
-			rm -rf package $$TAR_FILE; \
-			exit 1; \
-		fi && \
-		rm -rf package && \
-		npm publish $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
-		rm $$TAR_FILE; \
-	fi
-
-# Build all github-workflows packages
-build-all: build-common build-frontend build-backend
-	echo "All github-workflows packages built."
-
-# Publish all static github-workflows packages
-publish-all: publish-common publish-frontend publish-backend
-	echo "All static github-workflows packages published."
-
-# Publish all dynamic github-workflows packages
-publish-all-dynamic: publish-common publish-frontend-dynamic publish-backend-dynamic
-	echo "All dynamic github-workflows packages published."
-
-# Clean dist-dynamic directories to force fresh export with latest dependencies
+# Clean only dist-dynamic directories
 clean-dynamic:
 	@echo "Cleaning github-workflows dist-dynamic directories..."
-	rm -rf plugins/github-workflows/dist-dynamic
-	rm -rf plugins/github-workflow-backend/dist-dynamic
-	@echo "✅ Cleaned. Run build-frontend-dynamic or build-backend-dynamic to rebuild."
+	rm -rf $(FRONTEND_DIR)/dist-dynamic
+	rm -rf $(BACKEND_DIR)/dist-dynamic
+	@echo "Cleaned. Run build-dynamic to rebuild."
 
-# Gets the latest version in npm registry for github-workflows plugins
-get-version:
-	@echo "Getting latest version in npm registry for github-workflows plugins..."
-	@echo "github-workflows-common version:"
-	@npm view @veecode-platform/github-workflows-common version
-	@echo "backstage-plugin-github-workflows version:"
-	@npm view @veecode-platform/backstage-plugin-github-workflows version
-	@echo "backstage-plugin-github-workflows-dynamic version:"
-	@npm view @veecode-platform/backstage-plugin-github-workflows-dynamic version
-	@echo "backstage-plugin-github-workflows-backend version:"
-	@npm view @veecode-platform/backstage-plugin-github-workflows-backend version
-	@echo "backstage-plugin-github-workflows-backend-dynamic version:"
-	@npm view @veecode-platform/backstage-plugin-github-workflows-backend-dynamic version
-
-# unpublish packages (common package last)
-unpublish-all:
-	@echo "Unpublishing all github-workflows packages..."
-	@echo "Unpublishing frontend plugin..."
-	@npm unpublish @veecode-platform/backstage-plugin-github-workflows@$(GH_WORKFLOWS_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "Unpublishing backend plugin..."
-	@npm unpublish @veecode-platform/backstage-plugin-github-workflows-backend@$(GH_WORKFLOWS_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "Unpublishing dynamic frontend plugin..."
-	@npm unpublish @veecode-platform/backstage-plugin-github-workflows-dynamic@$(GH_WORKFLOWS_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "Unpublishing dynamic backend plugin..."
-	@npm unpublish @veecode-platform/backstage-plugin-github-workflows-backend-dynamic@$(GH_WORKFLOWS_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "Unpublishing common package..."
-	@npm unpublish @veecode-platform/github-workflows-common@$(GH_WORKFLOWS_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "✅ All packages unpublished."
-
+# Internal: Replace workspace:* references with versioned refs before publish
 replace-workspace:
-	@echo "Replacing workspace: references with version $(GH_WORKFLOWS_VERSION)..."
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(GH_WORKFLOWS_VERSION)"/' plugins/github-workflows/package.json
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(GH_WORKFLOWS_VERSION)"/' plugins/github-workflow-backend/package.json
-	@echo "✅ Workspace references replaced with ^$(GH_WORKFLOWS_VERSION)"
+	@echo "Replacing workspace: references with version $(VERSION)..."
+	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(FRONTEND_DIR)/package.json
+	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(BACKEND_DIR)/package.json
+	@echo "Workspace references replaced with ^$(VERSION)"
 
+# Internal: Restore workspace:* references after publish
 restore-workspace:
 	@echo "Restoring workspace: references..."
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "\^$(GH_WORKFLOWS_VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' plugins/github-workflows/package.json
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "\^$(GH_WORKFLOWS_VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' plugins/github-workflow-backend/package.json
-	@echo "✅ Workspace references restored to workspace:*"
+	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "\^$(VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' $(FRONTEND_DIR)/package.json
+	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "\^$(VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' $(BACKEND_DIR)/package.json
+	@echo "Workspace references restored to workspace:*"

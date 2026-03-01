@@ -46,24 +46,21 @@ Each workspace has its own Makefile with build, publish, and utility commands:
 
 ```bash
 cd workspace/<workspace-name>
-make help            # Shows all available commands
-make build           # Build the plugin(s)
-make build-dynamic   # Build dynamic plugin(s)
-make publish         # Publish static plugin(s)
-make publish-dynamic # Publish dynamic plugin(s)
-make set-version VERSION=x.x.x  # Set version
-make cleanup         # Clean build artifacts
-make get-version     # Get published version from npm
+make help               # Shows all available commands
+make build              # Build all static plugins
+make build-dynamic      # Build all dynamic plugins
+make pack               # Pack static plugins to .tgz
+make pack-dynamic       # Pack dynamic plugins to .tgz
+make publish            # Publish static plugins (builds first, skips published)
+make publish-dynamic    # Publish dynamic plugins
+make set-version VERSION=x.y.z  # Set version for all packages
+make get-version        # Show latest published versions from npm
+make unpublish          # Unpublish all packages at current version
+make clean              # Full clean (node_modules, dist, logs, .tgz)
+make clean-dynamic      # Clean only dist-dynamic directories
 ```
 
-Version variable names may vary by workspace, but we may change to use the same variable name `PLUGIN_VERSION` for all workspaces (setting a value for each run):
-
-- homepage: `HOMEPAGE_VERSION`
-- global-header: `GLOBAL_HEADER_VERSION`
-- github-workflows: `GH_WORKFLOWS_VERSION`
-- ldap-auth: `LDAP_AUTH_VERSION`
-- kong-tools: `KONG_TOOLS_VERSION`
-- kubernetes: `KUBERNETES_VERSION`
+All workspaces use the same `VERSION` variable (e.g., `make set-version VERSION=1.0.3`).
 
 ### Root-Level Makefile
 
@@ -87,8 +84,7 @@ workspace/
 ├── ldap-auth/             # ldap-auth frontend + backend
 ├── kong-tools/            # scaffolder-backend-module-kong plugin
 ├── kubernetes/            # kubernetes plugin (WIP)
-├── about/                 # about plugin (WIP - no hosting app yet)
-└── support/               # support plugin (WIP - no hosting app yet)
+└── about/                 # about plugin (WIP - no hosting app yet)
 ```
 
 Each complete workspace contains:

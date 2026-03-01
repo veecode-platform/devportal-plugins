@@ -1,98 +1,112 @@
 #
-# Makefile for homepage plugin
+# Makefile for homepage workspace
 # - Handles veecode-homepage plugin
 # - Supports both static and dynamic plugin builds
 #
 
-# Version for homepage package
-HOMEPAGE_VERSION ?= 1.0.1
+VERSION ?= 1.0.1
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
-.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic set-version clean-dynamic get-version unpublish-all cleanup
+# Plugin directories
+PLUGIN_DIR = plugins/veecode-homepage
+
+ALL_PLUGIN_DIRS = $(PLUGIN_DIR)
+
+.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+	set-version get-version unpublish clean clean-dynamic
 
 help:
-	@echo "Homepage Plugin Makefile"
-	@echo "========================"
+	@echo "Homepage Workspace Makefile"
+	@echo "==========================="
 	@echo ""
 	@echo "Build Commands:"
-	@echo "  make build               - Build the plugin"
-	@echo "  make build-dynamic       - Build the dynamic plugin"
-	@echo ""
-	@echo "Publish Commands:"
-	@echo "  make publish             - Publish the static plugin"
-	@echo "  make publish-dynamic     - Publish the dynamic plugin"
+	@echo "  make build               - Build all static plugins"
+	@echo "  make build-dynamic       - Build all dynamic plugins"
 	@echo ""
 	@echo "Package Commands:"
-	@echo "  make pack                - Pack the plugin to .tgz file"
-	@echo "  make pack-dynamic        - Pack the dynamic plugin to .tgz file"
+	@echo "  make pack                - Pack all static plugins to .tgz"
+	@echo "  make pack-dynamic        - Pack all dynamic plugins to .tgz"
+	@echo ""
+	@echo "Publish Commands:"
+	@echo "  make publish             - Publish all static plugins"
+	@echo "  make publish-dynamic     - Publish all dynamic plugins"
 	@echo ""
 	@echo "Utility Commands:"
-	@echo "  make set-version HOMEPAGE_VERSION=1.0.2 - Set version for package"
-	@echo "  make clean-dynamic       - Clean dynamic build directory"
-	@echo "  make cleanup             - Clean all build artifacts and node_modules"
-	@echo "  make get-version         - Get latest published version"
-	@echo "  make unpublish-all       - Unpublish all packages"
+	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
+	@echo "  make get-version         - Show latest published versions"
+	@echo "  make unpublish           - Unpublish all packages at current version"
+	@echo "  make clean               - Full clean (node_modules, dist, logs, .tgz)"
+	@echo "  make clean-dynamic       - Clean only dist-dynamic directories"
 
 # Set version for homepage package
-# Usage: make set-version HOMEPAGE_VERSION=1.0.2
-set-version: clean-dynamic
-	@echo "Setting homepage package to version $(HOMEPAGE_VERSION)..."
-	@sed -i '' 's/"version": "[^"]*"/"version": "$(HOMEPAGE_VERSION)"/' plugins/veecode-homepage/package.json
-	@echo "Package updated to version $(HOMEPAGE_VERSION)"
+# Usage: make set-version VERSION=1.0.2
+set-version:
+	@echo "Setting homepage package to version $(VERSION)..."
+	@sed -i '' 's/"version": "[^"]*"/"version": "$(VERSION)"/' $(PLUGIN_DIR)/package.json
+	@echo "Package updated to version $(VERSION)"
 	@yarn install
 
-# Build the homepage plugin
+# Build all static plugins
 build:
 	yarn install && yarn tsc && yarn build:all
 
-# Build the dynamic homepage plugin
+# Build all dynamic plugins
 build-dynamic: build
-	cd plugins/veecode-homepage && \
-	npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(PLUGIN_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
 
-# Create npm package for homepage plugin
+# Pack all static plugins
 pack:
-	cd plugins/veecode-homepage && npm pack
+	cd $(PLUGIN_DIR) && npm pack
 
-# Create npm package for dynamic homepage plugin
+# Pack all dynamic plugins
 pack-dynamic:
-	cd plugins/veecode-homepage/dist-dynamic && npm pack
+	cd $(PLUGIN_DIR)/dist-dynamic && npm pack
 
-# Publish homepage plugin
+# Helper: publish a single plugin if not already published
+define publish_plugin
+	@cd $(1) && \
+	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
+	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
+		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
+	else \
+		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
+		npm publish $(NPM_REGISTRY_ARGS); \
+	fi
+endef
+
+# Publish all static plugins
 publish: build
-	@echo "Checking if homepage plugin needs to be published..."
-	@cd plugins/veecode-homepage && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(HOMEPAGE_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(HOMEPAGE_VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(HOMEPAGE_VERSION)..."; \
-		npm publish $(NPM_REGISTRY_ARGS); \
-	fi
+	@echo "Publishing homepage plugin..."
+	$(call publish_plugin,$(PLUGIN_DIR))
 
-# Publish dynamic homepage plugin
+# Publish all dynamic plugins
 publish-dynamic: build-dynamic
-	@echo "Checking if homepage dynamic plugin needs to be published..."
-	@cd plugins/veecode-homepage/dist-dynamic && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(HOMEPAGE_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(HOMEPAGE_VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(HOMEPAGE_VERSION) dynamic package..."; \
-		npm publish $(NPM_REGISTRY_ARGS); \
-	fi
+	@echo "Publishing dynamic variant..."
+	@cd $(PLUGIN_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
 
-# Clean dist-dynamic directory
-clean-dynamic:
-	@echo "Cleaning homepage dist-dynamic directory..."
-	rm -rf plugins/veecode-homepage/dist-dynamic
-	@echo "Cleaned. Run build-dynamic to rebuild."
+# Get latest versions in npm registry
+get-version:
+	@echo "Getting latest versions in npm registry for homepage plugin..."
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
+		echo "$$PACKAGE_NAME:"; \
+		npm view $$PACKAGE_NAME version $(NPM_REGISTRY_ARGS) 2>/dev/null || echo "  Not published yet"; \
+	done
 
-# Cleanup workspace
-cleanup:
-	@echo "Cleaning up homepage workspace..."
-	@echo "Removing node_modules, build artifacts, and temporary files..."
+# Unpublish all packages
+unpublish:
+	@echo "Unpublishing homepage packages..."
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
+		npm unpublish $$PACKAGE_NAME@$(VERSION) $(NPM_REGISTRY_ARGS) 2>/dev/null || true; \
+		echo "  Unpublished $$PACKAGE_NAME@$(VERSION)"; \
+	done
+	@echo "Packages unpublished."
+
+# Full clean
+clean:
+	@echo "Cleaning homepage workspace..."
 	yarn clean || true
 	rm -rf node_modules
 	rm -rf packages/*/node_modules
@@ -107,21 +121,10 @@ cleanup:
 	find . -name "yarn-error.log" -type f -delete || true
 	find . -name "npm-debug.log*" -type f -delete || true
 	find . -name ".DS_Store" -type f -delete || true
-	@echo "Homepage workspace cleanup complete!"
+	@echo "Homepage workspace clean complete!"
 
-# Get latest version in npm registry
-get-version:
-	@echo "Getting latest version in npm registry for homepage plugin..."
-	@echo "plugin-veecode-homepage version:"
-	@npm view @veecode-platform/plugin-veecode-homepage version $(NPM_REGISTRY_ARGS) || echo "Not published yet"
-	@echo "plugin-veecode-homepage-dynamic version:"
-	@npm view @veecode-platform/plugin-veecode-homepage-dynamic version $(NPM_REGISTRY_ARGS) || echo "Not published yet"
-
-# Unpublish all packages
-unpublish-all:
-	@echo "Unpublishing all homepage packages..."
-	@echo "Unpublishing static plugin..."
-	@npm unpublish @veecode-platform/plugin-veecode-homepage@$(HOMEPAGE_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "Unpublishing dynamic plugin..."
-	@npm unpublish @veecode-platform/plugin-veecode-homepage-dynamic@$(HOMEPAGE_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "All packages unpublished."
+# Clean only dist-dynamic directories
+clean-dynamic:
+	@echo "Cleaning homepage dist-dynamic directories..."
+	rm -rf $(PLUGIN_DIR)/dist-dynamic
+	@echo "Cleaned. Run build-dynamic to rebuild."

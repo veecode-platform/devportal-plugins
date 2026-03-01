@@ -10,9 +10,8 @@
 | ldap-auth        | ✓           | ✓        | Ready          |
 | kong-tools       | ✓           | ✓        | Ready          |
 | kubernetes       | ✓           | ✓        | Ready          |
-| dummy            | ✓           | ✗        | Needs work     |
-| about            | ✗           | ✗        | Future work    |
-| support          | ✗           | ✗        | Future work    |
+| dummy            | ✓           | ✓        | Ready          |
+| about            | ✗           | ✓        | Needs hosting  |
 
 ## Roadmap
 
@@ -53,7 +52,13 @@ We will start with the dummy workspace ("./workspace/dummy"), as it is the most 
 - [ ] **2.2** Update root README.md workspace table
 - [ ] **2.3** Document which aspects of dummy should be carried to other workspaces
 
-### Phase 3: Create Hosting Apps (Future)
+### Phase 3: Standardize Dev Commands Across All Workspaces
 
-- [ ] **3.1** Create hosting app for `about` workspace
-- [ ] **3.2** Create hosting app for `support` workspace
+Add consistent `dev`, `lint`, `lint-fix`, and `test` targets to every workspace Makefile. These were intentionally excluded from the initial Makefile standardization to keep the scope focused on build/publish/clean operations.
+
+- [ ] **3.1** Define standard `dev`, `lint`, `lint-fix`, `test` targets
+- [ ] **3.2** Add targets to all 8 workspace Makefiles
+
+### Phase 4: Create Hosting Apps (Future)
+
+- [ ] **4.1** Create hosting app for `about` workspace

@@ -1,99 +1,133 @@
 #
-# Makefile for ldap-auth plugins
+# Makefile for ldap-auth workspace
 # - Handles frontend and backend plugins
-# - Static plugin builds only
+# - Static plugin builds only (no dynamic support)
 #
 
-# Version for ldap-auth packages (frontend, backend)
-LDAP_AUTH_VERSION ?= 1.1.0
+VERSION ?= 1.1.0
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
-.PHONY: help build-frontend build-backend publish-frontend publish-backend set-version build-all publish-all get-version unpublish-all
+# Plugin directories
+FRONTEND_DIR = plugins/ldap-auth
+BACKEND_DIR = plugins/ldap-auth-backend
+
+ALL_PLUGIN_DIRS = $(FRONTEND_DIR) $(BACKEND_DIR)
+
+.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+	set-version get-version unpublish clean clean-dynamic
 
 help:
-	@echo "LDAP Auth Plugin Makefile"
-	@echo "========================="
+	@echo "LDAP Auth Workspace Makefile"
+	@echo "============================"
 	@echo ""
 	@echo "Build Commands:"
-	@echo "  make build-all           - Build all packages (frontend, backend)"
-	@echo "  make build-frontend      - Build frontend plugin only"
-	@echo "  make build-backend       - Build backend plugin only"
+	@echo "  make build               - Build all static plugins"
+	@echo "  make build-dynamic       - (not supported) No dynamic plugins in this workspace"
+	@echo ""
+	@echo "Package Commands:"
+	@echo "  make pack                - Pack all static plugins to .tgz"
+	@echo "  make pack-dynamic        - (not supported) No dynamic plugins in this workspace"
 	@echo ""
 	@echo "Publish Commands:"
-	@echo "  make publish-all         - Publish all packages"
-	@echo "  make publish-frontend    - Publish frontend plugin"
-	@echo "  make publish-backend     - Publish backend plugin"
+	@echo "  make publish             - Publish all static plugins"
+	@echo "  make publish-dynamic     - (not supported) No dynamic plugins in this workspace"
 	@echo ""
 	@echo "Utility Commands:"
-	@echo "  make set-version VERSION=1.0.0 - Set version for all packages"
-	@echo "  make get-version         - Get latest published versions"
-	@echo "  make unpublish-all       - Unpublish all packages"
+	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
+	@echo "  make get-version         - Show latest published versions"
+	@echo "  make unpublish           - Unpublish all packages at current version"
+	@echo "  make clean               - Full clean (node_modules, dist, logs, .tgz)"
+	@echo "  make clean-dynamic       - (not supported) No dynamic plugins in this workspace"
 
-# Set version for all ldap-auth packages (frontend, backend)
-# Usage: make set-version LDAP_AUTH_VERSION=1.0.0
+# Set version for all ldap-auth packages
+# Usage: make set-version VERSION=1.0.0
 set-version:
-	@echo "Setting ldap-auth packages to version $(LDAP_AUTH_VERSION)..."
-	@sed -i '' 's/"version": "[^"]*"/"version": "$(LDAP_AUTH_VERSION)"/' plugins/ldap-auth/package.json
-	@sed -i '' 's/"version": "[^"]*"/"version": "$(LDAP_AUTH_VERSION)"/' plugins/ldap-auth-backend/package.json
-	@echo "✅ All packages updated to version $(LDAP_AUTH_VERSION)"
+	@echo "Setting ldap-auth packages to version $(VERSION)..."
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		sed -i '' 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
+		echo "  Updated $$dir"; \
+	done
+	@echo "All packages updated to version $(VERSION)"
 	@yarn install
 
-# Build the ldap-auth frontend plugin
-build-frontend:
-	yarn workspace @veecode-platform/backstage-plugin-ldap-auth install && \
-	yarn workspace @veecode-platform/backstage-plugin-ldap-auth build
+# Build all static plugins
+build:
+	yarn install && yarn tsc && yarn build:all
 
-# Build the ldap-auth backend plugin
-build-backend:
-	yarn workspace @veecode-platform/backstage-plugin-ldap-auth-backend install && \
-	yarn workspace @veecode-platform/backstage-plugin-ldap-auth-backend build
+# Dynamic plugins not supported in this workspace
+build-dynamic:
+	@echo "Dynamic plugins not supported in this workspace. Skipping."
 
-# Build all ldap-auth packages
-build-all: build-frontend build-backend
-	@echo "✅ All ldap-auth packages built."
+# Pack all static plugins
+pack:
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		echo "Packing $$dir..."; \
+		cd $$dir && npm pack && cd ../..; \
+	done
 
-# Publish ldap-auth frontend plugin
-publish-frontend: build-frontend
-	@echo "Checking if ldap-auth frontend needs to be published..."
-	@cd plugins/ldap-auth && \
+# Dynamic plugins not supported in this workspace
+pack-dynamic:
+	@echo "Dynamic plugins not supported in this workspace. Skipping."
+
+# Helper: publish a single plugin if not already published
+define publish_plugin
+	@cd $(1) && \
 	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(LDAP_AUTH_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "✅ $$PACKAGE_NAME@$(LDAP_AUTH_VERSION) is already published. Skipping."; \
+	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
+		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
 	else \
-		echo "📦 Publishing $$PACKAGE_NAME@$(LDAP_AUTH_VERSION)..."; \
+		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
 		npm publish $(NPM_REGISTRY_ARGS); \
 	fi
+endef
 
-# Publish ldap-auth backend plugin
-publish-backend: build-backend
-	@echo "Checking if ldap-auth backend needs to be published..."
-	@cd plugins/ldap-auth-backend && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(LDAP_AUTH_VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "✅ $$PACKAGE_NAME@$(LDAP_AUTH_VERSION) is already published. Skipping."; \
-	else \
-		echo "📦 Publishing $$PACKAGE_NAME@$(LDAP_AUTH_VERSION)..."; \
-		npm publish $(NPM_REGISTRY_ARGS); \
-	fi
+# Publish all static plugins
+publish: build
+	@echo "Publishing ldap-auth plugins..."
+	$(call publish_plugin,$(FRONTEND_DIR))
+	$(call publish_plugin,$(BACKEND_DIR))
 
-# Publish all ldap-auth packages
-publish-all: publish-frontend publish-backend
-	@echo "✅ All ldap-auth packages published."
+# Dynamic plugins not supported in this workspace
+publish-dynamic:
+	@echo "Dynamic plugins not supported in this workspace. Skipping."
 
-# Gets the latest version in npm registry for ldap-auth plugins
+# Get latest versions in npm registry
 get-version:
-	@echo "Getting latest version in npm registry for ldap-auth plugins..."
-	@echo "backstage-plugin-ldap-auth version:"
-	@npm view @veecode-platform/backstage-plugin-ldap-auth version $(NPM_REGISTRY_ARGS) || echo "Not published yet"
-	@echo "backstage-plugin-ldap-auth-backend version:"
-	@npm view @veecode-platform/backstage-plugin-ldap-auth-backend version $(NPM_REGISTRY_ARGS) || echo "Not published yet"
+	@echo "Getting latest versions in npm registry for ldap-auth plugins..."
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
+		echo "$$PACKAGE_NAME:"; \
+		npm view $$PACKAGE_NAME version $(NPM_REGISTRY_ARGS) 2>/dev/null || echo "  Not published yet"; \
+	done
 
 # Unpublish all packages
-unpublish-all:
-	@echo "Unpublishing all ldap-auth packages..."
-	@echo "Unpublishing frontend plugin..."
-	@npm unpublish @veecode-platform/backstage-plugin-ldap-auth@$(LDAP_AUTH_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "Unpublishing backend plugin..."
-	@npm unpublish @veecode-platform/backstage-plugin-ldap-auth-backend@$(LDAP_AUTH_VERSION) $(NPM_REGISTRY_ARGS) || true
-	@echo "✅ All packages unpublished."
+unpublish:
+	@echo "Unpublishing ldap-auth packages..."
+	@for dir in $(ALL_PLUGIN_DIRS); do \
+		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
+		npm unpublish $$PACKAGE_NAME@$(VERSION) $(NPM_REGISTRY_ARGS) 2>/dev/null || true; \
+		echo "  Unpublished $$PACKAGE_NAME@$(VERSION)"; \
+	done
+	@echo "Packages unpublished."
+
+# Full clean
+clean:
+	@echo "Cleaning ldap-auth workspace..."
+	yarn clean || true
+	rm -rf node_modules
+	rm -rf packages/*/node_modules
+	rm -rf plugins/*/node_modules
+	rm -rf dist-types
+	rm -rf plugins/*/dist
+	rm -rf plugins/*/*.tgz
+	rm -rf packages/*/dist
+	find . -name "*.log" -type f -delete || true
+	find . -name "yarn-error.log" -type f -delete || true
+	find . -name "npm-debug.log*" -type f -delete || true
+	find . -name ".DS_Store" -type f -delete || true
+	@echo "LDAP-auth workspace clean complete!"
+
+# Dynamic plugins not supported in this workspace
+clean-dynamic:
+	@echo "Dynamic plugins not supported in this workspace. Skipping."
