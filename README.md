@@ -1,99 +1,93 @@
-# VeeCode DevPortal Plugins Repository
+# VeeCode DevPortal Plugins
 
-## What is this repository?
+This repository hosts Backstage plugins developed by VeeCode for [VeeCode DevPortal](https://docs.platform.vee.codes/devportal/), an open-source Backstage distribution for Internal Developer Portals (IDP).
 
-This repository hosts plugins developed by VeeCode. The processes, tooling, and workflows are based on those in [backstage/community-plugins](https://github.com/backstage/community-plugins).
-
-Plugins are published to the `@veecode-platform` public npm namespace, in both static and dynamic forms.
-
-All VeeCode DevPortal plugins will eventually be moved into this repository (and deleted from the old repositories at [veecode-platform/backstage-plugins](https://github.com/veecode-platform/backstage-plugins) and [veecode-platform/dynamic-plugins](https://github.com/veecode-platform/dynamic-plugins)).
-
-These plugins are compatible with any Backstage build (and with RHDH too). In VeeCode DevPortal they are bundled into the image as static or dynamic plugins.
+Plugins are published to the `@veecode-platform` npm namespace in both static and dynamic formats. They are compatible with any Backstage build and with Red Hat Developer Hub (RHDH).
 
 ## Workspaces
 
-This repository contains several workspaces, each grouping related plugins together. Each workspace is an independent Backstage app used to develop and test the plugins it statically links.
+Each workspace groups related plugins together. A workspace is an independent Backstage app used to develop and test its plugins.
 
-Workspaces maintained in this repository:
+| Workspace | Plugins | Description | Status |
+|-----------|---------|-------------|--------|
+| [homepage](workspace/homepage/) | veecode-homepage | Homepage plugin | Ready |
+| [global-header](workspace/global-header/) | veecode-global-header | Global header plugin | Ready |
+| [github-workflows](workspace/github-workflows/) | github-workflows, github-workflows-common, github-workflow-backend | GitHub workflows (frontend + backend + common) | Ready |
+| [ldap-auth](workspace/ldap-auth/) | ldap-auth, ldap-auth-backend | LDAP auth (port from @immobiliarelabs) | Ready |
+| [kong-tools](workspace/kong-tools/) | scaffolder-backend-module-kong, kong-service-manager, kong-service-manager-backend, kong-service-manager-common, scaffolder-field-extensions-kong | Kong scaffolder actions and service manager | Ready |
+| [kubernetes](workspace/kubernetes/) | kubernetes-backend-module-getsecret | Kubernetes secret access module | WIP |
+| [about](workspace/about/) | about, about-backend | About plugin | ready. |
+| [dummy](workspace/dummy/) | dummy, dummy-backend | **Reference implementation** for plugin authors | Ready |
 
-| Workspace | Description | Status |
-|-----------|-------------|--------|
-| homepage | Homepage plugin for DevPortal | Ready |
-| global-header | Global header plugin for DevPortal | Ready |
-| github-workflows | GitHub workflows plugin (frontend + backend) | Ready |
-| ldap-auth | LDAP auth plugin (port from @immobiliarelabs) | Ready |
-| kong-tools | Kong scaffolder actions | Ready |
-| kubernetes | Kubernetes plugin | WIP |
-| about | About plugin | WIP |
-| support | Support plugin | WIP |
+## Getting Started
 
-### Plugin Workspace Structure
+Each workspace is self-contained. Navigate to a workspace and run:
 
-- Each workspace contains a plugin or a set of related plugins
-- Each workspace operates independently, with its own release cycle and dependencies
-- Each workspace has its own Makefile with commands for building, packaging, and releasing
-- Each complete workspace has a Backstage "hosting app" to test the plugins with static linking
-
-### Plugin Requirements
-
-All plugins in this repository should meet the following requirements:
-
-- Keep a proper README.md file to display useful info in npm registries (it can be minimal and refer to VeeCode main documentation site)
-- Static linking documentation in its README.md file (or refer to this info elsewhere)
-- Dynamic linking documentation in its README.md file (or refer to this info elsewhere)
-- Sensible defaults that work out of the box and avoid errors (e.g., good default configuration options)
-
-DON'T BREAK Backstage with bad defaults in a plugin, this is HARD to debug.
-
-## Releases
-
-Releasing plugins is a manual process based on Makefile targets. Each workspace has its own Makefile:
-
-```bash
-cd workspace/<workspace-name>
-make help  # Shows all available commands
+```sh
+cd workspace/<name>
+yarn install
+yarn start          # Start the Backstage hosting app
 ```
 
-Example for homepage plugin:
+To build and test:
 
-```bash
-cd workspace/homepage
-make build           # Build static plugin
-make build-dynamic   # Build dynamic plugin
-make publish         # Publish static plugin
-make publish-dynamic # Publish dynamic plugin
+```sh
+yarn tsc            # TypeScript check
+yarn build:all      # Build all packages
+yarn test:all       # Run all tests
+yarn lint:all       # Lint all files
 ```
 
-To copy dynamic plugins to a local devportal-base for testing:
+## Building and Publishing
 
-```bash
+Every workspace has a Makefile with standardized targets:
+
+```sh
+cd workspace/<name>
+make help               # Show all available commands
+make build              # Build all static plugins
+make build-dynamic      # Build all dynamic plugins (uses @red-hat-developer-hub/cli)
+make publish            # Publish static plugins to npm
+make publish-dynamic    # Publish dynamic plugins to npm
+make set-version VERSION=x.y.z  # Set version for all plugins in workspace
+make get-version        # Show latest published versions
+make clean              # Full clean
+```
+
+To copy dynamic plugins to a local DevPortal instance for testing:
+
+```sh
 make copy-dynamic-plugins
 ```
 
 ## Using a Private Registry
 
-You can run a local Verdaccio registry to validate the publishing process locally:
+You can validate publishing locally with [Verdaccio](https://verdaccio.org/):
 
-```bash
+```sh
 verdaccio -l 0.0.0.0:4873
 ```
 
-To use it globally create a `~/.yarnrc.yml` file:
+Some Makefile tasks accept a `NPM_REGISTRY` parameter to specify a custom registry. For example:
 
-```yaml
-npmRegistryServer: "http://localhost:4873/"
-
-unsafeHttpWhitelist:
-  - "localhost"
-  - "127.0.0.1"
+```sh
+make publish NPM_REGISTRY=http://localhost:4873
 ```
+
+This is important for testing dynamic plugins publishing (the `export-dynamic` task may break internal dependencies sometimes).
+
+## Reference Implementation
+
+The **dummy** workspace (`workspace/dummy/`) is the canonical reference for plugin authors. It demonstrates:
+
+- Frontend plugin with full-page view, entity cards, and entity tabs
+- Backend plugin with HTTP API, service architecture, and dependency injection
+- Complete test suite (plugin unit tests, hosting app wiring tests)
+- Dynamic plugin support with Docker Compose testing
+- Standardized Makefile with all build/publish targets
+
+When creating a new workspace, use dummy as the template to follow.
 
 ## Background
 
-### Why this repo exists
-
-It was becoming increasingly hard to manage too many separate repositories for all DevPortal plugins. This monorepo approach allows us to enforce consistency across plugins, streamline maintenance, and simplify the development and onboarding process.
-
-### Acknowledgments
-
-A lot in this repository was created based on previous work by Red Hat. It is organized in the same way as the [Red Hat Developer Hub plugins](https://github.com/redhat-developer/rhdh-plugins) repository. The dynamic plugins feature is also based on Red Hat's work.
+This monorepo replaces the previous multi-repository setup at [veecode-platform/backstage-plugins](https://github.com/veecode-platform/backstage-plugins) and [veecode-platform/dynamic-plugins](https://github.com/veecode-platform/dynamic-plugins). The structure is based on [backstage/community-plugins](https://github.com/backstage/community-plugins) and [redhat-developer/rhdh-plugins](https://github.com/redhat-developer/rhdh-plugins).

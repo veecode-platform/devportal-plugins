@@ -11,7 +11,7 @@
 | kong-tools       | ✓           | ✓        | Ready          |
 | kubernetes       | ✓           | ✓        | Ready          |
 | dummy            | ✓           | ✓        | Ready          |
-| about            | ✗           | ✓        | Needs hosting  |
+| about            | ✓           | ✓        | Ready          |
 
 ## Roadmap
 
@@ -24,42 +24,31 @@ We will start with the dummy workspace ("./workspace/dummy"), as it is the most 
   - [x] Comment the Makefile to make it LLM friendly (so it becomos the standard from now on)
 - [x] **1.2** Review and improve dummy workspace structure
   - [x] Check package.json for Backstage standards
-  - [ ] Consistent build implementation — workspace use "yarn install" and "yarn tsc" and "yarn build:all"
+  - [x] Consistent build implementation — workspace use "yarn install" and "yarn tsc" and "yarn build:all"
   - [x] Make sure there is an "update-backstage" script (`"update-backstage": "backstage-cli versions:bump"` entry under "scripts")
-- [ ] **1.3** Add/improve tests and test patterns
-  - [ ] **Plugin Tests** (inside `plugins/*`)
-    - [ ] Frontend plugins: component rendering tests using `@backstage/test-utils`
-    - [ ] Backend plugins: use `@backstage/backend-test-utils` (see [Testing Backend Plugins and Modules](https://backstage.io/docs/backend-system/building-plugins-and-modules/testing/))
-    - [ ] Keep tests simple - focus on basic functionality, avoid over-testing
-  - [ ] **Hosting App Wiring Tests** (inside `packages/app` and `packages/backend`)
-    - [ ] Verify plugins are correctly registered and exported
-    - [ ] Test that plugin routes/pages are accessible
-    - [ ] Test backend plugin endpoints respond correctly
-  - [ ] **Test Infrastructure**
-    - [ ] Review existing test patterns in the generated hosting app
-    - [ ] Ensure `yarn test:all` runs all plugin and wiring tests
-    - [ ] Document test commands in workspace README
+- [x] **1.3** Add/improve tests and test patterns
+  - [x] **Plugin Tests** (inside `plugins/*`)
+    - [x] Frontend plugins: component rendering tests using `@backstage/test-utils`
+    - [x] Backend plugins: use `@backstage/backend-test-utils` (see [Testing Backend Plugins and Modules](https://backstage.io/docs/backend-system/building-plugins-and-modules/testing/))
+    - [x] Keep tests simple - focus on basic functionality, avoid over-testing
+  - [x] **Hosting App Wiring Tests** (inside `packages/app` and `packages/backend`)
+    - [x] Verify plugins are correctly registered and exported
+    - [x] Test that plugin routes/pages are accessible
+    - [x] Test backend plugin endpoints respond correctly
+  - [x] **Test Infrastructure**
+    - [x] Review existing test patterns in the generated hosting app
+    - [x] Ensure `yarn test:all` runs all plugin and wiring tests
+    - [x] Document test commands in workspace README
 - [ ] **1.4** Dynamic plugin testing
   - [x] Create the required files for dynamic plugin testing:
     - [x] docker-compose.yaml (mounts dynamic plugins and config files)
     - [x] app-config.dynamic.yaml (usually minimal or even empty)
     - [x] dynamic-plugins.yaml (enables the dynamic plugins)
   - [ ] Create tests to validate dynamic plugin functionality (runs against the container)
-- [ ] **1.5** Check if documents like README.md are up to date
+- [x] **1.5** Check if documents like README.md are up to date
 
 ### Phase 2: Document Reference Implementation
 
-- [ ] **2.1** Update root CLAUDE.md to reference dummy as canonical example
-- [ ] **2.2** Update root README.md workspace table
-- [ ] **2.3** Document which aspects of dummy should be carried to other workspaces
-
-### Phase 3: Standardize Dev Commands Across All Workspaces
-
-Add consistent `dev`, `lint`, `lint-fix`, and `test` targets to every workspace Makefile. These were intentionally excluded from the initial Makefile standardization to keep the scope focused on build/publish/clean operations.
-
-- [ ] **3.1** Define standard `dev`, `lint`, `lint-fix`, `test` targets
-- [ ] **3.2** Add targets to all 8 workspace Makefiles
-
-### Phase 4: Create Hosting Apps (Future)
-
-- [ ] **4.1** Create hosting app for `about` workspace
+- [x] **2.1** Update root AGENTS.md to reference dummy as canonical example
+- [x] **2.2** Update root README.md workspace table
+- [x] **2.3** Document which aspects of dummy should be carried to other workspaces

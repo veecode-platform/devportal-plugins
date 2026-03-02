@@ -1,6 +1,6 @@
 import { TestApiProvider, renderInTestApp } from '@backstage/test-utils';
 import { discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
-import { DummyComponent } from './DummyComponent';
+import { DummyCard } from './DummyCard';
 
 const mockDiscoveryApi = {
   getBaseUrl: jest.fn().mockResolvedValue('http://localhost:7007/api/plugin-dummy-backend'),
@@ -21,8 +21,8 @@ const mockFetchApi = {
   }),
 } as any;
 
-describe('DummyComponent', () => {
-  it('should render', async () => {
+describe('DummyCard', () => {
+  it('renders the InfoCard with teams table', async () => {
     const { findByText } = await renderInTestApp(
       <TestApiProvider
         apis={[
@@ -30,10 +30,11 @@ describe('DummyComponent', () => {
           [fetchApiRef, mockFetchApi],
         ]}
       >
-        <DummyComponent />
+        <DummyCard />
       </TestApiProvider>,
     );
 
-    expect(await findByText('Welcome to dummy!')).toBeInTheDocument();
+    expect(await findByText('Dummy Plugin')).toBeInTheDocument();
+    expect(await findByText('Arsenal')).toBeInTheDocument();
   });
 });

@@ -5,13 +5,8 @@ import { pluginDummyBackendPlugin } from './plugin';
 import request from 'supertest';
 import { NotAllowedError } from '@backstage/errors';
 
-// TEMPLATE NOTE:
-// Plugin tests are integration tests for your plugin, ensuring that all pieces
-// work together end-to-end. You can still mock injected backend services
-// however, just like anyone who installs your plugin might replace the
-// services with their own implementations.
 describe('plugin', () => {
-  it('should return soccer teams', async () => {
+  it('should return soccer teams with default pagination', async () => {
     const { server } = await startTestBackend({
       features: [pluginDummyBackendPlugin],
     });
@@ -19,14 +14,37 @@ describe('plugin', () => {
     const res = await request(server).get('/api/plugin-dummy-backend/teams');
 
     expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      totalCount: 25,
+      limit: 10,
+      offset: 0,
+    });
+    expect(res.body.teams).toHaveLength(10);
+    expect(res.body.teams[0]).toEqual({
+      id: 'arsenal',
+      name: 'Arsenal',
+      country: 'England',
+    });
+  });
+
+  it('should support pagination query parameters', async () => {
+    const { server } = await startTestBackend({
+      features: [pluginDummyBackendPlugin],
+    });
+
+    const res = await request(server).get(
+      '/api/plugin-dummy-backend/teams?limit=2&offset=3',
+    );
+
+    expect(res.status).toBe(200);
     expect(res.body).toEqual({
       teams: [
-        { id: 'arsenal', name: 'Arsenal', country: 'England' },
-        { id: 'barcelona', name: 'FC Barcelona', country: 'Spain' },
-        { id: 'bayern', name: 'FC Bayern München', country: 'Germany' },
         { id: 'flamengo', name: 'Flamengo', country: 'Brazil' },
         { id: 'juventus', name: 'Juventus', country: 'Italy' },
       ],
+      totalCount: 25,
+      limit: 2,
+      offset: 3,
     });
   });
 
@@ -40,7 +58,7 @@ describe('plugin', () => {
           factory: () => ({
             listTeams: jest.fn().mockRejectedValue(new NotAllowedError()),
           }),
-        })
+        }),
       ],
     });
 

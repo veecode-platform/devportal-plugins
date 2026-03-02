@@ -1,6 +1,6 @@
 import { TestApiProvider, renderInTestApp } from '@backstage/test-utils';
 import { discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
-import { DummyComponent } from './DummyComponent';
+import { DummyContent } from './DummyContent';
 
 const mockDiscoveryApi = {
   getBaseUrl: jest.fn().mockResolvedValue('http://localhost:7007/api/plugin-dummy-backend'),
@@ -13,7 +13,7 @@ const mockFetchApi = {
     statusText: 'OK',
     headers: new Headers({ 'content-type': 'application/json' }),
     json: async () => ({
-      teams: [{ id: 'arsenal', name: 'Arsenal', country: 'England' }],
+      teams: [{ id: 'flamengo', name: 'Flamengo', country: 'Brazil' }],
       totalCount: 1,
       limit: 5,
       offset: 0,
@@ -21,8 +21,8 @@ const mockFetchApi = {
   }),
 } as any;
 
-describe('DummyComponent', () => {
-  it('should render', async () => {
+describe('DummyContent', () => {
+  it('renders the content grid with DummyCard', async () => {
     const { findByText } = await renderInTestApp(
       <TestApiProvider
         apis={[
@@ -30,10 +30,11 @@ describe('DummyComponent', () => {
           [fetchApiRef, mockFetchApi],
         ]}
       >
-        <DummyComponent />
+        <DummyContent />
       </TestApiProvider>,
     );
 
-    expect(await findByText('Welcome to dummy!')).toBeInTheDocument();
+    expect(await findByText('Dummy Plugin')).toBeInTheDocument();
+    expect(await findByText('Flamengo')).toBeInTheDocument();
   });
 });
