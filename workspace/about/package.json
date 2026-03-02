@@ -6,13 +6,16 @@
     "node": "20 || 22 || 24"
   },
   "scripts": {
+    "start": "backstage-cli repo start",
     "build:all": "backstage-cli repo build --all",
+    "build:backend": "yarn workspace backend build",
     "tsc": "tsc",
     "tsc:full": "tsc --skipLibCheck false --incremental false",
     "clean": "backstage-cli repo clean",
     "test": "backstage-cli repo test",
     "test:all": "backstage-cli repo test --coverage",
     "fix": "backstage-cli repo fix",
+    "new": "backstage-cli new --select plugin",
     "update-backstage": "backstage-cli versions:bump",
     "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint",
@@ -20,6 +23,7 @@
   },
   "workspaces": {
     "packages": [
+      "packages/*",
       "plugins/*"
     ]
   },
