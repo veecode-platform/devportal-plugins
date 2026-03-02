@@ -24,6 +24,7 @@ We will start with the dummy workspace ("./workspace/dummy"), as it is the most 
   - [x] Comment the Makefile to make it LLM friendly (so it becomos the standard from now on)
 - [x] **1.2** Review and improve dummy workspace structure
   - [x] Check package.json for Backstage standards
+  - [ ] Consistent build implementation — workspace use "yarn install" and "yarn tsc" and "yarn build:all"
   - [x] Make sure there is an "update-backstage" script (`"update-backstage": "backstage-cli versions:bump"` entry under "scripts")
 - [ ] **1.3** Add/improve tests and test patterns
   - [ ] **Plugin Tests** (inside `plugins/*`)
