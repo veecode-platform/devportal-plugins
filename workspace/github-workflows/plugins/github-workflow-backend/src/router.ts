@@ -3,14 +3,14 @@ import { InputError } from '@backstage/errors';
 import { z } from 'zod';
 import express from 'express';
 import Router from 'express-promise-router';
-import { GithubWorkflowsService } from './services/GithubWorkflowsService';
+import { GithubWorkflowsServiceApi } from './services/types';
 
 export async function createRouter({
   httpAuth: _httpAuth,
   githubWorkflowsService,
 }: {
   httpAuth: HttpAuthService;
-  githubWorkflowsService: GithubWorkflowsService;
+  githubWorkflowsService: GithubWorkflowsServiceApi;
 }): Promise<express.Router> {
   const router = Router();
   router.use(express.json());

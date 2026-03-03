@@ -1,15 +1,20 @@
 import { ConfigApi } from '@backstage/core-plugin-api';
-import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
+import { Octokit } from '@octokit/rest';
 import { ScmIntegrations, DefaultGithubCredentialsProvider } from '@backstage/integration';
 import YAML from 'js-yaml';
 import { LoggerService } from '@backstage/backend-plugin-api';
-import { 
-  GithubFileResponse, 
-  WorkflowDispatchParameters, 
-  Workflows 
+import {
+  GithubFileResponse,
+  WorkflowDispatchParameters,
+  Workflows,
+  Branch,
+  JobsResponse,
+  WorkflowRun,
+  EnvironmentsResponse,
 } from '@veecode-platform/github-workflows-common';
+import { GithubWorkflowsServiceApi } from './types';
 
-export class GithubWorkflowsService {
+export class GithubWorkflowsService implements GithubWorkflowsServiceApi {
   private readonly integrations: ScmIntegrations;
   private readonly credentialsProvider: DefaultGithubCredentialsProvider;
   private readonly logger: LoggerService;
@@ -171,7 +176,7 @@ export class GithubWorkflowsService {
   async listBranchesFromRepo(
     hostname: string,
     githubRepoSlug: string,
-  ): Promise<RestEndpointMethodTypes['repos']['listBranches']['response']['data']> {
+  ): Promise<Branch[]> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
@@ -187,7 +192,7 @@ export class GithubWorkflowsService {
   async getBranchDefaultFromRepo(
     hostname: string,
     githubRepoSlug: string,
-  ): Promise<RestEndpointMethodTypes['repos']['get']['response']['data']['default_branch']> {
+  ): Promise<string> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
@@ -206,7 +211,7 @@ export class GithubWorkflowsService {
     workflowId: number,
     branch: string,
     inputs?: { [key: string]: unknown },
-  ): Promise<RestEndpointMethodTypes['actions']['createWorkflowDispatch']['response']['status']> {
+  ): Promise<number> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
@@ -247,7 +252,7 @@ export class GithubWorkflowsService {
     hostname: string,
     githubRepoSlug: string,
     runId: number,
-  ): Promise<RestEndpointMethodTypes['actions']['cancelWorkflowRun']['response']['status']> {
+  ): Promise<number> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
@@ -268,7 +273,7 @@ export class GithubWorkflowsService {
     id: number,
     pageSize?: number,
     page?: number,
-  ): Promise<RestEndpointMethodTypes['actions']['listJobsForWorkflowRun']['response']['data']> {
+  ): Promise<JobsResponse> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
@@ -281,7 +286,7 @@ export class GithubWorkflowsService {
         page,
       });
       
-      return jobs.data;
+      return jobs.data as unknown as JobsResponse;
     });
   }
 
@@ -289,18 +294,18 @@ export class GithubWorkflowsService {
     hostname: string,
     githubRepoSlug: string,
     runId: number,
-  ): Promise<RestEndpointMethodTypes['actions']['getWorkflowRun']['response']['data']> {
+  ): Promise<WorkflowRun> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
-      
+
       const workflow = await octokit.actions.getWorkflowRun({
         owner,
         repo,
         run_id: runId,
       });
-      
-      return workflow.data;
+
+      return workflow.data as unknown as WorkflowRun;
     });
   }
 
@@ -308,35 +313,35 @@ export class GithubWorkflowsService {
     hostname: string,
     githubRepoSlug: string,
     jobId: number,
-  ): Promise<RestEndpointMethodTypes['actions']['downloadJobLogsForWorkflowRun']['response']['data']> {
+  ): Promise<string> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
-      
+
       const workflow = await octokit.actions.downloadJobLogsForWorkflowRun({
         owner,
         repo,
         job_id: jobId,
       });
 
-      return workflow.data;
+      return workflow.data as string;
     });
   }
 
   async getEnvironmentsList(
     hostname: string,
     githubRepoSlug: string,
-  ): Promise<RestEndpointMethodTypes['repos']['getAllEnvironments']['response']['data']> {
+  ): Promise<EnvironmentsResponse> {
     return this.catchOctokitError(async () => {
       const octokit = await this.getOctokit(hostname, githubRepoSlug);
       const { owner, repo } = this.parseRepo(githubRepoSlug);
-      
+
       const environments = await octokit.repos.getAllEnvironments({
         owner,
         repo,
       });
-      
-      return environments.data;
+
+      return environments.data as unknown as EnvironmentsResponse;
     });
   }
 
@@ -348,7 +353,7 @@ export class GithubWorkflowsService {
     hostname: string,
     workflowId: number,
     githubRepoSlug: string,
-  ): Promise<RestEndpointMethodTypes['actions']['listWorkflowRuns']['response']['data']['workflow_runs'][0]> {
+  ) {
     const octokit = await this.getOctokit(hostname, githubRepoSlug);
     const { owner, repo } = this.parseRepo(githubRepoSlug);
     
@@ -423,7 +428,7 @@ export class GithubWorkflowsService {
     hostname: string,
     githubRepoSlug: string,
     workflowId: number,
-  ): Promise<RestEndpointMethodTypes['actions']['listWorkflowRuns']['response']['data']['total_count']> {
+  ): Promise<number> {
     const octokit = await this.getOctokit(hostname, githubRepoSlug);
     const { owner, repo } = this.parseRepo(githubRepoSlug);
     

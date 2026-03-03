@@ -2,6 +2,8 @@
 
 This document provides detailed technical context for AI agents working with this repository. Humans should read `README.md` instead.
 
+This project is a collection of Backstage plugins for the VeeCode Platform. Each top level workspace is a self-contained Backstage hosting app (packages "app" and "backend" under "packages" folder) with Yarn workspaces for the plugins (under "plugins" folder). This way correlated plugins are grouped together and tested together in the same hosting app.
+
 ## Repository Layout
 
 ```pre

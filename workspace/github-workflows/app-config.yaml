@@ -82,17 +82,6 @@ integrations:
   #     target: 'https://example.com'
   #     changeOrigin: true
 
-# Reference documentation http://backstage.io/docs/features/techdocs/configuration
-# Note: After experimenting with basic setup, use CI/CD to generate docs
-# and an external cloud storage when deploying TechDocs for production use-case.
-# https://backstage.io/docs/features/techdocs/how-to-guides#how-to-migrate-from-techdocs-basic-to-recommended-deployment-approach
-techdocs:
-  builder: 'local' # Alternatives - 'external'
-  generator:
-    runIn: 'docker' # Alternatives - 'local'
-  publisher:
-    type: 'local' # Alternatives - 'googleGcs' or 'awsS3'. Read documentation for using alternatives.
-
 #scaffolder:
   # see https://backstage.io/docs/features/software-templates/configuration for software template options
 
@@ -101,33 +90,36 @@ catalog:
     entityFilename: catalog-info.yaml
     pullRequestBranchName: backstage-integration
   rules:
-    - allow: [Component, System, API, Resource, Location, User, Group]
+    - allow: [Component, System, API, Resource, Location, User, Group, Template]
   locations:
-    # Local example data, file locations are relative to the backend process, typically `packages/backend`
-    - type: file
-      target: ../../examples/entities.yaml
-
-    # Local example template
-    - type: file
-      target: ../../examples/template/template.yaml
-      rules:
-        - allow: [Template]
-
+    # Local example data
+    # File locations are relative to the backend process, typically in a deployed context, such as in a Docker container, this will be the root
+    # - type: file
+    #   target: ../../examples/entities.yaml
     # Local example organizational data
-    - type: file
-      target: ../../examples/org.yaml
-      rules:
-        - allow: [User, Group]
-
-    ## devportal-base public repo
-    - type: url
-      target: https://github.com/veecode-platform/devportal-base/blob/main/catalog-info.yaml
-
-    ## Uncomment these lines to add an example org
-    # - type: url
-    #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/acme-corp.yaml
+    # - type: file
+    #   target: ../../examples/org.yaml
     #   rules:
     #     - allow: [User, Group]
+  providers:
+    githubOrg:
+      id: development
+      githubUrl: https://github.com
+      orgs:
+        - "${GITHUB_ORG}"
+      schedule:
+        frequency:
+          minutes: 5
+        timeout:
+          minutes: 3
+    github:
+      development:
+        organization: "${GITHUB_ORG}"
+        schedule:
+          frequency:
+            minutes: 5
+          timeout:
+            minutes: 3
 
 #kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
@@ -135,7 +127,7 @@ catalog:
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:
   # setting this to `false` will disable permissions
-  enabled: true
+  enabled: false
   rbac:
     policies-csv-file: ../../rbac-policy.csv
     pluginsWithPermission:

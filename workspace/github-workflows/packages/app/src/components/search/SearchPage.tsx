@@ -3,29 +3,19 @@ import { Theme } from '@mui/material';
 import { makeStyles } from '@mui/styles';
 
 import { CatalogSearchResultListItem } from '@backstage/plugin-catalog';
-import {
-  catalogApiRef,
-  CATALOG_FILTER_EXISTS,
-} from '@backstage/plugin-catalog-react';
-import { TechDocsSearchResultListItem } from '@backstage/plugin-techdocs';
-
 import { SearchType } from '@backstage/plugin-search';
 import {
   SearchBar,
   SearchFilter,
   SearchResult,
   SearchPagination,
-  useSearch,
 } from '@backstage/plugin-search-react';
 import {
   CatalogIcon,
   Content,
-  DocsIcon,
   Header,
   Page,
 } from '@backstage/core-components';
-import { useApi } from '@backstage/core-plugin-api';
-
 const useStyles = makeStyles((theme: Theme) => ({
   bar: {
     padding: theme.spacing(1, 0),
@@ -43,8 +33,6 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 const SearchPage = () => {
   const classes = useStyles();
-  const { types } = useSearch();
-  const catalogApi = useApi(catalogApiRef);
 
   return (
     <Page themeId="home">
@@ -66,36 +54,10 @@ const SearchPage = () => {
                   name: 'Software Catalog',
                   icon: <CatalogIcon />,
                 },
-                {
-                  value: 'techdocs',
-                  name: 'Documentation',
-                  icon: <DocsIcon />,
-                },
               ]}
             />
             <Paper className={classes.filters}>
-              {types.includes('techdocs') && (
-                <SearchFilter.Select
-                  className={classes.filter}
-                  label="Entity"
-                  name="name"
-                  values={async () => {
-                    // Return a list of entities which are documented.
-                    const { items } = await catalogApi.getEntities({
-                      fields: ['metadata.name'],
-                      filter: {
-                        'metadata.annotations.backstage.io/techdocs-ref':
-                          CATALOG_FILTER_EXISTS,
-                      },
-                    });
-
-                    const names = items.map(entity => entity.metadata.name);
-                    names.sort();
-                    return names;
-                  }}
-                />
-              )}
-              <SearchFilter.Select
+<SearchFilter.Select
                 className={classes.filter}
                 label="Kind"
                 name="kind"
@@ -113,7 +75,6 @@ const SearchPage = () => {
             <SearchPagination />
             <SearchResult>
               <CatalogSearchResultListItem icon={<CatalogIcon />} />
-              <TechDocsSearchResultListItem icon={<DocsIcon />} />
             </SearchResult>
           </Grid>
         </Grid>

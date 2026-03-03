@@ -1,21 +1,17 @@
 import {
-  createServiceRef,
   createServiceFactory,
   coreServices,
 } from '@backstage/backend-plugin-api';
 import { GithubWorkflowsService } from './GithubWorkflowsService';
+import { githubWorkflowsServiceRef } from './ref';
+
+export { githubWorkflowsServiceRef } from './ref';
 
 /**
- * Service reference for GithubWorkflowsService
+ * Service factory for GithubWorkflowsService.
  *
- * @public
- */
-export const githubWorkflowsServiceRef = createServiceRef<GithubWorkflowsService>({
-  id: 'github-workflow-backend.githubWorkflowsService',
-});
-
-/**
- * Service factory for GithubWorkflowsService
+ * Useful when the hosting app needs to register the real service explicitly
+ * (e.g. alongside other overrides).
  *
  * @public
  */
@@ -29,3 +25,7 @@ export const githubWorkflowsServiceFactory = createServiceFactory({
     return new GithubWorkflowsService(config, logger);
   },
 });
+
+export type { GithubWorkflowsServiceApi } from './types';
+export { MockGithubWorkflowsService } from './MockGithubWorkflowsService';
+export { mockGithubWorkflowsServiceFactory } from './mockServiceFactory';
