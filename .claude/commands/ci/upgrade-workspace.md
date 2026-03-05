@@ -161,7 +161,7 @@ When a step fails:
    | `YN0028` / `lockfile would have been modified` | Immutable installs in CI | Prefix with `YARN_ENABLE_IMMUTABLE_INSTALLS=false` → retry |
    | `duplicate installation of` | Duplicate packages | `yarn dedupe` → `yarn install` → retry |
    | `Cannot find module '...'` / `Module '"..."' has no exported member` | Import moved/renamed | Adjust the import path → retry |
-   | `Cannot find type definition file for 'jest'` | Missing peer dependency | Revert and report |
+   | `Cannot find type definition file for '...'` | Missing type definitions (transitive dep became peer dep after bump) | `yarn add -D <package>` where `<package>` is the name inside the quotes → `yarn install` → retry |
    | `error TS2339` on methods that exist in `@backstage/*` + `declare module` in a `.d.ts` file | Module augmentation conflict | Remove or rewrite the `declare module` block → retry once |
    | Deprecated API with replacement noted in the error message | Deprecated API migration | Apply the documented replacement → retry |
    | Errors spanning 3+ source files | Broad breaking change | Revert and report |
