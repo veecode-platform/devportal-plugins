@@ -67,6 +67,11 @@ jobs:
       - name: Enable Corepack
         run: npm i -g corepack && corepack enable
 
+      - name: Remove local-only tooling config
+        run: |
+          rm -f .mcp.json
+          echo '{}' > .claude/settings.json
+
       - name: Read prompt file
         id: read-prompt
         run: |
