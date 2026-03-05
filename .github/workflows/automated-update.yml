@@ -12,18 +12,19 @@ jobs:
       should_continue: ${{ steps.check.outputs.should_continue }}
     steps:
       - uses: actions/checkout@v4
-      - name: Check for open automated PRs
+      - name: Close stale automated PRs
         id: check
         run: |
-          OPEN=$(gh pr list --state open --json headRefName,number,title \
+          OPEN_PRS=$(gh pr list --state open --json headRefName,number \
             --jq '.[] | select(.headRefName | startswith("chore/automated-update-"))')
-          if [ -n "$OPEN" ]; then
-            echo "Open automated PR found, skipping:"
-            echo "$OPEN"
-            echo "should_continue=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_continue=true" >> "$GITHUB_OUTPUT"
+          if [ -n "$OPEN_PRS" ]; then
+            echo "$OPEN_PRS" | jq -r '.number | tostring' | while read -r PR_NUM; do
+              BRANCH=$(echo "$OPEN_PRS" | jq -r "select(.number == $PR_NUM) | .headRefName")
+              echo "Closing PR #$PR_NUM ($BRANCH)"
+              gh pr close "$PR_NUM" --delete-branch
+            done
           fi
+          echo "should_continue=true" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
