@@ -141,19 +141,31 @@ a command exits with non-zero status.
 
 ## Error policy
 
-When a step fails, reason through it step by step:
+**Budget: max 3 fix-retry cycles per step.**
 
-1. Read the failing log to classify the error type.
-2. Apply the matching action:
+Diagnose using ONLY the error log output and workspace source files.
+Limit each diagnosis to reading the first 30 error lines from the log,
+then matching against the table below.
 
-   | Error type | Action |
-   |---|---|
-   | "duplicate installation" warnings | Run `yarn dedupe`, then `yarn install`, then retry the failing command |
-   | Import errors (module moved/renamed) | Adjust the imports to the new location |
-   | Type errors from deprecated API with documented replacement | Apply the documented migration |
-   | Unresolvable errors (types removed with no clear replacement, signature changes across multiple files) | Revert and report (see below) |
+When a step fails:
 
-3. After applying a fix, re-run the failing command to confirm it passes.
+1. Read the first 30 lines of errors:
+   `grep "error TS\|Error:" /tmp/logs/<step>.log | head -30`
+2. Match the error against the table below.
+3. Apply the fix, re-run the command once.
+4. If the retry fails with a **new** error, apply one more fix.
+5. If the third retry also fails → revert and report.
+
+   | Recognition pattern | Error type | Action |
+   |---|---|---|
+   | `YN0028` / `lockfile would have been modified` | Immutable installs in CI | Prefix with `YARN_ENABLE_IMMUTABLE_INSTALLS=false` → retry |
+   | `duplicate installation of` | Duplicate packages | `yarn dedupe` → `yarn install` → retry |
+   | `Cannot find module '...'` / `Module '"..."' has no exported member` | Import moved/renamed | Adjust the import path → retry |
+   | `Cannot find type definition file for 'jest'` | Missing peer dependency | Revert and report |
+   | `error TS2339` on methods that exist in `@backstage/*` + `declare module` in a `.d.ts` file | Module augmentation conflict | Remove or rewrite the `declare module` block → retry once |
+   | Deprecated API with replacement noted in the error message | Deprecated API migration | Apply the documented replacement → retry |
+   | Errors spanning 3+ source files | Broad breaking change | Revert and report |
+   | Any other unrecognized pattern | Unknown | Revert and report |
 
 **Revert and report**: revert all workspace changes with
 `git checkout -- workspace/$WORKSPACE/`, then save:
@@ -162,7 +174,7 @@ When a step fails, reason through it step by step:
 {
   "workspace": "$WORKSPACE",
   "status": "failed",
-  "error": "<description of the unresolvable error>"
+  "error": "<one-line classification>: <specific error message>"
 }
 ```
 
