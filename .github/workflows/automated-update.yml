@@ -1,0 +1,216 @@
+name: Automated Update Check
+
+on:
+  schedule:
+    - cron: '0 22 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  pre-flight:
+    runs-on: ubuntu-latest
+    outputs:
+      should_continue: ${{ steps.check.outputs.should_continue }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for open automated PRs
+        id: check
+        run: |
+          OPEN=$(gh pr list --state open --json headRefName,number,title \
+            --jq '.[] | select(.headRefName | startswith("chore/automated-update-"))')
+          if [ -n "$OPEN" ]; then
+            echo "Open automated PR found, skipping:"
+            echo "$OPEN"
+            echo "should_continue=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_continue=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  detect:
+    needs: pre-flight
+    if: needs.pre-flight.outputs.should_continue == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      workspaces: ${{ steps.list.outputs.workspaces }}
+      has_workspaces: ${{ steps.list.outputs.has_workspaces }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: List workspaces
+        id: list
+        run: |
+          WORKSPACES=$(ls -d workspace/*/package.json | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "workspaces=$WORKSPACES" >> "$GITHUB_OUTPUT"
+          COUNT=$(echo "$WORKSPACES" | jq length)
+          echo "has_workspaces=$( [ "$COUNT" -gt 0 ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          echo "Found $COUNT workspaces: $WORKSPACES"
+
+  update:
+    needs: detect
+    if: needs.detect.outputs.has_workspaces == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        workspace: ${{ fromJson(needs.detect.outputs.workspaces) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: npm i -g corepack && corepack enable
+
+      - name: Read prompt file
+        id: read-prompt
+        run: |
+          {
+            echo 'PROMPT<<EOF'
+            cat .github/prompts/automated-update-ci.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run upgrade agent
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: ${{ steps.read-prompt.outputs.PROMPT }}
+          claude_args: "--model claude-sonnet-4-6 --allowedTools Bash,Read,Edit,Write,Glob,Grep"
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKSPACE: ${{ matrix.workspace }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-${{ matrix.workspace }}
+          path: /tmp/results/
+          if-no-files-found: ignore
+
+  consolidate:
+    needs: update
+    if: always() && (needs.update.result == 'success' || needs.update.result == 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/all-results
+          pattern: update-*
+
+      - name: Apply patches and create PR
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          BRANCH="chore/automated-update-$DATE"
+
+          # Collect results
+          UPDATED=""
+          FAILED=""
+          UP_TO_DATE=""
+          PR_BODY="## Automated Update — $DATE\n\n### Updates applied\n"
+          VALIDATION_TABLE="| Workspace | tsc | build | export-dynamic | test |\n|-----------|-----|-------|----------------|------|\n"
+          HAS_CHANGES=false
+
+          for dir in /tmp/all-results/update-*/; do
+            [ -d "$dir" ] || continue
+            WS=$(basename "$dir" | sed 's/^update-//')
+            JSON="$dir/$WS.json"
+            PATCH="$dir/$WS.patch"
+
+            [ -f "$JSON" ] || continue
+            STATUS=$(jq -r '.status' "$JSON")
+
+            case "$STATUS" in
+              success)
+                HAS_CHANGES=true
+                FROM=$(jq -r '.backstage_from // "unknown"' "$JSON")
+                TO=$(jq -r '.backstage_to // "unknown"' "$JSON")
+                BUMPED=$(jq -r '.packages_bumped // 0' "$JSON")
+                TSC=$(jq -r '.tsc // "n/a"' "$JSON")
+                BUILD=$(jq -r '.build // "n/a"' "$JSON")
+                EXPORT=$(jq -r '.export_dynamic // "n/a"' "$JSON")
+                TEST=$(jq -r '.test // "n/a"' "$JSON")
+                UPDATED="$UPDATED\n- [x] $WS: $FROM → $TO ($BUMPED packages)"
+                VALIDATION_TABLE="$VALIDATION_TABLE| $WS | $TSC | $BUILD | $EXPORT | $TEST |\n"
+                ;;
+              failed)
+                ERR=$(jq -r '.error // "unknown error"' "$JSON")
+                FAILED="$FAILED\n- $WS: $ERR"
+                ;;
+              up-to-date)
+                UP_TO_DATE="$UP_TO_DATE\n- [ ] $WS: no updates"
+                ;;
+            esac
+          done
+
+          if [ "$HAS_CHANGES" = "false" ]; then
+            echo "No workspaces had updates. Exiting."
+            exit 0
+          fi
+
+          # Configure git author for commits
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Create branch and apply patches
+          git checkout -b "$BRANCH"
+
+          for dir in /tmp/all-results/update-*/; do
+            WS=$(basename "$dir" | sed 's/^update-//')
+            JSON="$dir/$WS.json"
+            PATCH="$dir/$WS.patch"
+
+            [ -f "$JSON" ] || continue
+            STATUS=$(jq -r '.status' "$JSON")
+
+            if [ "$STATUS" = "success" ] && [ -f "$PATCH" ] && [ -s "$PATCH" ]; then
+              git apply "$PATCH"
+              git add "workspace/$WS/"
+              git commit -m "chore: upgrade $WS backstage deps"
+            fi
+          done
+
+          # Verify at least one patch was actually applied
+          COMMIT_COUNT=$(git rev-list --count main..HEAD)
+          if [ "$COMMIT_COUNT" -eq 0 ]; then
+            echo "All workspaces reported success but no patches were applied. Exiting."
+            exit 0
+          fi
+
+          # Build PR body
+          PR_BODY="## Automated Update — $DATE\n\n### Updates applied\n$UPDATED$UP_TO_DATE"
+
+          if [ -n "$FAILED" ]; then
+            PR_BODY="$PR_BODY\n\n### Failed workspaces\n$FAILED"
+          fi
+
+          PR_BODY="$PR_BODY\n\n### Validation results per workspace\n$VALIDATION_TABLE"
+
+          if [ -n "$FAILED" ]; then
+            PR_BODY="$PR_BODY\n### Manual attention required\n$FAILED"
+          else
+            PR_BODY="$PR_BODY\n### Manual attention required\nnone"
+          fi
+
+          # Push and create PR
+          git push -u origin "$BRANCH"
+          printf '%b' "$PR_BODY" | gh pr create \
+            --title "chore: automated update $DATE" \
+            --body-file /dev/stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
