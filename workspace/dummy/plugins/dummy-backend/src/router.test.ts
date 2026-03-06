@@ -10,6 +10,9 @@ const mockTeams = {
     { id: 'arsenal', name: 'Arsenal', country: 'England' },
     { id: 'flamengo', name: 'Flamengo', country: 'Brazil' },
   ],
+  totalCount: 2,
+  limit: 10,
+  offset: 0,
 };
 
 // TEMPLATE NOTE:
