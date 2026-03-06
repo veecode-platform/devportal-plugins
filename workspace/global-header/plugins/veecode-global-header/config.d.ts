@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-import '@backstage/config';
-
-declare module '@backstage/config' {
-  interface Config {
-    app?: {
-      branding?: {
-        /**
-         * Base64 URI for the full logo
-         * @visibility frontend
-         */
-        fullLogo?:
+export interface Config {
+  app?: {
+    branding?: {
+      /**
+       * Base64 URI for the full logo
+       * @visibility frontend
+       */
+      fullLogo?:
         | string
         | {
             /**
@@ -38,18 +35,17 @@ declare module '@backstage/config' {
              */
             dark: string;
           };
-        /**
-         *  Width
-         * @visibility frontend
-         */
-        fullLogoWidth?: string;
-      };
-      support?: {
-        /**
-         * @visibility frontend
-         */
-        url?: string;
-      };
+      /**
+       *  Width
+       * @visibility frontend
+       */
+      fullLogoWidth?: string;
     };
-  }
+    support?: {
+      /**
+       * @visibility frontend
+       */
+      url?: string;
+    };
+  };
 }
