@@ -26,7 +26,7 @@ describe('DummyFetchComponent', () => {
       }),
     } as any;
 
-    const { findByRole, findByText } = await renderInTestApp(
+    const { findByText } = await renderInTestApp(
       <TestApiProvider
         apis={[
           [discoveryApiRef, mockDiscoveryApi],
