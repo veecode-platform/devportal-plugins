@@ -165,7 +165,7 @@ When a step fails:
    | `YN0028` / `lockfile would have been modified` | Immutable installs in CI | Prefix with `YARN_ENABLE_IMMUTABLE_INSTALLS=false` → retry |
    | `duplicate installation of` | Duplicate packages | `yarn dedupe` → `yarn install` → retry |
    | `Cannot find module '...'` / `Module '"..."' has no exported member` | Import moved/renamed | Adjust the import path → retry |
-   | `Cannot find type definition file for '...'` | Missing type definitions (transitive dep became peer dep after bump) | `yarn add -D <package>` where `<package>` is the name inside the quotes → `yarn install` → retry |
+   | `Cannot find type definition file for '...'` / `Cannot find module '...'` where the module was previously available without explicit installation | Missing peer dependency (transitive dep became peer dep after bump) | 1. Identify which parent package previously provided it (check `yarn why <package>`). 2. Read that parent's `peerDependencies` in its `package.json`. 3. `yarn add -D` all required peer deps that are missing from the workspace root `package.json`. 4. `yarn install` → retry. |
    | `error TS2339` on properties in a `declare module` block inside a `.d.ts` file, or `error TS2698` about extending a type alias | Module augmentation conflict (TS 5.8 broke `declare module` for type aliases) | Convert from `declare module '@backstage/config' { interface Config { ... } }` to `export interface Config { ... }` (direct export). Preserve all JSDoc annotations including `@visibility`. → retry |
    | Deprecated API with replacement noted in the error message | Deprecated API migration | Apply the documented replacement → retry |
    | Errors spanning 3+ source files | Broad breaking change | Revert and report |
