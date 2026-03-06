@@ -33,7 +33,7 @@
     "@backstage/catalog-client": "^1.13.0",
     "@backstage/core-plugin-api": "^1.12.3",
     "@backstage/errors": "^1.2.7",
-    "@backstage/integration": "^1.20.0",
+    "@backstage/integration": "^1.20.1",
     "@backstage/plugin-catalog-node": "^2.0.0",
     "@backstage/types": "^1.2.2",
     "@octokit/rest": "^19.0.13",
