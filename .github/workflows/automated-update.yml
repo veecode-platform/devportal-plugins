@@ -154,6 +154,16 @@ jobs:
                 TEST=$(jq -r '.test // "n/a"' "$JSON")
                 UPDATED="$UPDATED\n- [x] $WS: $FROM → $TO ($BUMPED packages)"
                 VALIDATION_TABLE="$VALIDATION_TABLE| $WS | $TSC | $BUILD | $EXPORT | $TEST |\n"
+
+                # Collect non-blocking failures for visibility
+                TEST_ERR=$(jq -r '.test_error // empty' "$JSON")
+                EXPORT_ERR=$(jq -r '.export_dynamic_error // empty' "$JSON")
+                if [ -n "$TEST_ERR" ]; then
+                  FAILED="$FAILED\n- $WS (test): $TEST_ERR"
+                fi
+                if [ -n "$EXPORT_ERR" ]; then
+                  FAILED="$FAILED\n- $WS (export-dynamic): $EXPORT_ERR"
+                fi
                 ;;
               failed)
                 ERR=$(jq -r '.error // "unknown error"' "$JSON")

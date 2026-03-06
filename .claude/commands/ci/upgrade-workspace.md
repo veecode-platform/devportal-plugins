@@ -131,6 +131,8 @@ a command exits with non-zero status.
       "build": "pass",
       "export_dynamic": "pass | fail | n/a",
       "test": "pass | fail",
+      "test_error": null,
+      "export_dynamic_error": null,
       "error": null
     }
     ```
@@ -142,6 +144,13 @@ a command exits with non-zero status.
 
     export-dynamic and test (steps 8-9) are non-blocking. Record
     the result ("pass" or "fail") and continue to step 10 regardless.
+    When either fails, capture the first 5 lines of errors from the
+    log and save them in the `test_error` or `export_dynamic_error`
+    field:
+
+    ```bash
+    grep -E "FAIL|Error|✕|●" /tmp/logs/test.log | head -5
+    ```
 
 ## Error policy
 
