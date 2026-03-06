@@ -135,9 +135,13 @@ a command exits with non-zero status.
     }
     ```
 
-    When any step fails and recovery is possible, continue and record
-    the failure in the corresponding field. When a step fails and
-    recovery is impossible, follow the error policy below.
+    **Gate rules**: tsc and build (steps 6-7) are blocking gates.
+    If either fails after exhausting the error policy retries, revert
+    the workspace and report — do NOT generate a patch or continue
+    to later steps.
+
+    export-dynamic and test (steps 8-9) are non-blocking. Record
+    the result ("pass" or "fail") and continue to step 10 regardless.
 
 ## Error policy
 
@@ -162,7 +166,7 @@ When a step fails:
    | `duplicate installation of` | Duplicate packages | `yarn dedupe` → `yarn install` → retry |
    | `Cannot find module '...'` / `Module '"..."' has no exported member` | Import moved/renamed | Adjust the import path → retry |
    | `Cannot find type definition file for '...'` | Missing type definitions (transitive dep became peer dep after bump) | `yarn add -D <package>` where `<package>` is the name inside the quotes → `yarn install` → retry |
-   | `error TS2339` on methods that exist in `@backstage/*` + `declare module` in a `.d.ts` file | Module augmentation conflict | Remove or rewrite the `declare module` block → retry once |
+   | `error TS2339` on properties in a `declare module` block inside a `.d.ts` file, or `error TS2698` about extending a type alias | Module augmentation conflict (TS 5.8 broke `declare module` for type aliases) | Convert from `declare module '@backstage/config' { interface Config { ... } }` to `export interface Config { ... }` (direct export). Preserve all JSDoc annotations including `@visibility`. → retry |
    | Deprecated API with replacement noted in the error message | Deprecated API migration | Apply the documented replacement → retry |
    | Errors spanning 3+ source files | Broad breaking change | Revert and report |
    | Any other unrecognized pattern | Unknown | Revert and report |
