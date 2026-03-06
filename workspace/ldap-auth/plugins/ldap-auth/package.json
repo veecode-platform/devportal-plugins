@@ -1,12 +1,14 @@
 {
   "name": "@veecode-platform/backstage-plugin-ldap-auth",
   "description": "Backstage LDAP Authentication plugin, this packages adds frontend login page and token management (fork from @immobiliarelabs original plugin)",
-  "version": "1.1.0",
-  "main": "dist/index.esm.js",
-  "types": "dist/index.d.ts",
+  "version": "1.1.1",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "license": "MIT",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "main": "dist/index.esm.js",
+    "types": "dist/index.d.ts"
   },
   "backstage": {
     "role": "frontend-plugin",

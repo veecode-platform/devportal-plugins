@@ -4,9 +4,12 @@
 # - Supports both static and dynamic plugin builds
 #
 
-VERSION ?= 1.0.2
+VERSION ?= 1.0.3
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
+
+# Cross-platform sed in-place
+SED_INPLACE := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "sed -i ''"; else echo "sed -i"; fi)
 
 # Plugin directories
 FRONTEND_DIR = plugins/about
@@ -31,7 +34,7 @@ help:
 	@echo ""
 	@echo "Publish Commands:"
 	@echo "  make publish             - Publish all static plugins"
-	@echo "  make publish-dynamic     - Publish all dynamic plugins"
+	@echo "  make publish-dynamic     - Publish all dynamic plugins"	
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
@@ -45,7 +48,7 @@ help:
 set-version:
 	@echo "Setting about packages to version $(VERSION)..."
 	@for dir in $(ALL_PLUGIN_DIRS); do \
-		sed -i '' 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
+		$(SED_INPLACE) 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
 		echo "  Updated $$dir"; \
 	done
 	@echo "All packages updated to version $(VERSION)"
@@ -80,7 +83,7 @@ define publish_plugin
 		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
 	else \
 		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish $(NPM_REGISTRY_ARGS); \
+		npm publish --access public $(NPM_REGISTRY_ARGS); \
 	fi
 endef
 
@@ -93,8 +96,8 @@ publish: build
 # Publish all dynamic plugins
 publish-dynamic: build-dynamic
 	@echo "Publishing dynamic variants..."
-	@cd $(FRONTEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
-	@cd $(BACKEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
+	@cd $(FRONTEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
+	@cd $(BACKEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:

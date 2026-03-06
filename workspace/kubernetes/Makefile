@@ -4,9 +4,12 @@
 # - Supports both static and dynamic plugin builds
 #
 
-VERSION ?= 1.0.2
+VERSION ?= 1.0.3
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
+
+# Cross-platform sed in-place
+SED_INPLACE := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "sed -i ''"; else echo "sed -i"; fi)
 
 # Plugin directories
 PLUGIN_DIR = plugins/kubernetes-backend-module-getsecret
@@ -43,7 +46,7 @@ help:
 # Usage: make set-version VERSION=0.2.0
 set-version:
 	@echo "Setting kubernetes package to version $(VERSION)..."
-	@sed -i '' 's/"version": "[^"]*"/"version": "$(VERSION)"/' $(PLUGIN_DIR)/package.json
+	@$(SED_INPLACE) 's/"version": "[^"]*"/"version": "$(VERSION)"/' $(PLUGIN_DIR)/package.json
 	@echo "Package updated to version $(VERSION)"
 	@yarn install
 
@@ -71,7 +74,7 @@ define publish_plugin
 		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
 	else \
 		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish $(NPM_REGISTRY_ARGS); \
+		npm publish --access public $(NPM_REGISTRY_ARGS); \
 	fi
 endef
 
@@ -83,7 +86,7 @@ publish: build
 # Publish all dynamic plugins
 publish-dynamic: build-dynamic
 	@echo "Publishing dynamic variant..."
-	@cd $(PLUGIN_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
+	@cd $(PLUGIN_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:

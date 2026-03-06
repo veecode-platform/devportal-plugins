@@ -5,9 +5,12 @@
 # - Static + dynamic plugin builds
 #
 
-VERSION ?= 1.0.1
+VERSION ?= 1.0.2
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
+
+# Cross-platform sed in-place
+SED_INPLACE := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "sed -i ''"; else echo "sed -i"; fi)
 
 # Plugin directories
 SCAFFOLDER_MODULE_DIR = plugins/scaffolder-backend-module-kong
@@ -49,7 +52,7 @@ help:
 set-version:
 	@echo "Setting all kong-tools packages to version $(VERSION)..."
 	@for dir in $(ALL_PLUGIN_DIRS); do \
-		sed -i '' 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
+		$(SED_INPLACE) 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
 		echo "  Updated $$dir"; \
 	done
 	@echo "All packages updated to version $(VERSION)"
@@ -86,7 +89,7 @@ define publish_plugin
 		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
 	else \
 		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish $(NPM_REGISTRY_ARGS); \
+		npm publish --access public $(NPM_REGISTRY_ARGS); \
 	fi
 endef
 
@@ -102,9 +105,9 @@ publish: build
 # Publish dynamic variants
 publish-dynamic: build-dynamic
 	@echo "Publishing dynamic variants..."
-	@cd $(KSM_BACKEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
-	@cd $(KSM_FRONTEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
-	@cd $(KSM_SCAFFOLDER_EXT_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
+	@cd $(KSM_BACKEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
+	@cd $(KSM_FRONTEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
+	@cd $(KSM_SCAFFOLDER_EXT_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:

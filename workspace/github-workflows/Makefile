@@ -5,9 +5,12 @@
 # - Has workspace:* dependency handling (replace-workspace/restore-workspace)
 #
 
-VERSION ?= 1.3.6
+VERSION ?= 1.3.7
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
+
+# Cross-platform sed in-place
+SED_INPLACE := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "sed -i ''"; else echo "sed -i"; fi)
 
 # Plugin directories
 COMMON_DIR = plugins/github-workflows-common
@@ -48,7 +51,7 @@ help:
 set-version:
 	@echo "Setting github-workflows packages to version $(VERSION)..."
 	@for dir in $(ALL_PLUGIN_DIRS); do \
-		sed -i '' 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
+		$(SED_INPLACE) 's/"version": "[^"]*"/"version": "$(VERSION)"/' $$dir/package.json; \
 		echo "  Updated $$dir"; \
 	done
 	@echo "All packages updated to version $(VERSION)"
@@ -93,7 +96,7 @@ define publish_plugin_safe
 			exit 1; \
 		fi && \
 		rm -rf package && \
-		npm publish $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
+		npm publish --access public $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
 		rm $$TAR_FILE; \
 	fi
 endef
@@ -106,7 +109,7 @@ define publish_plugin
 		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
 	else \
 		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish $(NPM_REGISTRY_ARGS); \
+		npm publish --access public $(NPM_REGISTRY_ARGS); \
 	fi
 endef
 
@@ -120,8 +123,8 @@ publish: replace-workspace build
 # Publish all dynamic plugins
 publish-dynamic: replace-workspace build-dynamic
 	@echo "Publishing dynamic variants..."
-	@cd $(FRONTEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
-	@cd $(BACKEND_DIR)/dist-dynamic && npm publish $(NPM_REGISTRY_ARGS) || true
+	@cd $(FRONTEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
+	@cd $(BACKEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:
@@ -170,13 +173,13 @@ clean-dynamic:
 # Internal: Replace workspace:* references with versioned refs before publish
 replace-workspace:
 	@echo "Replacing workspace: references with version $(VERSION)..."
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(FRONTEND_DIR)/package.json
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(BACKEND_DIR)/package.json
+	@$(SED_INPLACE) 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(FRONTEND_DIR)/package.json
+	@$(SED_INPLACE) 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(BACKEND_DIR)/package.json
 	@echo "Workspace references replaced with ^$(VERSION)"
 
 # Internal: Restore workspace:* references after publish
 restore-workspace:
 	@echo "Restoring workspace: references..."
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "\^$(VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' $(FRONTEND_DIR)/package.json
-	@sed -i '' 's/"@veecode-platform\/github-workflows-common": "\^$(VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' $(BACKEND_DIR)/package.json
+	@$(SED_INPLACE) 's/"@veecode-platform\/github-workflows-common": "\^$(VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' $(FRONTEND_DIR)/package.json
+	@$(SED_INPLACE) 's/"@veecode-platform\/github-workflows-common": "\^$(VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' $(BACKEND_DIR)/package.json
 	@echo "Workspace references restored to workspace:*"
