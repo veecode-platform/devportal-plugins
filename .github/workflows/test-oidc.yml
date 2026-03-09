@@ -1,0 +1,35 @@
+name: Test OIDC Publish
+
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: workspace/about
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Enable Corepack
+        run: npm i -g corepack && corepack enable
+
+      - name: Set prerelease version
+        run: make set-version VERSION=1.0.4-oidc-test.0
+
+      - name: Build
+        run: make build
+
+      - name: Publish prerelease (OIDC test)
+        run: |
+          cd plugins/about
+          npm publish --access public --provenance --tag oidc-test
+          echo "OIDC Publish successful!"
