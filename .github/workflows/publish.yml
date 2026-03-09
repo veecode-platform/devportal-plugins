@@ -17,9 +17,33 @@ jobs:
     outputs:
       matrix: ${{ steps.parse.outputs.matrix }}
     steps:
-      - id: parse
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: workspace
+          sparse-checkout-cone-mode: true
+
+      - name: Validate workspace names
+        env:
+          CONFIG: ${{ inputs.config }}
         run: |
-          MATRIX=$(echo '${{ inputs.config }}' | jq -c '[to_entries[] | {workspace: .key, bump: .value}]')
+          INVALID=""
+          for WS in $(echo "$CONFIG" | jq -r 'keys[]'); do
+            if [ ! -d "workspace/$WS" ]; then
+              INVALID="$INVALID $WS"
+            fi
+          done
+          if [ -n "$INVALID" ]; then
+            echo "::error::Invalid workspace name(s):$INVALID"
+            echo "Valid workspaces are:"
+            ls workspace/
+            exit 1
+          fi
+
+      - id: parse
+        env:
+          CONFIG: ${{ inputs.config }}
+        run: |
+          MATRIX=$(echo "$CONFIG" | jq -c '[to_entries[] | {workspace: .key, bump: .value}]')
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "Publishing: $MATRIX"
 
@@ -51,15 +75,17 @@ jobs:
 
       - name: Compute new version
         id: version
+        env:
+          BUMP: ${{ matrix.bump }}
         run: |
-          CURRENT=$(grep -E '^VERSION \?=' Makefile | sed 's/VERSION ?= //')
+          CURRENT=$(sed -n 's/^VERSION[[:space:]]*?=[[:space:]]*\([^ #]*\).*/\1/p' Makefile)
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
 
           MAJOR=$(echo "$CURRENT" | cut -d. -f1)
           MINOR=$(echo "$CURRENT" | cut -d. -f2)
           PATCH=$(echo "$CURRENT" | cut -d. -f3)
 
-          case "${{ matrix.bump }}" in
+          case "$BUMP" in
             patch) PATCH=$((PATCH + 1)) ;;
             minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
             major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
@@ -67,7 +93,7 @@ jobs:
 
           NEW="$MAJOR.$MINOR.$PATCH"
           echo "new=$NEW" >> "$GITHUB_OUTPUT"
-          echo "Version: $CURRENT → $NEW (${{ matrix.bump }})"
+          echo "Version: $CURRENT → $NEW ($BUMP)"
 
       - name: Set version
         run: make set-version VERSION=${{ steps.version.outputs.new }}
@@ -76,16 +102,26 @@ jobs:
         run: make publish VERSION=${{ steps.version.outputs.new }}
 
       - name: Publish dynamic plugins
-        run: make publish-dynamic VERSION=${{ steps.version.outputs.new }} || true
+        continue-on-error: true
+        run: make publish-dynamic VERSION=${{ steps.version.outputs.new }}
 
       - name: Restore workspace references
         if: always()
         run: make restore-workspace 2>/dev/null || true
 
-      - name: Update VERSION in Makefile
+      - name: Record successful publish
+        env:
+          WS: ${{ matrix.workspace }}
+          NEW_VERSION: ${{ steps.version.outputs.new }}
         run: |
-          cd $GITHUB_WORKSPACE
-          sed -i "s/^VERSION ?= .*/VERSION ?= ${{ steps.version.outputs.new }}/" workspace/${{ matrix.workspace }}/Makefile
+          mkdir -p /tmp/publish-results
+          echo "$NEW_VERSION" > "/tmp/publish-results/$WS"
+
+      - name: Upload publish result
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-${{ matrix.workspace }}
+          path: /tmp/publish-results/${{ matrix.workspace }}
 
       - name: Report
         if: always()
@@ -95,6 +131,7 @@ jobs:
           echo "- Bump: ${{ matrix.bump }}" >> "$GITHUB_STEP_SUMMARY"
 
   commit-versions:
+    if: always() && needs.publish.result != 'cancelled'
     needs: publish
     runs-on: ubuntu-latest
     permissions:
@@ -104,42 +141,51 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download publish results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: published-*
+          path: /tmp/published
+          merge-multiple: true
+
+      - name: Check for successful publishes
+        id: check
+        run: |
+          if [ -d /tmp/published ] && [ "$(ls -A /tmp/published 2>/dev/null)" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Successfully published: $(ls /tmp/published | tr '\n' ', ' | sed 's/,$//')"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No workspaces were published successfully — skipping commit"
+          fi
+
       - name: Configure git
+        if: steps.check.outputs.found == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Update Makefile versions on main
+        if: steps.check.outputs.found == 'true'
         run: |
-          CONFIG='${{ inputs.config }}'
-          for WS in $(echo "$CONFIG" | jq -r 'keys[]'); do
-            BUMP=$(echo "$CONFIG" | jq -r --arg ws "$WS" '.[$ws]')
+          for WS_FILE in /tmp/published/*; do
+            WS=$(basename "$WS_FILE")
+            NEW=$(cat "$WS_FILE")
             MAKEFILE="workspace/$WS/Makefile"
             [ -f "$MAKEFILE" ] || continue
-
-            CURRENT=$(grep -E '^VERSION \?=' "$MAKEFILE" | sed 's/VERSION ?= //')
-            MAJOR=$(echo "$CURRENT" | cut -d. -f1)
-            MINOR=$(echo "$CURRENT" | cut -d. -f2)
-            PATCH=$(echo "$CURRENT" | cut -d. -f3)
-
-            case "$BUMP" in
-              patch) PATCH=$((PATCH + 1)) ;;
-              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
-              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
-            esac
-
-            NEW="$MAJOR.$MINOR.$PATCH"
-            sed -i "s/^VERSION ?= .*/VERSION ?= $NEW/" "$MAKEFILE"
-            echo "Updated $MAKEFILE: $CURRENT → $NEW ($BUMP)"
+            CURRENT=$(sed -n 's/^VERSION[[:space:]]*?=[[:space:]]*\([^ #]*\).*/\1/p' "$MAKEFILE")
+            sed -i "s/^VERSION[[:space:]]*?=.*/VERSION ?= $NEW/" "$MAKEFILE"
+            echo "Updated $MAKEFILE: $CURRENT → $NEW"
           done
 
       - name: Commit version bumps
+        if: steps.check.outputs.found == 'true'
         run: |
           git add workspace/*/Makefile
           if git diff --cached --quiet; then
             echo "No version changes to commit"
           else
-            WORKSPACES=$(echo '${{ inputs.config }}' | jq -r 'keys | join(",")')
+            WORKSPACES=$(ls /tmp/published | tr '\n' ',' | sed 's/,$//')
             git commit -m "chore: bump versions after publish ($WORKSPACES)"
             git push origin main
           fi
