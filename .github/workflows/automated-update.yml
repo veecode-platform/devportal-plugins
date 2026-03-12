@@ -124,53 +124,82 @@ jobs:
         run: |
           DATE=$(date +%Y-%m-%d)
           BRANCH="chore/automated-update-$DATE"
+          RUN_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
-          # Collect results
-          UPDATED=""
-          FAILED=""
-          UP_TO_DATE=""
-          PR_BODY="## Automated Update — $DATE\n\n### Updates applied\n"
-          VALIDATION_TABLE="| Workspace | tsc | build | export-dynamic | test |\n|-----------|-----|-------|----------------|------|\n"
+          # --- First pass: collect results and aggregates ---
+          TOTAL_WS=0
+          UPGRADED_COUNT=0
+          UNCHANGED_COUNT=0
+          FAILED_COUNT=0
+          TSC_PASS=0; TSC_TOTAL=0
+          BUILD_PASS=0; BUILD_TOTAL=0
+          EXPORT_PASS=0; EXPORT_TOTAL=0
+          TEST_PASS=0; TEST_TOTAL=0
           HAS_CHANGES=false
+
+          DEP_TABLE=""
+          VAL_TABLE=""
+          SKIPPED_LIST=""
+          ERROR_LIST=""
+          WARN_BLOCKQUOTE=""
 
           for dir in /tmp/all-results/update-*/; do
             [ -d "$dir" ] || continue
             WS=$(basename "$dir" | sed 's/^update-//')
             JSON="$dir/$WS.json"
-            PATCH="$dir/$WS.patch"
-
             [ -f "$JSON" ] || continue
+
+            TOTAL_WS=$((TOTAL_WS + 1))
             STATUS=$(jq -r '.status' "$JSON")
 
             case "$STATUS" in
               success)
                 HAS_CHANGES=true
+                UPGRADED_COUNT=$((UPGRADED_COUNT + 1))
                 FROM=$(jq -r '.backstage_from // "unknown"' "$JSON")
                 TO=$(jq -r '.backstage_to // "unknown"' "$JSON")
                 BUMPED=$(jq -r '.packages_bumped // 0' "$JSON")
-                TSC=$(jq -r '.tsc // "n/a"' "$JSON")
-                BUILD=$(jq -r '.build // "n/a"' "$JSON")
-                EXPORT=$(jq -r '.export_dynamic // "n/a"' "$JSON")
-                TEST=$(jq -r '.test // "n/a"' "$JSON")
-                UPDATED="$UPDATED\n- [x] $WS: $FROM → $TO ($BUMPED packages)"
-                VALIDATION_TABLE="$VALIDATION_TABLE| $WS | $TSC | $BUILD | $EXPORT | $TEST |\n"
+                TSC_RES=$(jq -r '.tsc // "n/a"' "$JSON")
+                BUILD_RES=$(jq -r '.build // "n/a"' "$JSON")
+                EXPORT_RES=$(jq -r '.export_dynamic // "n/a"' "$JSON")
+                TEST_RES=$(jq -r '.test // "n/a"' "$JSON")
 
-                # Collect non-blocking failures for visibility
+                DEP_TABLE="${DEP_TABLE}| ${WS} | \`${FROM}\` → \`${TO}\` | ${BUMPED} |\n"
+
+                # Map results to emoji
+                TSC_EMOJI="✅ pass"; [ "$TSC_RES" = "fail" ] && TSC_EMOJI="❌ fail"
+                BUILD_EMOJI="✅ pass"; [ "$BUILD_RES" = "fail" ] && BUILD_EMOJI="❌ fail"
+                EXPORT_EMOJI="✅ pass"; [ "$EXPORT_RES" = "fail" ] && EXPORT_EMOJI="⚠️ fail"
+                TEST_EMOJI="✅ pass"; [ "$TEST_RES" = "fail" ] && TEST_EMOJI="⚠️ fail"
+
+                VAL_TABLE="${VAL_TABLE}| ${WS} | ${TSC_EMOJI} | ${BUILD_EMOJI} | ${EXPORT_EMOJI} | ${TEST_EMOJI} |\n"
+
+                # Aggregate pass counts
+                TSC_TOTAL=$((TSC_TOTAL + 1)); [ "$TSC_RES" = "pass" ] && TSC_PASS=$((TSC_PASS + 1))
+                BUILD_TOTAL=$((BUILD_TOTAL + 1)); [ "$BUILD_RES" = "pass" ] && BUILD_PASS=$((BUILD_PASS + 1))
+                EXPORT_TOTAL=$((EXPORT_TOTAL + 1)); [ "$EXPORT_RES" = "pass" ] && EXPORT_PASS=$((EXPORT_PASS + 1))
+                TEST_TOTAL=$((TEST_TOTAL + 1)); [ "$TEST_RES" = "pass" ] && TEST_PASS=$((TEST_PASS + 1))
+
+                # Collect warnings
                 TEST_ERR=$(jq -r '.test_error // empty' "$JSON")
                 EXPORT_ERR=$(jq -r '.export_dynamic_error // empty' "$JSON")
                 if [ -n "$TEST_ERR" ]; then
-                  FAILED="$FAILED\n- $WS (test): $TEST_ERR"
+                  ERROR_LIST="${ERROR_LIST}\n- ${WS} (test): ${TEST_ERR}"
+                  WARN_BLOCKQUOTE="${WARN_BLOCKQUOTE}\n> ⚠️ **${WS}** test failed: \`${TEST_ERR}\`"
                 fi
                 if [ -n "$EXPORT_ERR" ]; then
-                  FAILED="$FAILED\n- $WS (export-dynamic): $EXPORT_ERR"
+                  ERROR_LIST="${ERROR_LIST}\n- ${WS} (export-dynamic): ${EXPORT_ERR}"
+                  WARN_BLOCKQUOTE="${WARN_BLOCKQUOTE}\n> ⚠️ **${WS}** export-dynamic failed: \`${EXPORT_ERR}\`"
                 fi
                 ;;
               failed)
+                FAILED_COUNT=$((FAILED_COUNT + 1))
                 ERR=$(jq -r '.error // "unknown error"' "$JSON")
-                FAILED="$FAILED\n- $WS: $ERR"
+                ERROR_LIST="${ERROR_LIST}\n- ${WS}: ${ERR}"
                 ;;
               up-to-date)
-                UP_TO_DATE="$UP_TO_DATE\n- [ ] $WS: no updates"
+                UNCHANGED_COUNT=$((UNCHANGED_COUNT + 1))
+                SKIPPED_LIST="${SKIPPED_LIST}\n- ${WS}: no updates available"
                 ;;
             esac
           done
@@ -180,21 +209,17 @@ jobs:
             exit 0
           fi
 
-          # Configure git author for commits
+          # --- Configure git and apply patches ---
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Create branch and apply patches
           git checkout -b "$BRANCH"
 
           for dir in /tmp/all-results/update-*/; do
             WS=$(basename "$dir" | sed 's/^update-//')
             JSON="$dir/$WS.json"
             PATCH="$dir/$WS.patch"
-
             [ -f "$JSON" ] || continue
             STATUS=$(jq -r '.status' "$JSON")
-
             if [ "$STATUS" = "success" ] && [ -f "$PATCH" ] && [ -s "$PATCH" ]; then
               git apply "$PATCH"
               git add "workspace/$WS/"
@@ -202,31 +227,119 @@ jobs:
             fi
           done
 
-          # Verify at least one patch was actually applied
           COMMIT_COUNT=$(git rev-list --count main..HEAD)
           if [ "$COMMIT_COUNT" -eq 0 ]; then
             echo "All workspaces reported success but no patches were applied. Exiting."
             exit 0
           fi
 
-          # Build PR body
-          PR_BODY="## Automated Update — $DATE\n\n### Updates applied\n$UPDATED$UP_TO_DATE"
+          # --- Build Mermaid diagram ---
+          # Determine colors for validation nodes
+          color_for() {
+            local pass=$1 total=$2
+            if [ "$pass" -eq "$total" ]; then echo "fill:#238636,color:#fff"
+            elif [ "$pass" -eq 0 ]; then echo "fill:#da3633,color:#fff"
+            else echo "fill:#d29922,color:#fff"
+            fi
+          }
 
-          if [ -n "$FAILED" ]; then
-            PR_BODY="$PR_BODY\n\n### Failed workspaces\n$FAILED"
+          TSC_COLOR=$(color_for "$TSC_PASS" "$TSC_TOTAL")
+          BUILD_COLOR=$(color_for "$BUILD_PASS" "$BUILD_TOTAL")
+          EXPORT_COLOR=$(color_for "$EXPORT_PASS" "$EXPORT_TOTAL")
+          TEST_COLOR=$(color_for "$TEST_PASS" "$TEST_TOTAL")
+
+          # Overall pass emoji for consolidation gate
+          ALL_PASS=$((TSC_PASS + BUILD_PASS + EXPORT_PASS + TEST_PASS))
+          ALL_TOTAL=$((TSC_TOTAL + BUILD_TOTAL + EXPORT_TOTAL + TEST_TOTAL))
+          if [ "$ALL_PASS" -eq "$ALL_TOTAL" ]; then GATE_EMOJI="✅"; else GATE_EMOJI="⚠️"; fi
+
+          MERMAID="\`\`\`mermaid
+          graph TB
+              Start([\"🔄 Automated Maintenance\"])
+              Start --> M{{\"⚡ Discovery + Upgrade<br/><i>${TOTAL_WS} workspaces · versions:bump</i>\"}}
+
+              M --> T[\"tsc<br/>${TSC_PASS}/${TSC_TOTAL} pass\"]
+              M --> B[\"build<br/>${BUILD_PASS}/${BUILD_TOTAL} pass\"]
+              M --> E[\"export-dynamic<br/>${EXPORT_PASS}/${EXPORT_TOTAL} pass\"]
+              M --> X[\"test<br/>${TEST_PASS}/${TEST_TOTAL} pass\"]
+
+              T & B & E & X --> C{{\"Consolidation<br/><i>${UPGRADED_COUNT} upgraded · ${UNCHANGED_COUNT} unchanged</i><br/>${UPGRADED_COUNT}/${UPGRADED_COUNT} pass ${GATE_EMOJI}\"}}
+              C --> Done([\"✅ PR Ready for Review\"])
+
+              style Start fill:#1f6feb,color:#fff,stroke:#388bfd
+              style M fill:#1f2937,color:#e6edf3,stroke:#30363d
+              style T ${TSC_COLOR}
+              style B ${BUILD_COLOR}
+              style E ${EXPORT_COLOR}
+              style X ${TEST_COLOR}
+              style C fill:#1f2937,color:#e6edf3,stroke:#30363d
+              style Done fill:#238636,color:#fff,stroke:#2ea043
+          \`\`\`"
+
+          # --- Assemble PR body ---
+          PR_BODY="## Automated Maintenance — ${DATE}
+
+          > Autonomous dependency management for VeeCode DevPortal Plugins.
+          > This PR was created, validated, and verified by an AI agent
+          > without human intervention.
+
+          ### Pipeline
+
+          ${MERMAID}"
+
+          # Add warning blockquote after diagram if any
+          if [ -n "$WARN_BLOCKQUOTE" ]; then
+            PR_BODY="${PR_BODY}
+          $(printf '%b' "$WARN_BLOCKQUOTE")"
           fi
 
-          PR_BODY="$PR_BODY\n\n### Validation results per workspace\n$VALIDATION_TABLE"
+          PR_BODY="${PR_BODY}
 
-          if [ -n "$FAILED" ]; then
-            PR_BODY="$PR_BODY\n### Manual attention required\n$FAILED"
+          ### Dependency changes
+
+          | Workspace | Backstage Core | Packages bumped |
+          |-----------|---------------|-----------------|
+          $(printf '%b' "$DEP_TABLE")
+
+          ### Validation results per workspace
+
+          | Workspace | tsc | build | export-dynamic | test |
+          |-----------|-----|-------|----------------|------|
+          $(printf '%b' "$VAL_TABLE")"
+
+          if [ -n "$SKIPPED_LIST" ]; then
+            PR_BODY="${PR_BODY}
+
+          ### Skipped workspaces
+          $(printf '%b' "$SKIPPED_LIST")"
+          fi
+
+          if [ -n "$ERROR_LIST" ]; then
+            PR_BODY="${PR_BODY}
+
+          ### Errors encountered
+          $(printf '%b' "$ERROR_LIST")
+
+          ### Manual attention required
+          $(printf '%b' "$ERROR_LIST")"
           else
-            PR_BODY="$PR_BODY\n### Manual attention required\nnone"
+            PR_BODY="${PR_BODY}
+
+          ### Errors encountered
+          none
+
+          ### Manual attention required
+          none"
           fi
 
-          # Push and create PR
+          PR_BODY="${PR_BODY}
+
+          ---
+          <sub>🤖 Generated by <a href=\"https://github.com/veecode-platform/devportal-plugins/blob/main/.github/workflows/automated-update.yml\">VeeCode Automated Maintenance</a> · powered by Claude Code</sub>"
+
+          # --- Push and create PR ---
           git push -u origin "$BRANCH"
-          printf '%b' "$PR_BODY" | gh pr create \
+          echo "$PR_BODY" | gh pr create \
             --title "chore: automated update $DATE" \
             --body-file /dev/stdin
         env:
