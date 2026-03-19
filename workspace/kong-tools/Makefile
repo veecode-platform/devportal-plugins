@@ -64,9 +64,9 @@ build:
 
 # Build dynamic variants (backend + frontend only)
 build-dynamic: build
-	cd $(KSM_BACKEND_DIR) && npx @red-hat-developer-hub/cli@1.10.0 plugin export
-	cd $(KSM_FRONTEND_DIR) && npx @red-hat-developer-hub/cli@1.10.0 plugin export
-	cd $(KSM_SCAFFOLDER_EXT_DIR) && npx @red-hat-developer-hub/cli@1.10.0 plugin export
+	cd $(KSM_BACKEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(KSM_FRONTEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(KSM_SCAFFOLDER_EXT_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
 
 # Create npm packages for all plugins
 pack:

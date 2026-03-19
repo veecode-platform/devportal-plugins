@@ -60,8 +60,8 @@ build:
 
 # Build all dynamic plugins
 build-dynamic: build
-	cd $(FRONTEND_DIR) && npx @red-hat-developer-hub/cli@1.10.0 plugin export
-	cd $(BACKEND_DIR) && npx @red-hat-developer-hub/cli@1.10.0 plugin export
+	cd $(FRONTEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(BACKEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
 
 # Pack all static plugins
 pack:

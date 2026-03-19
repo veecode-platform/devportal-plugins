@@ -56,7 +56,7 @@ build:
 
 # Build all dynamic plugins
 build-dynamic: build
-	cd $(PLUGIN_DIR) && npx @red-hat-developer-hub/cli@1.10.0 plugin export
+	cd $(PLUGIN_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
 
 # Pack all static plugins
 pack:
