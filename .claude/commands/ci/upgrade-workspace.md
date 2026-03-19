@@ -98,12 +98,19 @@ a command exits with non-zero status.
 
    ```bash
    grep -q 'build-dynamic' Makefile && make build-dynamic > /tmp/logs/build-dynamic.log 2>&1
+   echo "export-dynamic exit code: $?"
    ```
 
-   - If the Makefile has a `build-dynamic` target: run it and record
-     `"export_dynamic": "pass"` or `"export_dynamic": "fail"`.
    - If the Makefile has no `build-dynamic` target: record
      `"export_dynamic": "n/a"`.
+   - If the Makefile has a `build-dynamic` target: determine pass/fail
+     **solely by the exit code** of `make build-dynamic`.
+     Exit code 0 = `"export_dynamic": "pass"`.
+     Non-zero exit code = `"export_dynamic": "fail"`.
+   - **Do NOT** use log content (grep for "Error", "FAIL", etc.) to
+     determine pass or fail. The build tools emit warnings that contain
+     the word "Error" even on successful builds (e.g. Module Federation
+     DTS warnings). Only the exit code is authoritative.
 
 9. **Test**:
 
