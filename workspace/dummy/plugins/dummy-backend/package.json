@@ -12,7 +12,11 @@
   },
   "backstage": {
     "role": "backend-plugin",
-    "pluginId": "plugin-dummy-backend"
+    "pluginId": "plugin-dummy-backend",
+    "pluginPackages": [
+      "@veecode-platform/backstage-plugin-dummy",
+      "@veecode-platform/backstage-plugin-dummy-backend"
+    ]
   },
   "scripts": {
     "start": "backstage-cli package start",

@@ -60,7 +60,7 @@ set-version:
 
 # Build all static plugins
 build:
-	yarn install && yarn tsc && yarn build:all
+	YARN_ENABLE_IMMUTABLE_INSTALLS=false yarn install && yarn tsc && yarn build:all
 
 # Build all dynamic plugins (requires common to be published first)
 build-dynamic: build
