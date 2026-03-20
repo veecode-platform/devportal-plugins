@@ -44,9 +44,17 @@ a command exits with non-zero status.
 
 2. **Capture current Backstage version**:
 
-   Record the current `@backstage/core-plugin-api` version (or another
-   `@backstage/*` package) from `package.json` or `yarn.lock` so the
-   report can show the before/after delta.
+   Read the Backstage release version from `backstage.json` in the
+   workspace root:
+
+   ```bash
+   BACKSTAGE_FROM=$(node -p "require('./backstage.json').version")
+   ```
+
+   This is the Backstage **release** version (e.g. `1.49.0`), NOT an
+   individual package version like `@backstage/core-plugin-api`. Always
+   use `backstage.json` as the source — it is the single source of truth
+   for the workspace's Backstage version.
 
 3. **Run the upgrade**:
 
@@ -131,8 +139,8 @@ a command exits with non-zero status.
     {
       "workspace": "$WORKSPACE",
       "status": "success",
-      "backstage_from": "<previous version>",
-      "backstage_to": "<new version>",
+      "backstage_from": "<BACKSTAGE_FROM from step 2>",
+      "backstage_to": "<read from backstage.json after bump: node -p require('./backstage.json').version>",
       "packages_bumped": 12,
       "tsc": "pass",
       "build": "pass",
