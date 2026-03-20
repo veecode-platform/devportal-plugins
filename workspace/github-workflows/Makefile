@@ -5,7 +5,7 @@
 # - Has workspace:* dependency handling (replace-workspace/restore-workspace)
 #
 
-VERSION ?= 1.3.7
+VERSION ?= 1.4.0
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 

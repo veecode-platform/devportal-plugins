@@ -4,7 +4,7 @@
 # - Supports both static and dynamic plugin builds
 #
 
-VERSION ?= 0.1.0
+VERSION ?= 0.2.0
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
