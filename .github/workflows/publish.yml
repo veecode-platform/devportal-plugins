@@ -99,10 +99,14 @@ jobs:
         run: make set-version VERSION=${{ steps.version.outputs.new }}
 
       - name: Publish static plugins
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: make publish VERSION=${{ steps.version.outputs.new }}
 
       - name: Publish dynamic plugins
         continue-on-error: true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: make publish-dynamic VERSION=${{ steps.version.outputs.new }}
 
       - name: Restore workspace references
