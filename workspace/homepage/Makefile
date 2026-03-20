@@ -54,8 +54,24 @@ set-version:
 build:
 	yarn install && yarn tsc && yarn build:all
 
+# Patch @mui/material/styles/package.json to include a version field.
+# Webpack Module Federation needs this to resolve the shared module version,
+# but MUI's subpath package.json files omit it. Without this patch, any
+# dependency that imports from @mui/material/styles (e.g. @mui/x-charts)
+# causes: "No version specified and unable to automatically determine one"
+patch-mui-styles-version:
+	@node -e " \
+	  var fs = require('fs'); \
+	  var root = JSON.parse(fs.readFileSync('node_modules/@mui/material/package.json', 'utf8')); \
+	  var stylesPath = 'node_modules/@mui/material/styles/package.json'; \
+	  var styles = JSON.parse(fs.readFileSync(stylesPath, 'utf8')); \
+	  if (!styles.version) { styles.version = root.version; fs.writeFileSync(stylesPath, JSON.stringify(styles, null, 2) + '\n'); \
+	    console.log('Patched @mui/material/styles/package.json with version ' + root.version); \
+	  } \
+	"
+
 # Build all dynamic plugins
-build-dynamic: build
+build-dynamic: build patch-mui-styles-version
 	cd $(PLUGIN_DIR) && rm -f dist/remoteEntry.js dist/remoteEntry.js.map dist/mf-manifest.json dist/mf-stats.json && rm -rf dist/@mf-types dist/compiled-types && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
 
 # Pack all static plugins
