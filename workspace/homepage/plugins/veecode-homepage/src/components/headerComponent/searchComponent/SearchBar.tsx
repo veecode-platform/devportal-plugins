@@ -26,7 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { SearchInput } from './SearchInput';
 import { SearchOption } from './SearchOption';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 
 interface SearchBarProps {
   query: SearchResultProps['query'];

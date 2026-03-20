@@ -1,5 +1,5 @@
 import { PropsWithChildren } from 'react';
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 import Box from '@mui/material/Box';
 import HomeIcon from '@mui/icons-material/Home';
 import ExtensionIcon from '@mui/icons-material/Extension';

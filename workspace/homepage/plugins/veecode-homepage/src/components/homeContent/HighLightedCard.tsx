@@ -5,7 +5,7 @@ import AddIcon from '@mui/icons-material/Add';
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import Box from '@mui/material/Box';
 import { LinkButton } from '@backstage/core-components';
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 import { useTranslation } from '../../hooks/useTranslation';
 
 export default function HighlightedCard() {

@@ -1,5 +1,5 @@
 import Box from '@mui/material/Box';
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 import { UserAvatar } from '../userAvatar/UserAvatar';
 import Typography from '@mui/material/Typography';
 import { useApi, configApiRef } from '@backstage/core-plugin-api';

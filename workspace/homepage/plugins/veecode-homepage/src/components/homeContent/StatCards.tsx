@@ -3,7 +3,7 @@ import CardContent from '@mui/material/CardContent';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import { alpha } from '@mui/material/styles';
+import { alpha } from '@mui/material';
 
 export type StatCardProps = {
   icon: React.ElementType;

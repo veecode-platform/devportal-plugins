@@ -5,7 +5,7 @@ import Menu from '@mui/material/Menu';
 import Box from '@mui/material/Box';
 import { useUserProfile } from '@backstage/plugin-user-settings';
 import Typography from '@mui/material/Typography';
-import { Divider, ListItemIcon, MenuItem } from '@mui/material';
+import { Divider, ListItemIcon, MenuItem, useTheme } from '@mui/material';
 import { UserAvatar } from '../../userAvatar/UserAvatar';
 import { useApi } from '@backstage/core-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
@@ -14,7 +14,6 @@ import { UserEntity } from '@backstage/catalog-model';
 import { Link } from 'react-router-dom';
 import { Logout } from '../logout/Logout';
 import Chip from '@mui/material/Chip';
-import { useTheme } from '@mui/material/styles';
 
 interface MenuItemsProps {
   anchorEl: HTMLElement | null;

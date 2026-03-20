@@ -18,7 +18,7 @@ import { useId } from 'react';
 import type { ReactNode, ComponentProps, MouseEvent, FC } from 'react';
 import Menu from '@mui/material/Menu';
 import Button from '@mui/material/Button';
-import { Theme } from '@mui/material/styles';
+import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';

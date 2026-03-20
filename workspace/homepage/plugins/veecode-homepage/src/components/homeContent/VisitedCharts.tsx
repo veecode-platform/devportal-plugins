@@ -2,14 +2,13 @@
 import * as React from 'react';
 import { PieChart } from '@mui/x-charts/PieChart';
 import { useDrawingArea } from '@mui/x-charts/hooks';
-import { styled, useTheme } from '@mui/material/styles';
+import { styled, useTheme, CardHeader, Divider } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
-import { CardHeader, Divider } from '@mui/material';
 import { useApi, configApiRef } from '@backstage/core-plugin-api';
 import { useVisited } from '../../hooks/useVisited';
 import { generateColorVariants } from '../../utils/generateColor';

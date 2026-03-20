@@ -1,4 +1,4 @@
-import { styled } from '@mui/material/styles';
+import { styled } from '@mui/material';
 
 // MUI v5 styled refactor replacing legacy makeStyles usage
 // Keeping the original dimensions and fill color.

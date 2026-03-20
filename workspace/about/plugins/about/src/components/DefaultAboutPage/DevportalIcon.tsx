@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-import Icon from '@mui/material/Icon';
-import { useTheme } from '@mui/material/styles';
+import { Icon, useTheme } from '@mui/material';
 
 export const VeecodeLogoIcon = () => {
 

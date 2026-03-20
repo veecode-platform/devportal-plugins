@@ -8,7 +8,7 @@ import { SearchComponent } from './searchComponent/SearchComponent';
 import { MenuItems } from './menuItems/MenuItems';
 import { Notifications } from './notifications/Notifications';
 import { Profile } from './profile/Profle';
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 
 export const HeaderComponent = () => {
   const theme = useTheme();

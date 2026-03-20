@@ -31,7 +31,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';

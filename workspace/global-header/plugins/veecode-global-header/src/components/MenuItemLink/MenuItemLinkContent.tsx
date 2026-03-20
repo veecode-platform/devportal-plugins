@@ -17,7 +17,7 @@ import type { FC } from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { HeaderIcon } from '../HeaderIcon/HeaderIcon';
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 import LaunchIcon from '@mui/icons-material/Launch';
 import { MenuItemLinkType } from './MenuItemLink';
 import { RenderIconByType } from '../RenderIconByType/RenderIconByType';

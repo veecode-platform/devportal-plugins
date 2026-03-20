@@ -25,7 +25,7 @@ import { createSearchLink } from '../../utils/stringUtils';
 import { useNavigate } from 'react-router-dom';
 import { SearchInput } from './SearchInput';
 import { SearchOption } from './SearchOption';
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
 import { useTranslation } from '../../hooks/useTranslation';
 

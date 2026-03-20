@@ -24,7 +24,7 @@ import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined
 import KeyboardArrowDownOutlinedIcon from '@mui/icons-material/KeyboardArrowDownOutlined';
 import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
-import { lighten } from '@mui/material/styles';
+import { lighten } from '@mui/material';
 import Box from '@mui/material/Box';
 
 import { MenuItemConfig, MenuSection } from './MenuSection';

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material';
 import type { ThemeConfig } from '@red-hat-developer-hub/backstage-plugin-theme';
 
 /**

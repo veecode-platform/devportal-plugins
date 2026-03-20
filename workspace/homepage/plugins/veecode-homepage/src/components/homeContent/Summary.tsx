@@ -2,14 +2,13 @@
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Box from '@mui/material/Box';
-import { CardHeader, Divider } from '@mui/material';
+import { CardHeader, Divider, useTheme } from '@mui/material';
 import StatCard from './StatCards';
 import HighlightedCard from './HighLightedCard';
 import { useCatalog } from '../../hooks/useCatalog';
 import AutoAwesomeMotionIcon from '@mui/icons-material/AutoAwesomeMotion';
 import FolderCopyIcon from '@mui/icons-material/FolderCopy';
 import ExtensionIcon from '@mui/icons-material/Extension';
-import { useTheme } from '@mui/material/styles';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
 import { generateColorVariants } from '../../utils/generateColor';
 import { useTranslation } from '../../hooks/useTranslation';
