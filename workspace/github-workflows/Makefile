@@ -64,8 +64,8 @@ build:
 
 # Build all dynamic plugins (requires common to be published first)
 build-dynamic: build
-	cd $(FRONTEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
-	cd $(BACKEND_DIR) && npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(FRONTEND_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(BACKEND_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
 
 # Pack all static plugins
 pack:
