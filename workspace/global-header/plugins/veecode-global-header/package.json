@@ -34,7 +34,7 @@
     "@backstage/catalog-model": "^1.7.7",
     "@backstage/core-components": "^0.18.8",
     "@backstage/core-plugin-api": "^1.12.4",
-    "@backstage/plugin-catalog-react": "^2.1.0",
+    "@backstage/plugin-catalog-react": "^2.1.1",
     "@backstage/plugin-notifications": "^0.5.15",
     "@backstage/plugin-notifications-common": "^0.2.1",
     "@backstage/plugin-search": "^1.7.0",
