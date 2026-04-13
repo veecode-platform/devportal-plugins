@@ -54,7 +54,7 @@
     "@backstage/frontend-plugin-api": "^0.15.1",
     "@backstage/integration": "^2.0.0",
     "@backstage/integration-react": "^1.2.16",
-    "@backstage/plugin-catalog-react": "^2.1.0",
+    "@backstage/plugin-catalog-react": "^2.1.1",
     "@backstage/theme": "^0.7.2",
     "@mui/icons-material": "^5.15.0",
     "@mui/lab": "^5.0.0-alpha.158",
