@@ -1,0 +1,19 @@
+{
+  "extends": "@backstage/cli/config/tsconfig.json",
+  "include": [
+    "plugins/*/src",
+    "plugins/*/config.d.ts",
+    "plugins/*/dev"
+  ],
+  "exclude": [
+    "node_modules",
+    "plugins/*/src/**/*.test.ts",
+    "plugins/*/src/**/*.test.tsx",
+    "plugins/*/src/**/*.stories.tsx"
+  ],
+  "compilerOptions": {
+    "outDir": "dist-types",
+    "rootDir": ".",
+    "jsx": "react-jsx"
+  }
+}

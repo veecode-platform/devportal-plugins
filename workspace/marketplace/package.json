@@ -1,0 +1,57 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "20 || 22"
+  },
+  "scripts": {
+    "build:all": "backstage-cli repo build --all",
+    "tsc": "tsc",
+    "tsc:full": "tsc --skipLibCheck false --incremental false",
+    "clean": "backstage-cli repo clean",
+    "test": "backstage-cli repo test",
+    "test:all": "backstage-cli repo test --coverage",
+    "fix": "backstage-cli repo fix",
+    "lint": "backstage-cli repo lint --since origin/main",
+    "lint:all": "backstage-cli repo lint",
+    "prettier:check": "prettier --check .",
+    "update-backstage": "backstage-cli versions:bump"
+  },
+  "workspaces": {
+    "packages": [
+      "plugins/*"
+    ]
+  },
+  "devDependencies": {
+    "@backstage/cli": "^0.36.0",
+    "@jest/environment-jsdom-abstract": "^30.0.0",
+    "@material-ui/core": "^4.12.2",
+    "@types/jest": "^30.0.0",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "jest": "^30.2.0",
+    "jsdom": "^27.1.0",
+    "prettier": "^2.3.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.2",
+    "typescript": "~5.8.0"
+  },
+  "resolutions": {
+    "@material-ui/core": "^4.12.2",
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "prettier": "@backstage/cli/config/prettier",
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "packageManager": "yarn@4.12.0"
+}
