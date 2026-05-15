@@ -18,7 +18,7 @@ environment variable.
 
 Steps 3 (`versions:bump`) and 8 (`make build-dynamic`) run deterministic
 scripts that modify files in the working tree. Treat ALL changes in the
-`workspace/$WORKSPACE/` directory as part of the upgrade — preserve every
+`workspaces/$WORKSPACE/` directory as part of the upgrade — preserve every
 modified file through the remaining steps and include them all in the
 final `git diff` patch.
 
@@ -37,10 +37,10 @@ a command exits with non-zero status.
 1. **Navigate to workspace and install dependencies**:
 
    ```bash
-   cd workspace/$WORKSPACE && yarn install > /tmp/logs/install.log 2>&1
+   cd workspaces/$WORKSPACE && yarn install > /tmp/logs/install.log 2>&1
    ```
 
-   Confirm `workspace/$WORKSPACE/` exists and exit code is 0.
+   Confirm `workspaces/$WORKSPACE/` exists and exit code is 0.
 
 2. **Capture current Backstage version**:
 
@@ -65,7 +65,7 @@ a command exits with non-zero status.
 4. **Check for actual changes**:
 
    ```bash
-   git status --porcelain 'workspace/$WORKSPACE/'
+   git status --porcelain 'workspaces/$WORKSPACE/'
    ```
 
    If no files were modified: save the up-to-date result and stop.
@@ -196,7 +196,7 @@ When a step fails:
    | Any other unrecognized pattern | Unknown | Revert and report |
 
 **Revert and report**: revert all workspace changes with
-`git checkout -- workspace/$WORKSPACE/`, then save:
+`git checkout -- workspaces/$WORKSPACE/`, then save:
 
 ```json
 {

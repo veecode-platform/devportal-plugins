@@ -11,7 +11,7 @@ checkpoints.
    List all available workspaces:
 
    ```bash
-   ls -d workspace/*/package.json
+   ls -d workspaces/*/package.json
    ```
 
    Display them in a numbered list (extracting the workspace name from
@@ -21,10 +21,10 @@ checkpoints.
 2. **Navigate to workspace and install dependencies**:
 
    ```bash
-   cd workspace/$WORKSPACE && yarn install
+   cd workspaces/$WORKSPACE && yarn install
    ```
 
-   Confirm `workspace/$WORKSPACE/` exists and `yarn install` exits with code 0.
+   Confirm `workspaces/$WORKSPACE/` exists and `yarn install` exits with code 0.
 
 3. **Capture current Backstage version**:
 
@@ -41,7 +41,7 @@ checkpoints.
 5. **Check for actual changes**:
 
    ```bash
-   git status --porcelain 'workspace/$WORKSPACE/'
+   git status --porcelain 'workspaces/$WORKSPACE/'
    ```
 
    If no files were modified, inform the user: "All Backstage packages
@@ -56,7 +56,7 @@ checkpoints.
    | @backstage/core-plugin-api | 1.9.0 | 1.10.0 |
 
    Use `AskUserQuestion` to let the user review and confirm. If the
-   user rejects, revert with `git checkout -- workspace/$WORKSPACE/`
+   user rejects, revert with `git checkout -- workspaces/$WORKSPACE/`
    and stop.
 
 7. **Install post-bump**:

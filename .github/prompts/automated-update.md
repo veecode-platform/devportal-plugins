@@ -17,7 +17,7 @@ to the CI workflow.
 Discover all workspaces:
 
 ```bash
-ls -d workspace/*/package.json | xargs -I{} dirname {} | xargs -I{} basename {}
+ls -d workspaces/*/package.json | xargs -I{} dirname {} | xargs -I{} basename {}
 ```
 
 For each workspace, set the WORKSPACE environment variable and follow the

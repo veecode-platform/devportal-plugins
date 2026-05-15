@@ -8,7 +8,7 @@ This project is a collection of Backstage plugins for the VeeCode Platform. Each
 
 ```pre
 devportal-plugins/
-├── workspace/                    # All workspaces live here
+├── workspaces/                    # All workspaces live here
 │   ├── dummy/                    # Reference implementation — start here
 │   ├── homepage/
 │   ├── global-header/
@@ -30,7 +30,7 @@ There is **no root `package.json`**. Each workspace manages its own dependencies
 Every workspace is a self-contained Backstage app with Yarn workspaces:
 
 ```pre
-workspace/<name>/
+workspaces/<name>/
 ├── packages/
 │   ├── app/                      # Backstage frontend hosting app (for dev/testing only)
 │   │   └── src/App.tsx           # Route registration, plugin wiring
@@ -73,7 +73,7 @@ workspace/<name>/
 
 ## Commands Reference
 
-### Per-Workspace (run from `workspace/<name>/`)
+### Per-Workspace (run from `workspaces/<name>/`)
 
 | Command | Purpose |
 |---------|---------|
@@ -95,7 +95,7 @@ workspace/<name>/
 | `yarn build` | Build the plugin |
 | `yarn lint` | Lint the plugin |
 
-### Makefile Targets (run from `workspace/<name>/`)
+### Makefile Targets (run from `workspaces/<name>/`)
 
 | Target | Purpose |
 |--------|---------|
@@ -238,10 +238,10 @@ Always use `--watchAll=false` when running tests from the command line to preven
 
 ```bash
 # All tests in a workspace
-cd workspace/<name> && yarn test:all --watchAll=false
+cd workspaces/<name> && yarn test:all --watchAll=false
 
 # Single plugin
-cd workspace/<name>/plugins/<plugin> && yarn test --watchAll=false
+cd workspaces/<name>/plugins/<plugin> && yarn test --watchAll=false
 ```
 
 ## Dynamic Plugin Testing with Docker
@@ -275,7 +275,7 @@ The `dist-dynamic/` directories are mounted into `/app/dynamic-plugins/dist/` in
 
 ## Reference Implementation
 
-The **dummy workspace** (`workspace/dummy/`) is the canonical example. When creating a new workspace or standardizing an existing one, refer to dummy for:
+The **dummy workspace** (`workspaces/dummy/`) is the canonical example. When creating a new workspace or standardizing an existing one, refer to dummy for:
 
 - Makefile structure and targets
 - Plugin package.json scripts and metadata (`backstage.role`, `pluginId`, `publishConfig`)
