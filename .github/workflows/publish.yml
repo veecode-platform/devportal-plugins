@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: workspace
+          sparse-checkout: workspaces
           sparse-checkout-cone-mode: true
 
       - name: Validate workspace names
@@ -28,14 +28,14 @@ jobs:
         run: |
           INVALID=""
           for WS in $(echo "$CONFIG" | jq -r 'keys[]'); do
-            if [ ! -d "workspace/$WS" ]; then
+            if [ ! -d "workspaces/$WS" ]; then
               INVALID="$INVALID $WS"
             fi
           done
           if [ -n "$INVALID" ]; then
             echo "::error::Invalid workspace name(s):$INVALID"
             echo "Valid workspaces are:"
-            ls workspace/
+            ls workspaces/
             exit 1
           fi
 
@@ -60,7 +60,7 @@ jobs:
       fail-fast: false
     defaults:
       run:
-        working-directory: workspace/${{ matrix.workspace }}
+        working-directory: workspaces/${{ matrix.workspace }}
     steps:
       - uses: actions/checkout@v4
 
@@ -175,7 +175,7 @@ jobs:
           for WS_FILE in /tmp/published/*; do
             WS=$(basename "$WS_FILE")
             NEW=$(cat "$WS_FILE")
-            MAKEFILE="workspace/$WS/Makefile"
+            MAKEFILE="workspaces/$WS/Makefile"
             [ -f "$MAKEFILE" ] || continue
             CURRENT=$(sed -n 's/^VERSION[[:space:]]*?=[[:space:]]*\([^ #]*\).*/\1/p' "$MAKEFILE")
             sed -i "s/^VERSION[[:space:]]*?=.*/VERSION ?= $NEW/" "$MAKEFILE"
@@ -185,7 +185,7 @@ jobs:
       - name: Commit version bumps
         if: steps.check.outputs.found == 'true'
         run: |
-          git add workspace/*/Makefile
+          git add workspaces/*/Makefile
           if git diff --cached --quiet; then
             echo "No version changes to commit"
           else

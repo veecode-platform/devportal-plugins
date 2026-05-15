@@ -20,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git@github.com:veecode-platform/devportal-plugins.git",
-    "directory": "workspace/ldap-auth/plugins/ldap-auth"
+    "directory": "workspaces/ldap-auth/plugins/ldap-auth"
   },
   "sideEffects": false,
   "scripts": {

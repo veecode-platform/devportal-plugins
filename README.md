@@ -10,21 +10,21 @@ Each workspace groups related plugins together. A workspace is an independent Ba
 
 | Workspace | Plugins | Description | Status |
 |-----------|---------|-------------|--------|
-| [homepage](workspace/homepage/) | veecode-homepage | Homepage plugin | Ready |
-| [global-header](workspace/global-header/) | veecode-global-header | Global header plugin | Ready |
-| [github-workflows](workspace/github-workflows/) | github-workflows, github-workflows-common, github-workflow-backend | GitHub workflows (frontend + backend + common) | Ready |
-| [ldap-auth](workspace/ldap-auth/) | ldap-auth, ldap-auth-backend | LDAP auth (port from @immobiliarelabs) | Ready |
-| [kong-tools](workspace/kong-tools/) | scaffolder-backend-module-kong, kong-service-manager, kong-service-manager-backend, kong-service-manager-common, scaffolder-field-extensions-kong | Kong scaffolder actions and service manager | Ready |
-| [kubernetes](workspace/kubernetes/) | kubernetes-backend-module-getsecret | Kubernetes secret access module | WIP |
-| [about](workspace/about/) | about, about-backend | About plugin | ready. |
-| [dummy](workspace/dummy/) | dummy, dummy-backend | **Reference implementation** for plugin authors | Ready |
+| [homepage](workspaces/homepage/) | veecode-homepage | Homepage plugin | Ready |
+| [global-header](workspaces/global-header/) | veecode-global-header | Global header plugin | Ready |
+| [github-workflows](workspaces/github-workflows/) | github-workflows, github-workflows-common, github-workflow-backend | GitHub workflows (frontend + backend + common) | Ready |
+| [ldap-auth](workspaces/ldap-auth/) | ldap-auth, ldap-auth-backend | LDAP auth (port from @immobiliarelabs) | Ready |
+| [kong-tools](workspaces/kong-tools/) | scaffolder-backend-module-kong, kong-service-manager, kong-service-manager-backend, kong-service-manager-common, scaffolder-field-extensions-kong | Kong scaffolder actions and service manager | Ready |
+| [kubernetes](workspaces/kubernetes/) | kubernetes-backend-module-getsecret | Kubernetes secret access module | WIP |
+| [about](workspaces/about/) | about, about-backend | About plugin | ready. |
+| [dummy](workspaces/dummy/) | dummy, dummy-backend | **Reference implementation** for plugin authors | Ready |
 
 ## Getting Started
 
 Each workspace is self-contained. Navigate to a workspace and run:
 
 ```sh
-cd workspace/<name>
+cd workspaces/<name>
 yarn install
 yarn start          # Start the Backstage hosting app
 ```
@@ -43,7 +43,7 @@ yarn lint:all       # Lint all files
 Every workspace has a Makefile with standardized targets:
 
 ```sh
-cd workspace/<name>
+cd workspaces/<name>
 make help               # Show all available commands
 make build              # Build all static plugins
 make build-dynamic      # Build all dynamic plugins (uses @red-hat-developer-hub/cli)
@@ -78,7 +78,7 @@ This is important for testing dynamic plugins publishing (the `export-dynamic` t
 
 ## Reference Implementation
 
-The **dummy** workspace (`workspace/dummy/`) is the canonical reference for plugin authors. It demonstrates:
+The **dummy** workspace (`workspaces/dummy/`) is the canonical reference for plugin authors. It demonstrates:
 
 - Frontend plugin with full-page view, entity cards, and entity tabs
 - Backend plugin with HTTP API, service architecture, and dependency injection

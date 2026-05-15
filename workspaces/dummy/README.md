@@ -5,7 +5,7 @@ This workspace contains dummy plugin pair (frontend + backend) for demonstration
 ## Workspace Structure
 
 ```pre
-workspace/dummy/
+workspaces/dummy/
 ├── packages/
 │   ├── app/              # Frontend hosting app (for development/testing)
 │   └── backend/          # Backend hosting app (for development/testing)

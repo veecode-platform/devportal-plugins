@@ -19,7 +19,7 @@ This will create a `dist-dynamic/dist` folder in the plugin directory.
 Start a `vkdr` local cluster and deploy some labeled services in it:
 
 ```sh
-cd workspace/kubernetes/dynamic/
+cd workspaces/kubernetes/dynamic/
 vkdr infra start --api-port 9000
 vkdr kong install --default-ic --label=vee.codes/cluster=vkdr-config-cluster
 vkdr whoami install --label=vee.codes/cluster=vkdr-catalog-cluster

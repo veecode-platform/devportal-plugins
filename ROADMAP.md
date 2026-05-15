@@ -17,7 +17,7 @@
 
 ### Phase 1: Improve Dummy Workspace
 
-We will start with the dummy workspace ("./workspace/dummy"), as it is the most basic example of a Backstage plugin and it is intended to become a reference implementation for other workspaces.
+We will start with the dummy workspace ("./workspaces/dummy"), as it is the most basic example of a Backstage plugin and it is intended to become a reference implementation for other workspaces.
 
 - [x] **1.1** Create Makefile for dummy workspace
   - [x] Follow the standards defined in most other workspaces

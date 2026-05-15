@@ -182,7 +182,7 @@ plugins:
 Start the plugin in standalone mode for local development:
 
 ```bash
-cd workspace/kong-tools
+cd workspaces/kong-tools
 yarn --cwd plugins/kong-service-manager-backend start
 ```
 

@@ -4,13 +4,13 @@
     {
       "name": "kong-tools-tsc",
       "runtimeExecutable": "yarn",
-      "runtimeArgs": ["--cwd", "workspace/kong-tools", "tsc"],
+      "runtimeArgs": ["--cwd", "workspaces/kong-tools", "tsc"],
       "port": 0
     },
     {
       "name": "kong-tools-dev",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["BROWSER=none", "yarn", "--cwd", "workspace/kong-tools", "start"],
+      "runtimeArgs": ["BROWSER=none", "yarn", "--cwd", "workspaces/kong-tools", "start"],
       "port": 3000
     }
   ]
