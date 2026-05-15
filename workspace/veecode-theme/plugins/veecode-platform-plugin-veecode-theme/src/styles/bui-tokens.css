@@ -1,0 +1,27 @@
+/*
+ * VeeCode brand overrides for the @backstage/ui (BUI) design tokens.
+ *
+ * This file ships INSIDE the dynamic plugin's Module-Federation bundle and is
+ * imported from src/index.ts, so it loads when the remote loads — after the
+ * app's static `import '@backstage/ui/css/styles.css'` (packages/app/src/index.tsx),
+ * which is what lets these overrides win on cascade order. Confirming that the
+ * MF bundle's CSS is actually injected and wins is ADR-011 validation criterion #5;
+ * the fallback if it doesn't is to move this import into packages/app instead.
+ *
+ * CAUTION: BUI is pre-1.0 and renames tokens in *minor* releases. The app
+ * resolves @backstage/ui ^0.14; the token/selector names below were read from
+ * the 0.13.2 build and MUST be re-checked against the app's resolved version
+ * (`@backstage/ui/dist/css/styles.css`) before being relied on. Keep this set small.
+ */
+:root {
+  /* "solid" = BUI's filled/primary surface (primary buttons, etc.) */
+  --bui-bg-solid: #00857a;
+  --bui-bg-solid-hover: #006d64;
+  --bui-bg-solid-pressed: #005a53;
+}
+
+[data-theme='dark'] {
+  --bui-bg-solid: #2ec8b6;
+  --bui-bg-solid-hover: #25a895;
+  --bui-bg-solid-pressed: #1f8e7e;
+}
