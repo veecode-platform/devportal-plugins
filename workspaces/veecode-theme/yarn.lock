@@ -1957,7 +1957,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/cli@npm:^0.36.0, @backstage/cli@npm:^0.36.1":
+"@backstage/cli@npm:^0.36.1":
   version: 0.36.1
   resolution: "@backstage/cli@npm:0.36.1"
   dependencies:
@@ -2048,7 +2048,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/core-plugin-api@npm:^1.12.0":
+"@backstage/core-plugin-api@npm:^1.12.5":
   version: 1.12.5
   resolution: "@backstage/core-plugin-api@npm:1.12.5"
   dependencies:
@@ -2174,7 +2174,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/theme@npm:^0.7.2":
+"@backstage/theme@npm:^0.7.3":
   version: 0.7.3
   resolution: "@backstage/theme@npm:0.7.3"
   dependencies:
@@ -16190,7 +16190,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "root@workspace:."
   dependencies:
-    "@backstage/cli": "npm:^0.36.0"
+    "@backstage/cli": "npm:^0.36.1"
     "@backstage/e2e-test-utils": "npm:^0.1.2"
     "@jest/environment-jsdom-abstract": "npm:^30.0.0"
     "@material-ui/core": "npm:^4.12.2"
@@ -18289,8 +18289,8 @@ __metadata:
   resolution: "veecode-platform-plugin-veecode-theme@workspace:plugins/veecode-platform-plugin-veecode-theme"
   dependencies:
     "@backstage/cli": "npm:^0.36.1"
-    "@backstage/core-plugin-api": "npm:^1.12.0"
-    "@backstage/theme": "npm:^0.7.2"
+    "@backstage/core-plugin-api": "npm:^1.12.5"
+    "@backstage/theme": "npm:^0.7.3"
     "@red-hat-developer-hub/cli": "npm:latest"
     typescript: "npm:~5.8.0"
   peerDependencies:
