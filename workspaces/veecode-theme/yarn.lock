@@ -2174,7 +2174,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/theme@npm:^0.7.3":
+"@backstage/theme@npm:^0.7.2":
   version: 0.7.3
   resolution: "@backstage/theme@npm:0.7.3"
   dependencies:
@@ -18290,7 +18290,7 @@ __metadata:
   dependencies:
     "@backstage/cli": "npm:^0.36.1"
     "@backstage/core-plugin-api": "npm:^1.12.0"
-    "@backstage/theme": "npm:^0.7.3"
+    "@backstage/theme": "npm:^0.7.2"
     "@red-hat-developer-hub/cli": "npm:latest"
     typescript: "npm:~5.8.0"
   peerDependencies:
