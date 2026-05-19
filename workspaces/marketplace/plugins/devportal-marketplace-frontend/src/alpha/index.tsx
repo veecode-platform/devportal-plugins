@@ -17,7 +17,6 @@
 import {
   createFrontendModule,
   createFrontendPlugin,
-  NavItemBlueprint,
   PageBlueprint,
 } from '@backstage/frontend-plugin-api';
 import { TranslationBlueprint } from '@backstage/plugin-app-react';
@@ -36,23 +35,13 @@ export const extensionsPage = PageBlueprint.make({
   params: {
     path: '/marketplace',
     routeRef: rootRouteRef,
+    title: 'Extensions',
+    icon: <ExtensionsIcon fontSize="inherit" />,
     loader: () =>
       import('../pages/DynamicExtensionsPluginRouter').then(m =>
         compatWrapper(<m.DynamicExtensionsPluginRouter />),
       ),
     // async () => compatWrapper(<DynamicExtensionsPluginRouter/>),
-  },
-});
-
-/**
- * @alpha
- */
-
-export const extensionsNavItem = NavItemBlueprint.make({
-  params: {
-    title: 'Extensions',
-    routeRef: rootRouteRef,
-    icon: ExtensionsIcon,
   },
 });
 
@@ -83,7 +72,6 @@ export default createFrontendPlugin({
     dynamicPluginsInfoApi,
     extensionApi,
     extensionsPage,
-    extensionsNavItem,
   ],
   routes: allRoutes,
 });
