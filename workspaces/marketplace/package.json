@@ -24,7 +24,7 @@
     ]
   },
   "devDependencies": {
-    "@backstage/cli": "^0.36.0",
+    "@backstage/cli": "^0.36.2",
     "@jest/environment-jsdom-abstract": "^30.0.0",
     "@material-ui/core": "^4.12.2",
     "@types/jest": "^30.0.0",
