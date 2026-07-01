@@ -23,3 +23,23 @@
   display: block;
   margin-top: 16px;
 }
+
+/*
+ * App canvas — the shell paints `body { background: var(--bui-bg-app) }` from
+ * the Backstage UI (BUI) stylesheet, with defaults #f8f8f8 (light) / #333333
+ * (dark) scoped by [data-theme-mode]. That variable lives OUTSIDE the MUI
+ * palette, so `background.default` never reaches the body: every page whose
+ * content is transparent (catalog, entity, APIs...) showed the BUI gray. The
+ * Home page masked it with its own full-bleed surface — which is why only
+ * non-home pages looked wrong.
+ *
+ * UnifiedThemeProvider stamps `data-theme-mode` on <body>, so `body[...]`
+ * (specificity 0,1,1) beats BUI's bare `[data-theme-mode]` (0,1,0) regardless
+ * of stylesheet order. Values mirror tokens.ts: brand.canvas / brand.dark.canvas.
+ */
+body[data-theme-mode='light'] {
+  --bui-bg-app: #f3f5f8;
+}
+body[data-theme-mode='dark'] {
+  --bui-bg-app: #101820;
+}
