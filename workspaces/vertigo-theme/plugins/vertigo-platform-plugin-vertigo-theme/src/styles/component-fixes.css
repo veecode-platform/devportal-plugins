@@ -1,0 +1,25 @@
+/*
+ * v4-layer fixes — reached only by GLOBAL CSS, not the theme's component overrides.
+ *
+ * The DevPortal renders the catalog UserListPicker with MUI v4 (jss). Two facts
+ * force this file to exist instead of a `styleOverrides` rule:
+ *   1. createUnifiedTheme reaches the v4 Card ROOT (border/radius apply) but
+ *      DROPS nested selector objects, so `& > .MuiTypography-subtitle2:first-child`
+ *      in styleOverrides never emits for v4.
+ *   2. Backstage's class generator suffixes every class (`MuiCard-root-2510`,
+ *      `MuiTypography-subtitle2-93`), so exact `.MuiCard-root` would not match —
+ *      hence the substring `[class*="..."]` selectors below.
+ *
+ * The picker renders each group label ("PERSONAL", "VEECODE") as a bare subtitle
+ * that is the Card's FIRST child (no CardContent), so it sat flush against the
+ * card's top edge. This rule only matches that pattern (a subtitle that is the
+ * first child of a card), so ordinary Card > CardContent layouts are untouched.
+ *
+ * The label is a <span> (display:inline), and vertical margins have NO effect on
+ * inline elements — so `margin-top` alone computed as 16px but moved nothing.
+ * `display:block` makes the vertical margin actually take effect.
+ */
+[class*="MuiCard-root"] > [class*="MuiTypography-subtitle2"]:first-child {
+  display: block;
+  margin-top: 16px;
+}
