@@ -10,20 +10,20 @@ export const useModalStyles = makeStyles((theme: Theme) => ({
     justifyContent: 'center'
    },
    modalContent:{
-    backgroundColor: theme.palette.background.default,
+    backgroundColor: theme?.palette?.background?.default ?? '#fff',
     backdropFilter: 'blur(13.5px)',
     '-webkit-backdrop-filter':'blur(13.5px)',
     width: '60%',
     height: '80%',
     padding: '1rem',
     borderRadius: '8px',
-    border: `1px solid ${theme.palette.background.paper}`,
+    border: `1px solid ${theme?.palette?.background?.paper ?? '#fff'}`,
     overflowY:'auto'
    },
    modalHeader:{
     width: '100%',
     padding: '.8rem',
-    borderBottom: `2px solid ${theme.palette.divider}`
+    borderBottom: `2px solid ${theme?.palette?.divider ?? 'rgba(0, 0, 0, 0.12)'}`
    },
    subtitle:{
     display: 'flex',
@@ -38,7 +38,7 @@ export const useModalStyles = makeStyles((theme: Theme) => ({
    jobsList:{
     width: '100%',
     '& > li:nth-child(odd)':{
-     backgroundColor: theme.palette.background.paper
+     backgroundColor: theme?.palette?.background?.paper ?? '#fff'
     }
    },
    jobListItem:{
@@ -48,7 +48,7 @@ export const useModalStyles = makeStyles((theme: Theme) => ({
    AccordionLogs:{
     marginTop: '.5rem',
     padding: '.5rem',
-    backgroundColor: theme.palette.background.paper
+    backgroundColor: theme?.palette?.background?.paper ?? '#fff'
    },
    button: {
     order: -1,
@@ -72,6 +72,6 @@ export const useModalStyles = makeStyles((theme: Theme) => ({
         width: '100%',
     },
     log: {
-       backgroundColor: theme.palette.background.default,
+       backgroundColor: theme?.palette?.background?.default ?? '#fff',
     },
 }));

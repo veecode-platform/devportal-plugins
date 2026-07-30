@@ -4,7 +4,7 @@ import { Theme } from "@mui/material";
 export const useModalStyles = makeStyles((theme: Theme) => ({
     modal: {
         padding: '2rem',
-        borderTop: `1px solid ${theme.palette.divider}`,
+        borderTop: `1px solid ${theme?.palette?.divider ?? 'rgba(0, 0, 0, 0.12)'}`,
         display: 'flex',
         alignItems: 'stretch',
         justifyContent: 'center',

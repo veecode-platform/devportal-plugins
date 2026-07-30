@@ -34,15 +34,15 @@ export const useWorkflowCardStyles = makeStyles((theme: Theme) => ({
       padding: '2rem 1rem',
       gap: '1.5rem',
       overflow: 'auto',
-      borderTop: `1px solid ${theme.palette.divider}`,
+      borderTop: `1px solid ${theme?.palette?.divider ?? 'rgba(0, 0, 0, 0.12)'}`,
       '&::-webkit-scrollbar': {
         width: '10px',
         height: '4px'
       },
       '&::-webkit-scrollbar-thumb': {
         borderRadius: '50px',
-        background: theme.palette.grey[600],
-  
+        background: theme?.palette?.grey?.[600] ?? '#757575',
+
       },
       '&::-webkit-scrollbar-track': {
         background: 'transparent',

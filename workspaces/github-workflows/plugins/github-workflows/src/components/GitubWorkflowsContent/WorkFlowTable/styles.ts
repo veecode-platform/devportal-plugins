@@ -20,7 +20,7 @@ export const useWorkflowTableStyles = makeStyles((theme: Theme) => ({
       fontSize: '1rem',
       display: 'flex',
       alignItems: 'center',
-      color: theme.palette.text.secondary,
+      color: theme?.palette?.text?.secondary ?? 'rgba(0, 0, 0, 0.6)',
     },
     name:{
       display: 'flex',
