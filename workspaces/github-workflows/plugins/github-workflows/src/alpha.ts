@@ -18,6 +18,7 @@ import { createFrontendPlugin } from '@backstage/frontend-plugin-api';
 import {
   GithubWorkflowsTabContent,
   GithubWorkflowsOverviewContent,
+  githubWorkflowsApi,
 } from './alpha/index';
 import { rootRouteRef } from './routes';
 
@@ -29,5 +30,12 @@ export default createFrontendPlugin({
   routes: convertLegacyRouteRefs({
     entityContent: rootRouteRef,
   }),
-  extensions: [GithubWorkflowsTabContent, GithubWorkflowsOverviewContent],
+  // The API extension must ship with the surfaces: without it the NFS host
+  // has no factory for apiRef{plugin.githubworkflows} and both surfaces
+  // crash with NotImplementedError (first runtime pilot, 2026-07-30).
+  extensions: [
+    githubWorkflowsApi,
+    GithubWorkflowsTabContent,
+    GithubWorkflowsOverviewContent,
+  ],
 });
