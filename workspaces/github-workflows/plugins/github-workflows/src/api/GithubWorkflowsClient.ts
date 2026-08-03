@@ -1,52 +1,54 @@
-import { DiscoveryApi } from "@backstage/core-plugin-api";
+import { DiscoveryApi, FetchApi } from "@backstage/core-plugin-api";
 import { GithubWorkflowsApi } from "./GithubWorkflowsApi";
 import { Options, Workflows } from "./types";
 
 
 /**
- * 
+ *
  * HTTP Client implementation - calls backend API instead of using Octokit directly
  * All GitHub authentication is handled by the backend.
  * @public
- * 
- */ 
+ *
+ */
 
 class Client {
   private readonly discoveryApi: DiscoveryApi;
+  private readonly fetchApi: FetchApi;
 
   constructor(options: Options) {
     this.discoveryApi = options.discoveryApi;
+    this.fetchApi = options.fetchApi;
   }
 
   private async fetchFromBackend<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
     const baseUrl = await this.discoveryApi.getBaseUrl('github-workflow-backend');
     const queryString = new URLSearchParams(params).toString();
     const url = `${baseUrl}/${endpoint}${queryString ? `?${queryString}` : ''}`;
-    
-    const response = await fetch(url);
+
+    const response = await this.fetchApi.fetch(url);
     if (!response.ok) {
       throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
     }
-    
+
     return response.json();
   }
 
   private async postToBackend<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
     const baseUrl = await this.discoveryApi.getBaseUrl('github-workflow-backend');
     const url = `${baseUrl}/${endpoint}`;
-    
-    const response = await fetch(url, {
+
+    const response = await this.fetchApi.fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Backend API error: ${response.status} ${response.statusText}`);
     }
-    
+
     return response.json();
   }
 

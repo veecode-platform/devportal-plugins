@@ -1,4 +1,4 @@
-import { DiscoveryApi } from '@backstage/core-plugin-api';
+import { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
 
 // Import all types from common package
 export type { 
@@ -30,4 +30,5 @@ export type Integrations = {
 
 export type Options = {
   discoveryApi: DiscoveryApi;
+  fetchApi: FetchApi;
 }

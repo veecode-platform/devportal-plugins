@@ -7,8 +7,8 @@ export const useWorkflowDetailsStyles = makeStyles((theme: Theme) => ({
     },
     container:{
       padding: '1rem',
-      [theme.breakpoints.up('md')]: {    
-        backgroundColor: theme.palette.background.paper 
+      [theme.breakpoints.up('md')]: {
+        backgroundColor: theme?.palette?.background?.paper ?? '#fff'
        },
        [theme.breakpoints.down('md')]: {
         minWidth:'500px'
@@ -49,15 +49,15 @@ export const useWorkflowDetailsStyles = makeStyles((theme: Theme) => ({
       gap: '.5rem'
     },
     link:{
-      color: theme.palette.primary.main,
+      color: theme?.palette?.primary?.main ?? '#1976d2',
       textAlign: 'center',
       '&:hover':{
-        color: theme.palette.primary.dark
+        color: theme?.palette?.primary?.dark ?? '#1565c0'
       }
     },
     footer:{
       width: 'auto',
-      background: theme.palette.background.paper,
+      background: theme?.palette?.background?.paper ?? '#fff',
       padding: '1rem 0',
       display: 'flex',
       alignItems: 'center',
@@ -66,7 +66,7 @@ export const useWorkflowDetailsStyles = makeStyles((theme: Theme) => ({
     jobsSection:{
       marginTop: '1.5rem',
       padding: '1.5rem',
-      backgroundColor: theme.palette.background.default
+      backgroundColor: theme?.palette?.background?.default ?? '#fff'
     },
     jobsContent:{
       width: '100%',
@@ -84,7 +84,7 @@ export const useWorkflowDetailsStyles = makeStyles((theme: Theme) => ({
       '-webkit-backdrop-filter':'blur(13.5px)',
       padding: '1rem',
       borderRadius: '10px',
-      border: `1px solid ${theme.palette.background.paper}`,
+      border: `1px solid ${theme?.palette?.background?.paper ?? '#fff'}`,
       cursor: 'pointer'
     },
     jobDuration:{
