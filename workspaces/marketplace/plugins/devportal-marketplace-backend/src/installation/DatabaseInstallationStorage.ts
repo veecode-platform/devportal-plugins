@@ -69,6 +69,9 @@ export class DatabaseInstallationStorage implements InstallationStorage {
 
         rows.push({
           package_name: pkgName,
+          // T1.3 / D-G8: record what was asked for, verbatim. The digest that
+          // ends up being installed is resolved later, by the platform pre-step.
+          requested_ref: pkgName,
           disabled,
           config_yaml: configYaml,
         });
@@ -165,6 +168,7 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     await this.db(TABLE)
       .insert({
         package_name: packageName,
+        requested_ref: packageName,
         disabled,
         config_yaml: configYaml,
         updated_at: this.db.fn.now(),
@@ -199,6 +203,7 @@ export class DatabaseInstallationStorage implements InstallationStorage {
         await trx(TABLE)
           .insert({
             package_name: pkgName,
+            requested_ref: pkgName,
             disabled,
             config_yaml: configYaml,
             updated_at: trx.fn.now(),
@@ -247,6 +252,7 @@ export class DatabaseInstallationStorage implements InstallationStorage {
       toBlockStyle(doc.contents);
       await this.db(TABLE).insert({
         package_name: packageName,
+        requested_ref: packageName,
         disabled,
         config_yaml: doc.toString({ lineWidth: 120 }),
         updated_at: this.db.fn.now(),
@@ -287,6 +293,7 @@ export class DatabaseInstallationStorage implements InstallationStorage {
           toBlockStyle(doc.contents);
           await trx(TABLE).insert({
             package_name: packageName,
+            requested_ref: packageName,
             disabled,
             config_yaml: doc.toString({ lineWidth: 120 }),
             updated_at: trx.fn.now(),
