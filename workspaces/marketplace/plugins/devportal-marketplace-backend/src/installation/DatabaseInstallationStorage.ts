@@ -18,6 +18,16 @@ interface DbRow {
   disabled: boolean;
   config_yaml: string | null;
   updated_at: Date;
+  // T1.3 / D-G8. Optional rather than required, for two independent reasons:
+  // both columns are nullable in the database, and the reads in this class select
+  // columns by name (`select('config_yaml','package_name','disabled')`), so a row
+  // object legitimately arrives without them.
+  //
+  // requested_ref  — what the operator asked for, written here at install time.
+  // resolved_digest — filled by the platform pre-step, which resolves it once via
+  //                   skopeo; this backend has no registry client and never sets it.
+  requested_ref?: string | null;
+  resolved_digest?: string | null;
 }
 
 export class DatabaseInstallationStorage implements InstallationStorage {
