@@ -14,10 +14,14 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./alpha": "./src/alpha.tsx",
     "./package.json": "./package.json"
   },
   "typesVersions": {
     "*": {
+      "alpha": [
+        "src/alpha.tsx"
+      ],
       "package.json": [
         "package.json"
       ]
@@ -26,11 +30,14 @@
   "scripts": {
     "tsc": "tsc",
     "build": "backstage-cli package build",
-    "clean": "backstage-cli package clean"
+    "clean": "backstage-cli package clean",
+    "test": "backstage-cli package test"
   },
   "dependencies": {
+    "@backstage/core-compat-api": "^0.5.9",
     "@backstage/core-components": "^0.18.8",
     "@backstage/core-plugin-api": "^1.12.4",
+    "@backstage/frontend-plugin-api": "^0.15.1",
     "@mui/icons-material": "^5.18.0",
     "@mui/material": "^5.18.0",
     "react-use": "^17.5.1"

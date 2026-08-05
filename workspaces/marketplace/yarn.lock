@@ -13363,8 +13363,10 @@ __metadata:
   resolution: "devportal-pending-changes@workspace:plugins/devportal-pending-changes"
   dependencies:
     "@backstage/cli": "npm:^0.36.0"
+    "@backstage/core-compat-api": "npm:^0.5.9"
     "@backstage/core-components": "npm:^0.18.8"
     "@backstage/core-plugin-api": "npm:^1.12.4"
+    "@backstage/frontend-plugin-api": "npm:^0.15.1"
     "@mui/icons-material": "npm:^5.18.0"
     "@mui/material": "npm:^5.18.0"
     react-use: "npm:^17.5.1"
