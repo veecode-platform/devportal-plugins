@@ -9,3 +9,11 @@ dynamicPlugins:
             props:
               width: 1500
               height: 800
+      # Visit recorder. The v3 shell mounts no VisitListener of its own — it only
+      # consumes this mount point — so without this entry `visitsApiRef.save()` is
+      # never called and the "Recently visited" / "Top visited" cards stay empty.
+      # Note: the ApplicationListener renders the component bare, so neither
+      # `config.props` nor `config.if` is honoured here.
+      mountPoints:
+        - mountPoint: application/listener
+          importName: VisitListener

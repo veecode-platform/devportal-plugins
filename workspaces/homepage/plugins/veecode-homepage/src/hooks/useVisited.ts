@@ -24,7 +24,13 @@ export const useVisited = () => {
   const useVisitedApi = useApi(visitsApiRef);
 
   const { value, loading, error } = useAsync(async (): Promise<VisitType> => {
-    const data = (await useVisitedApi.list()) as Visit[];
+    // Without queryParams `list()` falls back to DEFAULT_LIST_LIMIT = 8 and no
+    // ordering; since visits are persisted sorted by timestamp, the chart would
+    // show "hits among the 8 most recent visits" instead of the top visited.
+    const data = (await useVisitedApi.list({
+      orderBy: [{ field: 'hits', direction: 'desc' }],
+      limit: 20,
+    })) as Visit[];
     const total = data.reduce((acc, item) => acc + item.hits, 0);
     const items = data.map(visit => ({
       label: visit.name,
