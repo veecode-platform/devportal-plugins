@@ -40,10 +40,9 @@ export default function Summary() {
 
   const color =
     (isDarkMode
-      ? configApi.app?.branding?.theme?.dark?.headerColor1
-      : // ? configApi.getOptionalString('app.branding.theme.dark.headerColo1')
-        // : configApi.getOptionalString('app.branding.theme.light.headerColo1')) ??
-        configApi.app?.branding?.theme?.light?.headerColor1) ?? '#45556D';
+      ? configApi.getOptionalString('app.branding.theme.dark.headerColor1')
+      : configApi.getOptionalString('app.branding.theme.light.headerColor1')) ??
+    '#45556D';
   const colors = generateColorVariants(color, data.length);
 
   return (

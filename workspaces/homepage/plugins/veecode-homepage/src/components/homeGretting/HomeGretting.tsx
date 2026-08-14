@@ -18,16 +18,14 @@ export const HomeGreeting = () => {
   const configApi = useApi(configApiRef);
   const color1 =
     (isDarkMode
-      ? configApi.app?.branding?.theme?.dark?.headerColor1
-      : // ? configApi.getOptionalString('app.branding.theme.dark.headerColo1')
-        // : configApi.getOptionalString('app.branding.theme.light.headerColo1')) ??
-        configApi.app?.branding?.theme?.light?.headerColor1) ?? '#45556D';
+      ? configApi.getOptionalString('app.branding.theme.dark.headerColor1')
+      : configApi.getOptionalString('app.branding.theme.light.headerColor1')) ??
+    '#45556D';
   const color2 =
     (isDarkMode
-      ? configApi.app?.branding?.theme?.dark?.headerColor2
-      : // ? configApi.getOptionalString('app.branding.theme.dark.headerColo2')
-        // : configApi.getOptionalString('app.branding.theme.light.headerColo2')) ??
-        configApi.app?.branding?.theme?.light?.headerColor2) ?? '#86F4CE';
+      ? configApi.getOptionalString('app.branding.theme.dark.headerColor2')
+      : configApi.getOptionalString('app.branding.theme.light.headerColor2')) ??
+    '#86F4CE';
 
   const profileDisplayName = () => {
     const name = displayName;

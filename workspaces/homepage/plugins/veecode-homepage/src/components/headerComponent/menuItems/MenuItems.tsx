@@ -63,8 +63,7 @@ export const MenuItems: React.FC<MenuItemsProps> = ({
   const catalogApi = useApi(catalogApiRef);
   const config = useApi(configApiRef);
   const supportUrl =
-    config.app?.support?.url ??
-    // config.getOptionalString('app.support.url') ??
+    config.getOptionalString('app.support.url') ??
     'https://github.com/orgs/veecode-platform/discussions';
 
   useEffect(() => {
