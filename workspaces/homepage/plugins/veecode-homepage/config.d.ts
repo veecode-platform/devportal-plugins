@@ -14,74 +14,72 @@
  * limitations under the License.
  */
 
-declare module '@backstage/config' {
-  interface Config {
-    app?: {
-      branding?: {
+export interface Config {
+  app?: {
+    branding?: {
+      /**
+       * Base64 URI for the full logo
+       * @visibility frontend
+       */
+      fullLogo?: string;
+      /**
+       * Base64 URI for the full log DarkMode
+       * @visibility frontend
+       */
+      fullLogoDarkMode?: string;
+      /**
+       * @visibility frontend
+       */
+      theme?: {
         /**
-         * Base64 URI for the full logo
          * @visibility frontend
          */
-        fullLogo?: string;
-        /**
-         * Base64 URI for the full log DarkMode
-         * @visibility frontend
-         */
-        fullLogoDarkMode?: string;
-        /**
-         * @visibility frontend
-         */
-        theme?: {
+        light?: {
           /**
            * @visibility frontend
            */
-          light?: {
-            /**
-             * @visibility frontend
-             */
-            primaryColor?: string;
-            /**
-             * @visibility frontend
-             */
-            headerColor1?: string;
-            /**
-             * @visibility frontend
-             */
-            headerColor2?: string;
-            /**
-             * @visibility frontend
-             */
-            navigationIndicatorColor?: string;
-          };
+          primaryColor?: string;
           /**
            * @visibility frontend
            */
-          dark?: {
-            /**
-             * @visibility frontend
-             */
-            primaryColor?: string;
-            /**
-             * @visibility frontend
-             */
-            headerColor1?: string;
-            /**
-             * @visibility frontend
-             */
-            headerColor2?: string;
-            /**
-             * @visibility frontend
-             */
-            navigationIndicatorColor?: string;
-          };
+          headerColor1?: string;
+          /**
+           * @visibility frontend
+           */
+          headerColor2?: string;
+          /**
+           * @visibility frontend
+           */
+          navigationIndicatorColor?: string;
+        };
+        /**
+         * @visibility frontend
+         */
+        dark?: {
+          /**
+           * @visibility frontend
+           */
+          primaryColor?: string;
+          /**
+           * @visibility frontend
+           */
+          headerColor1?: string;
+          /**
+           * @visibility frontend
+           */
+          headerColor2?: string;
+          /**
+           * @visibility frontend
+           */
+          navigationIndicatorColor?: string;
         };
       };
-      support?: {
-        /**
-         * @visibility frontend
-         */
-        url?: string;
-      };
     };
-  }
+    support?: {
+      /**
+       * @visibility frontend
+       */
+      url?: string;
+    };
+  };
 }
