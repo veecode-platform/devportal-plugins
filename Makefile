@@ -5,7 +5,7 @@
 # Use: cd workspaces/<name> && make help
 #
 # Workspaces:
-# - homepage:         cd workspaces/homepage && make help
+# - veecode-homepage:         cd workspaces/veecode-homepage && make help
 # - global-header:    cd workspaces/global-header && make help
 # - github-workflows: cd workspaces/github-workflows && make help
 # - ldap-auth:        cd workspaces/ldap-auth && make help
@@ -24,7 +24,7 @@ help:
 	@echo ""
 	@echo "Each workspace has its own Makefile. Navigate to the workspace first:"
 	@echo ""
-	@echo "  cd workspaces/homepage && make help"
+	@echo "  cd workspaces/veecode-homepage && make help"
 	@echo "  cd workspaces/global-header && make help"
 	@echo "  cd workspaces/github-workflows && make help"
 	@echo "  cd workspaces/ldap-auth && make help"
@@ -46,9 +46,9 @@ copy-dynamic-plugins: echo-paths
 		cp -R workspaces/global-header/plugins/veecode-global-header/dist-dynamic $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-global-header-dynamic; \
 		echo "Copied global-header dynamic plugin"; \
 	fi
-	@if [ -d "workspaces/homepage/plugins/veecode-homepage/dist-dynamic" ]; then \
+	@if [ -d "workspaces/veecode-homepage/plugins/veecode-homepage/dist-dynamic" ]; then \
 		rm -Rf $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic; \
-		cp -R workspaces/homepage/plugins/veecode-homepage/dist-dynamic $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic; \
+		cp -R workspaces/veecode-homepage/plugins/veecode-homepage/dist-dynamic $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic; \
 		echo "Copied homepage dynamic plugin"; \
 	fi
 	@echo "Done."

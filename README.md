@@ -10,7 +10,7 @@ Each workspace groups related plugins together. A workspace is an independent Ba
 
 | Workspace | Plugins | Description | Status |
 |-----------|---------|-------------|--------|
-| [homepage](workspaces/homepage/) | veecode-homepage | Homepage plugin | Ready |
+| [veecode-homepage](workspaces/veecode-homepage/) | veecode-homepage | Homepage plugin | Ready |
 | [global-header](workspaces/global-header/) | veecode-global-header | Global header plugin | Ready |
 | [github-workflows](workspaces/github-workflows/) | github-workflows, github-workflows-common, github-workflow-backend | GitHub workflows (frontend + backend + common) | Ready |
 | [ldap-auth](workspaces/ldap-auth/) | ldap-auth, ldap-auth-backend | LDAP auth (port from @immobiliarelabs) | Ready |
