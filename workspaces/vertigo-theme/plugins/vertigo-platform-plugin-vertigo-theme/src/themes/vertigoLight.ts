@@ -25,28 +25,58 @@ const subtle = tokens.brand.textSecondary; // blue-gray, secondary text (7.43:1 
 // Editorial header: navy with a very subtle depth stop (not an "AI gradient").
 const header = genPageTheme({ colors: [navy, navyDeep], shape: shapes.wave });
 
-export const vertigoLight = createUnifiedTheme({
-  palette: {
-    ...palettes.light,
-    primary: { main: blue },
-    secondary: { main: navy },
-    background: { default: canvas, paper: tokens.brand.paper },
-    text: {
-      primary: ink,
-      secondary: subtle,
-    },
-    link: blueLink,
-    linkHover: blue,
-    navigation: {
-      ...palettes.light.navigation,
-      background: tokens.chrome,
-      indicator: blueSoft,
-      color: tokens.brand.sidebarText, // unselected items on chrome (AAA)
-      selectedColor: '#ffffff',
-      navItem: { hoverBackground: 'rgba(233, 238, 252, 0.06)' },
-      submenu: { background: tokens.chromeDeep },
+/*
+ * RHDH 3.x layout contract — theme.palette.rhdh.general.*.
+ *
+ * The 3.x app shell (devportal-core-main/packages/app) does layout arithmetic
+ * with this subtree, which the old-generation `createUnifiedTheme` form never
+ * emitted:
+ *   - Root.tsx:171            reads pageInset (docked-drawer margin calc())
+ *   - ResizableDrawer.tsx:117 reads sidebarBackgroundColor (drawer paper)
+ *   - useThemedConfig.ts:20   reads appBarBackgroundScheme (logo variant)
+ *   - CustomSidebarItem.tsx   reads sidebarItemSelectedBackgroundColor
+ * Without it, the calc() resolves against `undefined` — the sidebar↔content
+ * gap, the Administration-expand shift and the full-height loader. Kept as a
+ * separate const because MUI's createPalette deep-merges unknown palette keys
+ * (verified: @backstage/theme passes `palette` through untouched), while an
+ * inline literal would trip the TS excess-property check.
+ */
+const palette = {
+  ...palettes.light,
+  primary: { main: blue },
+  secondary: { main: navy },
+  background: { default: canvas, paper: tokens.brand.paper },
+  text: {
+    primary: ink,
+    secondary: subtle,
+  },
+  link: blueLink,
+  linkHover: blue,
+  navigation: {
+    ...palettes.light.navigation,
+    background: tokens.chrome,
+    indicator: blueSoft,
+    color: tokens.brand.sidebarText, // unselected items on chrome (AAA)
+    selectedColor: '#ffffff',
+    navItem: { hoverBackground: 'rgba(233, 238, 252, 0.06)' },
+    submenu: { background: tokens.chromeDeep },
+  },
+  // Vertigo values for the fields the 3.x shell reads (mirrors the M5 palette;
+  // the shell default for appBarBackgroundScheme is 'dark' — navy header).
+  rhdh: {
+    general: {
+      sidebarBackgroundColor: tokens.chrome,
+      sidebarItemSelectedBackgroundColor: blue,
+      appBarBackgroundScheme: 'dark',
+      appBarBackgroundColor: navy,
+      appBarForegroundColor: '#ffffff',
+      pageInset: '1.5rem',
     },
   },
+};
+
+export const vertigoLight = createUnifiedTheme({
+  palette,
   defaultPageTheme: 'home',
   pageTheme: {
     home: header,

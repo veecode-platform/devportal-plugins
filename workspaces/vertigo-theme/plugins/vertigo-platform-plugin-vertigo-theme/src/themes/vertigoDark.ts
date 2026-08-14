@@ -24,28 +24,44 @@ const subtle = tokens.brand.dark.textSecondary; // secondary text on dark (8.05:
 
 const header = genPageTheme({ colors: [navy, navyDeep], shape: shapes.wave });
 
-export const vertigoDark = createUnifiedTheme({
-  palette: {
-    ...palettes.dark,
-    primary: { main: blue },
-    secondary: { main: '#9db4ff' },
-    background: { default: canvas, paper: surface },
-    text: {
-      primary: ink,
-      secondary: subtle,
-    },
-    link: blue,
-    linkHover: blueSoft,
-    navigation: {
-      ...palettes.dark.navigation,
-      background: tokens.chrome,
-      indicator: blue,
-      color: tokens.brand.sidebarText,
-      selectedColor: '#ffffff',
-      navItem: { hoverBackground: 'rgba(233, 238, 252, 0.06)' },
-      submenu: { background: tokens.chromeDeep },
+/*
+ * RHDH 3.x layout contract — theme.palette.rhdh.general.* (see vertigoLight.ts
+ * for the full rationale). Same fields, dark-mode values.
+ */
+const palette = {
+  ...palettes.dark,
+  primary: { main: blue },
+  secondary: { main: '#9db4ff' },
+  background: { default: canvas, paper: surface },
+  text: {
+    primary: ink,
+    secondary: subtle,
+  },
+  link: blue,
+  linkHover: blueSoft,
+  navigation: {
+    ...palettes.dark.navigation,
+    background: tokens.chrome,
+    indicator: blue,
+    color: tokens.brand.sidebarText,
+    selectedColor: '#ffffff',
+    navItem: { hoverBackground: 'rgba(233, 238, 252, 0.06)' },
+    submenu: { background: tokens.chromeDeep },
+  },
+  rhdh: {
+    general: {
+      sidebarBackgroundColor: tokens.chrome,
+      sidebarItemSelectedBackgroundColor: blue,
+      appBarBackgroundScheme: 'dark',
+      appBarBackgroundColor: navy,
+      appBarForegroundColor: '#ffffff',
+      pageInset: '1.5rem',
     },
   },
+};
+
+export const vertigoDark = createUnifiedTheme({
+  palette,
   defaultPageTheme: 'home',
   pageTheme: {
     home: header,
