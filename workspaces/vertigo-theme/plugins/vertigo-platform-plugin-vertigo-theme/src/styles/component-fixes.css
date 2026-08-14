@@ -39,7 +39,37 @@
  */
 body[data-theme-mode='light'] {
   --bui-bg-app: #f3f5f8;
+  --vertigo-surface: #ffffff;
 }
 body[data-theme-mode='dark'] {
   --bui-bg-app: #101820;
+  --vertigo-surface: #17202b;
+}
+
+/*
+ * Surfaces painted OUTSIDE the theme by core-components' own makeStyles.
+ *
+ * Both offenders use an ANONYMOUS makeStyles (runtime classes like `jss4-2207`,
+ * no `{name}`), so there is no Backstage override key to target from the theme
+ * and no stable class name either — hence global CSS keyed on the MUI class
+ * fragment, scoped to `main`. No `!important` needed: `main [class*=...]` is
+ * (0,1,1) and beats the JSS rule's (0,1,0) regardless of injection order.
+ *
+ * 1. The TechDocs/catalog EmptyState grid paints
+ *    `background.default` (the app canvas), which reads as a darker rectangle on
+ *    top of the content surface — measured `#101820` inside an `article` that is
+ *    already `#17202b`. Grid containers carry no background of their own, so
+ *    clearing it is safe.
+ * 2. The catalog/docs filter picker is a v4 Card with a hardcoded
+ *    `rgba(0,0,0,0.11)` wash and MUI's default 4px radius: a grey block in light
+ *    mode and a muddy one in dark. createUnifiedTheme's v4 translation does reach
+ *    the Card root, but this component overrides it locally.
+ */
+#rhdh-sidebar-layout main [class*='MuiGrid-container'] {
+  background-color: transparent;
+}
+
+#rhdh-sidebar-layout main [class*='MuiCard-root'] {
+  background-color: var(--vertigo-surface);
+  border-radius: 12px;
 }

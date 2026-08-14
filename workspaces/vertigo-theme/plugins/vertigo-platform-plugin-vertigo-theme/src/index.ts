@@ -20,13 +20,20 @@ import '@fontsource/geist-sans/700.css';
 // file header for the full rationale.
 import './styles/component-fixes.css';
 
+// Tab icon. Side-effect on module load (like the CSS imports above) because the
+// favicon lives in the image's `public/`, out of app-config's reach — see the
+// file header for why the theme plugin owns it.
+import { applyVertigoFavicon } from './branding/favicon';
+
+applyVertigoFavicon();
+
 export { vertigoThemePlugin } from './plugin';
 export {
   VertigoLightThemeProvider,
   VertigoDarkThemeProvider,
 } from './providers';
-export { vertigoLight } from './themes/vertigoLight';
-export { vertigoDark } from './themes/vertigoDark';
+export { vertigoLightThemeConfig } from './themes/vertigoLight';
+export { vertigoDarkThemeConfig } from './themes/vertigoDark';
 export { VertigoHeaderBadge } from './components/VertigoHeaderBadge';
 
 // NOTE: custom Lucide system-icons were reverted. Only ~2/10 sidebar icons pass

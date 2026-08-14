@@ -14,6 +14,11 @@ export const tokens = {
   // blue accent (active state) pops instead of competing.
   chrome: '#161d2e',
   chromeDeep: '#0f1523', // submenu / a subtle depth stop
+  // Hover on the chrome (sidebar items). A translucent light wash, so it reads on
+  // the navy in BOTH modes and never fights the selected state. The RHDH defaults
+  // here are opaque (#ffffff light / #292929 dark) and made the sidebar label
+  // (sidebarText) unreadable on hover.
+  chromeHover: 'rgba(233, 238, 252, 0.10)',
   // Hairline: navy-tinted on light surfaces; a light cool tint on dark surfaces
   // (a navy hairline is invisible on dark paper — hairlineDark restores it).
   hairline: `rgba(${navyRGB}, 0.10)`,

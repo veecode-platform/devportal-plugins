@@ -23,6 +23,25 @@ import { tokens, type ThemeMode } from './tokens';
  * States pattern — applied consistently to EVERY interactive surface:
  *  hover → tinted overlay · focus → 2px blue ring on :focus-visible ·
  *  selected → brand blue · disabled → reduced opacity.
+ *
+ * SCOPE BOUNDARY (2026-08-14 regression fix). This layer is now merged ON TOP of
+ * the RHDH component layer (`variant: 'rhdh'` → `createComponents`), which owns
+ * the SHELL CHROME: sidebar drawer, sidebar items, page inset / sidebar↔content
+ * seam, app bar, tabs and the page header. Anything this file used to override
+ * in that set diverged from the app-config reference state, so the following
+ * were REMOVED rather than re-tuned:
+ *  - `MuiAppBar.colorPrimary` — repainted the global header brand-navy; the
+ *    reference header is the RHDH inset colour (measured `#f2f2f2` / `#151515`).
+ *  - `MuiTabs.indicator` + `MuiTab['&.Mui-selected']` — the reference selected
+ *    tab is `text.primary` (measured `rgb(238,241,251)` on dark), not brand blue.
+ *  - `BackstageSidebarItem` root/selected/iconContainer — the RHDH layer paints
+ *    the selected item from `rhdh.general.sidebarItemSelectedBackgroundColor`
+ *    (background) + `navigation.selectedColor` (label AND icon). The old
+ *    `selected.color` pinned the icon to a blue nearly identical to the selected
+ *    background, i.e. the invisible dark-mode icon. Its `'& $iconContainer'`
+ *    rule was JSS reference syntax and inert under the v5/Emotion layer anyway.
+ * What stays is the surface polish the reference state does not measure: radius,
+ * hairline, elevation, density and control shapes.
  */
 export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components'] => {
   const dark = mode === 'dark';
@@ -30,6 +49,10 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
   const hairline = `1px solid ${hairlineColor}`;
   const elev = dark ? tokens.elevationDark : tokens.elevation;
   const hoverOverlay = dark ? tokens.state.hoverOverlayDark : tokens.state.hoverOverlay;
+  // Mode-aware accent. `tokens.brand.blue` (#076cfe) is the LIGHT primary; using
+  // it on dark produced a blue-on-blue "selected" state indistinguishable from
+  // the selected background (the dark-mode invisible-icon class of bug).
+  const accent = dark ? tokens.brand.dark.primary : tokens.brand.blue;
   // Keyboard-only focus ring, identical on every interactive component.
   const focusRing = {
     '&:focus-visible': {
@@ -45,42 +68,31 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
       },
     },
 
-    // Global header (AppBar) — the veecode global-header renders as an AppBar
-    // color="primary", so its bar was painted brand-blue in light mode and dark
-    // in dark mode. Pin it to the dark chrome navy in BOTH modes so the top bar
-    // matches the sidebar: one coherent dark frame around light/dark content,
-    // and blue stays reserved for actions. Flat (no gray AppBar shadow).
-    //
-    // The header's icons/links/search are painted by the plugin with
-    // palette.text.primary (dark ink) and DON'T inherit the AppBar color, so on
-    // the dark chrome they vanished. Force the interactive chrome to the same
-    // calm light the sidebar uses (idle = sidebarText, hover = white), and the
-    // typed search text to white. The search field bg is transparent, so
-    // lightening its text + adornment icon is safe.
+    /*
+     * Global header FOREGROUND only. The bar's own colour comes from the palette
+     * (`rhdh.general.appBarBackgroundColor` → chrome navy, applied by the RHDH
+     * layer), so nothing here paints a background — that was the old override's
+     * mistake.
+     *
+     * The foreground has to live here because `rhdh.general.appBarForegroundColor`
+     * is NOT consumed by `createComponents` (verified: only appBarBackgroundColor
+     * and appBarBackgroundImage are). The veecode global-header paints its icons,
+     * links and search input with `palette.text.primary` — dark ink — so on the
+     * navy bar they vanish (measured: invisible header icons in light mode).
+     *
+     * Targeted by TAG (button/a/svg/input), not by MUI class name:
+     * createUnifiedTheme prefixes runtime classes with `v5-`, and raw selector
+     * strings here are NOT rewritten, so `.MuiIconButton-root` would never match.
+     * SVG fill is currentColor, so `color` recolours the glyphs too.
+     */
     MuiAppBar: {
       styleOverrides: {
         colorPrimary: {
-          backgroundColor: tokens.chrome,
-          // MUI's dark mode paints an elevation overlay (a translucent white
-          // gradient) on elevated Paper. The AppBar is elevation4, so in dark
-          // mode the header was lightened above the flat chrome sidebar. Kill the
-          // overlay so the header stays pure chrome — identical in both themes
-          // and matched to the sidebar (which carries no overlay).
-          backgroundImage: 'none',
-          color: tokens.brand.paper,
-          // The header's icons/buttons are colorInherit and pick up the Toolbar's
-          // dark ink. We target by TAG (button/a/svg/input), not by MUI class
-          // name: createUnifiedTheme prefixes runtime classes with `v5-`, but raw
-          // selector strings here are NOT rewritten, so `.MuiIconButton-root`
-          // never matches `v5-MuiIconButton-root`. Tag selectors are
-          // prefix-agnostic. !important overrides the inherited ink. SVG fill is
-          // currentColor, so setting color also recolors the glyphs.
           '& button, & a, & svg': { color: `${tokens.brand.sidebarText} !important` },
           '& button:hover, & a:hover': { color: `${tokens.brand.paper} !important` },
           '& input': { color: `${tokens.brand.paper} !important` },
           '& input::placeholder': { color: tokens.brand.sidebarText, opacity: 0.7 },
         },
-        root: { boxShadow: elev.e0 },
       },
     },
 
@@ -207,7 +219,7 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
       styleOverrides: {
         root: {
           '&:hover': { backgroundColor: hoverOverlay },
-          '&.Mui-selected': { backgroundColor: hoverOverlay, color: tokens.brand.blue },
+          '&.Mui-selected': { backgroundColor: hoverOverlay, color: accent },
           '&.Mui-selected:hover': { backgroundColor: hoverOverlay },
           ...focusRing,
         },
@@ -219,7 +231,7 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
         root: {
           borderRadius: tokens.radius.md,
           '&:hover': { backgroundColor: hoverOverlay },
-          '&.Mui-selected': { backgroundColor: hoverOverlay, color: tokens.brand.blue },
+          '&.Mui-selected': { backgroundColor: hoverOverlay, color: accent },
           '&.Mui-selected:hover': { backgroundColor: hoverOverlay },
           ...focusRing,
         },
@@ -240,26 +252,8 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
       },
     },
 
-    // Tabs — the active-route accent: a 2px blue indicator.
-    MuiTabs: {
-      styleOverrides: {
-        indicator: { height: 2, borderRadius: tokens.radius.sm, backgroundColor: tokens.brand.blue },
-      },
-    },
-    MuiTab: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          fontWeight: 600,
-          letterSpacing: 0,
-          minWidth: 0,
-          '&:hover': { backgroundColor: hoverOverlay },
-          '&.Mui-selected': { color: tokens.brand.blue },
-          '&.Mui-disabled': { opacity: tokens.state.disabledOpacity },
-          ...focusRing,
-        },
-      },
-    },
+    // Tabs are owned by the RHDH layer (indicator, selected colour, density) —
+    // see the SCOPE BOUNDARY note in the file header.
 
     // Table — quiet, dense, editorial: hairline rules only, bolder head, cells on
     // the medium row-height for an even rhythm.
@@ -304,24 +298,63 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
       },
     },
 
-    // SidebarItem sits on the dark chrome in BOTH themes, so its active accent
-    // uses the lighter blue (better contrast on the dark navy-graphite sidebar,
-    // and matches the navigation indicator).
-    BackstageSidebarItem: {
+    /*
+     * ---- Layout adjustments ON TOP of the RHDH layer -----------------------
+     *
+     * These three are deliberate departures from the reference render (all three
+     * measured before and after), not bug fixes:
+     *
+     * 1. The content sits FLUSH against the sidebar. The shell hardcodes
+     *    `marginLeft: 27px` on the BackstageSidebarPage root
+     *    (Root.tsx:150, present in every theme) and RHDH only cancels it on
+     *    `main`, leaving a 27px band that the reference state fills with the page
+     *    inset colour. `RHDHPageWithoutFixHeight/sidebarLayout` is a themeable
+     *    slot (the shell declares `styled(Box, {name, slot})`), so the margin is
+     *    zeroed through the theme instead of a global `!important` rule.
+     * 2. With the margin gone, the drawer's 0.5rem right border (which RHDH adds
+     *    to stretch the painted sidebar across that band) would overlap the
+     *    content card, so it goes away.
+     * 3. The content fills the page: RHDH emulates the PF6 page inset with
+     *    `margin: pageInset` + a rounded `clipPath` on `main`, which left a band
+     *    on the right and bottom. Margin and clip are dropped, so the content is
+     *    flush on all four sides and square everywhere. `maxHeight` goes back to
+     *    the full viewport (RHDH set `calc(100vh - 2 * pageInset)` to compensate
+     *    for the margin it no longer has).
+     */
+    RHDHPageWithoutFixHeight: {
       styleOverrides: {
-        root: {
-          textDecorationLine: 'none',
-          '&:hover': { backgroundColor: 'rgba(233, 238, 252, 0.06)' },
+        sidebarLayout: {
+          '@media (min-width: 600px)': {
+            '& > div': { marginLeft: 0 },
+          },
         },
-        selected: {
-          color: tokens.brand.dark.primary,
-          '& $iconContainer': { color: tokens.brand.dark.primary },
-        },
-        iconContainer: {},
       },
     },
-    // Cast: BackstageInfoCard / BackstageSidebarItem are valid Backstage override
-    // keys applied at runtime (verified in the spike), but they are not present in
-    // the MUI Components type that UnifiedThemeOptions['components'] resolves to.
+    BackstageSidebar: {
+      styleOverrides: {
+        drawer: { borderRight: 'none' },
+      },
+    },
+    BackstageSidebarPage: {
+      styleOverrides: {
+        root: {
+          '@media (min-width: 600px)': {
+            "& > [class*='MuiLinearProgress-root'], & > main": {
+              margin: 0,
+              maxHeight: '100vh',
+              clipPath: 'none',
+            },
+          },
+        },
+      },
+    },
+
+    // BackstageSidebarItem is owned by the RHDH layer (selected background from
+    // `rhdh.general.sidebarItemSelectedBackgroundColor`, label + icon from
+    // `navigation.selectedColor`) — see the SCOPE BOUNDARY note in the header.
+    //
+    // Cast: BackstageInfoCard is a valid Backstage override key applied at
+    // runtime (verified in the spike), but it is not present in the MUI
+    // Components type that UnifiedThemeOptions['components'] resolves to.
   } as UnifiedThemeOptions['components'];
 };
