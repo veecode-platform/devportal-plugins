@@ -30,9 +30,12 @@ export const tokens = {
   // symmetric instead of running flush into the drawer's right edge.
   // `sidebarRailWidth` mirrors the RHDH collapsed-item width, restated so our
   // width override does not stretch the icon-only rail.
+  // `pageInset` mirrors `palette.rhdh.general.pageInset` (1.5rem) in pixels. RHDH
+  // only applies it on the right and bottom of `main`; we add the top and left so
+  // the content card is inset on all four sides.
   density: {
     rowHeight: 44, inputHeight: 40, buttonHeight: 36, cardPadding: 24,
-    sidebarItemInset: 8, sidebarRailWidth: 72,
+    sidebarItemInset: 8, sidebarRailWidth: 72, pageInset: 24,
   },
   state: {
     hoverOverlay: `rgba(${navyRGB}, 0.05)`,

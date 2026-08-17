@@ -319,10 +319,16 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
      * BACK. A third departure used to drop RHDH's `margin: pageInset` and its
      * rounded `clipPath` on `main` (plus `maxHeight: 100vh` to compensate), which
      * made the content flush on all four sides and square everywhere. That
-     * override is gone, so `main` inherits the RHDH treatment again: inset by
-     * `pageInset` (1.5rem, from palette.rhdh.general) and rounded. Departure 1
-     * stays, and it is what keeps the inset SYMMETRIC — without it the shell's
-     * 27px band would add to the left inset only.
+     * override is gone, so `main` inherits the RHDH treatment again.
+     *
+     * 3. …but RHDH only insets `main` on the RIGHT and BOTTOM: measured
+     *    `margin: 0 24px 24px 0`, i.e. flush against the app bar and the sidebar.
+     *    Gio asked for a UNIFORM inset, and the two missing sides CANNOT be set
+     *    from here — RHDH ships
+     *      `#rhdh-above-…-header-container:has(*) ~ … main { margin-top: 0 !important }`
+     *    whose specificity (two ids + a class) outranks any themeable slot. So the
+     *    top and left insets live in `styles/component-fixes.css`, which exists for
+     *    exactly this class of problem.
      */
     RHDHPageWithoutFixHeight: {
       styleOverrides: {

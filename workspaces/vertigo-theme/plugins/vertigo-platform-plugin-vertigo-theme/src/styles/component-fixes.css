@@ -47,6 +47,41 @@ body[data-theme-mode='dark'] {
 }
 
 /*
+ * Uniform page inset on the main content card.
+ *
+ * RHDH insets `main` on the RIGHT and BOTTOM only — measured `margin: 0 24px 24px 0`
+ * — so the card sits flush against the app bar and the sidebar while its `clipPath`
+ * rounds all four corners, which reads as two clipped corners rather than rounded
+ * ones. These two declarations add the missing sides.
+ *
+ * Why global CSS and not a themeable slot: RHDH pins the top margin with
+ *   `.css-<hash> #rhdh-above-sidebar-header-container:has(*) ~ #rhdh-sidebar-layout main,
+ *    .css-<hash> #rhdh-above-main-content-header-container:has(*) ~ main
+ *      { margin-top: 0 !important }`
+ * (two ids + a class + important, applied whenever a header renders above the
+ * content — which is always, we ship the global header). No `styleOverrides` slot
+ * can outrank that. The id is repeated three times to clear the two-id-plus-class
+ * specificity without depending on `.css-<hash>`, which is emotion-generated and
+ * changes between builds.
+ *
+ * `max-height` is deliberately NOT touched: RHDH already sets
+ * `calc(100vh - 2 * pageInset)` (952px at a 1000px viewport), which is exactly the
+ * budget a top+bottom inset needs, and `main` scrolls internally (`overflow: auto`),
+ * so the added top margin shortens the box instead of pushing the page into scroll.
+ * Right margin is left alone so the docked-drawer rule
+ * (`margin-right: calc(var(--docked-drawer-width) + 1.5rem)`) keeps working.
+ */
+@media (min-width: 600px) {
+  #rhdh-sidebar-layout#rhdh-sidebar-layout#rhdh-sidebar-layout > div > main,
+  #rhdh-sidebar-layout#rhdh-sidebar-layout#rhdh-sidebar-layout
+    > div
+    > [class*='MuiLinearProgress-root'] {
+    margin-top: 1.5rem !important;
+    margin-left: 1.5rem !important;
+  }
+}
+
+/*
  * Surfaces painted OUTSIDE the theme by core-components' own makeStyles.
  *
  * Both offenders use an ANONYMOUS makeStyles (runtime classes like `jss4-2207`,
