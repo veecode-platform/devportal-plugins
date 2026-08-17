@@ -24,7 +24,9 @@ export const tokens = {
   hairline: `rgba(${navyRGB}, 0.10)`,
   hairlineDark: 'rgba(233, 238, 252, 0.13)',
   radius: { sm: 6, md: 8, lg: 12 },
-  // `sidebarItemInset` is the chrome gutter each side of a selected sidebar item.
+  // `sidebarItemInset` is the chrome gutter each side of a sidebar item — it applies
+  // to every painted state (selected AND hover), which is why the width override
+  // lives on the item root, not only on the `selected` slot.
   // It MIRRORS the RHDH layer's own `margin-left: 8px` on that item — the width
   // override in components.ts subtracts it twice so the painted block is
   // symmetric instead of running flush into the drawer's right edge.

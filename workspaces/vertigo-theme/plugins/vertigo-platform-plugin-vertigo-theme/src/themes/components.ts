@@ -346,7 +346,7 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
     },
 
     /*
-     * Sidebar selected item — breathing room on the RIGHT.
+     * Sidebar items — breathing room on the RIGHT, in every painted state.
      *
      * The RHDH layer paints the item root with `margin-left: 0.5rem !important`
      * and `width: calc(100% - 0.5rem) !important`, so the painted block ends
@@ -373,6 +373,21 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
      */
     BackstageSidebarItem: {
       styleOverrides: {
+        // The inset belongs on the ROOT, not only on `selected`: every item —
+        // selected or not — measures 222px inside the 230px drawer with
+        // `margin-left: 8px`, so the HOVER wash (`navigation.navItem.hoverBackground`)
+        // painted flush against the right edge exactly like the selected block did.
+        // Same width on the root fixes hover, focus and any other painted state at
+        // once, and costs no layout shift: the margin is untouched and the label is
+        // left-aligned, so only the right edge moves.
+        root: {
+          '&&': {
+            width: `calc(100% - ${tokens.density.sidebarItemInset * 2}px) !important`,
+          },
+        },
+        // Kept even though `root` now carries the same value: RHDH's own selected
+        // rule is `!important`, so the selected slot needs its own (0,2,0) important
+        // declaration rather than inheriting from a rule of equal weight.
         selected: {
           '&&': {
             width: `calc(100% - ${tokens.density.sidebarItemInset * 2}px) !important`,
