@@ -301,8 +301,8 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
     /*
      * ---- Layout adjustments ON TOP of the RHDH layer -----------------------
      *
-     * These three are deliberate departures from the reference render (all three
-     * measured before and after), not bug fixes:
+     * Deliberate departures from the reference render (all measured before and
+     * after), not bug fixes:
      *
      * 1. The content sits FLUSH against the sidebar. The shell hardcodes
      *    `marginLeft: 27px` on the BackstageSidebarPage root
@@ -314,12 +314,15 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
      * 2. With the margin gone, the drawer's 0.5rem right border (which RHDH adds
      *    to stretch the painted sidebar across that band) would overlap the
      *    content card, so it goes away.
-     * 3. The content fills the page: RHDH emulates the PF6 page inset with
-     *    `margin: pageInset` + a rounded `clipPath` on `main`, which left a band
-     *    on the right and bottom. Margin and clip are dropped, so the content is
-     *    flush on all four sides and square everywhere. `maxHeight` goes back to
-     *    the full viewport (RHDH set `calc(100vh - 2 * pageInset)` to compensate
-     *    for the margin it no longer has).
+     *
+     * REVERTED (round 2, Gio's call): the page inset and the rounded corners are
+     * BACK. A third departure used to drop RHDH's `margin: pageInset` and its
+     * rounded `clipPath` on `main` (plus `maxHeight: 100vh` to compensate), which
+     * made the content flush on all four sides and square everywhere. That
+     * override is gone, so `main` inherits the RHDH treatment again: inset by
+     * `pageInset` (1.5rem, from palette.rhdh.general) and rounded. Departure 1
+     * stays, and it is what keeps the inset SYMMETRIC — without it the shell's
+     * 27px band would add to the left inset only.
      */
     RHDHPageWithoutFixHeight: {
       styleOverrides: {
@@ -335,23 +338,46 @@ export const makeComponents = (mode: ThemeMode): UnifiedThemeOptions['components
         drawer: { borderRight: 'none' },
       },
     },
-    BackstageSidebarPage: {
+
+    /*
+     * Sidebar selected item — breathing room on the RIGHT.
+     *
+     * The RHDH layer paints the item root with `margin-left: 0.5rem !important`
+     * and `width: calc(100% - 0.5rem) !important`, so the painted block ends
+     * FLUSH against the drawer's right edge: measured item right = 230px inside a
+     * 230px container, against an 8px gap on the left. Subtracting the inset twice
+     * makes it symmetric — 8px of chrome on each side — without touching the
+     * margin, so the selection indicator and the label stay aligned.
+     *
+     * Two mechanics are load-bearing here:
+     *  - `&&` doubles the class in the emitted selector (0,2,0) and the value
+     *    carries `!important`, because the RHDH root rule is (0,1,0) `!important`.
+     *    Specificity alone loses to an important declaration; important alone ties
+     *    on specificity and would be decided by injection order. Both together win
+     *    deterministically.
+     *  - the COLLAPSED item must keep its square 72px. RHDH sets that through
+     *    `.selected.closed` (0,2,0, no important), which our (0,2,0) important rule
+     *    would otherwise beat, stretching the icon-only rail. So `closed` is
+     *    restated at (0,3,0) to stay on top. The 72px mirrors the RHDH value — if
+     *    the rail width ever changes upstream, this is the line to follow.
+     *
+     * Scope note: everything ELSE about this item is owned by the RHDH layer
+     * (selected background from `rhdh.general.sidebarItemSelectedBackgroundColor`,
+     * label + icon from `navigation.selectedColor`) — see the header note.
+     */
+    BackstageSidebarItem: {
       styleOverrides: {
-        root: {
-          '@media (min-width: 600px)': {
-            "& > [class*='MuiLinearProgress-root'], & > main": {
-              margin: 0,
-              maxHeight: '100vh',
-              clipPath: 'none',
-            },
+        selected: {
+          '&&': {
+            width: `calc(100% - ${tokens.density.sidebarItemInset * 2}px) !important`,
           },
+        },
+        closed: {
+          '&&&': { width: `${tokens.density.sidebarRailWidth}px !important` },
         },
       },
     },
 
-    // BackstageSidebarItem is owned by the RHDH layer (selected background from
-    // `rhdh.general.sidebarItemSelectedBackgroundColor`, label + icon from
-    // `navigation.selectedColor`) — see the SCOPE BOUNDARY note in the header.
     //
     // Cast: BackstageInfoCard is a valid Backstage override key applied at
     // runtime (verified in the spike), but it is not present in the MUI

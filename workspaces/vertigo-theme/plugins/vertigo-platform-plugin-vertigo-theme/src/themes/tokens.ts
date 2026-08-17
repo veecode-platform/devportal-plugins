@@ -24,7 +24,16 @@ export const tokens = {
   hairline: `rgba(${navyRGB}, 0.10)`,
   hairlineDark: 'rgba(233, 238, 252, 0.13)',
   radius: { sm: 6, md: 8, lg: 12 },
-  density: { rowHeight: 44, inputHeight: 40, buttonHeight: 36, cardPadding: 24 },
+  // `sidebarItemInset` is the chrome gutter each side of a selected sidebar item.
+  // It MIRRORS the RHDH layer's own `margin-left: 8px` on that item — the width
+  // override in components.ts subtracts it twice so the painted block is
+  // symmetric instead of running flush into the drawer's right edge.
+  // `sidebarRailWidth` mirrors the RHDH collapsed-item width, restated so our
+  // width override does not stretch the icon-only rail.
+  density: {
+    rowHeight: 44, inputHeight: 40, buttonHeight: 36, cardPadding: 24,
+    sidebarItemInset: 8, sidebarRailWidth: 72,
+  },
   state: {
     hoverOverlay: `rgba(${navyRGB}, 0.05)`,
     hoverOverlayDark: 'rgba(233, 238, 252, 0.06)',
