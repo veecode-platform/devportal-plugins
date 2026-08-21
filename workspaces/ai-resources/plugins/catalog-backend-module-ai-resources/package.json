@@ -1,0 +1,47 @@
+{
+  "name": "@veecode-platform/backstage-plugin-catalog-backend-module-ai-resources",
+  "description": "Activates Backstage core's AiResource entity kind (and the McpServer API model) in the catalog. Registration-only: schemas, validators and relations come from the host's @backstage/catalog-model.",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public",
+    "main": "dist/index.cjs.js",
+    "types": "dist/index.d.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:veecode-platform/devportal-plugins.git",
+    "directory": "workspaces/ai-resources/plugins/catalog-backend-module-ai-resources"
+  },
+  "backstage": {
+    "role": "backend-plugin-module",
+    "pluginId": "catalog",
+    "pluginPackage": "@backstage/plugin-catalog-backend"
+  },
+  "scripts": {
+    "start": "backstage-cli package start",
+    "tsc": "tsc",
+    "build": "backstage-cli package build",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "test:ci": "backstage-cli package test --watch false",
+    "clean": "backstage-cli package clean",
+    "prepack": "backstage-cli package prepack",
+    "postpack": "backstage-cli package postpack"
+  },
+  "dependencies": {
+    "@backstage/backend-plugin-api": "^1.9.0",
+    "@backstage/catalog-model": "~1.9.0",
+    "@backstage/plugin-catalog-node": "~2.2.2"
+  },
+  "devDependencies": {
+    "@backstage/backend-test-utils": "^1.11.0",
+    "@backstage/cli": "^0.36.0",
+    "typescript": "~5.5.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
