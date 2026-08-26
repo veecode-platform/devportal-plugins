@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: devportal-plugins
+  description: VeeCode Backstage plugins monorepo (72 workspaces; 5 exported to the fleet). Plugins reach the fleet through devportal-plugin-export-overlays, pinned by commit SHA in each workspace's source.json.
+  annotations:
+    github.com/project-slug: veecode-platform/devportal-plugins
+  tags: [backstage, plugins]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:default/veecode-platform
+  system: veecode-devportal
+  dependsOn:
+    - component:default/devportal-plugin-export-overlays
