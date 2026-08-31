@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { authenticate, AuthenticationOptions } from 'ldap-authentication';
+import { resolveProviderConfig, type ConfigLike } from './config';
 import type {
-    BackstageLdapAuthConfiguration,
     CookiesOptions,
     ProviderConstructor,
     ProviderCreateOptions,
@@ -171,13 +171,14 @@ export class ProviderLdapAuthProvider implements AuthProviderRouteHandlers {
 export const ldap = {
     create(options: ProviderCreateOptions) {
         return (factoryOptions: {
-            config: any;
+            config: ConfigLike;
+            logger?: { warn(message: string): void };
             resolverContext: AuthResolverContext;
         }) => {
-            const { config, resolverContext } = factoryOptions;
-            const cnf = config.get(
-                process.env.NODE_ENV || 'development'
-            ) as BackstageLdapAuthConfiguration;
+            const { config, logger, resolverContext } = factoryOptions;
+            const cnf = resolveProviderConfig(config, {
+                warn: message => logger?.warn(message),
+            });
 
             cnf.cookies = {
                 field: cnf?.cookies?.field || COOKIE_FIELD_KEY,
