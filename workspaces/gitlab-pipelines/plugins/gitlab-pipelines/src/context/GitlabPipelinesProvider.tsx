@@ -7,21 +7,14 @@ import { Job, Pipeline } from '../utils/types';
 import { gitlabPipelinesApiRef } from '../api';
 import { useEntityAnnotations } from '../hooks';
 import {
-  addJobs,
   addLatestPipeline,
   addPipelines,
   initialJobsAnnotationState,
-  initialJobsState,
-  initialJobParamsState,
   initialLatestPipelineState,
   initialPipelinesState,
-  initialVariableParamsState,
   JobsAnnotationReducer,
-  JobsReducer,
-  JobParamsReducer,
   LatestPipelineReducer,
   PipelinesReducer,
-  VariablesParamsReducer,
 } from './state';
 
 interface GitlabPipelinesProviderProps {
@@ -38,21 +31,9 @@ export const GitlabPipelinesProvider: React.FC<GitlabPipelinesProviderProps> = (
     LatestPipelineReducer,
     initialLatestPipelineState,
   );
-  const [jobsListState, dispatchJobList] = React.useReducer(
-    JobsReducer,
-    initialJobsState,
-  );
   const [jobsByAnnotation, dispatchJobsByAnnotation] = React.useReducer(
     JobsAnnotationReducer,
     initialJobsAnnotationState,
-  );
-  const [variablesParams, dispatchVariablesParams] = React.useReducer(
-    VariablesParamsReducer,
-    initialVariableParamsState,
-  );
-  const [jobParams, dispatchJobParams] = React.useReducer(
-    JobParamsReducer,
-    initialJobParamsState,
   );
   const { entity } = useEntity();
   const { projectName, entityRef, jobsAnnotations } = useEntityAnnotations(entity);
@@ -142,16 +123,6 @@ export const GitlabPipelinesProvider: React.FC<GitlabPipelinesProviderProps> = (
     }
   };
 
-  const allJobs = async (pipelineId: number): Promise<Job[] | null> => {
-    const response = await listJobs(pipelineId);
-    if (response.length > 0) {
-      const jobs = response.filter(job => job.allowFailure);
-      dispatchJobList(addJobs(jobs));
-      return jobs;
-    }
-    return null;
-  };
-
   const playJob = async (
     jobId: number,
     variables: PipelineVariable[],
@@ -197,20 +168,13 @@ export const GitlabPipelinesProvider: React.FC<GitlabPipelinesProviderProps> = (
         latestPipeline,
         latestPipelineState,
         dispachLatestPipeline,
-        variablesParams,
-        dispatchVariablesParams,
         runNewPipeline,
         retryPipeline,
         cancelPipeline,
         listJobs,
-        allJobs,
-        jobsListState,
         jobsByAnnotation,
         dispatchJobsByAnnotation,
-        dispatchJobList,
         playJob,
-        jobParams,
-        dispatchJobParams,
         cancelJob,
         retryJob,
       }}

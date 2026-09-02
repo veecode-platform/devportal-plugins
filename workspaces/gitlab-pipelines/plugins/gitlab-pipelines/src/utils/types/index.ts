@@ -7,7 +7,6 @@ export type {
   JobDto as ListJobsResponse,
   BranchDto as ListBranchResponse,
   PipelineVariable as VariablesParams,
-  PipelineVariable as JobVariablesAttributes,
 } from '@veecode-platform/gitlab-pipelines-common';
 
 export type Pipeline = PipelineDto;

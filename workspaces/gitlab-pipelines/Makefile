@@ -5,7 +5,7 @@
 # - Has workspace:* dependency handling (replace-workspace/restore-workspace)
 #
 
-VERSION ?= 1.4.0
+VERSION ?= 1.0.0
 NPM_REGISTRY =
 NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
@@ -47,7 +47,7 @@ help:
 	@echo "  make clean-dynamic       - Clean only dist-dynamic directories"
 
 # Set version for all gitlab-pipelines packages
-# Usage: make set-version VERSION=1.4.0
+# Usage: make set-version VERSION=1.0.0
 set-version:
 	@echo "Setting gitlab-pipelines packages to version $(VERSION)..."
 	@for dir in $(ALL_PLUGIN_DIRS); do \
