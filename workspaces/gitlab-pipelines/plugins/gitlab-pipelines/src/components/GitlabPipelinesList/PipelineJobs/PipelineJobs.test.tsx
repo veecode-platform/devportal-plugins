@@ -34,4 +34,17 @@ describe('PipelineJobs', () => {
     fireEvent.click(screen.getByRole('button', { name: /run/i }));
     await waitFor(() => expect(c.playJob).toHaveBeenCalledWith(6, []));
   });
+
+  it('renders a job with an unsafe URL without an anchor', async () => {
+    const c = ctx({
+      listJobs: jest.fn(async () => [
+        { id: 7, name: 'unsafe job', stage: 'test', status: 'success', manual: false, allowFailure: false, webUrl: 'javascript:alert(1)', startedAt: null, finishedAt: null },
+      ]),
+    });
+    render(<GitlabPipelinesContext.Provider value={c as any}><PipelineJobs pipelineId={1} /></GitlabPipelinesContext.Provider>);
+
+    await screen.findByText('unsafe job');
+    expect(screen.queryByRole('link', { name: 'unsafe job' })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="javascript:alert(1)"]')).not.toBeInTheDocument();
+  });
 });

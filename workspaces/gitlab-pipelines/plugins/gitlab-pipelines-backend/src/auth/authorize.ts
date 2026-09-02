@@ -21,7 +21,7 @@ export function createAuthorizer(deps: { httpAuth: HttpAuthService; userInfo: Us
     // (d) ownership is invariant
     const info = await deps.userInfo.getUserInfo(credentials);
     if (!info.ownershipEntityRefs.includes(resolved.ownerRef)) {
-      throw new NotAllowedError(`Not allowed: ${info.userEntityRef} is not an owner of ${resolved.entityRef} (owner ${resolved.ownerRef})`);
+      throw new NotAllowedError(`Not allowed: ${info.userEntityRef} is not an owner of ${resolved.entityRef}`);
     }
     return { ...resolved, userEntityRef: info.userEntityRef };
   };

@@ -1,7 +1,7 @@
 import React from 'react';
+import { Link } from '@backstage/core-components';
 import {
   IconButton,
-  Link,
   Table,
   TableBody,
   TableCell,
@@ -16,6 +16,15 @@ import { JobDto, PipelineVariable } from '@veecode-platform/gitlab-pipelines-com
 import { useGitlabPipelinesContext } from '../../../context';
 import { ModalComponent } from '../../ModalComponent';
 import { StatusComponent } from '../../StatusComponent';
+
+const isSafeUrl = (url: string): boolean => {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 export const PipelineJobs = ({ pipelineId }: { pipelineId: number }) => {
   const { listJobs, playJob, retryJob, cancelJob } = useGitlabPipelinesContext();
@@ -65,9 +74,13 @@ export const PipelineJobs = ({ pipelineId }: { pipelineId: number }) => {
             <TableRow key={job.id}>
               <TableCell>{job.stage}</TableCell>
               <TableCell>
-                <Link href={job.webUrl} target="_blank" rel="noopener">
-                  {job.name}
-                </Link>
+                {isSafeUrl(job.webUrl) ? (
+                  <Link to={job.webUrl} target="_blank" rel="noopener">
+                    {job.name}
+                  </Link>
+                ) : (
+                  job.name
+                )}
               </TableCell>
               <TableCell>
                 <StatusComponent status={job.status} />
