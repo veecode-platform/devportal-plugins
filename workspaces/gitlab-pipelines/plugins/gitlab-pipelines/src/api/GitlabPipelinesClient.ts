@@ -25,7 +25,10 @@ export class GitlabPipelinesApiClient implements GitlabPipelinesApi {
     return (await res.json()) as T;
   }
   listBranches(e: string) { return this.call<any>(e, '/branches'); }
-  listPipelines(e: string, ref: string) { return this.call<any>(e, `/pipelines?ref=${encodeURIComponent(ref)}`); }
+  listPipelines(e: string, ref?: string) {
+    const query = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+    return this.call<any>(e, `/pipelines${query}`);
+  }
   getPipeline(e: string, id: number) { return this.call<any>(e, `/pipelines/${id}`); }
   listJobs(e: string, id: number) { return this.call<any>(e, `/pipelines/${id}/jobs`); }
   createPipeline(e: string, ref: string, variables: PipelineVariable[]) { return this.call<any>(e, '/pipelines', { method: 'POST', body: { ref, variables } }); }

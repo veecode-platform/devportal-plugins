@@ -5,7 +5,7 @@ export const gitlabPipelinesApiRef = createApiRef<GitlabPipelinesApi>({ id: 'plu
 
 export interface GitlabPipelinesApi {
   listBranches(entityRef: string): Promise<BranchDto[]>;
-  listPipelines(entityRef: string, ref: string): Promise<PipelineDto[]>;
+  listPipelines(entityRef: string, ref?: string): Promise<PipelineDto[]>;
   getPipeline(entityRef: string, id: number): Promise<PipelineDto>;
   listJobs(entityRef: string, pipelineId: number): Promise<JobDto[]>;
   createPipeline(entityRef: string, ref: string, variables: PipelineVariable[]): Promise<PipelineDto>;

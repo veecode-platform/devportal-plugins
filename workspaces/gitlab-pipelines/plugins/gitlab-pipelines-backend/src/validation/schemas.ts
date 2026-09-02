@@ -7,4 +7,4 @@ export const variablesSchema = z.array(z.object({ key: variableKey, value: z.str
 export const createPipelineSchema = z.object({ ref: z.string().min(1).max(255), variables: variablesSchema });
 export const playJobSchema = z.object({ variables: variablesSchema });
 export const idParam = z.coerce.number().int().positive();
-export const refQuery = z.object({ ref: z.string().min(1).max(255) });
+export const refQuery = z.object({ ref: z.string().min(1).max(255).optional() });

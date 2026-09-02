@@ -38,8 +38,13 @@ export class GitlabApi {
   listBranches(host: string, slug: string) {
     return this.call<any[]>(host, slug, '/repository/branches?per_page=100').then(b => b.map(x => ({ name: x.name, default: !!x.default, protected: !!x.protected }) as BranchDto));
   }
-  listPipelines(host: string, slug: string, ref: string) {
-    return this.call<any[]>(host, slug, `/pipelines?ref=${encodeURIComponent(ref)}&per_page=20`).then(p => p.map(toPipeline));
+  listPipelines(host: string, slug: string, ref?: string) {
+    const query = new URLSearchParams();
+    if (ref) query.set('ref', ref);
+    query.set('per_page', '20');
+    query.set('order_by', 'id');
+    query.set('sort', 'desc');
+    return this.call<any[]>(host, slug, `/pipelines?${query.toString()}`).then(p => p.map(toPipeline));
   }
   getPipeline(host: string, slug: string, id: number) { return this.call<any>(host, slug, `/pipelines/${id}`).then(toPipeline); }
   listJobs(host: string, slug: string, pipelineId: number) { return this.call<any[]>(host, slug, `/pipelines/${pipelineId}/jobs?per_page=100`).then(j => j.map(toJob)); }

@@ -19,6 +19,8 @@ describe('GitlabApi', () => {
       rest.get('https://gitlab.example.com/api/v4/projects/group%2Frepo/pipelines', (req, res, ctx) => {
         seenToken = req.headers.get('PRIVATE-TOKEN') ?? '';
         expect(req.url.searchParams.get('ref')).toBe('main');
+        expect(req.url.searchParams.get('order_by')).toBe('id');
+        expect(req.url.searchParams.get('sort')).toBe('desc');
         return res(ctx.json([{ id: 7, project_id: 3, ref: 'main', sha: 'abc', status: 'success', source: 'push', web_url: 'https://x/7', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:01:00Z' }]));
       }),
     );

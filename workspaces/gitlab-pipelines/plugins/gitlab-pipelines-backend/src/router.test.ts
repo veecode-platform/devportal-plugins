@@ -44,8 +44,13 @@ const url = (p: string) => `/api/gitlab-pipelines/entities/default/resource/box$
 
 describe('router', () => {
   it('lists pipelines for the owner', async () => {
-    server.use(rest.get(`${base}/pipelines`, (_r, res, ctx) => res(ctx.json([{ id: 1, project_id: 9, ref: 'main', sha: 'a', status: 'success', source: 'push', web_url: 'u', created_at: 'c', updated_at: 'u2' }]))));
-    const res = await request(await backend()).get(url('/pipelines?ref=main')).set(auth);
+    server.use(rest.get(`${base}/pipelines`, (req, res, ctx) => {
+      expect(req.url.searchParams.get('ref')).toBeNull();
+      expect(req.url.searchParams.get('order_by')).toBe('id');
+      expect(req.url.searchParams.get('sort')).toBe('desc');
+      return res(ctx.json([{ id: 1, project_id: 9, ref: 'main', sha: 'a', status: 'success', source: 'push', web_url: 'u', created_at: 'c', updated_at: 'u2' }]));
+    }));
+    const res = await request(await backend()).get(url('/pipelines')).set(auth);
     expect(res.status).toBe(200);
     expect(res.body[0]).toMatchObject({ id: 1, status: 'success' });
   });

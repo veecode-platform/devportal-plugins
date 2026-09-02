@@ -74,7 +74,7 @@ export function createRouter({
   });
   router.get(`${E}/pipelines`, async (req, res) => {
     const c = await authorize(req, gitlabPipelineReadPermission);
-    const { ref } = parse<{ ref: string }>(refQuery, req.query);
+    const { ref } = parse<{ ref?: string }>(refQuery, req.query);
     res.json(await gitlab.listPipelines(c.host, c.projectSlug, ref));
   });
   router.get(`${E}/pipelines/:id`, async (req, res) => {
