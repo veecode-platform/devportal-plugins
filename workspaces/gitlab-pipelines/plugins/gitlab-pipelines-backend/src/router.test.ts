@@ -90,7 +90,14 @@ describe('router', () => {
     server.use(rest.get(`${base}/pipelines`, (_r, res, ctx) => res(ctx.status(500), ctx.json({ message: 'upstream down' }))));
     const res = await request(await backend()).get(url('/pipelines?ref=main')).set(auth);
     expect(res.status).toBe(502);
-    expect(res.body.error.upstreamStatus).toBe(500);
+    expect(res.body).toEqual({
+      error: {
+        name: 'UpstreamError',
+        message: 'GitLab request failed with status 500',
+        upstreamStatus: 500,
+      },
+    });
+    expect(JSON.stringify(res.body)).not.toContain('upstream down');
   });
   it('defaults omitted play variables to an empty list', async () => {
     server.use(

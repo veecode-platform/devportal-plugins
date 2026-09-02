@@ -44,17 +44,33 @@ export function createRouter({
   );
 
   const E = '/entities/:namespace/:kind/:name';
-  const audit = (
+  const auditFields = (
     ctx: AuthorizedContext,
-    op: string,
     extra: Record<string, unknown>,
-  ) =>
-    logger.info(`gitlab-pipelines ${op}`, {
+  ) => ({
       user: ctx.userEntityRef,
       entity: ctx.entityRef,
       project: `${ctx.host}/${ctx.projectSlug}`,
       ...extra,
     });
+  const audit = (
+    ctx: AuthorizedContext,
+    op: string,
+    extra: Record<string, unknown>,
+  ) => logger.info(`gitlab-pipelines ${op}`, auditFields(ctx, extra));
+  const auditedGitlabCall = async <T>(
+    ctx: AuthorizedContext,
+    op: string,
+    extra: Record<string, unknown>,
+    call: () => Promise<T>,
+  ): Promise<T> => {
+    try {
+      return await call();
+    } catch (err) {
+      logger.warn(`gitlab-pipelines ${op} failed`, auditFields(ctx, extra));
+      throw err;
+    }
+  };
   const parse = <T>(
     schema: { safeParse: (v: unknown) => any },
     value: unknown,
@@ -103,15 +119,20 @@ export function createRouter({
       ref: string;
       variables: { key: string; value: string }[];
     }>(createPipelineSchema, req.body);
-    const p = await gitlab.createPipeline(
-      c.host,
-      c.projectSlug,
-      body.ref,
-      body.variables,
-    );
-    audit(c, 'pipeline.create', {
+    const auditDetails = {
       ref: body.ref,
       variableKeys: body.variables.map(v => v.key),
+    };
+    const p = await auditedGitlabCall(c, 'pipeline.create', auditDetails, () =>
+      gitlab.createPipeline(
+        c.host,
+        c.projectSlug,
+        body.ref,
+        body.variables,
+      ),
+    );
+    audit(c, 'pipeline.create', {
+      ...auditDetails,
       pipelineId: p.id,
     });
     res.status(201).json(p);
@@ -119,14 +140,18 @@ export function createRouter({
   router.post(`${E}/pipelines/:id/retry`, async (req, res) => {
     const c = await authorize(req, gitlabPipelineTriggerPermission);
     const id = parse<number>(idParam, req.params.id);
-    const p = await gitlab.retryPipeline(c.host, c.projectSlug, id);
+    const p = await auditedGitlabCall(c, 'pipeline.retry', { pipelineId: id }, () =>
+      gitlab.retryPipeline(c.host, c.projectSlug, id),
+    );
     audit(c, 'pipeline.retry', { pipelineId: id });
     res.json(p);
   });
   router.post(`${E}/pipelines/:id/cancel`, async (req, res) => {
     const c = await authorize(req, gitlabPipelineCancelPermission);
     const id = parse<number>(idParam, req.params.id);
-    const p = await gitlab.cancelPipeline(c.host, c.projectSlug, id);
+    const p = await auditedGitlabCall(c, 'pipeline.cancel', { pipelineId: id }, () =>
+      gitlab.cancelPipeline(c.host, c.projectSlug, id),
+    );
     audit(c, 'pipeline.cancel', { pipelineId: id });
     res.json(p);
   });
@@ -136,36 +161,41 @@ export function createRouter({
     const body = parse<{
       variables: { key: string; value: string }[];
     }>(playJobSchema, req.body);
-    const job = await gitlab.getJob(c.host, c.projectSlug, id);
+    const variableKeys = body.variables.map(v => v.key);
+    const job = await auditedGitlabCall(c, 'job.play', { jobId: id, variableKeys }, () =>
+      gitlab.getJob(c.host, c.projectSlug, id),
+    );
     if (!job.manual) {
       throw new ConflictError(
         `Job ${id} (${job.name}) is ${job.status}, not manual`,
       );
     }
-    const played = await gitlab.playJob(
-      c.host,
-      c.projectSlug,
-      id,
-      body.variables,
-    );
-    audit(c, 'job.play', {
+    const auditDetails = {
       jobId: id,
       jobName: job.name,
-      variableKeys: body.variables.map(v => v.key),
-    });
+      variableKeys,
+    };
+    const played = await auditedGitlabCall(c, 'job.play', auditDetails, () =>
+      gitlab.playJob(c.host, c.projectSlug, id, body.variables),
+    );
+    audit(c, 'job.play', auditDetails);
     res.json(played);
   });
   router.post(`${E}/jobs/:id/retry`, async (req, res) => {
     const c = await authorize(req, gitlabPipelinePlayPermission);
     const id = parse<number>(idParam, req.params.id);
-    const job = await gitlab.retryJob(c.host, c.projectSlug, id);
+    const job = await auditedGitlabCall(c, 'job.retry', { jobId: id }, () =>
+      gitlab.retryJob(c.host, c.projectSlug, id),
+    );
     audit(c, 'job.retry', { jobId: id });
     res.json(job);
   });
   router.post(`${E}/jobs/:id/cancel`, async (req, res) => {
     const c = await authorize(req, gitlabPipelineCancelPermission);
     const id = parse<number>(idParam, req.params.id);
-    const job = await gitlab.cancelJob(c.host, c.projectSlug, id);
+    const job = await auditedGitlabCall(c, 'job.cancel', { jobId: id }, () =>
+      gitlab.cancelJob(c.host, c.projectSlug, id),
+    );
     audit(c, 'job.cancel', { jobId: id });
     res.json(job);
   });
@@ -174,15 +204,25 @@ export function createRouter({
   router.use(
     (
       err: any,
-      _req: express.Request,
+      req: express.Request,
       res: express.Response,
       next: express.NextFunction,
     ) => {
-      if (err?.status && /^GitLab /.test(err.message)) {
+      if (
+        typeof err?.status === 'number' &&
+        typeof err?.upstreamBody === 'string' &&
+        /^GitLab request failed with status \d+$/.test(err.message)
+      ) {
+        logger.warn('gitlab-pipelines upstream request failed', {
+          op: `${req.method} ${req.path}`,
+          path: req.path,
+          status: err.status,
+          body: err.upstreamBody,
+        });
         return res.status(502).json({
           error: {
             name: 'UpstreamError',
-            message: err.message,
+            message: `GitLab request failed with status ${err.status}`,
             upstreamStatus: err.status,
           },
         });

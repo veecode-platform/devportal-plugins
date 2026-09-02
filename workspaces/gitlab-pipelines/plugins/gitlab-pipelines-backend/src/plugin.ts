@@ -41,7 +41,7 @@ export const gitlabPipelinesPlugin = createBackendPlugin({
         );
         // Only the permission-integration well-known path is unauthenticated; every entity route authenticates itself.
         httpRouter.addAuthPolicy({
-          path: '/.well-known',
+          path: '/.well-known/backstage/permissions/metadata',
           allow: 'unauthenticated',
         });
       },

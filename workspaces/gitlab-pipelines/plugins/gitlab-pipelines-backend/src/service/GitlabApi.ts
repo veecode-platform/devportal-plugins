@@ -28,8 +28,12 @@ export class GitlabApi {
     });
     if (!res.ok) {
       const text = await res.text();
-      const err = new Error(`GitLab ${init.method ?? 'GET'} ${path} failed: ${res.status} ${text}`);
-      (err as any).status = res.status;
+      const err = new Error(`GitLab request failed with status ${res.status}`) as Error & {
+        status: number;
+        upstreamBody: string;
+      };
+      err.status = res.status;
+      err.upstreamBody = text;
       throw err;
     }
     return (await res.json()) as T;
