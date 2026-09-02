@@ -1,0 +1,141 @@
+app:
+  title: Scaffolded Backstage App
+  baseUrl: http://localhost:3000
+
+organization:
+  name: My Company
+
+backend:
+  # Used for enabling authentication, secret is shared by all backend plugins
+  # See https://backstage.io/docs/auth/service-to-service-auth for
+  # information on the format
+  # auth:
+  #   keys:
+  #     - secret: ${BACKEND_SECRET}
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+    # Uncomment the following host directive to bind to specific interfaces
+    # host: 127.0.0.1
+  auth:
+    dangerouslyDisableDefaultAuthPolicy: true
+    externalAccess:
+      - type: static
+        options:
+          # Notice: This test-token can be used to add notifications to the backstage demo application.
+          # Production enironments should define a token in a more secure way that supports rotation.
+          token: mysecrettoken
+          subject: mysecretsubject
+  csp:
+    connect-src: ["'self'", 'http:', 'https:']
+    # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
+    # Default Helmet Content-Security-Policy values can be removed by setting the key to false
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  # This is for local development only, it is not recommended to use this in production
+  # The production database configuration is stored in app-config.production.yaml
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+  # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
+
+auth:
+  # repeat environment from main file
+  environment: development
+  # now the new provider (will add to main file)
+  providers:
+    # See https://backstage.io/docs/auth/guest/provider
+    guest:
+      userEntityRef: user:default/admin
+      ownershipEntityRefs: [group:default/admins]
+      dangerouslyAllowOutsideDevelopment: true
+    # --- GitHub provider (loaded dynamically from the module, if loaded) ---
+    github:
+      # or remove this level for a single env block
+      development:
+        clientId: ${GITHUB_CLIENT_ID}
+        clientSecret: ${GITHUB_CLIENT_SECRET}
+        signIn:
+          resolvers:
+            - resolver: usernameMatchingUserEntityName
+            - resolver: emailMatchingUserEntityProfileEmail
+            - resolver: emailLocalPartMatchingUserEntityName
+
+integrations:
+  github:
+    - host: github.com
+      #token: ${GITHUB_TOKEN}
+      apps:
+        - appId: ${GITHUB_APP_ID}
+          clientId: ${GITHUB_CLIENT_ID}
+          clientSecret: ${GITHUB_CLIENT_SECRET}
+          privateKey: |
+            ${GITHUB_PRIVATE_KEY}
+
+#proxy:
+  ### Example for how to add a proxy endpoint for the frontend.
+  ### A typical reason to do this is to handle HTTPS and CORS for internal services.
+  # endpoints:
+  #   '/test':
+  #     target: 'https://example.com'
+  #     changeOrigin: true
+
+#scaffolder:
+  # see https://backstage.io/docs/features/software-templates/configuration for software template options
+
+catalog:
+  import:
+    entityFilename: catalog-info.yaml
+    pullRequestBranchName: backstage-integration
+  rules:
+    - allow: [Component, System, API, Resource, Location, User, Group, Template]
+  locations:
+    # Local example data
+    # File locations are relative to the backend process, typically in a deployed context, such as in a Docker container, this will be the root
+    # - type: file
+    #   target: ../../examples/entities.yaml
+    # Local example organizational data
+    # - type: file
+    #   target: ../../examples/org.yaml
+    #   rules:
+    #     - allow: [User, Group]
+  providers:
+    githubOrg:
+      id: development
+      githubUrl: https://github.com
+      orgs:
+        - "${GITHUB_ORG}"
+      schedule:
+        frequency:
+          minutes: 5
+        timeout:
+          minutes: 3
+    github:
+      development:
+        organization: "${GITHUB_ORG}"
+        schedule:
+          frequency:
+            minutes: 5
+          timeout:
+            minutes: 3
+
+#kubernetes:
+  # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
+
+# see https://backstage.io/docs/permissions/getting-started for more on the permission framework
+permission:
+  # setting this to `false` will disable permissions
+  enabled: false
+  rbac:
+    policies-csv-file: ../../rbac-policy.csv
+    pluginsWithPermission:
+      - catalog
+      - scaffolder
+      - permission
+    admin:
+      users:
+        - name: group:default/admins
+      superUsers:
+        - name: group:default/admins
