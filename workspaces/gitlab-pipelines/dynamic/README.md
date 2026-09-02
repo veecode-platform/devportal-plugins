@@ -6,26 +6,29 @@ development and packaging check, not a production deployment.
 
 ## Run
 
-From this directory, export both plugins on the remote build host first:
+From the repository root, export both plugins on the build host first:
 
 ```sh
-cd ..
-/tmp/claude-1000/-home-gio-workspace/256dd8ed-a0f2-427d-9790-463db8f04f6f/scratchpad/atlas-run.sh 'make build-dynamic'
-/tmp/claude-1000/-home-gio-workspace/256dd8ed-a0f2-427d-9790-463db8f04f6f/scratchpad/atlas-pull.sh workspaces/gitlab-pipelines
-rsync -az --no-group plugins/gitlab-pipelines/dist-dynamic/ atlas-worker:work/devportal-plugins-wt/workspaces/gitlab-pipelines/plugins/gitlab-pipelines/dist-dynamic/
-rsync -az --no-group plugins/gitlab-pipelines-backend/dist-dynamic/ atlas-worker:work/devportal-plugins-wt/workspaces/gitlab-pipelines/plugins/gitlab-pipelines-backend/dist-dynamic/
+cd workspaces/gitlab-pipelines
+make build-dynamic
 cd dynamic
+GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy docker compose up -d
 ```
 
-The remote build is required for this repository. The pulled `dist-dynamic/`
-folders are ignored by Git and are mounted directly into the installer. The
-backend export also installs its private dependencies so the V3 installer's
-local `npm pack` step can bundle them.
+The `dist-dynamic/` folders are ignored by Git and are mounted directly into
+the installer. The backend export also installs its private dependencies so
+the V3 installer's local `npm pack` step can bundle them. If the checkout and
+Docker daemon are on another build host, run the equivalent commands there:
+
+```sh
+ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines && make build-dynamic'
+ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines/dynamic && GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy docker compose up -d'
+```
 
 For a loading-only smoke, use placeholder values:
 
 ```sh
-ssh atlas-worker 'cd ~/work/devportal-plugins-wt/workspaces/gitlab-pipelines/dynamic && GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy ./run-dynamic.sh'
+curl -sS http://localhost:7007/api/scalprum/plugins
 ```
 
 The portal will be available at `http://localhost:7007`. The installer must
@@ -37,8 +40,11 @@ GitLab API calls.
 To stop the stack and remove its database and dynamic-plugin volume:
 
 ```sh
-ssh atlas-worker 'cd ~/work/devportal-plugins-wt/workspaces/gitlab-pipelines/dynamic && docker compose down -v'
+docker compose down -v
 ```
+
+When running on another build host, prefix these commands with `ssh
+<build-host>` and use the checkout path on that host.
 
 ## Files
 

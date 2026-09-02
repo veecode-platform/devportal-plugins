@@ -15,8 +15,8 @@ checks the resource-scoped permission, and then checks ownership. The four
 permissions are:
 
 - `gitlab.pipeline.read` — list branches, pipelines, and jobs.
-- `gitlab.pipeline.trigger` — create a pipeline and retry a pipeline or job.
-- `gitlab.pipeline.play` — play a manual job with variables.
+- `gitlab.pipeline.trigger` — create a pipeline and retry a pipeline.
+- `gitlab.pipeline.play` — play a manual job with variables, and retry a job.
 - `gitlab.pipeline.cancel` — cancel a pipeline or job.
 
 An RBAC CSV policy can grant all four permissions to a developer role:
@@ -48,13 +48,22 @@ frontend cards. The complete loop is:
 
 ```sh
 cd workspaces/gitlab-pipelines
-/tmp/claude-1000/-home-gio-workspace/256dd8ed-a0f2-427d-9790-463db8f04f6f/scratchpad/atlas-run.sh 'make build-dynamic'
-/tmp/claude-1000/-home-gio-workspace/256dd8ed-a0f2-427d-9790-463db8f04f6f/scratchpad/atlas-pull.sh workspaces/gitlab-pipelines
-rsync -az --no-group plugins/gitlab-pipelines/dist-dynamic/ atlas-worker:work/devportal-plugins-wt/workspaces/gitlab-pipelines/plugins/gitlab-pipelines/dist-dynamic/
-rsync -az --no-group plugins/gitlab-pipelines-backend/dist-dynamic/ atlas-worker:work/devportal-plugins-wt/workspaces/gitlab-pipelines/plugins/gitlab-pipelines-backend/dist-dynamic/
-ssh atlas-worker 'cd ~/work/devportal-plugins-wt/workspaces/gitlab-pipelines/dynamic && GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy ./run-dynamic.sh'
-ssh atlas-worker 'curl -s http://localhost:7007/api/scalprum/plugins'
-ssh atlas-worker 'cd ~/work/devportal-plugins-wt/workspaces/gitlab-pipelines/dynamic && docker compose down -v'
+make build-dynamic
+cd dynamic
+GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy docker compose up -d
+curl -sS http://localhost:7007/api/scalprum/plugins
+docker compose down -v
+```
+
+If the checkout and Docker daemon are on another build host, run the same
+commands there through SSH, replacing the placeholders with that host and its
+checkout path:
+
+```sh
+ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines && make build-dynamic'
+ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines/dynamic && GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy docker compose up -d'
+ssh <build-host> 'curl -sS http://localhost:7007/api/scalprum/plugins'
+ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines/dynamic && docker compose down -v'
 ```
 
 The first smoke only proves that both dynamic plugins load; it deliberately
