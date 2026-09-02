@@ -1,0 +1,22 @@
+includes:
+  - dynamic-plugins.default.yaml
+plugins:
+  - package: ./local-plugins/gitlab-pipelines-backend
+    disabled: false
+  - package: ./local-plugins/gitlab-pipelines
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-gitlab-pipelines:
+            mountPoints:
+              - mountPoint: entity.page.ci/cards
+                importName: GitlabPipelineList
+                config:
+                  layout: { gridColumn: "1 / -1" }
+                  if: { allOf: [isGitlabAvailable] }
+              - mountPoint: entity.page.overview/cards
+                importName: GitlabJobs
+                config:
+                  layout: { gridColumnEnd: { lg: "span 4", md: "span 6", xs: "span 12" } }
+                  if: { allOf: [isGitlabJobsAvailable] }

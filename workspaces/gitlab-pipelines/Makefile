@@ -62,10 +62,11 @@ set-version:
 build:
 	YARN_ENABLE_IMMUTABLE_INSTALLS=false yarn install && yarn tsc && yarn build:all
 
-# Build all dynamic plugins (requires common to be published first)
+# Build all dynamic plugins (embeds and installs private backend dependencies)
 build-dynamic: build
 	cd $(FRONTEND_DIR) && rm -f dist/remoteEntry.js dist/remoteEntry.js.map dist/mf-manifest.json dist/mf-stats.json && rm -rf dist/@mf-types dist/compiled-types && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
-	cd $(BACKEND_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
+	cd $(BACKEND_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export --embed-package @veecode-platform/gitlab-pipelines-common --no-install
+	cd $(BACKEND_DIR)/dist-dynamic && YARN_ENABLE_IMMUTABLE_INSTALLS=false yarn install --no-immutable
 
 # Pack all static plugins
 pack:
