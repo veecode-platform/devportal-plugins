@@ -17,6 +17,7 @@ describe('PipelineJobs', () => {
     const c = ctx();
     render(<GitlabPipelinesContext.Provider value={c as any}><PipelineJobs pipelineId={1} /></GitlabPipelinesContext.Provider>);
     await screen.findAllByText('destroy');
+    expect(screen.getByText('Manual')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /play/i })).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: /play/i }));
     fireEvent.change(screen.getByLabelText(/key/i), { target: { value: 'CONFIRM_DESTROY' } });

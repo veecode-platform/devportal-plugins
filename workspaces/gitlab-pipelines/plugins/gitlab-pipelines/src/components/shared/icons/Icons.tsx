@@ -4,6 +4,7 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import ChevronRightOutlined from '@material-ui/icons/ChevronRightOutlined';
 import HighlightOffIcon from '@material-ui/icons/HighlightOff';
 import AccessTimeIcon from '@material-ui/icons/AccessTime';
+import PauseCircleOutlineIcon from '@material-ui/icons/PauseCircleOutline';
 
 export const WarningIcon = () => (
   <ErrorIcon style={{ fontSize: '20', color: 'orange' }} />
@@ -27,4 +28,8 @@ export const CircleCloseOutline = () => (
 
 export const ClockIcon = () => (
   <AccessTimeIcon style={{ fontSize: '22', color: '#eab308' }} />
+);
+
+export const ManualIcon = () => (
+  <PauseCircleOutlineIcon style={{ fontSize: '22', color: '#6b7280' }} />
 );

@@ -9,6 +9,7 @@ import {
   CircleChevronsRight,
   CircleCloseOutline,
   ClockIcon,
+  ManualIcon,
 } from '../shared';
 
 const styles = {
@@ -69,8 +70,13 @@ export const StatusComponent: React.FC<PipelineStatusProps> = props => {
           <RecordIcon /> {!icon && 'Created'}
         </div>
       );
-    case GitlabPipelinesStatus.success:
     case GitlabPipelinesStatus.manual:
+      return (
+        <div style={styles}>
+          <ManualIcon /> {!icon && 'Manual'}
+        </div>
+      );
+    case GitlabPipelinesStatus.success:
       return (
         <div style={styles}>
           <CheckOkIcon /> {!icon && 'Success'}
