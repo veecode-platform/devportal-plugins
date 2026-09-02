@@ -62,6 +62,7 @@ const TextFieldComponent : React.FC<TextFieldProps> = (props) => {
                             value={inputField.key}
                             onChange={event => handleChangeInput(index, event)}
                             onBlur={event => touchedField(index, event)}
+                            inputProps={{ 'aria-label': 'key' }}
                             placeholder='Insert the Variable Name'
                             className={classes.input}
                             error={errors[`key_${index}`]}
@@ -79,6 +80,7 @@ const TextFieldComponent : React.FC<TextFieldProps> = (props) => {
                             value={inputField.value}
                             onChange={event => handleChangeInput(index, event)}
                             onBlur={event => touchedField(index, event)}
+                            inputProps={{ 'aria-label': 'value' }}
                             placeholder='Insert the Variable value'
                             className={classes.input}
                             error={errors[`value_${index}`]}

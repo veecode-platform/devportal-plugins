@@ -6,7 +6,7 @@ import AccessTimeIcon from '@material-ui/icons/AccessTime';
 import { Box, Button, Tooltip } from '@material-ui/core';
 import { ModalComponent } from '../../ModalComponent/ModalComponent';
 import { GitlabPipelinesStatus } from '../../../utils/enums/GitlabPipelinesStatus';
-import { Pipeline } from '../../../utils/types';
+import { Pipeline, VariablesParams } from '../../../utils/types';
 import { useGitlabPipelinesContext } from '../../../context';
 import { usePipelineActionsStyles } from './styles';
 import { PipelineActionsProps } from './types';
@@ -16,7 +16,7 @@ import { addPipelines } from '../../../context/state';
 export const PipelineActions : React.FC<PipelineActionsProps> = (props) => {
 
   const [showModal, setShowModal] = React.useState<boolean>(false);
-  const { variablesParams, runNewPipeline, cancelPipeline , listAllPipelines, dispatchPipelines} = useGitlabPipelinesContext();
+  const { runNewPipeline, cancelPipeline , listAllPipelines, dispatchPipelines} = useGitlabPipelinesContext();
   const classes = usePipelineActionsStyles();
   const { status } = props;
 
@@ -29,11 +29,9 @@ export const PipelineActions : React.FC<PipelineActionsProps> = (props) => {
     dispatchPipelines(addPipelines(data as Pipeline[]));
   }
 
-  const handleStartPipeline = async () => {
-    if (variablesParams) {
-      await runNewPipeline(variablesParams);
-      await updateData();
-    }
+  const handleStartPipeline = async (variables: VariablesParams[]) => {
+    await runNewPipeline(variables);
+    await updateData();
   }
 
   const handleStopPipeline = async () => {
@@ -122,9 +120,8 @@ export const PipelineActions : React.FC<PipelineActionsProps> = (props) => {
                 Gitlab Docs
               </Button>
             </Box>)}
-            modalType="Pipeline"
-            handleModal={handleShowModal}
-            handleStartAction={handleStartPipeline}
+            onClose={handleShowModal}
+            onConfirm={handleStartPipeline}
           />
         )
       }

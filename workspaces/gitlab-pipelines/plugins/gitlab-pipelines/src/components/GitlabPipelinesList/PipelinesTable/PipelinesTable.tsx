@@ -2,6 +2,7 @@ import React from 'react';
 import { Table, TableColumn,Progress,ResponseErrorPanel,Link,EmptyState} from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
 import LanguageIcon from '@material-ui/icons/Language';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import { Box, Typography } from '@material-ui/core';
 import { SelectBranch } from '../../SelectBranch';
 import ErrorBoundary from '../../ErrorBoundary/ErrorBoundary';
@@ -22,9 +23,22 @@ import { usePipelinesTableStyles } from './styles';
 import { DenseTableProps } from './types';
 import { GITLAB_ANNOTATION } from '../../../utils/constants';
 import { addPipelines } from '../../../context/state';
+import { PipelineJobs } from '../PipelineJobs';
 
 dayjs.extend(relativeTime);
 dayjs.extend(duration);
+
+type PipelineTableRow = {
+  id: number;
+  pipelineID: React.ReactNode;
+  status: React.ReactNode;
+  url: React.ReactNode;
+  createdAt: React.ReactNode;
+};
+
+const ExpandMore = React.forwardRef<SVGSVGElement, React.ComponentProps<typeof ExpandMoreIcon>>(
+  (props, ref) => <ExpandMoreIcon {...props} ref={ref} />,
+);
 
 export const DenseTable : React.FC<DenseTableProps> = (props) => {
   
@@ -40,14 +54,14 @@ export const DenseTable : React.FC<DenseTableProps> = (props) => {
     setTimeout(()=> setLoading(false), 800)
   }
 
-  const columns: TableColumn[] = [
+  const columns: TableColumn<PipelineTableRow>[] = [
     { title: 'Pipeline ID', field: 'pipelineID',  width:'1fr', align:'center'},
     { title: 'Status', field: 'status', width:'1fr', align:'center' },
     { title: 'Url', field: 'url', width:'1fr', align:'center'},
     { title: 'Created At', field: 'createdAt', width:'auto', align:'center'}
   ];
 
-  const data = items.map(item => {
+  const data: PipelineTableRow[] = items.map(item => {
     return {
       id: item.id,
       pipelineID: (
@@ -95,7 +109,7 @@ export const DenseTable : React.FC<DenseTableProps> = (props) => {
 
   return (
    <>
-    <Table
+    <Table<PipelineTableRow>
       style={{width: '100%', padding: '1rem'}}
       title={TitleBar}
       options={{ search: false, paging: true }}
@@ -110,6 +124,15 @@ export const DenseTable : React.FC<DenseTableProps> = (props) => {
           onClick: () => updateData(),
         },
       ]}
+      detailPanel={[
+        {
+          tooltip: 'Show pipeline jobs',
+          render: ({ rowData }: { rowData: PipelineTableRow }) => (
+            <PipelineJobs pipelineId={rowData.id} />
+          ),
+        },
+      ]}
+      icons={{ ...Table.icons, DetailPanel: ExpandMore }}
     />
   </>
   );
