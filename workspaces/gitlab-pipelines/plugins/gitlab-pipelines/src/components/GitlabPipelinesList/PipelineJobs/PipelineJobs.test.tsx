@@ -47,4 +47,19 @@ describe('PipelineJobs', () => {
     expect(screen.queryByRole('link', { name: 'unsafe job' })).not.toBeInTheDocument();
     expect(document.querySelector('a[href="javascript:alert(1)"]')).not.toBeInTheDocument();
   });
+
+  it('renders a job with a safe URL as a link', async () => {
+    const jobName = 'deploy';
+    const jobUrl = 'https://gitlab.example.com/g/box/-/jobs/7';
+    const c = ctx({
+      listJobs: jest.fn(async () => [
+        { id: 7, name: jobName, stage: 'release', status: 'success', manual: false, allowFailure: false, webUrl: jobUrl, startedAt: null, finishedAt: null },
+      ]),
+    });
+    render(<GitlabPipelinesContext.Provider value={c as any}><PipelineJobs pipelineId={1} /></GitlabPipelinesContext.Provider>);
+
+    await screen.findByText(jobName);
+    const jobLink = screen.getByRole('link', { name: new RegExp(`^${jobName}(?:, Opens in a new window)?$`) });
+    expect(jobLink).toHaveAttribute('href', jobUrl);
+  });
 });
