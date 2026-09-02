@@ -24,4 +24,13 @@ describe('PipelineJobs', () => {
     fireEvent.click(screen.getByRole('button', { name: /confirm|run/i }));
     await waitFor(() => expect(c.playJob).toHaveBeenCalledWith(6, [{ key: 'CONFIRM_DESTROY', value: 'yes' }]));
   });
+
+  it('plays a manual job with no variables when Run is clicked without typing', async () => {
+    const c = ctx();
+    render(<GitlabPipelinesContext.Provider value={c as any}><PipelineJobs pipelineId={1} /></GitlabPipelinesContext.Provider>);
+    await screen.findAllByText('destroy');
+    fireEvent.click(screen.getByRole('button', { name: /play/i }));
+    fireEvent.click(screen.getByRole('button', { name: /run/i }));
+    await waitFor(() => expect(c.playJob).toHaveBeenCalledWith(6, []));
+  });
 });

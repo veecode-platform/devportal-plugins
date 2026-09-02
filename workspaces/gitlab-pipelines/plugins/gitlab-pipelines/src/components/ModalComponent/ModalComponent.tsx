@@ -101,9 +101,11 @@ export const ModalComponent: React.FC<ModalComponentProps> = props => {
     if (handleStartAction) await handleStartAction();
   };
 
-  const hasEmptyVariable = variables.some(
-    variable => variable.key.trim() === '' || variable.value.trim() === '',
-  );
+  const hasPartiallyFilledVariable = variables.some(variable => {
+    const hasKey = variable.key.trim() !== '';
+    const hasValue = variable.value.trim() !== '';
+    return hasKey !== hasValue;
+  });
 
   return (
     <Dialog open={open} onClose={close} aria-labelledby="form-dialog-title" maxWidth="lg" fullWidth>
@@ -206,7 +208,7 @@ export const ModalComponent: React.FC<ModalComponentProps> = props => {
           Cancel
         </Button>
         <Button
-          disabled={onConfirm ? hasEmptyVariable : Object.values(errorsState).some(error => error)}
+          disabled={onConfirm ? hasPartiallyFilledVariable : Object.values(errorsState).some(error => error)}
           onClick={handleSetInputs}
           color="primary"
           variant="contained"
