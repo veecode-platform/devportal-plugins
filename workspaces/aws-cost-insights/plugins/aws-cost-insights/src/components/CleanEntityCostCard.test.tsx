@@ -23,7 +23,7 @@ global.ResizeObserver = class {
   disconnect() {}
 } as any;
 
-const mockEntity = {
+const mockEntity: import('@backstage/catalog-model').Entity = {
   apiVersion: 'backstage.io/v1alpha1',
   kind: 'Component',
   metadata: {
@@ -31,12 +31,16 @@ const mockEntity = {
     namespace: 'default',
     annotations: {
       'backstage.io/kubernetes-namespace': 'test-namespace',
+      'aws.amazon.com/cost-insights-tags': 'Name=test-service',
     },
   },
 };
 
+// Mutable so the no-annotation test can swap the entity without re-mocking the module
+let currentEntity = mockEntity;
+
 jest.mock('@backstage/plugin-catalog-react', () => ({
-  useEntity: () => ({ entity: mockEntity }),
+  useEntity: () => ({ entity: currentEntity }),
 }));
 
 describe('CleanEntityCostCard State Machine', () => {
@@ -71,6 +75,42 @@ describe('CleanEntityCostCard State Machine', () => {
   beforeEach(() => {
     expect(React).toBeDefined();
     jest.clearAllMocks();
+    currentEntity = mockEntity;
+  });
+
+  it('renders setup hint and queries nothing when the entity has no cost annotation', async () => {
+    currentEntity = {
+      ...mockEntity,
+      metadata: {
+        ...mockEntity.metadata,
+        annotations: {
+          'backstage.io/kubernetes-namespace': 'test-namespace',
+        },
+      },
+    };
+    const mockClient = {
+      getCatalogEntityDailyCost: jest.fn(),
+    };
+    const mockFetchApi = { fetch: jest.fn() };
+
+    render(
+      <TestApiProvider
+        apis={[
+          [translationApiRef, mockApis.translation()],
+          [errorApiRef, mockErrorApi],
+          [costInsightsApiRef, mockClient as unknown as CostInsightsApi],
+          [discoveryApiRef, mockDiscoveryApi],
+          [fetchApiRef, mockFetchApi as unknown as FetchApi],
+        ]}
+      >
+        <CleanEntityCostCard />
+      </TestApiProvider>,
+    );
+
+    expect(screen.getByTestId('no-annotation-info')).toBeInTheDocument();
+    expect(screen.queryByTestId('tco-banner')).toBeNull();
+    expect(mockClient.getCatalogEntityDailyCost).not.toHaveBeenCalled();
+    expect(mockFetchApi.fetch).not.toHaveBeenCalled();
   });
 
   it('renders loading state when initial requests are pending', async () => {

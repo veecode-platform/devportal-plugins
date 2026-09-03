@@ -30,6 +30,7 @@ import {
 } from 'recharts';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
+import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { costInsightsApiRef } from '@backstage-community/plugin-cost-insights';
 import { Cost, Group } from '@backstage-community/plugin-cost-insights-common';
 import { costInsightsTranslationRef } from '../translations';
@@ -39,6 +40,7 @@ import { GlobalClusterCostCard } from './GlobalClusterCostCard';
 export const CleanCostInsightsPage: React.FC = () => {
   const client = useApi(costInsightsApiRef);
   const identityApi = useApi(identityApiRef);
+  const catalogApi = useApi(catalogApiRef);
   const { t } = useTranslationRef(costInsightsTranslationRef);
 
   const [loading, setLoading] = useState(true);
@@ -61,10 +63,30 @@ export const CleanCostInsightsPage: React.FC = () => {
       try {
         const profile = await identityApi.getBackstageIdentity();
         const groups = await client.getUserGroups(profile.userEntityRef);
+        // Only offer groups whose entity carries the Cost Explorer filter
+        // annotation — the backend answers 500 for any group without it, so an
+        // unannotated group in the dropdown is a guaranteed error banner.
+        let annotated = groups;
+        try {
+          const { items } = await catalogApi.getEntitiesByRefs({
+            entityRefs: groups.map(g => `group:default/${g.id}`),
+            fields: ['metadata.annotations'],
+          });
+          annotated = groups.filter((_, idx) => {
+            const ann = items[idx]?.metadata?.annotations ?? {};
+            return (
+              ann['aws.amazon.com/cost-insights-tags'] ||
+              ann['aws.amazon.com/cost-insights-cost-categories']
+            );
+          });
+        } catch {
+          // Catalog lookup failed: keep the unfiltered list rather than hiding
+          // groups that might work.
+        }
         if (mounted) {
-          setUserGroups(groups);
-          if (groups.length > 0) {
-            setSelectedGroup(groups[0].id);
+          setUserGroups(annotated);
+          if (annotated.length > 0) {
+            setSelectedGroup(annotated[0].id);
           } else {
             setLoading(false);
           }
@@ -80,7 +102,7 @@ export const CleanCostInsightsPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [client, identityApi, t]);
+  }, [client, identityApi, catalogApi, t]);
 
   useEffect(() => {
     let mounted = true;
