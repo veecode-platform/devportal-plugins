@@ -66,6 +66,9 @@ export const CleanEntityCostCard: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     async function loadData() {
+      // Without the annotation the backend answers 500 ("Annotation not found
+      // on entity") — don't query, the render below shows the setup hint instead.
+      if (!tagAnnotation) return;
       if (!client.getCatalogEntityDailyCost) return;
       setAwsStatus('loading');
       setError(null);
@@ -88,11 +91,12 @@ export const CleanEntityCostCard: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [client, entityRef, intervals, t]);
+  }, [client, entityRef, intervals, t, tagAnnotation]);
 
   useEffect(() => {
     let mounted = true;
     async function loadK8sTco() {
+      if (!tagAnnotation) return; // no AWS side, no consolidated TCO to feed
       setK8sStatus('loading');
       try {
         const allocations = await fetchOpenCostAllocations(
@@ -122,7 +126,7 @@ export const CleanEntityCostCard: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [discoveryApi, fetchApi, entity]);
+  }, [discoveryApi, fetchApi, entity, tagAnnotation]);
 
   const serviceList = useMemo(() => {
     if (!costData?.groupedCosts?.service) return [];
@@ -238,6 +242,24 @@ export const CleanEntityCostCard: React.FC = () => {
     '#7b1fa2',
     '#0288d1',
   ];
+
+  if (!tagAnnotation) {
+    return (
+      <Card variant="outlined" style={{ marginBottom: 24 }}>
+        <CardContent>
+          <Box display="flex" alignItems="center" mb={2}>
+            <CloudQueueIcon color="primary" style={{ marginRight: 12, fontSize: 32 }} />
+            <Typography variant="h6" color="textPrimary">
+              {t('entityCard.cloudTitle')}
+            </Typography>
+          </Box>
+          <Alert severity="info" data-testid="no-annotation-info">
+            {t('entityCard.noAnnotationInfo')}
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card variant="outlined" style={{ marginBottom: 24 }}>
