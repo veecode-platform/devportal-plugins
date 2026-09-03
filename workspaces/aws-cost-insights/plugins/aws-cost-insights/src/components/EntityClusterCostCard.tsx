@@ -45,7 +45,7 @@ export const EntityClusterCostCard: React.FC = () => {
         const allocations = await fetchOpenCostAllocations(
           discoveryApi,
           fetchApi,
-          'today',
+          'yesterday',
           'namespace',
         );
         if (mounted) {

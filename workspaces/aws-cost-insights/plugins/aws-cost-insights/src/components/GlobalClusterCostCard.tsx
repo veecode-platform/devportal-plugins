@@ -46,7 +46,7 @@ export const GlobalClusterCostCard: React.FC = () => {
         const data = await fetchOpenCostAllocations(
           discoveryApi,
           fetchApi,
-          'today',
+          'yesterday',
           'namespace',
         );
         if (mounted) {

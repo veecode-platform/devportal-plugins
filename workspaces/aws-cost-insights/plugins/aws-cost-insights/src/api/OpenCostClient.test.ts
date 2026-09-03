@@ -154,6 +154,11 @@ describe('OpenCostClient', () => {
       );
       expect(result).toHaveProperty('default');
       expect(result.default.totalCost).toBe(0.15);
+      // Default window must be a COMPLETE day: 'today' is partial and would
+      // make daily figures and *DAYS_IN_MONTH projections swing with the clock.
+      expect(mockFetchApi.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('window=yesterday'),
+      );
     });
 
     it('returns empty object when data array is empty', async () => {

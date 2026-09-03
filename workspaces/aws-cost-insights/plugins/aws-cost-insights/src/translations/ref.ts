@@ -25,6 +25,8 @@ export const costInsightsMessages = {
     tcoUnavailableTitle: 'Consolidated Cost Unavailable',
     tcoFormat: '${{total}}/mo',
     tcoBreakdown: '(${{aws}} AWS Cloud + ${{k8s}} Kubernetes Workload)',
+    tcoDisclaimer:
+      'Assumes AWS-billed and in-cluster costs are disjoint; cluster nodes billed under the same AWS tags would be counted twice.',
     tcoCloudOnly: '(${{aws}} AWS Cloud · No in-cluster workload)',
     tcoCloudOnlyUnavailable: '(${{aws}} AWS Cloud · Kubernetes cost data unavailable)',
     tcoCalculating: 'Calculating consolidated costs...',

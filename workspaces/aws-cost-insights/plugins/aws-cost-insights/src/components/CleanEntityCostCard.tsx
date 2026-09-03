@@ -98,7 +98,7 @@ export const CleanEntityCostCard: React.FC = () => {
         const allocations = await fetchOpenCostAllocations(
           discoveryApi,
           fetchApi,
-          'today',
+          'yesterday',
           'namespace',
         );
         if (!mounted) return;
@@ -315,6 +315,16 @@ export const CleanEntityCostCard: React.FC = () => {
               {bannerSubtext}
             </Typography>
           </Box>
+          {awsStatus === 'success' && k8sStatus === 'available' && (
+            <Typography
+              variant="caption"
+              color="textSecondary"
+              component="div"
+              style={{ marginTop: 4 }}
+            >
+              {t('entityCard.tcoDisclaimer')}
+            </Typography>
+          )}
         </Box>
 
         {/* KPI Banner */}

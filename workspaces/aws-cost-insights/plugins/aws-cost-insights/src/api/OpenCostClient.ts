@@ -40,7 +40,10 @@ function toMatchedAllocation(
 export async function fetchOpenCostAllocations(
   discoveryApi: DiscoveryApi,
   fetchApi: FetchApi,
-  window: string = 'today',
+  // 'yesterday' is the most recent COMPLETE day. 'today' is a partial window
+  // (midnight → now), so any daily figure or *DAYS_IN_MONTH projection built
+  // on it would swing with the wall clock (~$0 right after midnight).
+  window: string = 'yesterday',
   aggregate: string = 'namespace',
 ): Promise<Record<string, OpenCostAllocation>> {
   const baseUrl = await discoveryApi.getBaseUrl('proxy');

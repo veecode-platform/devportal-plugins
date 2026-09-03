@@ -81,8 +81,9 @@ export const RichPeriodSelect: React.FC<RichPeriodSelectProps> = ({
       return;
     }
 
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    // Calendar-day count is INCLUSIVE of both endpoints (01 → 03 = 3 days)
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
     const intervals = `R${diffDays}/P1D/${endDate}`;
     const label = `${startDate} ~ ${endDate} (${diffDays}${t('periodSelect.daysSuffix')})`;

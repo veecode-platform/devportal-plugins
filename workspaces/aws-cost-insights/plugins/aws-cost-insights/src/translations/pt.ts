@@ -27,6 +27,8 @@ const costInsightsPtMessages = createTranslationMessages({
     'entityCard.tcoUnavailableTitle': 'Custo Consolidado Indisponível',
     'entityCard.tcoFormat': '${{total}}/mês',
     'entityCard.tcoBreakdown': '(${{aws}} Nuvem AWS + ${{k8s}} Workload Kubernetes)',
+    'entityCard.tcoDisclaimer':
+      'Assume que custos faturados na AWS e custos in-cluster são disjuntos; nós do cluster faturados sob as mesmas tags AWS seriam contados duas vezes.',
     'entityCard.tcoCloudOnly': '(${{aws}} Nuvem AWS · Sem workload no cluster)',
     'entityCard.tcoCloudOnlyUnavailable': '(${{aws}} Nuvem AWS · Custos Kubernetes indisponíveis)',
     'entityCard.tcoCalculating': 'Calculando custos consolidados...',
