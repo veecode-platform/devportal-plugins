@@ -27,6 +27,7 @@ help:
 	@echo "  cd workspaces/veecode-homepage && make help"
 	@echo "  cd workspaces/global-header && make help"
 	@echo "  cd workspaces/github-workflows && make help"
+	@echo "  cd workspaces/gitlab-pipelines && make help"
 	@echo "  cd workspaces/ldap-auth && make help"
 	@echo "  cd workspaces/kong-tools && make help"
 	@echo ""

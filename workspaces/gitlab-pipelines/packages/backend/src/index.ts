@@ -1,0 +1,78 @@
+/*
+ * Hi!
+ *
+ * Note that this is an EXAMPLE Backstage backend. Please check the README.
+ *
+ * Happy hacking!
+ */
+
+import { createBackend } from '@backstage/backend-defaults';
+import { WinstonLogger } from '@backstage/backend-defaults/rootLogger';
+
+const backend = createBackend();
+
+// Create a logger to cover logging static initialization tasks
+const staticLogger = WinstonLogger.create({
+  meta: { service: 'veecode-devportal-init' },
+});
+staticLogger.info('Starting DevPortal backend');
+
+backend.add(import('@backstage/plugin-app-backend'));
+backend.add(import('@backstage/plugin-proxy-backend'));
+
+// scaffolder plugin
+backend.add(import('@backstage/plugin-scaffolder-backend'));
+backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
+backend.add(
+  import('@backstage/plugin-scaffolder-backend-module-notifications'),
+);
+
+// auth plugin
+backend.add(import('@backstage/plugin-auth-backend'));
+// See https://backstage.io/docs/backend-system/building-backends/migrating#the-auth-plugin
+backend.add(import('@backstage/plugin-auth-backend-module-guest-provider'));
+// See https://backstage.io/docs/auth/guest/provider
+backend.add(import('@backstage/plugin-auth-backend-module-github-provider'));
+// See https://backstage.io/docs/auth/github/provider
+
+// catalog plugin
+backend.add(import('@backstage/plugin-catalog-backend'));
+backend.add(
+  import('@backstage/plugin-catalog-backend-module-scaffolder-entity-model'),
+);
+
+// GitHub org entity provider — syncs users, groups, and repos from GitHub
+backend.add(import('@backstage/plugin-catalog-backend-module-github-org'));
+backend.add(import('@backstage/plugin-catalog-backend-module-github'));
+
+// See https://backstage.io/docs/features/software-catalog/configuration#subscribing-to-catalog-errors
+backend.add(import('@backstage/plugin-catalog-backend-module-logs'));
+
+// permission plugin
+backend.add(import('@backstage/plugin-permission-backend'));
+// See https://backstage.io/docs/permissions/getting-started for how to create your own permission policy
+backend.add(import('@backstage-community/plugin-rbac-backend'));
+// Note: RBAC plugin provides its own permission policy, so we don't use allow-all-policy
+staticLogger.info(`RBAC permission policy is ENABLED`);
+
+// search plugin
+backend.add(import('@backstage/plugin-search-backend'));
+
+// search engine
+// See https://backstage.io/docs/features/search/search-engines
+backend.add(import('@backstage/plugin-search-backend-module-pg'));
+
+// search collators
+backend.add(import('@backstage/plugin-search-backend-module-catalog'));
+// kubernetes plugin
+backend.add(import('@backstage/plugin-kubernetes-backend'));
+
+// events plugin
+backend.add(import('@backstage/plugin-events-backend'));
+
+// notifications and signals plugins
+backend.add(import('@backstage/plugin-notifications-backend'));
+backend.add(import('@backstage/plugin-signals-backend'));
+
+backend.add(import('@veecode-platform/backstage-plugin-gitlab-pipelines-backend'));
+backend.start();

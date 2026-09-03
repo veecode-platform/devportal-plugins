@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: backstage, POSTGRES_PASSWORD: backstage, POSTGRES_DB: backstage }
+  fix-volume-ownership:
+    image: busybox:1.36
+    command: ["sh", "-c", "chown -R 1001:1001 /dynamic-plugins-root"]
+    volumes:
+      - dynamic-plugins-root:/dynamic-plugins-root
+  install-dynamic-plugins:
+    image: veecode/devportal:3.0.0-beta.7
+    depends_on:
+      fix-volume-ownership: { condition: service_completed_successfully }
+    entrypoint: ["./install-dynamic-plugins.sh"]
+    command: ["/dynamic-plugins-root"]
+    volumes:
+      - dynamic-plugins-root:/dynamic-plugins-root
+      - ./dynamic-plugins.yaml:/opt/app-root/src/dynamic-plugins.yaml:ro
+      - ../plugins/gitlab-pipelines/dist-dynamic:/opt/app-root/src/local-plugins/gitlab-pipelines:ro
+      - ../plugins/gitlab-pipelines-backend/dist-dynamic:/opt/app-root/src/local-plugins/gitlab-pipelines-backend:ro
+  devportal:
+    image: veecode/devportal:3.0.0-beta.7
+    depends_on:
+      install-dynamic-plugins: { condition: service_completed_successfully }
+      postgres: { condition: service_started }
+    ports: ["7007:7007"]
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=backstage
+      - POSTGRES_PASSWORD=backstage
+      - GITLAB_HOST
+      - GITLAB_TOKEN
+    volumes:
+      - dynamic-plugins-root:/opt/app-root/src/dynamic-plugins-root
+      - ./app-config.yaml:/opt/app-root/src/app-config.local.yaml:ro
+      - ./catalog:/opt/app-root/src/catalog:ro
+    command:
+      - --config
+      - dynamic-plugins-root/app-config.dynamic-plugins.yaml
+      - --config
+      - app-config.local.yaml
+volumes:
+  dynamic-plugins-root: {}
