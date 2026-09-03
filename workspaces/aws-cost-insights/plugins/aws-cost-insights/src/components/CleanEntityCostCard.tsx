@@ -216,32 +216,31 @@ export const CleanEntityCostCard = () => {
         {/* Consolidated Monthly TCO Banner */}
         <Box
           mb={2}
-          p={2}
-          borderRadius={8}
-          style={{
-            background: 'linear-gradient(90deg, rgba(25, 118, 210, 0.08) 0%, rgba(13, 148, 136, 0.08) 100%)',
-            border: '1px solid rgba(25, 118, 210, 0.2)',
-          }}
+          p={1.5}
+          bgcolor="action.hover"
+          borderRadius={6}
+          border={1}
+          borderColor="divider"
         >
           <Typography
             variant="caption"
+            color="textSecondary"
             style={{
               textTransform: 'uppercase',
-              letterSpacing: 0.8,
+              letterSpacing: 0.5,
               fontWeight: 700,
-              color: '#0284c7',
             }}
           >
             {t('entityCard.tcoTitle')}
           </Typography>
-          <Box display="flex" alignItems="baseline" mt={0.5} flexWrap="wrap" style={{ gap: 8 }}>
-            <Typography variant="h4" style={{ fontWeight: 800, color: '#0f172a' }}>
+          <Box display="flex" alignItems="baseline" mt={0.5} flexWrap="wrap" style={{ gap: 10 }}>
+            <Typography variant="h5" style={{ fontWeight: 700, color: '#1976d2' }}>
               ${totalMonthlyTco.toFixed(2)}
-              <Typography component="span" variant="body1" style={{ fontWeight: 500, color: '#64748b', marginLeft: 4 }}>
+              <Typography component="span" variant="body2" color="textSecondary" style={{ marginLeft: 4, fontWeight: 500 }}>
                 /mo
               </Typography>
             </Typography>
-            <Typography variant="body2" style={{ color: '#475569', fontWeight: 500 }}>
+            <Typography variant="body2" color="textSecondary" style={{ fontWeight: 500 }}>
               {k8sMonthlyCost > 0
                 ? t('entityCard.tcoBreakdown' as any, {
                     aws: awsMonthlyEstimate.toFixed(2),
