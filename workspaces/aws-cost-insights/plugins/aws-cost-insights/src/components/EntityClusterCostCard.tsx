@@ -1,23 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
   Typography,
+  Box,
+  CircularProgress,
+  Chip,
   Table,
   TableHead,
   TableRow,
   TableCell,
   TableBody,
-  Chip,
-  Box,
-  CircularProgress,
   LinearProgress,
 } from '@material-ui/core';
+import Alert from '@material-ui/lab/Alert';
 import StorageIcon from '@material-ui/icons/Storage';
+import { useApi, discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
-import { discoveryApiRef, fetchApiRef, useApi } from '@backstage/core-plugin-api';
 import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
 import { costInsightsTranslationRef } from '../translations';
+import {
+  fetchOpenCostAllocations,
+  findMatchingNamespaceAllocation,
+  DAYS_IN_MONTH,
+  OpenCostAllocation,
+} from '../api/OpenCostClient';
 
 export const EntityClusterCostCard = () => {
   const { entity } = useEntity();
@@ -25,48 +32,30 @@ export const EntityClusterCostCard = () => {
   const fetchApi = useApi(fetchApiRef);
   const { t } = useTranslationRef(costInsightsTranslationRef);
 
-  const [clusterCost, setClusterCost] = useState<any>(null);
+  const [clusterCost, setClusterCost] = useState<OpenCostAllocation | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const k8sId =
-    entity.metadata.annotations?.['backstage.io/kubernetes-id'] ||
-    entity.metadata.name;
-  const k8sNs =
-    entity.metadata.annotations?.['backstage.io/kubernetes-namespace'];
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     async function loadClusterCosts() {
+      setLoading(true);
+      setError(null);
       try {
-        const baseUrl = await discoveryApi.getBaseUrl('proxy');
-        const res = await fetchApi.fetch(
-          `${baseUrl}/opencost/allocation/compute?window=today&aggregate=namespace`,
+        const allocations = await fetchOpenCostAllocations(
+          discoveryApi,
+          fetchApi,
+          'today',
+          'namespace',
         );
-        const json = await res.json();
-        if (mounted && json.data && json.data.length > 0) {
-          const allocations = json.data[0];
-          let matched = null;
-
-          if (k8sNs && allocations[k8sNs]) {
-            matched = allocations[k8sNs];
-          } else {
-            const searchTerms = [
-              (k8sId || '').toLowerCase().replace(/-service$/, ''),
-              entity.metadata.name.toLowerCase().replace(/-service$/, ''),
-            ].filter(Boolean);
-
-            for (const key of Object.keys(allocations)) {
-              const lowerKey = key.toLowerCase();
-              if (searchTerms.some(term => lowerKey.includes(term))) {
-                matched = allocations[key];
-                break;
-              }
-            }
-          }
-          setClusterCost(matched || null);
+        if (mounted) {
+          const match = findMatchingNamespaceAllocation(allocations, entity);
+          setClusterCost(match ? match.allocation : null);
         }
-      } catch (err) {
-        console.error('Failed to load OpenCost data', err);
+      } catch (err: any) {
+        if (mounted) {
+          setError(err?.message || 'Error fetching OpenCost data');
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -75,7 +64,7 @@ export const EntityClusterCostCard = () => {
     return () => {
       mounted = false;
     };
-  }, [discoveryApi, fetchApi, k8sId, k8sNs, entity.metadata.name]);
+  }, [discoveryApi, fetchApi, entity]);
 
   const efficiency =
     (clusterCost?.totalEfficiency || clusterCost?.cpuEfficiency || 0) * 100;
@@ -104,48 +93,50 @@ export const EntityClusterCostCard = () => {
             <Chip label={t('clusterCard.badge')} color="primary" size="small" />
           </Box>
 
-          {loading ? (
+          {error ? (
+            <Alert severity="warning">
+              {t('clusterCard.errorFetching' as any, { error })}
+            </Alert>
+          ) : loading ? (
             <Box display="flex" justifyContent="center" p={3}>
               <CircularProgress />
             </Box>
           ) : clusterCost ? (
-            <>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>{t('clusterCard.workloadHeader')}</strong></TableCell>
-                    <TableCell align="right"><strong>{t('clusterCard.cpuCostHeader')}</strong></TableCell>
-                    <TableCell align="right"><strong>{t('clusterCard.ramCostHeader')}</strong></TableCell>
-                    <TableCell align="right"><strong>{t('clusterCard.dailyTotalHeader')}</strong></TableCell>
-                    <TableCell align="right"><strong>{t('clusterCard.monthlyProjectionHeader')}</strong></TableCell>
-                    <TableCell align="right"><strong>{t('clusterCard.efficiencyHeader')}</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TableRow hover>
-                    <TableCell>{clusterCost.name || clusterCost.properties?.namespace}</TableCell>
-                    <TableCell align="right">${(clusterCost.cpuCost || 0).toFixed(2)}</TableCell>
-                    <TableCell align="right">${(clusterCost.ramCost || 0).toFixed(2)}</TableCell>
-                    <TableCell align="right"><strong>${(clusterCost.totalCost || 0).toFixed(2)}</strong></TableCell>
-                    <TableCell align="right">${((clusterCost.totalCost || 0) * 30).toFixed(2)}</TableCell>
-                    <TableCell align="right">
-                      <Box display="flex" alignItems="center" justifyContent="flex-end">
-                        <Box width={60} mr={1}>
-                          <LinearProgress
-                            variant="determinate"
-                            value={Math.min(efficiency, 100)}
-                            color={efficiency < 20 ? 'secondary' : 'primary'}
-                          />
-                        </Box>
-                        <Typography variant="body2" style={{ fontWeight: 600 }}>
-                          {efficiency.toFixed(1)}%
-                        </Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>{t('clusterCard.workloadHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('clusterCard.cpuCostHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('clusterCard.ramCostHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('clusterCard.dailyTotalHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('clusterCard.monthlyProjectionHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('clusterCard.efficiencyHeader')}</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow hover>
+                  <TableCell>{clusterCost.name}</TableCell>
+                  <TableCell align="right">${(clusterCost.cpuCost || 0).toFixed(2)}</TableCell>
+                  <TableCell align="right">${(clusterCost.ramCost || 0).toFixed(2)}</TableCell>
+                  <TableCell align="right"><strong>${(clusterCost.totalCost || 0).toFixed(2)}</strong></TableCell>
+                  <TableCell align="right">${((clusterCost.totalCost || 0) * DAYS_IN_MONTH).toFixed(2)}</TableCell>
+                  <TableCell align="right">
+                    <Box display="flex" alignItems="center" justifyContent="flex-end">
+                      <Box width={60} mr={1}>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.min(efficiency, 100)}
+                          color={efficiency < 20 ? 'secondary' : 'primary'}
+                        />
                       </Box>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </>
+                      <Typography variant="body2" style={{ fontWeight: 600 }}>
+                        {efficiency.toFixed(1)}%
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
           ) : (
             <Typography variant="body2" color="textSecondary">
               {t('clusterCard.noWorkload')}

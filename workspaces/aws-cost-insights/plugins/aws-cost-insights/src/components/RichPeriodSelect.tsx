@@ -77,7 +77,7 @@ export const RichPeriodSelect: React.FC<RichPeriodSelectProps> = ({
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (start > end) {
-      alert('Start date must be before end date.');
+      alert(t('periodSelect.invalidRangeAlert'));
       return;
     }
 

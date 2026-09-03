@@ -1,5 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
+  Page,
+  Header,
+  Content,
+} from '@backstage/core-components';
+import {
   Card,
   CardContent,
   Typography,
@@ -8,6 +13,10 @@ import {
   Tab,
   CircularProgress,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import {
@@ -22,8 +31,7 @@ import {
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
 import { costInsightsApiRef } from '@backstage-community/plugin-cost-insights';
-import { Cost } from '@backstage-community/plugin-cost-insights-common';
-import { Page, Header, Content } from '@backstage/core-components';
+import { Cost, Group } from '@backstage-community/plugin-cost-insights-common';
 import { costInsightsTranslationRef } from '../translations';
 import { RichPeriodSelect } from './RichPeriodSelect';
 import { GlobalClusterCostCard } from './GlobalClusterCostCard';
@@ -36,24 +44,53 @@ export const CleanCostInsightsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [costData, setCostData] = useState<Cost | null>(null);
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [intervals, setIntervals] = useState(() => {
     const today = new Date().toISOString().split('T')[0];
     return `R90/P1D/${today}`;
   });
-  const [periodLabel, setPeriodLabel] = useState('Past 90 Days');
+  const [periodLabel, setPeriodLabel] = useState(t('periodSelect.past90Days'));
   const [tabIndex, setTabIndex] = useState(0);
 
   useEffect(() => {
     let mounted = true;
-    async function loadData() {
+    async function loadGroups() {
       setLoading(true);
       setError(null);
       try {
         const profile = await identityApi.getBackstageIdentity();
-        const userGroups = await client.getUserGroups(profile.userEntityRef);
-        const targetGroup = userGroups[0]?.id || 'admins';
+        const groups = await client.getUserGroups(profile.userEntityRef);
+        if (mounted) {
+          setUserGroups(groups);
+          if (groups.length > 0) {
+            setSelectedGroup(groups[0].id);
+          } else {
+            setLoading(false);
+          }
+        }
+      } catch (err: any) {
+        if (mounted) {
+          setError(err?.message || 'Error fetching user groups');
+          setLoading(false);
+        }
+      }
+    }
+    loadGroups();
+    return () => {
+      mounted = false;
+    };
+  }, [client, identityApi]);
 
-        const data = await client.getGroupDailyCost(targetGroup, intervals);
+  useEffect(() => {
+    let mounted = true;
+    if (!selectedGroup) return;
+
+    async function loadData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await client.getGroupDailyCost(selectedGroup, intervals);
         if (mounted) {
           setCostData(data);
         }
@@ -67,7 +104,7 @@ export const CleanCostInsightsPage = () => {
     return () => {
       mounted = false;
     };
-  }, [client, identityApi, intervals]);
+  }, [client, selectedGroup, intervals]);
 
   const totalPeriodCost = useMemo(() => {
     if (!costData?.aggregation) return 0;
@@ -114,8 +151,10 @@ export const CleanCostInsightsPage = () => {
     '#1976d2',
     '#388e3c',
     '#f57c00',
+    '#d32f2f',
     '#7b1fa2',
-    '#0097a7',
+    '#0288d1',
+    '#00796b',
     '#c2185b',
   ];
 
@@ -126,17 +165,8 @@ export const CleanCostInsightsPage = () => {
         subtitle={t('globalPage.subtitle')}
       />
       <Content>
-        <Box width="100%" px={0}>
-          {error && (
-            <Box mb={2}>
-              <Alert severity="error">
-                {t('globalPage.fetchError' as any, { error })}
-              </Alert>
-            </Box>
-          )}
-
-          {/* Card 1: AWS Cloud Infrastructure Spend */}
-          <Card variant="outlined" style={{ width: '100%' }}>
+        <Box mb={4}>
+          <Card variant="outlined">
             <CardContent>
               <Box
                 display="flex"
@@ -146,31 +176,68 @@ export const CleanCostInsightsPage = () => {
                 mb={2}
                 style={{ gap: 16 }}
               >
-                <Box display="flex" alignItems="baseline" style={{ gap: 16 }}>
-                  <div>
-                    <Typography
-                      variant="caption"
-                      color="textSecondary"
-                      style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}
+                <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 16 }}>
+                  {userGroups.length > 1 && (
+                    <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
+                      <InputLabel id="cost-group-select-label">Team / Group</InputLabel>
+                      <Select
+                        labelId="cost-group-select-label"
+                        value={selectedGroup}
+                        onChange={e => setSelectedGroup(e.target.value as string)}
+                        label="Team / Group"
+                      >
+                        {userGroups.map(g => (
+                          <MenuItem key={g.id} value={g.id}>
+                            {g.name || g.id}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+
+                  {selectedGroup && (
+                    <Box
+                      display="flex"
+                      alignItems="baseline"
+                      p={1}
+                      bgcolor="action.hover"
+                      borderRadius={6}
+                      style={{ gap: 16 }}
                     >
-                      {t('globalPage.totalPeriodLabel' as any, { period: periodLabel })}
-                    </Typography>
-                    <Typography variant="h4" style={{ fontWeight: 700, color: '#1976d2' }}>
-                      ${totalPeriodCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Typography>
-                  </div>
-                  <Box
-                    px={1.5}
-                    py={0.5}
-                    bgcolor="action.hover"
-                    borderRadius={4}
-                  >
-                    <Typography variant="body2" color="textSecondary">
-                      {t('globalPage.dailyAvgFormat' as any, {
-                        avg: dailyAverageCost.toFixed(2),
-                      })}
-                    </Typography>
-                  </Box>
+                      <div>
+                        <Typography
+                          variant="caption"
+                          color="textSecondary"
+                          style={{ textTransform: 'uppercase' }}
+                        >
+                          {t('globalPage.totalPeriodLabel' as any, {
+                            period: periodLabel,
+                          })}
+                        </Typography>
+                        <Typography
+                          variant="h5"
+                          style={{ fontWeight: 700, color: '#1976d2' }}
+                        >
+                          ${totalPeriodCost.toFixed(2)}
+                        </Typography>
+                      </div>
+                      <Divider orientation="vertical" flexItem />
+                      <div>
+                        <Typography
+                          variant="caption"
+                          color="textSecondary"
+                          style={{ textTransform: 'uppercase' }}
+                        >
+                          {t('globalPage.dailyAverageLabel')}
+                        </Typography>
+                        <Typography variant="subtitle2" color="textSecondary">
+                          {t('globalPage.dailyAvgFormat' as any, {
+                            avg: dailyAverageCost.toFixed(2),
+                          })}
+                        </Typography>
+                      </div>
+                    </Box>
+                  )}
                 </Box>
 
                 <RichPeriodSelect
@@ -182,26 +249,37 @@ export const CleanCostInsightsPage = () => {
                 />
               </Box>
 
-              <Divider style={{ marginBottom: 16 }} />
+              {error && (
+                <Box mb={2}>
+                  <Alert severity="error">
+                    {t('globalPage.fetchError' as any, { error })}
+                  </Alert>
+                </Box>
+              )}
 
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-                mb={2}
-              >
-                <Tabs
-                  value={tabIndex}
-                  indicatorColor="primary"
-                  textColor="primary"
-                  onChange={(_, val) => setTabIndex(val)}
-                >
-                  <Tab label={t('globalPage.totalCostTab')} />
-                  {serviceList.length > 1 && (
-                    <Tab label={t('globalPage.breakdownTab')} />
-                  )}
-                </Tabs>
-              </Box>
+              {!loading && userGroups.length === 0 && (
+                <Box mb={2}>
+                  <Alert severity="info">
+                    {t('globalPage.noGroups')}
+                  </Alert>
+                </Box>
+              )}
+
+              {selectedGroup && (
+                <Box mb={2}>
+                  <Tabs
+                    value={tabIndex}
+                    indicatorColor="primary"
+                    textColor="primary"
+                    onChange={(_, val) => setTabIndex(val)}
+                  >
+                    <Tab label={t('globalPage.totalCostTab')} />
+                    {serviceList.length > 1 && (
+                      <Tab label={t('globalPage.breakdownTab')} />
+                    )}
+                  </Tabs>
+                </Box>
+              )}
 
               {loading ? (
                 <Box
@@ -264,9 +342,9 @@ export const CleanCostInsightsPage = () => {
                       <Tooltip
                         formatter={(val: any, name: any) => [
                           `$${Number(val).toFixed(2)}`,
-                          `${name || 'Daily Cost'}`,
+                          `${name || t('globalPage.dailyCostTooltip')}`,
                         ]}
-                        labelFormatter={label => `Date: ${label}`}
+                        labelFormatter={label => `${t('globalPage.dateAxisLabel')}: ${label}`}
                         contentStyle={{
                           backgroundColor: '#222',
                           borderRadius: 6,
@@ -277,7 +355,7 @@ export const CleanCostInsightsPage = () => {
                         <Area
                           type="monotone"
                           dataKey="cost"
-                          name="AWS Total Cost"
+                          name={t('globalPage.totalCostLabel')}
                           stroke="#1976d2"
                           strokeWidth={2}
                           fillOpacity={1}
@@ -293,7 +371,6 @@ export const CleanCostInsightsPage = () => {
                             stroke={serviceColors[idx % serviceColors.length]}
                             fill={serviceColors[idx % serviceColors.length]}
                             fillOpacity={0.2}
-                            stackId="1"
                           />
                         ))
                       )}
@@ -303,10 +380,9 @@ export const CleanCostInsightsPage = () => {
               )}
             </CardContent>
           </Card>
-
-          {/* Card 2: Platform Cluster Workload Spend (OpenCost) */}
-          <GlobalClusterCostCard />
         </Box>
+
+        <GlobalClusterCostCard />
       </Content>
     </Page>
   );

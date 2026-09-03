@@ -28,6 +28,11 @@ import { useEntity } from '@backstage/plugin-catalog-react';
 import { stringifyEntityRef } from '@backstage/catalog-model';
 import { costInsightsTranslationRef } from '../translations';
 import { RichPeriodSelect } from './RichPeriodSelect';
+import {
+  fetchOpenCostAllocations,
+  findMatchingNamespaceAllocation,
+  DAYS_IN_MONTH,
+} from '../api/OpenCostClient';
 
 export const CleanEntityCostCard = () => {
   const client = useApi(costInsightsApiRef);
@@ -39,23 +44,22 @@ export const CleanEntityCostCard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [costData, setCostData] = useState<Cost | null>(null);
+
+  type K8sStatus = 'loading' | 'available' | 'not_applicable' | 'error';
+  const [k8sStatus, setK8sStatus] = useState<K8sStatus>('loading');
   const [k8sMonthlyCost, setK8sMonthlyCost] = useState<number>(0);
+
   const [intervals, setIntervals] = useState(() => {
     const today = new Date().toISOString().split('T')[0];
     return `R30/P1D/${today}`;
   });
-  const [periodLabel, setPeriodLabel] = useState('Past 30 Days');
+  const [periodLabel, setPeriodLabel] = useState(t('periodSelect.past30Days'));
   const [tabIndex, setTabIndex] = useState(0);
 
   const entityRef = stringifyEntityRef(entity);
   const tagAnnotation =
     entity.metadata.annotations?.['aws.amazon.com/cost-insights-tags'] ||
     entity.metadata.annotations?.['aws.amazon.com/cost-insights-cost-categories'];
-
-  const k8sNs = entity.metadata.annotations?.['backstage.io/kubernetes-namespace'];
-  const k8sId =
-    entity.metadata.annotations?.['backstage.io/kubernetes-id'] ||
-    entity.metadata.name;
 
   useEffect(() => {
     let mounted = true;
@@ -84,42 +88,29 @@ export const CleanEntityCostCard = () => {
     let mounted = true;
     async function loadK8sTco() {
       try {
-        const baseUrl = await discoveryApi.getBaseUrl('proxy');
-        const res = await fetchApi.fetch(
-          `${baseUrl}/opencost/allocation/compute?window=today&aggregate=namespace`,
-        );
-        const json = await res.json();
-        if (mounted && json.data && json.data.length > 0) {
-          const allocations = json.data[0];
-          let matched = null;
-          if (k8sNs && allocations[k8sNs]) {
-            matched = allocations[k8sNs];
-          } else {
-            const searchTerms = [
-              (k8sId || '').toLowerCase().replace(/-service$/, ''),
-              entity.metadata.name.toLowerCase().replace(/-service$/, ''),
-            ].filter(Boolean);
-            for (const key of Object.keys(allocations)) {
-              const lowerKey = key.toLowerCase();
-              if (searchTerms.some(term => lowerKey.includes(term))) {
-                matched = allocations[key];
-                break;
-              }
-            }
-          }
-          if (matched && matched.totalCost) {
-            setK8sMonthlyCost(matched.totalCost * 30.5);
-          }
+        const allocations = await fetchOpenCostAllocations(discoveryApi, fetchApi, 'today', 'namespace');
+        if (!mounted) return;
+
+        const match = findMatchingNamespaceAllocation(allocations, entity);
+        if (match) {
+          setK8sMonthlyCost(match.monthlyProjection);
+          setK8sStatus('available');
+        } else {
+          setK8sMonthlyCost(0);
+          setK8sStatus('not_applicable');
         }
-      } catch {
-        // OpenCost not present or unreachable
+      } catch (_err) {
+        if (mounted) {
+          setK8sMonthlyCost(0);
+          setK8sStatus('error');
+        }
       }
     }
     loadK8sTco();
     return () => {
       mounted = false;
     };
-  }, [discoveryApi, fetchApi, k8sNs, k8sId, entity.metadata.name]);
+  }, [discoveryApi, fetchApi, entity]);
 
   const serviceList = useMemo(() => {
     if (!costData?.groupedCosts?.service) return [];
@@ -166,8 +157,51 @@ export const CleanEntityCostCard = () => {
     return totalPeriodCost / chartData.length;
   }, [totalPeriodCost, chartData.length]);
 
-  const awsMonthlyEstimate = dailyAverageCost * 30.5;
-  const totalMonthlyTco = awsMonthlyEstimate + k8sMonthlyCost;
+  const awsMonthlyEstimate = dailyAverageCost * DAYS_IN_MONTH;
+
+  const { bannerTitle, bannerTotal, bannerSubtext } = useMemo(() => {
+    const awsFormatted = awsMonthlyEstimate.toFixed(2);
+    const k8sFormatted = k8sMonthlyCost.toFixed(2);
+
+    if (k8sStatus === 'available') {
+      const total = (awsMonthlyEstimate + k8sMonthlyCost).toFixed(2);
+      return {
+        bannerTitle: t('entityCard.tcoTitle'),
+        bannerTotal: total,
+        bannerSubtext: t('entityCard.tcoBreakdown' as any, {
+          aws: awsFormatted,
+          k8s: k8sFormatted,
+        }),
+      };
+    }
+
+    if (k8sStatus === 'error') {
+      return {
+        bannerTitle: t('entityCard.tcoCloudOnlyTitle'),
+        bannerTotal: awsFormatted,
+        bannerSubtext: t('entityCard.tcoCloudOnlyUnavailable' as any, {
+          aws: awsFormatted,
+        }),
+      };
+    }
+
+    if (k8sStatus === 'loading') {
+      return {
+        bannerTitle: t('entityCard.tcoTitle'),
+        bannerTotal: awsFormatted,
+        bannerSubtext: t('entityCard.tcoCalculatingK8s'),
+      };
+    }
+
+    // not_applicable
+    return {
+      bannerTitle: t('entityCard.tcoCloudOnlyTitle'),
+      bannerTotal: awsFormatted,
+      bannerSubtext: t('entityCard.tcoCloudOnly' as any, {
+        aws: awsFormatted,
+      }),
+    };
+  }, [awsMonthlyEstimate, k8sMonthlyCost, k8sStatus, t]);
 
   const colors = [
     '#1976d2',
@@ -213,7 +247,7 @@ export const CleanEntityCostCard = () => {
           />
         </Box>
 
-        {/* Consolidated Monthly TCO Banner */}
+        {/* Consolidated Monthly TCO / Cloud Banner */}
         <Box
           mb={2}
           p={1.5}
@@ -231,24 +265,22 @@ export const CleanEntityCostCard = () => {
               fontWeight: 700,
             }}
           >
-            {t('entityCard.tcoTitle')}
+            {bannerTitle}
           </Typography>
           <Box display="flex" alignItems="baseline" mt={0.5} flexWrap="wrap" style={{ gap: 10 }}>
             <Typography variant="h5" style={{ fontWeight: 700, color: '#1976d2' }}>
-              ${totalMonthlyTco.toFixed(2)}
-              <Typography component="span" variant="body2" color="textSecondary" style={{ marginLeft: 4, fontWeight: 500 }}>
-                /mo
+              ${bannerTotal}
+              <Typography
+                component="span"
+                variant="body2"
+                color="textSecondary"
+                style={{ marginLeft: 4, fontWeight: 500 }}
+              >
+                {t('entityCard.perMonth')}
               </Typography>
             </Typography>
             <Typography variant="body2" color="textSecondary" style={{ fontWeight: 500 }}>
-              {k8sMonthlyCost > 0
-                ? t('entityCard.tcoBreakdown' as any, {
-                    aws: awsMonthlyEstimate.toFixed(2),
-                    k8s: k8sMonthlyCost.toFixed(2),
-                  })
-                : t('entityCard.tcoCloudOnly' as any, {
-                    aws: awsMonthlyEstimate.toFixed(2),
-                  })}
+              {bannerSubtext}
             </Typography>
           </Box>
         </Box>
@@ -349,7 +381,7 @@ export const CleanEntityCostCard = () => {
                   formatter={(value: any, name: any) => {
                     const num = Number(value || 0);
                     const formatted = `$${num.toFixed(2)}`;
-                    const label = name === 'total' ? 'AWS Total Cost' : name;
+                    const label = name === 'total' ? t('globalPage.totalCostLabel') : name;
                     return [formatted, label];
                   }}
                 />

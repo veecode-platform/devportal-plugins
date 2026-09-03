@@ -56,23 +56,21 @@ export class CostExplorerClient implements CostInsightsApi {
     return dateFormat(yesterday, 'yyyy-mm-dd');
   }
 
-  async getUserGroups(userId: string): Promise<Group[]> {
+  async getUserGroups(userRef: string): Promise<Group[]> {
+    const normalizedUserRef = userRef.includes(':')
+      ? userRef
+      : `user:default/${userRef}`;
+
     const userGroups = (
       await this.catalogApi.getEntities({
         filter: {
           kind: 'Group',
-          ['relations.hasMember']: [`user:default/${userId}`],
+          'relations.hasMember': [normalizedUserRef],
         },
       })
     ).items;
 
-    const groups =
-      userGroups.length > 0
-        ? userGroups
-        : (await this.catalogApi.getEntities({ filter: { kind: 'Group' } }))
-            .items;
-
-    return groups.map(e => {
+    return userGroups.map(e => {
       const spec = e.spec as any;
       return {
         id: stringifyEntityRef(e),
