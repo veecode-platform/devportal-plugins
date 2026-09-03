@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -27,7 +27,7 @@ import {
   OpenCostAllocation,
 } from '../api/OpenCostClient';
 
-export const GlobalClusterCostCard = () => {
+export const GlobalClusterCostCard: React.FC = () => {
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const { t } = useTranslationRef(costInsightsTranslationRef);
@@ -54,7 +54,7 @@ export const GlobalClusterCostCard = () => {
         }
       } catch (err: any) {
         if (mounted) {
-          setError(err?.message || 'Error fetching OpenCost data');
+          setError(err?.message || t('globalCluster.fetchErrorFallback'));
         }
       } finally {
         if (mounted) setLoading(false);
@@ -64,7 +64,7 @@ export const GlobalClusterCostCard = () => {
     return () => {
       mounted = false;
     };
-  }, [discoveryApi, fetchApi]);
+  }, [discoveryApi, fetchApi, t]);
 
   const namespaceList = useMemo(() => {
     const list = Object.entries(allocations).map(([name, data]) => ({

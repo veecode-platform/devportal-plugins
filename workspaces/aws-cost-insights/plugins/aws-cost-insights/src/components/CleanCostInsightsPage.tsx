@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Page,
   Header,
@@ -36,7 +36,7 @@ import { costInsightsTranslationRef } from '../translations';
 import { RichPeriodSelect } from './RichPeriodSelect';
 import { GlobalClusterCostCard } from './GlobalClusterCostCard';
 
-export const CleanCostInsightsPage = () => {
+export const CleanCostInsightsPage: React.FC = () => {
   const client = useApi(costInsightsApiRef);
   const identityApi = useApi(identityApiRef);
   const { t } = useTranslationRef(costInsightsTranslationRef);
@@ -71,7 +71,7 @@ export const CleanCostInsightsPage = () => {
         }
       } catch (err: any) {
         if (mounted) {
-          setError(err?.message || 'Error fetching user groups');
+          setError(err?.message || t('globalPage.fetchGroupsFallback'));
           setLoading(false);
         }
       }
@@ -80,7 +80,7 @@ export const CleanCostInsightsPage = () => {
     return () => {
       mounted = false;
     };
-  }, [client, identityApi]);
+  }, [client, identityApi, t]);
 
   useEffect(() => {
     let mounted = true;
@@ -89,13 +89,17 @@ export const CleanCostInsightsPage = () => {
     async function loadData() {
       setLoading(true);
       setError(null);
+      setCostData(null); // Clear previous data so stale figures never survive across group/interval change
       try {
         const data = await client.getGroupDailyCost(selectedGroup, intervals);
         if (mounted) {
           setCostData(data);
         }
       } catch (err: any) {
-        if (mounted) setError(err?.message || 'Error fetching cost data');
+        if (mounted) {
+          setCostData(null);
+          setError(err?.message || t('globalPage.fetchErrorFallback'));
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -104,7 +108,7 @@ export const CleanCostInsightsPage = () => {
     return () => {
       mounted = false;
     };
-  }, [client, selectedGroup, intervals]);
+  }, [client, selectedGroup, intervals, t]);
 
   const totalPeriodCost = useMemo(() => {
     if (!costData?.aggregation) return 0;
@@ -179,12 +183,12 @@ export const CleanCostInsightsPage = () => {
                 <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 16 }}>
                   {userGroups.length > 1 && (
                     <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
-                      <InputLabel id="cost-group-select-label">Team / Group</InputLabel>
+                      <InputLabel id="cost-group-select-label">{t('globalPage.teamGroupLabel')}</InputLabel>
                       <Select
                         labelId="cost-group-select-label"
                         value={selectedGroup}
                         onChange={e => setSelectedGroup(e.target.value as string)}
-                        label="Team / Group"
+                        label={t('globalPage.teamGroupLabel')}
                       >
                         {userGroups.map(g => (
                           <MenuItem key={g.id} value={g.id}>

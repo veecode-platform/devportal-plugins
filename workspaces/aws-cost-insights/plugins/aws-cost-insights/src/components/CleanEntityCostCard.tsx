@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -34,18 +34,20 @@ import {
   DAYS_IN_MONTH,
 } from '../api/OpenCostClient';
 
-export const CleanEntityCostCard = () => {
+export type K8sStatus = 'loading' | 'available' | 'not_applicable' | 'error';
+export type AwsStatus = 'loading' | 'success' | 'error';
+
+export const CleanEntityCostCard: React.FC = () => {
   const client = useApi(costInsightsApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const { entity } = useEntity();
   const { t } = useTranslationRef(costInsightsTranslationRef);
 
-  const [loading, setLoading] = useState(true);
+  const [awsStatus, setAwsStatus] = useState<AwsStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [costData, setCostData] = useState<Cost | null>(null);
 
-  type K8sStatus = 'loading' | 'available' | 'not_applicable' | 'error';
   const [k8sStatus, setK8sStatus] = useState<K8sStatus>('loading');
   const [k8sMonthlyCost, setK8sMonthlyCost] = useState<number>(0);
 
@@ -65,30 +67,40 @@ export const CleanEntityCostCard = () => {
     let mounted = true;
     async function loadData() {
       if (!client.getCatalogEntityDailyCost) return;
-      setLoading(true);
+      setAwsStatus('loading');
       setError(null);
+      setCostData(null); // Clear previous data so stale figures never survive across group/interval change
       try {
         const data = await client.getCatalogEntityDailyCost(entityRef, intervals);
         if (mounted) {
           setCostData(data);
+          setAwsStatus('success');
         }
       } catch (err: any) {
-        if (mounted) setError(err?.message || 'Error fetching entity cost data');
-      } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setCostData(null);
+          setAwsStatus('error');
+          setError(err?.message || t('entityCard.fetchErrorFallback'));
+        }
       }
     }
     loadData();
     return () => {
       mounted = false;
     };
-  }, [client, entityRef, intervals]);
+  }, [client, entityRef, intervals, t]);
 
   useEffect(() => {
     let mounted = true;
     async function loadK8sTco() {
+      setK8sStatus('loading');
       try {
-        const allocations = await fetchOpenCostAllocations(discoveryApi, fetchApi, 'today', 'namespace');
+        const allocations = await fetchOpenCostAllocations(
+          discoveryApi,
+          fetchApi,
+          'today',
+          'namespace',
+        );
         if (!mounted) return;
 
         const match = findMatchingNamespaceAllocation(allocations, entity);
@@ -159,49 +171,64 @@ export const CleanEntityCostCard = () => {
 
   const awsMonthlyEstimate = dailyAverageCost * DAYS_IN_MONTH;
 
-  const { bannerTitle, bannerTotal, bannerSubtext } = useMemo(() => {
+  // Fully coordinated banner states: both AWS and K8s considered
+  const { bannerTitle, bannerTotal, bannerSubtext, isBannerLoading } = useMemo(() => {
     const awsFormatted = awsMonthlyEstimate.toFixed(2);
     const k8sFormatted = k8sMonthlyCost.toFixed(2);
 
+    if (awsStatus === 'loading' || k8sStatus === 'loading') {
+      return {
+        bannerTitle: t('entityCard.tcoTitle'),
+        bannerTotal: '...',
+        bannerSubtext: t('entityCard.tcoCalculating'),
+        isBannerLoading: true,
+      };
+    }
+
+    if (awsStatus === 'error') {
+      return {
+        bannerTitle: t('entityCard.tcoUnavailableTitle'),
+        bannerTotal: '—',
+        bannerSubtext: t('entityCard.awsUnavailable'),
+        isBannerLoading: false,
+      };
+    }
+
+    // awsStatus === 'success'
     if (k8sStatus === 'available') {
       const total = (awsMonthlyEstimate + k8sMonthlyCost).toFixed(2);
       return {
         bannerTitle: t('entityCard.tcoTitle'),
-        bannerTotal: total,
+        bannerTotal: `$${total}`,
         bannerSubtext: t('entityCard.tcoBreakdown' as any, {
           aws: awsFormatted,
           k8s: k8sFormatted,
         }),
+        isBannerLoading: false,
       };
     }
 
     if (k8sStatus === 'error') {
       return {
         bannerTitle: t('entityCard.tcoCloudOnlyTitle'),
-        bannerTotal: awsFormatted,
+        bannerTotal: `$${awsFormatted}`,
         bannerSubtext: t('entityCard.tcoCloudOnlyUnavailable' as any, {
           aws: awsFormatted,
         }),
-      };
-    }
-
-    if (k8sStatus === 'loading') {
-      return {
-        bannerTitle: t('entityCard.tcoTitle'),
-        bannerTotal: awsFormatted,
-        bannerSubtext: t('entityCard.tcoCalculatingK8s'),
+        isBannerLoading: false,
       };
     }
 
     // not_applicable
     return {
       bannerTitle: t('entityCard.tcoCloudOnlyTitle'),
-      bannerTotal: awsFormatted,
+      bannerTotal: `$${awsFormatted}`,
       bannerSubtext: t('entityCard.tcoCloudOnly' as any, {
         aws: awsFormatted,
       }),
+      isBannerLoading: false,
     };
-  }, [awsMonthlyEstimate, k8sMonthlyCost, k8sStatus, t]);
+  }, [awsMonthlyEstimate, k8sMonthlyCost, awsStatus, k8sStatus, t]);
 
   const colors = [
     '#1976d2',
@@ -233,7 +260,9 @@ export const CleanEntityCostCard = () => {
               <Typography variant="body2" color="textSecondary">
                 {serviceList.length === 1
                   ? t('entityCard.cloudSubtitleSingle' as any, { service: serviceList[0] })
-                  : t('entityCard.cloudSubtitleMultiple' as any, { tags: tagAnnotation || 'default' })}
+                  : t('entityCard.cloudSubtitleMultiple' as any, {
+                      tags: tagAnnotation || t('entityCard.defaultTagFallback'),
+                    })}
               </Typography>
             </div>
           </Box>
@@ -255,6 +284,7 @@ export const CleanEntityCostCard = () => {
           borderRadius={6}
           border={1}
           borderColor="divider"
+          data-testid="tco-banner"
         >
           <Typography
             variant="caption"
@@ -269,15 +299,17 @@ export const CleanEntityCostCard = () => {
           </Typography>
           <Box display="flex" alignItems="baseline" mt={0.5} flexWrap="wrap" style={{ gap: 10 }}>
             <Typography variant="h5" style={{ fontWeight: 700, color: '#1976d2' }}>
-              ${bannerTotal}
-              <Typography
-                component="span"
-                variant="body2"
-                color="textSecondary"
-                style={{ marginLeft: 4, fontWeight: 500 }}
-              >
-                {t('entityCard.perMonth')}
-              </Typography>
+              {bannerTotal}
+              {!isBannerLoading && bannerTotal !== '—' && (
+                <Typography
+                  component="span"
+                  variant="body2"
+                  color="textSecondary"
+                  style={{ marginLeft: 4, fontWeight: 500 }}
+                >
+                  {t('entityCard.perMonth')}
+                </Typography>
+              )}
             </Typography>
             <Typography variant="body2" color="textSecondary" style={{ fontWeight: 500 }}>
               {bannerSubtext}
@@ -338,7 +370,7 @@ export const CleanEntityCostCard = () => {
           </Box>
         )}
 
-        {loading ? (
+        {awsStatus === 'loading' ? (
           <Box
             display="flex"
             justifyContent="center"

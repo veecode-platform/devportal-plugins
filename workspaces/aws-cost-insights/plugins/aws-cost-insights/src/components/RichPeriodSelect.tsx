@@ -85,7 +85,7 @@ export const RichPeriodSelect: React.FC<RichPeriodSelectProps> = ({
     const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
     const intervals = `R${diffDays}/P1D/${endDate}`;
-    const label = `${startDate} ~ ${endDate} (${diffDays}d)`;
+    const label = `${startDate} ~ ${endDate} (${diffDays}${t('periodSelect.daysSuffix')})`;
 
     setSelectedPreset('CUSTOM');
     setCustomLabel(label);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -26,7 +26,7 @@ import {
   OpenCostAllocation,
 } from '../api/OpenCostClient';
 
-export const EntityClusterCostCard = () => {
+export const EntityClusterCostCard: React.FC = () => {
   const { entity } = useEntity();
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
@@ -54,7 +54,7 @@ export const EntityClusterCostCard = () => {
         }
       } catch (err: any) {
         if (mounted) {
-          setError(err?.message || 'Error fetching OpenCost data');
+          setError(err?.message || t('clusterCard.fetchErrorFallback'));
         }
       } finally {
         if (mounted) setLoading(false);
@@ -64,7 +64,7 @@ export const EntityClusterCostCard = () => {
     return () => {
       mounted = false;
     };
-  }, [discoveryApi, fetchApi, entity]);
+  }, [discoveryApi, fetchApi, entity, t]);
 
   const efficiency =
     (clusterCost?.totalEfficiency || clusterCost?.cpuEfficiency || 0) * 100;

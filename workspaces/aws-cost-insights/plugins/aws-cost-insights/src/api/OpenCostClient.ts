@@ -22,7 +22,19 @@ export interface MatchedNamespaceAllocation {
   namespace: string;
   allocation: OpenCostAllocation;
   monthlyProjection: number;
-  isExactNamespace: boolean;
+}
+
+function toMatchedAllocation(
+  namespace: string,
+  allocation: OpenCostAllocation,
+): MatchedNamespaceAllocation {
+  return {
+    namespace,
+    allocation,
+    monthlyProjection: Number(
+      ((allocation.totalCost || 0) * DAYS_IN_MONTH).toFixed(2),
+    ),
+  };
 }
 
 export async function fetchOpenCostAllocations(
@@ -59,37 +71,19 @@ export function findMatchingNamespaceAllocation(
   const explicitNs =
     entity.metadata.annotations?.['backstage.io/kubernetes-namespace'];
   if (explicitNs && allocations[explicitNs]) {
-    const alloc = allocations[explicitNs];
-    return {
-      namespace: explicitNs,
-      allocation: alloc,
-      monthlyProjection: Number(((alloc.totalCost || 0) * DAYS_IN_MONTH).toFixed(2)),
-      isExactNamespace: true,
-    };
+    return toMatchedAllocation(explicitNs, allocations[explicitNs]);
   }
 
   const explicitK8sId =
     entity.metadata.annotations?.['backstage.io/kubernetes-id'];
   if (explicitK8sId && allocations[explicitK8sId]) {
-    const alloc = allocations[explicitK8sId];
-    return {
-      namespace: explicitK8sId,
-      allocation: alloc,
-      monthlyProjection: Number(((alloc.totalCost || 0) * DAYS_IN_MONTH).toFixed(2)),
-      isExactNamespace: true,
-    };
+    return toMatchedAllocation(explicitK8sId, allocations[explicitK8sId]);
   }
 
   // Exact match on entity name (no substring matching to avoid collisions)
   const entityName = entity.metadata.name;
   if (entityName && allocations[entityName]) {
-    const alloc = allocations[entityName];
-    return {
-      namespace: entityName,
-      allocation: alloc,
-      monthlyProjection: Number(((alloc.totalCost || 0) * DAYS_IN_MONTH).toFixed(2)),
-      isExactNamespace: true,
-    };
+    return toMatchedAllocation(entityName, allocations[entityName]);
   }
 
   return null;
