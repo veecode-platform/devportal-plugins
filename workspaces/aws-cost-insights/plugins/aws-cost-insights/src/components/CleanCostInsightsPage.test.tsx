@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { TestApiProvider, mockApis } from '@backstage/test-utils';
 import { identityApiRef, IdentityApi } from '@backstage/core-plugin-api';
