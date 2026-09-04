@@ -15,6 +15,8 @@ export const costInsightsMessages = {
     noData: 'No cost data available for the selected period.',
     noGroups: 'You are not assigned to any catalog group with AWS cost tags.',
     teamGroupLabel: 'Team / Group',
+    accountLabel: 'AWS Account',
+    allAccounts: 'All accounts',
     fetchError: 'Error fetching cost data: {{error}}',
     fetchErrorFallback: 'Error fetching cost data',
     fetchGroupsFallback: 'Error fetching user groups',

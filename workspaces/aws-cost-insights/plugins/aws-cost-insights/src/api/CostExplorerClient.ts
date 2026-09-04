@@ -79,9 +79,13 @@ export class CostExplorerClient implements CostInsightsApi {
     });
   }
 
-  // No default implementation
+  // Projects are AWS linked accounts, resolved by the backend against the
+  // payer's Cost Explorer (GetDimensionValues LINKED_ACCOUNT). The group is
+  // irrelevant for the account list, but the signature is the upstream
+  // CostInsightsApi contract.
   async getGroupProjects(_: string): Promise<Project[]> {
-    return [];
+    const response = await this.get<{ projects: Project[] }>('v1/projects');
+    return response.projects;
   }
 
   // No default implementation
@@ -99,8 +103,12 @@ export class CostExplorerClient implements CostInsightsApi {
     return this.getCatalogEntityDailyCost(group, intervals);
   }
 
-  async getProjectDailyCost(_: string, __: string): Promise<Cost> {
-    throw new Error('Not implemented');
+  async getProjectDailyCost(project: string, intervals: string): Promise<Cost> {
+    return this.get<Cost>(
+      `v1/project/${encodeURIComponent(project)}/${encodeURIComponent(
+        intervals,
+      )}`,
+    );
   }
 
   // @ts-ignore
