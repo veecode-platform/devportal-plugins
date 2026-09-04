@@ -141,9 +141,11 @@ export const CleanCostInsightsPage: React.FC = () => {
       setCostData(null); // Clear previous data so stale figures never survive across group/interval change
       try {
         const data =
-          selectedProject !== 'all'
-            ? await client.getProjectDailyCost(selectedProject, intervals)
-            : await client.getGroupDailyCost(selectedGroup, intervals);
+          selectedProject === 'org'
+            ? await client.getOrgDailyCost(intervals)
+            : selectedProject !== 'all'
+              ? await client.getProjectDailyCost(selectedProject, intervals)
+              : await client.getGroupDailyCost(selectedGroup, intervals);
         if (mounted) {
           setCostData(data);
         }
@@ -261,6 +263,7 @@ export const CleanCostInsightsPage: React.FC = () => {
                         label={t('globalPage.accountLabel')}
                       >
                         <MenuItem value="all">{t('globalPage.allAccounts')}</MenuItem>
+                        <MenuItem value="org">{t('globalPage.orgAccounts')}</MenuItem>
                         {projects.map(p => (
                           <MenuItem key={p.id} value={p.id}>
                             {p.name ? `${p.name} (${p.id})` : p.id}
