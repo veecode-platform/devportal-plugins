@@ -30,7 +30,7 @@ describe('CleanCostInsightsPage group filtering', () => {
   const mockIdentityApi = {
     getBackstageIdentity: jest.fn().mockResolvedValue({
       type: 'user',
-      userEntityRef: 'user:default/giovanicorrea',
+      userEntityRef: 'user:default/example-user',
       ownershipEntityRefs: [],
     }),
   } as unknown as IdentityApi;
