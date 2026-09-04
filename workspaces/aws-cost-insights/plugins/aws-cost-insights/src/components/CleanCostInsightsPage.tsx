@@ -32,7 +32,11 @@ import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { costInsightsApiRef } from '@backstage-community/plugin-cost-insights';
-import { Cost, Group } from '@backstage-community/plugin-cost-insights-common';
+import {
+  Cost,
+  Group,
+  Project,
+} from '@backstage-community/plugin-cost-insights-common';
 import { costInsightsTranslationRef } from '../translations';
 import { RichPeriodSelect } from './RichPeriodSelect';
 import { GlobalClusterCostCard } from './GlobalClusterCostCard';
@@ -48,6 +52,8 @@ export const CleanCostInsightsPage: React.FC = () => {
   const [costData, setCostData] = useState<Cost | null>(null);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('all');
   const [intervals, setIntervals] = useState(() => {
     const today = new Date().toISOString().split('T')[0];
     return `R90/P1D/${today}`;
@@ -109,6 +115,24 @@ export const CleanCostInsightsPage: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
+    // Projects = AWS linked accounts (upstream Cost Insights contract). An
+    // older backend without /v1/projects just means no selector — the page
+    // works exactly as before, so failures here stay silent by design.
+    Promise.resolve()
+      .then(() => client.getGroupProjects(''))
+      .then(list => {
+        if (mounted) setProjects(list);
+      })
+      .catch(() => {
+        if (mounted) setProjects([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [client]);
+
+  useEffect(() => {
+    let mounted = true;
     if (!selectedGroup) return;
 
     async function loadData() {
@@ -116,7 +140,10 @@ export const CleanCostInsightsPage: React.FC = () => {
       setError(null);
       setCostData(null); // Clear previous data so stale figures never survive across group/interval change
       try {
-        const data = await client.getGroupDailyCost(selectedGroup, intervals);
+        const data =
+          selectedProject !== 'all'
+            ? await client.getProjectDailyCost(selectedProject, intervals)
+            : await client.getGroupDailyCost(selectedGroup, intervals);
         if (mounted) {
           setCostData(data);
         }
@@ -133,7 +160,7 @@ export const CleanCostInsightsPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [client, selectedGroup, intervals, t]);
+  }, [client, selectedGroup, selectedProject, intervals, t]);
 
   const totalPeriodCost = useMemo(() => {
     if (!costData?.aggregation) return 0;
@@ -218,6 +245,25 @@ export const CleanCostInsightsPage: React.FC = () => {
                         {userGroups.map(g => (
                           <MenuItem key={g.id} value={g.id}>
                             {g.name || g.id}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+
+                  {projects.length > 0 && (
+                    <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
+                      <InputLabel id="cost-account-select-label">{t('globalPage.accountLabel')}</InputLabel>
+                      <Select
+                        labelId="cost-account-select-label"
+                        value={selectedProject}
+                        onChange={e => setSelectedProject(e.target.value as string)}
+                        label={t('globalPage.accountLabel')}
+                      >
+                        <MenuItem value="all">{t('globalPage.allAccounts')}</MenuItem>
+                        {projects.map(p => (
+                          <MenuItem key={p.id} value={p.id}>
+                            {p.name ? `${p.name} (${p.id})` : p.id}
                           </MenuItem>
                         ))}
                       </Select>

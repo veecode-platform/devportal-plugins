@@ -19,6 +19,8 @@ const costInsightsPtMessages = createTranslationMessages({
     'globalPage.noData': 'Nenhum dado de custo disponível para o período selecionado.',
     'globalPage.noGroups': 'Você não está associado a nenhum grupo com tags de custos AWS no catálogo.',
     'globalPage.teamGroupLabel': 'Time / Grupo',
+    'globalPage.accountLabel': 'Conta AWS',
+    'globalPage.allAccounts': 'Todas as contas',
     'globalPage.fetchError': 'Erro ao carregar dados de custo: {{error}}',
     'globalPage.fetchErrorFallback': 'Erro ao carregar dados de custo',
     'globalPage.fetchGroupsFallback': 'Erro ao carregar grupos do usuário',

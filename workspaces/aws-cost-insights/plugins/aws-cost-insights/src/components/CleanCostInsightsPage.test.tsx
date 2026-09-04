@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import {
   renderInTestApp,
   TestApiProvider,
@@ -64,6 +64,7 @@ describe('CleanCostInsightsPage group filtering', () => {
         .mockResolvedValue([{ id: 'group:default/finops', name: 'FinOps' }]),
       getLastCompleteBillingDate: jest.fn().mockResolvedValue('2026-09-02'),
       getGroupDailyCost: jest.fn(() => new Promise(() => {})),
+      getGroupProjects: jest.fn().mockResolvedValue([]),
     };
     const mockCatalogApi = {
       getEntitiesByRefs: jest.fn().mockResolvedValue({
@@ -138,5 +139,55 @@ describe('CleanCostInsightsPage group filtering', () => {
       ).toBeInTheDocument();
     });
     expect(mockClient.getGroupDailyCost).not.toHaveBeenCalled();
+  });
+
+  it('shows the account selector when projects resolve and switches to project cost', async () => {
+    const mockClient = {
+      getUserGroups: jest
+        .fn()
+        .mockResolvedValue([{ id: 'group:default/finops', name: 'FinOps' }]),
+      getLastCompleteBillingDate: jest.fn().mockResolvedValue('2026-09-02'),
+      getGroupDailyCost: jest.fn(() => new Promise(() => {})),
+      getGroupProjects: jest
+        .fn()
+        .mockResolvedValue([{ id: '111111111111', name: 'dev' }]),
+      getProjectDailyCost: jest.fn(() => new Promise(() => {})),
+    };
+    const mockCatalogApi = {
+      getEntitiesByRefs: jest.fn().mockResolvedValue({
+        items: [
+          {
+            metadata: {
+              annotations: {
+                'aws.amazon.com/cost-insights-tags': 'Name=eks-platform-vtg',
+              },
+            },
+          },
+        ],
+      }),
+    };
+
+    await renderInTestApp(
+      <TestApiProvider
+        apis={[
+          ...baseApis,
+          [catalogApiRef, mockCatalogApi as any],
+          [costInsightsApiRef, mockClient as unknown as CostInsightsApi],
+        ]}
+      >
+        <CleanCostInsightsPage />
+      </TestApiProvider>,
+    );
+
+    const combo = await screen.findByLabelText(/AWS Account/i);
+    fireEvent.mouseDown(combo);
+    fireEvent.click(await screen.findByText('dev (111111111111)'));
+
+    await waitFor(() => {
+      expect(mockClient.getProjectDailyCost).toHaveBeenCalledWith(
+        '111111111111',
+        expect.stringMatching(/^R90\/P1D\//),
+      );
+    });
   });
 });
