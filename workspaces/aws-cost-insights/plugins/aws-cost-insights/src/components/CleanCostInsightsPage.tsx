@@ -251,7 +251,7 @@ export const CleanCostInsightsPage: React.FC = () => {
                     </FormControl>
                   )}
 
-                  {projects.length > 0 && (
+                  {selectedGroup && projects.length > 0 && (
                     <FormControl variant="outlined" size="small" style={{ minWidth: 200 }}>
                       <InputLabel id="cost-account-select-label">{t('globalPage.accountLabel')}</InputLabel>
                       <Select

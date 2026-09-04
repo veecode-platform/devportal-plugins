@@ -159,7 +159,7 @@ describe('CleanCostInsightsPage group filtering', () => {
           {
             metadata: {
               annotations: {
-                'aws.amazon.com/cost-insights-tags': 'Name=eks-platform-vtg',
+                'aws.amazon.com/cost-insights-tags': 'Name=example-cluster',
               },
             },
           },
