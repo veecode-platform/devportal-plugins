@@ -68,8 +68,11 @@ export const CleanCostInsightsPage: React.FC = () => {
         // unannotated group in the dropdown is a guaranteed error banner.
         let annotated = groups;
         try {
+          // Group.id is already a full entity ref (stringifyEntityRef in
+          // getUserGroups) — prefixing it again builds an invalid ref that
+          // matches nothing and silently filters every group out.
           const { items } = await catalogApi.getEntitiesByRefs({
-            entityRefs: groups.map(g => `group:default/${g.id}`),
+            entityRefs: groups.map(g => g.id),
             fields: ['metadata.annotations'],
           });
           annotated = groups.filter((_, idx) => {
