@@ -1,6 +1,16 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { TestApiProvider, mockApis } from '@backstage/test-utils';
-import { identityApiRef, IdentityApi } from '@backstage/core-plugin-api';
+import { screen, waitFor } from '@testing-library/react';
+import {
+  renderInTestApp,
+  TestApiProvider,
+  mockApis,
+} from '@backstage/test-utils';
+import {
+  identityApiRef,
+  IdentityApi,
+  errorApiRef,
+  discoveryApiRef,
+  fetchApiRef,
+} from '@backstage/core-plugin-api';
 import { translationApiRef } from '@backstage/core-plugin-api/alpha';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import {
@@ -24,6 +34,25 @@ describe('CleanCostInsightsPage group filtering', () => {
       ownershipEntityRefs: [],
     }),
   } as unknown as IdentityApi;
+
+  const mockErrorApi = { post: jest.fn(), error$: jest.fn() };
+  // GlobalClusterCostCard (rendered below the chart) fetches OpenCost via
+  // discovery+fetch; a rejected fetch keeps it in its own error state
+  // without touching the group-filter logic under test.
+  const mockDiscoveryApi = {
+    getBaseUrl: jest.fn().mockResolvedValue('http://localhost/api/proxy'),
+  };
+  const mockFetchApi = {
+    fetch: jest.fn().mockRejectedValue(new Error('no opencost in tests')),
+  };
+
+  const baseApis = [
+    [translationApiRef, mockApis.translation()],
+    [identityApiRef, mockIdentityApi],
+    [errorApiRef, mockErrorApi],
+    [discoveryApiRef, mockDiscoveryApi],
+    [fetchApiRef, mockFetchApi],
+  ] as const;
 
   it('queries annotations with Group.id verbatim (already a full entity ref) and keeps annotated groups', async () => {
     // Regression: Group.id comes from stringifyEntityRef ('group:default/finops');
@@ -50,11 +79,10 @@ describe('CleanCostInsightsPage group filtering', () => {
       }),
     };
 
-    render(
+    await renderInTestApp(
       <TestApiProvider
         apis={[
-          [translationApiRef, mockApis.translation()],
-          [identityApiRef, mockIdentityApi],
+          ...baseApis,
           [catalogApiRef, mockCatalogApi as any],
           [costInsightsApiRef, mockClient as unknown as CostInsightsApi],
         ]}
@@ -92,11 +120,10 @@ describe('CleanCostInsightsPage group filtering', () => {
       }),
     };
 
-    render(
+    await renderInTestApp(
       <TestApiProvider
         apis={[
-          [translationApiRef, mockApis.translation()],
-          [identityApiRef, mockIdentityApi],
+          ...baseApis,
           [catalogApiRef, mockCatalogApi as any],
           [costInsightsApiRef, mockClient as unknown as CostInsightsApi],
         ]}
