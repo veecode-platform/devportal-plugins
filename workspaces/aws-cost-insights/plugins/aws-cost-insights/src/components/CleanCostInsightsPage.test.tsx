@@ -30,7 +30,7 @@ describe('CleanCostInsightsPage group filtering', () => {
   const mockIdentityApi = {
     getBackstageIdentity: jest.fn().mockResolvedValue({
       type: 'user',
-      userEntityRef: 'user:default/giovanicorrea',
+      userEntityRef: 'user:default/example-user',
       ownershipEntityRefs: [],
     }),
   } as unknown as IdentityApi;
@@ -72,7 +72,7 @@ describe('CleanCostInsightsPage group filtering', () => {
           {
             metadata: {
               annotations: {
-                'aws.amazon.com/cost-insights-tags': 'Name=eks-platform-vtg',
+                'aws.amazon.com/cost-insights-tags': 'Name=example-cluster',
               },
             },
           },
@@ -189,5 +189,114 @@ describe('CleanCostInsightsPage group filtering', () => {
         expect.stringMatching(/^R90\/P1D\//),
       );
     });
+  });
+
+  it('queries org-wide cost when the organization option is selected', async () => {
+    const mockClient = {
+      getUserGroups: jest
+        .fn()
+        .mockResolvedValue([{ id: 'group:default/finops', name: 'FinOps' }]),
+      getLastCompleteBillingDate: jest.fn().mockResolvedValue('2026-09-02'),
+      getGroupDailyCost: jest.fn(() => new Promise(() => {})),
+      getGroupProjects: jest
+        .fn()
+        .mockResolvedValue([{ id: '111111111111', name: 'dev' }]),
+      getProjectDailyCost: jest.fn(() => new Promise(() => {})),
+      getOrgDailyCost: jest.fn(() => new Promise(() => {})),
+    };
+    const mockCatalogApi = {
+      getEntitiesByRefs: jest.fn().mockResolvedValue({
+        items: [
+          {
+            metadata: {
+              annotations: {
+                'aws.amazon.com/cost-insights-tags': 'Name=example-cluster',
+              },
+            },
+          },
+        ],
+      }),
+    };
+
+    await renderInTestApp(
+      <TestApiProvider
+        apis={[
+          ...baseApis,
+          [catalogApiRef, mockCatalogApi as any],
+          [costInsightsApiRef, mockClient as unknown as CostInsightsApi],
+        ]}
+      >
+        <CleanCostInsightsPage />
+      </TestApiProvider>,
+    );
+
+    const combo = await screen.findByLabelText(/AWS Account/i);
+    fireEvent.mouseDown(combo);
+    fireEvent.click(await screen.findByText('Organization (all accounts)'));
+
+    await waitFor(() => {
+      expect(mockClient.getOrgDailyCost).toHaveBeenCalledWith(
+        expect.stringMatching(/^R90\/P1D\//),
+      );
+    });
+    expect(mockClient.getProjectDailyCost).not.toHaveBeenCalled();
+  });
+
+  it('keeps the default group-tag view calling getGroupDailyCost when the org option is merely present', async () => {
+    const mockClient = {
+      getUserGroups: jest
+        .fn()
+        .mockResolvedValue([{ id: 'group:default/finops', name: 'FinOps' }]),
+      getLastCompleteBillingDate: jest.fn().mockResolvedValue('2026-09-02'),
+      getGroupDailyCost: jest.fn(() => new Promise(() => {})),
+      getGroupProjects: jest
+        .fn()
+        .mockResolvedValue([{ id: '111111111111', name: 'dev' }]),
+      getProjectDailyCost: jest.fn(() => new Promise(() => {})),
+      getOrgDailyCost: jest.fn(() => new Promise(() => {})),
+    };
+    const mockCatalogApi = {
+      getEntitiesByRefs: jest.fn().mockResolvedValue({
+        items: [
+          {
+            metadata: {
+              annotations: {
+                'aws.amazon.com/cost-insights-tags': 'Name=example-cluster',
+              },
+            },
+          },
+        ],
+      }),
+    };
+
+    await renderInTestApp(
+      <TestApiProvider
+        apis={[
+          ...baseApis,
+          [catalogApiRef, mockCatalogApi as any],
+          [costInsightsApiRef, mockClient as unknown as CostInsightsApi],
+        ]}
+      >
+        <CleanCostInsightsPage />
+      </TestApiProvider>,
+    );
+
+    // The closed select shows the relabeled default option's text — guards
+    // against a regression back to the old misleading 'All accounts' label —
+    // and no selection change means the default group-tag branch
+    // (getGroupDailyCost) is what fires: the new 'org' MenuItem being present
+    // must not short-circuit it.
+    await screen.findByLabelText(/AWS Account/i);
+    expect(await screen.findByText('Group view (tags)')).toBeInTheDocument();
+    expect(screen.queryByText('All accounts')).toBeNull();
+
+    await waitFor(() => {
+      expect(mockClient.getGroupDailyCost).toHaveBeenCalledWith(
+        'group:default/finops',
+        expect.stringMatching(/^R90\/P1D\//),
+      );
+    });
+    expect(mockClient.getOrgDailyCost).not.toHaveBeenCalled();
+    expect(mockClient.getProjectDailyCost).not.toHaveBeenCalled();
   });
 });

@@ -111,6 +111,14 @@ export class CostExplorerClient implements CostInsightsApi {
     );
   }
 
+  // Org-wide cost across every linked account on the payer, independent of
+  // any group's tags/cost-categories filter. Not part of the upstream
+  // CostInsightsApi contract — a plain extra method, same shape as
+  // getProjectDailyCost above.
+  async getOrgDailyCost(intervals: string): Promise<Cost> {
+    return this.get<Cost>(`v1/org/${encodeURIComponent(intervals)}`);
+  }
+
   // @ts-ignore
   async getCatalogEntityDailyCost(
     catalogEntityRef: string,

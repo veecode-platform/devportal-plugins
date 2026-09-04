@@ -31,7 +31,10 @@ import {
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { costInsightsApiRef } from '@backstage-community/plugin-cost-insights';
+import {
+  costInsightsApiRef,
+  CostInsightsApi,
+} from '@backstage-community/plugin-cost-insights';
 import {
   Cost,
   Group,
@@ -41,8 +44,17 @@ import { costInsightsTranslationRef } from '../translations';
 import { RichPeriodSelect } from './RichPeriodSelect';
 import { GlobalClusterCostCard } from './GlobalClusterCostCard';
 
+// getOrgDailyCost isn't part of the upstream CostInsightsApi contract (a
+// plain extra method on CostExplorerClient — see CostExplorerClient.ts).
+// This page only ever runs against CostExplorerClient behind
+// costInsightsApiRef, so it's safe to widen the type locally for this one
+// call rather than touch the upstream package's types.
+type CostInsightsApiWithOrg = CostInsightsApi & {
+  getOrgDailyCost(intervals: string): Promise<Cost>;
+};
+
 export const CleanCostInsightsPage: React.FC = () => {
-  const client = useApi(costInsightsApiRef);
+  const client = useApi(costInsightsApiRef) as CostInsightsApiWithOrg;
   const identityApi = useApi(identityApiRef);
   const catalogApi = useApi(catalogApiRef);
   const { t } = useTranslationRef(costInsightsTranslationRef);
@@ -141,9 +153,11 @@ export const CleanCostInsightsPage: React.FC = () => {
       setCostData(null); // Clear previous data so stale figures never survive across group/interval change
       try {
         const data =
-          selectedProject !== 'all'
-            ? await client.getProjectDailyCost(selectedProject, intervals)
-            : await client.getGroupDailyCost(selectedGroup, intervals);
+          selectedProject === 'org'
+            ? await client.getOrgDailyCost(intervals)
+            : selectedProject !== 'all'
+              ? await client.getProjectDailyCost(selectedProject, intervals)
+              : await client.getGroupDailyCost(selectedGroup, intervals);
         if (mounted) {
           setCostData(data);
         }
@@ -261,6 +275,7 @@ export const CleanCostInsightsPage: React.FC = () => {
                         label={t('globalPage.accountLabel')}
                       >
                         <MenuItem value="all">{t('globalPage.allAccounts')}</MenuItem>
+                        <MenuItem value="org">{t('globalPage.orgAccounts')}</MenuItem>
                         {projects.map(p => (
                           <MenuItem key={p.id} value={p.id}>
                             {p.name ? `${p.name} (${p.id})` : p.id}
