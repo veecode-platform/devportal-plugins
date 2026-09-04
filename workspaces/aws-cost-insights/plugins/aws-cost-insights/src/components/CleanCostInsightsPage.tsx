@@ -31,7 +31,10 @@ import {
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { costInsightsApiRef } from '@backstage-community/plugin-cost-insights';
+import {
+  costInsightsApiRef,
+  CostInsightsApi,
+} from '@backstage-community/plugin-cost-insights';
 import {
   Cost,
   Group,
@@ -41,8 +44,17 @@ import { costInsightsTranslationRef } from '../translations';
 import { RichPeriodSelect } from './RichPeriodSelect';
 import { GlobalClusterCostCard } from './GlobalClusterCostCard';
 
+// getOrgDailyCost isn't part of the upstream CostInsightsApi contract (a
+// plain extra method on CostExplorerClient — see CostExplorerClient.ts).
+// This page only ever runs against CostExplorerClient behind
+// costInsightsApiRef, so it's safe to widen the type locally for this one
+// call rather than touch the upstream package's types.
+type CostInsightsApiWithOrg = CostInsightsApi & {
+  getOrgDailyCost(intervals: string): Promise<Cost>;
+};
+
 export const CleanCostInsightsPage: React.FC = () => {
-  const client = useApi(costInsightsApiRef);
+  const client = useApi(costInsightsApiRef) as CostInsightsApiWithOrg;
   const identityApi = useApi(identityApiRef);
   const catalogApi = useApi(catalogApiRef);
   const { t } = useTranslationRef(costInsightsTranslationRef);
