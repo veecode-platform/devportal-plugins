@@ -1,0 +1,5 @@
+This package was vendored from https://github.com/awslabs/backstage-plugins-for-aws
+via the retired fork https://github.com/veecode-platform/backstage-plugins-for-aws
+(commit cf408c11), Apache-2.0. Original copyright Amazon.com, Inc. or its
+affiliates. VeeCode modifications: RBAC permission gate, org-wide route,
+per-account projects, entity account-id filter (see ADR-011 in devportal-planning).
