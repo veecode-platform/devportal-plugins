@@ -24,7 +24,7 @@
     ]
   },
   "devDependencies": {
-    "@backstage/cli": "^0.36.0",
+    "@backstage/cli": "^0.35.4",
     "@backstage/e2e-test-utils": "^0.1.2",
     "@jest/environment-jsdom-abstract": "^30",
     "@playwright/test": "^1.32.3",
@@ -32,7 +32,7 @@
     "jest": "^30.2.0",
     "jsdom": "^27",
     "prettier": "^2.3.2",
-    "typescript": "~5.8.0"
+    "typescript": "~5.9.0"
   },
   "resolutions": {
     "@types/react": "^18",
@@ -45,7 +45,9 @@
     "react-dom": "^18.0.2",
     "react-router": "^6.3.0",
     "react-router-dom": "^6.3.0",
-    "fast-xml-parser": "5.7.3"
+    "fast-xml-parser": "5.7.3",
+    "esbuild": "0.27.3",
+    "@backstage/plugin-catalog-node": "2.2.2"
   },
   "prettier": "@backstage/cli/config/prettier"
 }
