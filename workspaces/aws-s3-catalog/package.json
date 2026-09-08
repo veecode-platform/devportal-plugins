@@ -1,0 +1,27 @@
+{
+  "name": "aws-s3-catalog-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "20 || 22"
+  },
+  "scripts": {
+    "tsc": "tsc",
+    "test": "backstage-cli repo test",
+    "lint:all": "backstage-cli repo lint"
+  },
+  "workspaces": {
+    "packages": [
+      "plugins/*"
+    ]
+  },
+  "resolutions": {
+    "fast-xml-parser": "5.7.3"
+  },
+  "devDependencies": {
+    "@backstage/cli": "^0.36.0",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "typescript": "~5.8.0"
+  }
+}

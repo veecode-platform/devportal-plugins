@@ -1,0 +1,16 @@
+app:
+  # required by @backstage/plugin-auth-backend; no frontend is served by this host
+  baseUrl: http://localhost:3000
+backend:
+  baseUrl: http://localhost:7007
+  listen: { port: 7007 }
+  auth: { dangerouslyDisableDefaultAuthPolicy: false }
+auth:
+  providers: { guest: {} }
+aws:
+  accounts: [] # fill locally with role/externalId for cross-account dev
+  costInsights:
+    costExplorer:
+      costMetric: AmortizedCost
+permission:
+  enabled: true
