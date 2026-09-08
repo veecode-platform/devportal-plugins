@@ -6,8 +6,14 @@
     "node": "20 || 22"
   },
   "scripts": {
+    "build:all": "backstage-cli repo build --all",
     "tsc": "tsc",
+    "tsc:full": "tsc --skipLibCheck false --incremental false",
+    "clean": "backstage-cli repo clean",
     "test": "backstage-cli repo test",
+    "test:all": "backstage-cli repo test --coverage",
+    "update-backstage": "backstage-cli versions:bump",
+    "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint"
   },
   "workspaces": {
