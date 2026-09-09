@@ -40,7 +40,12 @@ jobs:
       - name: List workspaces
         id: list
         run: |
-          WORKSPACES=$(ls -d workspaces/*/package.json | xargs -I{} dirname {} | xargs -I{} basename {} | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          # ADR-011 scaffold freeze: aws-cost-insights and aws-s3-catalog carry
+          # pinned toolchain + a ported lockfile that guarantee byte-parity with
+          # the artifacts production runs. Excluded from automated updates until
+          # the scaffold demolition lands (first post-cutover bump, 0.11.0) —
+          # remove the grep below in that same PR.
+          WORKSPACES=$(ls -d workspaces/*/package.json | xargs -I{} dirname {} | xargs -I{} basename {} | grep -vE '^(aws-cost-insights|aws-s3-catalog)$' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "workspaces=$WORKSPACES" >> "$GITHUB_OUTPUT"
           COUNT=$(echo "$WORKSPACES" | jq length)
           echo "has_workspaces=$( [ "$COUNT" -gt 0 ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
