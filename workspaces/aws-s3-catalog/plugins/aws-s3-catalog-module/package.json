@@ -1,7 +1,7 @@
 {
   "name": "@aws/aws-s3-catalog-module-for-backstage",
   "description": "Dynamic-plugin wrapper for Backstage AWS S3 catalog discovery.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "repository": {
     "type": "git",
     "url": "github:awslabs/backstage-plugins-for-aws",
