@@ -2,6 +2,15 @@
 
 This repository contains a Backstage hosting app for development of Kong-related Backstage plugins.
 
+## Before deploying: how will changes reach your Kong?
+
+Whether portal actions (creating routes, enabling Kong plugins) apply directly — and whether
+they survive — depends on how your team runs Kong. Read
+[Applying changes to Kong: pick the path that matches your setup](docs/applying-changes-to-kong.md)
+before installing this plugin anywhere. The plugin supports two paths (direct writes and,
+on the roadmap, export as configuration files) and deliberately recommends neither — that
+choice belongs to the team deploying it (recorded internally as plugins ADR-0005).
+
 ## Reference implementation
 
 This workspace structure is based on the sibling "dummy" workspace, which is a simplified reference workspace containing a frontend plugin, a backend plugin and a backstage hosting app.
