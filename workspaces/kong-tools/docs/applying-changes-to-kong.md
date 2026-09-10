@@ -6,10 +6,9 @@ they **stay applied**, depends entirely on how your team runs Kong. This guide e
 paths the plugin supports and how to choose. It assumes no prior knowledge of Kong's operating
 modes.
 
-The decision behind this guide is recorded as
-[plugins ADR-0005](https://github.com/veecode-platform/devportal-plugins-parent/blob/main/docs/adr/0005-kong-plugin-supports-two-write-paths-without-a-default.md):
-the plugin supports both paths and does not enforce either. The team deploying the portal
-should read this page and recommend one path for its own context.
+A deliberate product decision: the plugin supports both paths and does not enforce either.
+The team deploying the portal should read this page and recommend one path for its own
+context. (Recorded internally as plugins ADR-0005.)
 
 ## First: how do you run Kong?
 
