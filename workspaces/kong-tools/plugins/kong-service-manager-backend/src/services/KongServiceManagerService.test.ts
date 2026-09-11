@@ -227,6 +227,74 @@ describe('KongServiceManagerService', () => {
     expect(svc.getInstances()).toEqual([]);
   });
 
+  // --- defaultTags ---
+
+  describe('defaultTags', () => {
+    const bodyOfCall = (call = 0) =>
+      JSON.parse(fetchSpy.mock.calls[call][1].body);
+
+    it('injects defaultTags on create when the caller sends no tags', async () => {
+      const svc = createService(
+        createConfig({ defaultTags: ['devportal-managed'] }),
+      );
+
+      await svc.createRoute('default', 'my-service', {
+        name: 'r1',
+        paths: ['/r1'],
+      } as any);
+
+      expect(bodyOfCall().tags).toEqual(['devportal-managed']);
+    });
+
+    it('merges and dedupes caller tags with defaultTags on create', async () => {
+      const svc = createService(
+        createConfig({ defaultTags: ['devportal-managed'] }),
+      );
+
+      await svc.addPluginToService('default', 'my-service', {
+        name: 'rate-limiting',
+        tags: ['team-x', 'devportal-managed'],
+      } as any);
+
+      expect(bodyOfCall().tags).toEqual(['devportal-managed', 'team-x']);
+    });
+
+    it('does not touch tags on PATCH when the caller sends none', async () => {
+      const svc = createService(
+        createConfig({ defaultTags: ['devportal-managed'] }),
+      );
+
+      await svc.editRoute('default', 'my-service', 'route-id', {
+        paths: ['/new'],
+      });
+
+      expect(bodyOfCall()).not.toHaveProperty('tags');
+    });
+
+    it('merges defaultTags back in on PATCH when the caller sends tags', async () => {
+      const svc = createService(
+        createConfig({ defaultTags: ['devportal-managed'] }),
+      );
+
+      await svc.editRoutePlugin('default', 'route-id', 'plugin-id', {
+        tags: ['team-x'],
+      } as any);
+
+      expect(bodyOfCall().tags).toEqual(['devportal-managed', 'team-x']);
+    });
+
+    it('sends no tags key at all when defaultTags is not configured', async () => {
+      const svc = createService();
+
+      await svc.createRoute('default', 'my-service', {
+        name: 'r1',
+        paths: ['/r1'],
+      } as any);
+
+      expect(bodyOfCall()).not.toHaveProperty('tags');
+    });
+  });
+
   // --- no instances configured ---
 
   it('initializes with empty instances when none configured', () => {
