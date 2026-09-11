@@ -68,8 +68,10 @@ If an automated process also writes to the same Kong (for example Kong's Ingress
 a db-backed cluster, or scheduled decK syncs), two writers share one gateway. Kong's ecosystem
 handles this with **tags**:
 
-- Everything this plugin creates carries a distinctive tag (default: `devportal-managed`,
-  configurable per instance).
+- Set `kong.instances[].defaultTags` (for example `["devportal-managed"]`) and everything this
+  plugin creates through that instance carries those tags automatically — callers don't have to
+  remember them. There is no built-in default: without the setting, entities are created exactly
+  as submitted.
 - Kong's Ingress Controller only manages entities carrying **its** tag
   (`managed-by-ingress-controller` by default) and leaves everything else alone.
 - decK does the same when configured with `select_tags` — see

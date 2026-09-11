@@ -56,6 +56,7 @@ kong:
 | `kong.instances[].id` | `string` | Yes | Unique identifier for this Kong instance. |
 | `kong.instances[].apiBaseUrl` | `string` | Yes | Kong Admin API base URL. |
 | `kong.instances[].workspace` | `string` | No | Kong workspace name. |
+| `kong.instances[].defaultTags` | `string[]` | No | Tags merged into every entity created or retagged through this instance (e.g. `["devportal-managed"]` to keep portal-created entities out of a tag-scoped reconciler's diff). No default. |
 | `kong.instances[].auth.kongAdmin` | `string` | Conditional | Token sent as the `Kong-Admin-Token` header. Use this **or** `custom`. |
 | `kong.instances[].auth.custom.header` | `string` | Conditional | Custom auth header name. |
 | `kong.instances[].auth.custom.value` | `string` | Conditional | Custom auth header value. |

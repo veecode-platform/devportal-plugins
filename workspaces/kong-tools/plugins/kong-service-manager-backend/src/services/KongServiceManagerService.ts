@@ -23,6 +23,14 @@ export type KongInstanceConfig = {
   apiBaseUrl: string;
   workspace?: string;
   description?: string;
+  /**
+   * Tags merged into every entity this plugin creates or retags on this
+   * instance. Lets an operator mark portal-created entities (e.g. so a
+   * tag-scoped reconciler like the Kong Ingress Controller ignores them)
+   * without relying on callers to remember the tag. No default: the plugin
+   * stays unopinionated about coexistence strategy.
+   */
+  defaultTags?: string[];
   auth:
     | { kongAdmin: string }
     | { custom: { header: string; value: string } };
@@ -56,6 +64,7 @@ export class KongServiceManagerService {
       const apiBaseUrl = c.getString('apiBaseUrl');
       const workspace = c.getOptionalString('workspace');
       const description = c.getOptionalString('description');
+      const defaultTags = c.getOptionalStringArray('defaultTags');
 
       let auth: KongInstanceConfig['auth'];
       if (c.has('auth.kongAdmin')) {
@@ -71,8 +80,40 @@ export class KongServiceManagerService {
         auth = { kongAdmin: '' };
       }
 
-      return { id, apiBaseUrl, workspace, description, auth };
+      return { id, apiBaseUrl, workspace, description, defaultTags, auth };
     });
+  }
+
+  /**
+   * Tags for a create: union of the instance's defaultTags and the caller's
+   * tags, deduplicated. Undefined when the union is empty, so the key is
+   * omitted from the request body.
+   */
+  private tagsForCreate(
+    instance: KongInstanceConfig,
+    tags?: string[] | null,
+  ): string[] | undefined {
+    const merged = [
+      ...new Set([...(instance.defaultTags ?? []), ...(tags ?? [])]),
+    ];
+    return merged.length > 0 ? merged : undefined;
+  }
+
+  /**
+   * Tags for an edit (PATCH). When the caller sends no tags field, Kong
+   * preserves the entity's existing tags — injecting defaults here would
+   * overwrite that set, so the field stays untouched. When the caller does
+   * send tags, the defaults are merged back in so an edit cannot strip the
+   * instance's marker tags.
+   */
+  private tagsForEdit(
+    instance: KongInstanceConfig,
+    tags?: string[] | null,
+  ): string[] | undefined {
+    if (tags === undefined || tags === null) {
+      return undefined;
+    }
+    return this.tagsForCreate(instance, tags);
   }
 
   private getInstance(instanceName: string): KongInstanceConfig {
@@ -191,12 +232,16 @@ export class KongServiceManagerService {
     serviceName: string,
     route: CreateRoute,
   ): Promise<RouteResponse> {
+    const instance = this.getInstance(instanceName);
     return this.kongFetch<RouteResponse>(
       instanceName,
       `/services/${encodeURIComponent(serviceName)}/routes`,
       {
         method: 'POST',
-        body: JSON.stringify(route),
+        body: JSON.stringify({
+          ...route,
+          tags: this.tagsForCreate(instance, route.tags),
+        }),
       },
     );
   }
@@ -207,12 +252,16 @@ export class KongServiceManagerService {
     routeId: string,
     route: Partial<CreateRoute>,
   ): Promise<RouteResponse> {
+    const instance = this.getInstance(instanceName);
     return this.kongFetch<RouteResponse>(
       instanceName,
       `/services/${encodeURIComponent(serviceName)}/routes/${encodeURIComponent(routeId)}`,
       {
         method: 'PATCH',
-        body: JSON.stringify(route),
+        body: JSON.stringify({
+          ...route,
+          tags: this.tagsForEdit(instance, route.tags),
+        }),
       },
     );
   }
@@ -266,12 +315,16 @@ export class KongServiceManagerService {
     serviceName: string,
     plugin: CreatePlugin,
   ): Promise<AssociatedPluginsResponse> {
+    const instance = this.getInstance(instanceName);
     return this.kongFetch<AssociatedPluginsResponse>(
       instanceName,
       `/services/${encodeURIComponent(serviceName)}/plugins`,
       {
         method: 'POST',
-        body: JSON.stringify(plugin),
+        body: JSON.stringify({
+          ...plugin,
+          tags: this.tagsForCreate(instance, plugin.tags),
+        }),
       },
     );
   }
@@ -282,12 +335,16 @@ export class KongServiceManagerService {
     pluginId: string,
     plugin: Partial<CreatePlugin>,
   ): Promise<AssociatedPluginsResponse> {
+    const instance = this.getInstance(instanceName);
     return this.kongFetch<AssociatedPluginsResponse>(
       instanceName,
       `/services/${encodeURIComponent(serviceName)}/plugins/${encodeURIComponent(pluginId)}`,
       {
         method: 'PATCH',
-        body: JSON.stringify(plugin),
+        body: JSON.stringify({
+          ...plugin,
+          tags: this.tagsForEdit(instance, plugin.tags),
+        }),
       },
     );
   }
@@ -322,12 +379,16 @@ export class KongServiceManagerService {
     routeId: string,
     plugin: CreatePlugin,
   ): Promise<AssociatedPluginsResponse> {
+    const instance = this.getInstance(instanceName);
     return this.kongFetch<AssociatedPluginsResponse>(
       instanceName,
       `/routes/${encodeURIComponent(routeId)}/plugins`,
       {
         method: 'POST',
-        body: JSON.stringify(plugin),
+        body: JSON.stringify({
+          ...plugin,
+          tags: this.tagsForCreate(instance, plugin.tags),
+        }),
       },
     );
   }
@@ -338,12 +399,16 @@ export class KongServiceManagerService {
     pluginId: string,
     plugin: Partial<CreatePlugin>,
   ): Promise<AssociatedPluginsResponse> {
+    const instance = this.getInstance(instanceName);
     return this.kongFetch<AssociatedPluginsResponse>(
       instanceName,
       `/routes/${encodeURIComponent(routeId)}/plugins/${encodeURIComponent(pluginId)}`,
       {
         method: 'PATCH',
-        body: JSON.stringify(plugin),
+        body: JSON.stringify({
+          ...plugin,
+          tags: this.tagsForEdit(instance, plugin.tags),
+        }),
       },
     );
   }
