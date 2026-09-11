@@ -7,6 +7,10 @@ import {
 } from '@backstage/core-plugin-api';
 import { kongServiceManagerApiRef, KongServiceManagerClient } from './api';
 import { rootRouteRef } from './routes';
+import { configureMuiClassNames } from './muiClassNameSetup';
+
+// Must run before any MUI component module evaluates (see muiClassNameSetup.ts).
+configureMuiClassNames();
 
 export const kongServiceManagerPlugin = createPlugin({
   id: 'kong-service-manager',
