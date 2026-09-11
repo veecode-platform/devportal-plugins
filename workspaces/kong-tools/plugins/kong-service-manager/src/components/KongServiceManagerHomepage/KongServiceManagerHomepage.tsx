@@ -97,10 +97,11 @@ export function KongServiceManagerHomepage() {
       <SelectInstance />
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        {/* textTransform none = same casing as the RHDH entity tabs above */}
         <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)}>
-          <Tab label="Service" />
-          <Tab label="Plugins" />
-          <Tab label="Routes" />
+          <Tab label="Service" sx={{ textTransform: 'none' }} />
+          <Tab label="Plugins" sx={{ textTransform: 'none' }} />
+          <Tab label="Routes" sx={{ textTransform: 'none' }} />
         </Tabs>
       </Box>
 
