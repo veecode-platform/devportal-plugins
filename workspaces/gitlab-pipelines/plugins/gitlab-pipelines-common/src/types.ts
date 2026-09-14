@@ -26,8 +26,25 @@ export interface JobDto {
   webUrl: string;
   startedAt: string | null;
   finishedAt: string | null;
+  pipelineId?: number;
 }
 
 export interface PipelineVariable { key: string; value: string }
 export interface CreatePipelineRequest { ref: string; variables?: PipelineVariable[] }
 export interface PlayJobRequest { variables?: PipelineVariable[] }
+
+export type TeardownState = 'pending' | 'failed' | 'superseded' | 'consumed' | 'flagged';
+
+export interface TeardownOperationDto {
+  id: number;
+  host: string;
+  projectSlug: string;
+  pipelineId: number;
+  jobId: number;
+  requesterRef: string;
+  state: TeardownState;
+  detail: string | null;
+  unregisterCommitSha: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
