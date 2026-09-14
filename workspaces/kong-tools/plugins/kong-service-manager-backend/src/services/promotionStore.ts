@@ -85,6 +85,13 @@ export interface PromotionStore {
     routeId: string,
     pluginType: string,
   ): Promise<PromotionRecordRow[]>;
+  /**
+   * Every non-terminal record, oldest first — the finalizer's (P4) work
+   * queue. Terminal states (`codified`, `failed-restored`, `discarded`,
+   * `aborted-teardown`) never come back from here, so a record the
+   * finalizer has already resolved is never re-processed.
+   */
+  listActive(): Promise<PromotionRecordRow[]>;
   transition(
     id: number,
     state: PromotionState,
@@ -163,6 +170,13 @@ export class KnexPromotionStore implements PromotionStore {
     const rows = await this.db<PromotionTableRow>(TABLE)
       .where({ instance, route_id: routeId, plugin_type: pluginType })
       .orderBy([{ column: 'created_at', order: 'desc' }, { column: 'id', order: 'desc' }]);
+    return rows.map(toRecordRow);
+  }
+
+  async listActive(): Promise<PromotionRecordRow[]> {
+    const rows = await this.db<PromotionTableRow>(TABLE)
+      .whereIn('state', ACTIVE_PROMOTION_STATES)
+      .orderBy([{ column: 'created_at', order: 'asc' }, { column: 'id', order: 'asc' }]);
     return rows.map(toRecordRow);
   }
 

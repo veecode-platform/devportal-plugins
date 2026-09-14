@@ -253,7 +253,8 @@ describe('promote to code (Task P3)', () => {
         .mockResolvedValueOnce(draft); // 2nd call: resumes the crashed draft
       promotionStore.upsertDraft.mockResolvedValue(draft);
       promotionStore.transition
-        .mockRejectedValueOnce(new Error('db connection lost')) // 1st call "crashes" right after the MR is opened
+        .mockResolvedValueOnce(undefined) // 1st call, 1st request: persists the repo coords on the draft
+        .mockRejectedValueOnce(new Error('db connection lost')) // 2nd call, 1st request: crashes right after the MR is opened
         .mockResolvedValue(undefined);
 
       const gitlabClient = gitlabClientMock();

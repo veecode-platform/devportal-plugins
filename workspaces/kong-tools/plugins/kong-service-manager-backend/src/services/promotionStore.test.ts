@@ -143,4 +143,23 @@ describe('KnexPromotionStore', () => {
       expect(history.map(r => r.id)).toEqual([second.id, first.id]);
     },
   );
+
+  it.each(databases.eachSupportedId())(
+    'listActive returns every non-terminal record, oldest first, and excludes terminal states, %p',
+    async databaseId => {
+      const store = await KnexPromotionStore.create(await databases.init(databaseId));
+      const draftRecord = await store.upsertDraft(draft());
+      const mrOpen = await store.upsertDraft(
+        draft({ idempotencyKey: 'other-type', pluginType: 'correlation-id' }),
+      );
+      await store.transition(mrOpen.id, 'mr-open', { mrRef: 'project-42-mr-7' });
+      const discarded = await store.upsertDraft(
+        draft({ idempotencyKey: 'other-route', routeId: 'route-2' }),
+      );
+      await store.transition(discarded.id, 'discarded');
+
+      const active = await store.listActive();
+      expect(active.map(r => r.id)).toEqual([draftRecord.id, mrOpen.id]);
+    },
+  );
 });

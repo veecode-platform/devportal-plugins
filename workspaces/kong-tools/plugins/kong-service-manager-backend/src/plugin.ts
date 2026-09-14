@@ -7,6 +7,7 @@ import { createRouter } from './router';
 import { KongServiceManagerService } from './services/KongServiceManagerService';
 import { KnexPromotionStore } from './services/promotionStore';
 import { GitlabClient } from './services/GitlabClient';
+import { reconcilePromotions } from './services/promotionFinalizer';
 
 /**
  * Kong Service Manager backend plugin
@@ -28,7 +29,7 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
         userInfo: coreServices.userInfo,
         catalog: catalogServiceRef,
       },
-      async init({ httpAuth, httpRouter, config, logger, permissions, database, userInfo, catalog }) {
+      async init({ httpAuth, httpRouter, config, logger, permissions, database, scheduler, userInfo, catalog }) {
         logger.info('Initializing Kong Service Manager backend plugin...');
 
         const kongService = KongServiceManagerService.create({ logger, config });
@@ -37,7 +38,7 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
         // Store and GitLab client are created together, eagerly, so a later
         // promote request never pays for a first-use migration and the
         // router never has to special-case "store present, client absent";
-        // the finalizer that also consumes the store lands in a later task.
+        // the finalizer (below) consumes the same pair.
         const promotionStore = promotionEnabled
           ? await KnexPromotionStore.create(await database.getClient())
           : undefined;
@@ -59,6 +60,24 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
           path: '/health',
           allow: 'unauthenticated',
         });
+
+        if (promotionStore && gitlabClient) {
+          const applyTimeoutMinutes = config.getOptionalNumber('kong.promotion.applyTimeoutMinutes') ?? 10;
+          const reconcileIntervalSeconds = config.getOptionalNumber('kong.promotion.reconcileIntervalSeconds') ?? 60;
+          await scheduler.scheduleTask({
+            id: 'kong-service-manager-promotion-finalizer',
+            frequency: { seconds: reconcileIntervalSeconds },
+            timeout: { seconds: Math.max(reconcileIntervalSeconds, 30) },
+            fn: () =>
+              reconcilePromotions({
+                logger,
+                gitlab: gitlabClient,
+                kong: kongService,
+                store: promotionStore,
+                config: { applyTimeoutMinutes },
+              }),
+          });
+        }
 
         logger.info(
           'Kong Service Manager backend plugin initialized successfully',

@@ -304,6 +304,95 @@ describe('GitlabClient', () => {
     });
   });
 
+  describe('getMergeRequest', () => {
+    const repo = { host: 'gitlab.example.com', projectSlug: 'group/box' };
+
+    it('returns state and merged_at', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/merge_requests/7',
+          (_req, res, ctx) => res(ctx.json({ state: 'merged', merged_at: '2026-09-01T00:00:00Z' })),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(client.getMergeRequest(repo, 7)).resolves.toEqual({
+        state: 'merged',
+        mergedAt: '2026-09-01T00:00:00Z',
+      });
+    });
+  });
+
+  describe('getProject', () => {
+    const repo = { host: 'gitlab.example.com', projectSlug: 'group/box' };
+
+    it('returns archived flag and default branch', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox',
+          (_req, res, ctx) => res(ctx.json({ id: 42, archived: false, default_branch: 'main' })),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(client.getProject(repo)).resolves.toEqual({ archived: false, defaultBranch: 'main' });
+    });
+
+    it('throws with a 404 status when the project is gone', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox',
+          (_req, res, ctx) => res(ctx.status(404), ctx.json({ message: '404 Project Not Found' })),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(client.getProject(repo)).rejects.toMatchObject({ status: 404 });
+    });
+  });
+
+  describe('hasSuccessfulDeployAtOrAfter', () => {
+    const repo = { host: 'gitlab.example.com', projectSlug: 'group/box' };
+
+    it('is true when a successful pipeline ran for a commit at or after "since"', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/commits',
+          (req, res, ctx) => {
+            expect(req.url.searchParams.get('ref_name')).toBe('main');
+            expect(req.url.searchParams.get('since')).toBe('2026-09-01T00:00:00Z');
+            return res(ctx.json([{ id: 'merge-sha' }, { id: 'later-sha' }]));
+          },
+        ),
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/pipelines',
+          (req, res, ctx) => {
+            expect(req.url.searchParams.get('status')).toBe('success');
+            return res(ctx.json([{ id: 2, sha: 'later-sha' }, { id: 1, sha: 'unrelated-sha' }]));
+          },
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(
+        client.hasSuccessfulDeployAtOrAfter(repo, 'main', '2026-09-01T00:00:00Z'),
+      ).resolves.toBe(true);
+    });
+
+    it('is false when every successful pipeline predates "since"', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/commits',
+          (_req, res, ctx) => res(ctx.json([{ id: 'merge-sha' }])),
+        ),
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/pipelines',
+          (_req, res, ctx) => res(ctx.json([{ id: 1, sha: 'stale-sha' }])),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(
+        client.hasSuccessfulDeployAtOrAfter(repo, 'main', '2026-09-01T00:00:00Z'),
+      ).resolves.toBe(false);
+    });
+  });
+
   describe('commitEdits', () => {
     it('sends update actions for existing files and create actions for new ones, with content read back from disk', async () => {
       const repo = { host: 'gitlab.example.com', projectSlug: 'group/box', projectId: 42, defaultBranch: 'main' };
