@@ -167,6 +167,20 @@ export type PromotionState =
   | 'discarded'
   | 'aborted-teardown';
 
+/** Promote-to-code record for a route plugin (design 02 / plan P3), as returned by the backend. */
+export type PromotionRecord = {
+  id: number;
+  instance: string;
+  serviceName: string;
+  routeId: string;
+  pluginType: string;
+  state: PromotionState;
+  mrRef: string | null;
+  requesterRef: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** Plugin categories enum */
 export enum PluginCategory {
   AI = 'ai',

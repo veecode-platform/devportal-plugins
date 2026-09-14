@@ -10,6 +10,7 @@ import type {
   AssociatedPluginsResponse,
   PluginFieldsResponse,
   PluginPerCategory,
+  PromotionRecord,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
   kongServiceManagerPlugin,
@@ -122,6 +123,19 @@ const mockAvailablePlugins: PluginPerCategory[] = [
   },
 ];
 
+const mockPromotion: PromotionRecord = {
+  id: 1,
+  instance: 'default',
+  serviceName: 'my-service',
+  routeId: ROUTE_ID,
+  pluginType: 'rate-limiting',
+  state: 'mr-open',
+  mrRef: 'https://gitlab.example.com/team/my-service/-/merge_requests/12',
+  requesterRef: 'user:default/dev',
+  createdAt: '2026-09-01T00:00:00.000Z',
+  updatedAt: '2026-09-01T00:00:00.000Z',
+};
+
 // ---------------------------------------------------------------------------
 // Mock API implementation
 // ---------------------------------------------------------------------------
@@ -146,6 +160,9 @@ const mockApi: KongServiceManagerApi = {
   addPluginToRoute: async () => mockPlugin,
   editRoutePlugin: async () => mockPlugin,
   removeRoutePlugin: async () => {},
+  promotePlugin: async () => mockPromotion,
+  discardPromotion: async () => {},
+  getPromotions: async () => [mockPromotion],
 };
 
 // ---------------------------------------------------------------------------
@@ -160,6 +177,7 @@ const mockEntity: Entity = {
     annotations: {
       'kong-manager/service-name': 'my-service',
       'kong-manager/instance': 'default',
+      'gitlab.com/project-slug': 'team/my-service',
     },
   },
   spec: {
