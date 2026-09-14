@@ -73,7 +73,7 @@ function gitlabClientMock(): jest.Mocked<GitlabClient> {
   return {
     resolveRepo: jest.fn(),
     materializeChart: jest.fn(),
-    pathsExisting: jest.fn(),
+    pathsExistingOnRef: jest.fn(),
     ensureBranch: jest.fn(),
     commitEdits: jest.fn(),
     findOpenMergeRequest: jest.fn(),
@@ -111,7 +111,7 @@ function withRealChart(gitlabClient: jest.Mocked<GitlabClient>): { cleanup: () =
     dir = await copyGoldenPathRepo();
     return { dir, cleanup: jest.fn().mockResolvedValue(undefined) };
   });
-  gitlabClient.pathsExisting.mockResolvedValue(new Set(['chart/values.yaml']));
+  gitlabClient.pathsExistingOnRef.mockResolvedValue(new Set(['chart/values.yaml']));
   gitlabClient.ensureBranch.mockResolvedValue(undefined);
   gitlabClient.commitEdits.mockResolvedValue({ sha: 'sha-abc' });
   return {
@@ -150,6 +150,13 @@ describe('promote to code (Task P3)', () => {
         expect(res.status).toBe(201);
         expect(res.body).toMatchObject({ state: 'mr-open', mrRef: mr.webUrl, pluginType: 'rate-limiting' });
         expect(gitlabClient.ensureBranch).toHaveBeenCalledWith(repo, 'kong-promote/rate-limiting');
+        // create-vs-update must be decided against the promotion branch, not the
+        // default-branch copy `renderCheck` runs against.
+        expect(gitlabClient.pathsExistingOnRef).toHaveBeenCalledWith(
+          repo,
+          'kong-promote/rate-limiting',
+          expect.arrayContaining(['chart/values.yaml']),
+        );
         expect(gitlabClient.openMergeRequest).toHaveBeenCalledTimes(1);
         expect(promotionStore.transition).toHaveBeenCalledWith(
           draftRow().id,
@@ -159,6 +166,39 @@ describe('promote to code (Task P3)', () => {
         expect(kongService.editRoutePlugin).toHaveBeenCalledWith('default', ROUTE_ID, PLUGIN_ID, {
           tags: ['promotion-pending:42-7'],
         });
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('sends update (not create) for a file the promotion branch already carries from a prior commit', async () => {
+      // Simulates a crash-retry or a re-promote after discard: the branch
+      // survived with the template file already on it, even though the
+      // default-branch chart renderCheck runs against never had it.
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
+      kongService.editRoutePlugin.mockResolvedValue(routePlugin);
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(draftRow());
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+      gitlabClient.pathsExistingOnRef.mockResolvedValue(
+        new Set(['chart/values.yaml', 'chart/templates/kongplugin-rate-limiting.yaml']),
+      );
+      gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+      gitlabClient.openMergeRequest.mockResolvedValue(mr);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient });
+      try {
+        const res = await request(app).post(PROMOTE_URL).send({ entityRef: 'component:default/svc' });
+        expect(res.status).toBe(201);
+
+        const [, , , , existing] = gitlabClient.commitEdits.mock.calls[0];
+        expect(existing.has('chart/templates/kongplugin-rate-limiting.yaml')).toBe(true);
       } finally {
         await chart.cleanup();
       }

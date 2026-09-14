@@ -146,6 +146,45 @@ describe('GitlabClient', () => {
     });
   });
 
+  describe('pathsExistingOnRef', () => {
+    const repo = { host: 'gitlab.example.com', projectSlug: 'group/box', projectId: 42, defaultBranch: 'main' };
+
+    it('checks existence on the given ref, not the default branch', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/files/chart%2Fvalues.yaml/raw',
+          (req, res, ctx) => {
+            expect(req.url.searchParams.get('ref')).toBe('kong-promote/rate-limiting');
+            return res(ctx.text('kongPlugins: {}\n'));
+          },
+        ),
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/files/chart%2Ftemplates%2Fkongplugin-rate-limiting.yaml/raw',
+          (_req, res, ctx) => res(ctx.status(404), ctx.json({ message: '404 File Not Found' })),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      const existing = await client.pathsExistingOnRef(repo, 'kong-promote/rate-limiting', [
+        'chart/values.yaml',
+        'chart/templates/kongplugin-rate-limiting.yaml',
+      ]);
+      expect(existing).toEqual(new Set(['chart/values.yaml']));
+    });
+
+    it('rethrows a non-404 failure', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/files/chart%2Fvalues.yaml/raw',
+          (_req, res, ctx) => res(ctx.status(500), ctx.json({ message: 'boom' })),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(
+        client.pathsExistingOnRef(repo, 'kong-promote/rate-limiting', ['chart/values.yaml']),
+      ).rejects.toThrow(/GitLab request failed/);
+    });
+  });
+
   describe('ensureBranch', () => {
     const repo = { host: 'gitlab.example.com', projectSlug: 'group/box', projectId: 42, defaultBranch: 'main' };
 

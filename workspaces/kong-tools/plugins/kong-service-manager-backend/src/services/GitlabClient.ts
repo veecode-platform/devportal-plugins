@@ -133,15 +133,29 @@ export class GitlabClient {
     return { dir, cleanup: () => fs.rm(dir, { recursive: true, force: true }) };
   }
 
-  /** Which of `paths` already exist under the materialized `dir`, before edits are applied. */
-  async pathsExisting(dir: string, paths: string[]): Promise<Set<string>> {
+  /**
+   * Which of `paths` already exist on `ref` in GitLab. Must be checked
+   * against the promotion branch, not the materialized default-branch copy
+   * `renderCheck` runs against — a crash-retry, or a promote issued right
+   * after a discard (which closes the MR but leaves the branch), can find
+   * the branch already carrying a prior commit; getting this wrong sends a
+   * GitLab `create` action for a file the branch already has, which GitLab
+   * rejects with a 400.
+   */
+  async pathsExistingOnRef(repo: ResolvedRepo, ref: string, paths: string[]): Promise<Set<string>> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
     const existing = new Set<string>();
     for (const p of paths) {
       try {
-        await fs.access(path.join(dir, p));
+        await this.callRaw(
+          token,
+          `${base}/repository/files/${encodeURIComponent(p)}/raw?ref=${encodeURIComponent(ref)}`,
+        );
         existing.add(p);
-      } catch {
-        // absent — will be a `create` action
+      } catch (err) {
+        const e = err as GitlabRequestError;
+        if (e.status === 404) continue; // absent on this ref — will be a `create` action
+        throw err;
       }
     }
     return existing;

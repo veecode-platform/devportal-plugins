@@ -605,7 +605,6 @@ export async function createRouter({
       const { dir, cleanup } = await gitlabClient.materializeChart(repo, repo.defaultBranch);
 
       try {
-        const existing = await gitlabClient.pathsExisting(dir, edits.map(e => e.path));
         const check = await renderCheck({ repoDir: dir, adapter, edits, liveConfig: snapshot });
         if (!check.equal) {
           throw new ConflictError(
@@ -614,8 +613,14 @@ export async function createRouter({
         }
 
         // Step 3: branch/commit/MR (idempotent — reuses a branch/MR left by a crashed prior attempt).
+        // create-vs-update is decided against the PROMOTION branch, not the
+        // default-branch copy `dir` was materialized from: a crash-retry (or
+        // a promote right after a discard, which doesn't delete the branch)
+        // can find the branch already carrying a prior commit, and sending
+        // `create` for a file that already exists there is a GitLab 400.
         const branch = `kong-promote/${adapter.pluginType}`;
         await gitlabClient.ensureBranch(repo, branch);
+        const existing = await gitlabClient.pathsExistingOnRef(repo, branch, edits.map(e => e.path));
         await gitlabClient.commitEdits(
           repo,
           branch,
