@@ -195,7 +195,7 @@ Maintained and updated by [VeeCode Platform](https://github.com/veecode-platform
 
 ## License
 
-MIT License, as declared in this package's `package.json`.
+MIT License. This package is a fork of ImmobiliareLabs' plugin and keeps its copyright and permission notice; see [LICENSE](LICENSE).
 
 Original work Copyright (c) ImmobiliareLabs  
 Modified work Copyright (c) VeeCode Platform

@@ -95,6 +95,10 @@ The **dummy** workspace (`workspaces/dummy/`) is the reference implementation fo
 
 New workspaces are assembled from dummy's elements rather than copied wholesale. Read `workspaces/dummy/README.md` for the shape of a workspace and `workspaces/dummy/AGENTS.md` for the patterns.
 
+## License
+
+Apache-2.0 for the repository, see [LICENSE](LICENSE). The two `ldap-auth` plugin packages are the exception: they are MIT forks of [immobiliare/backstage-plugin-ldap-auth](https://github.com/immobiliare/backstage-plugin-ldap-auth) and each carries the original MIT `LICENSE` in its package folder, which npm ships with the package.
+
 ## Background
 
 This monorepo replaced the earlier multi-repository setup (`veecode-platform/backstage-plugins` and `veecode-platform/dynamic-plugins`) and follows the structure of [backstage/community-plugins](https://github.com/backstage/community-plugins) and [redhat-developer/rhdh-plugins](https://github.com/redhat-developer/rhdh-plugins); the history of those repositories is recorded in the planning repository (`docs/inventory/repos.md`).
