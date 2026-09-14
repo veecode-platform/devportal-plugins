@@ -46,6 +46,19 @@ export interface NewPromotionDraft {
   requesterRef: string;
 }
 
+/**
+ * Non-terminal states (P4's finalizer loop still owns the record). Kong's
+ * one-plugin-per-(type, route) constraint means at most one of these can
+ * exist at a time for a given (instance, route, plugin type) — that's what
+ * makes it safe to key freeze/resume lookups on that tuple alone.
+ */
+export const ACTIVE_PROMOTION_STATES: PromotionState[] = [
+  'draft',
+  'mr-open',
+  'awaiting-deploy',
+  'applying',
+];
+
 export interface PromotionStore {
   /**
    * Inserts a new draft, or returns the existing one for this idempotency
@@ -55,6 +68,23 @@ export interface PromotionStore {
   upsertDraft(draft: NewPromotionDraft): Promise<PromotionRecordRow>;
   getById(id: number): Promise<PromotionRecordRow | undefined>;
   getByIdempotencyKey(idempotencyKey: string): Promise<PromotionRecordRow | undefined>;
+  /**
+   * The in-flight promotion (if any) for this route plugin — the freeze
+   * guard (P3) and the crash-recovery resume path both key off this instead
+   * of a caller-supplied id, since only one promotion can be open per
+   * (instance, route, plugin type) at a time.
+   */
+  getActiveByRoute(
+    instance: string,
+    routeId: string,
+    pluginType: string,
+  ): Promise<PromotionRecordRow | undefined>;
+  /** Full history (any state) for a route plugin, newest first — feeds the GET .../promotions endpoint. */
+  listByRoute(
+    instance: string,
+    routeId: string,
+    pluginType: string,
+  ): Promise<PromotionRecordRow[]>;
   transition(
     id: number,
     state: PromotionState,
@@ -110,6 +140,30 @@ export class KnexPromotionStore implements PromotionStore {
   async getByIdempotencyKey(idempotencyKey: string): Promise<PromotionRecordRow | undefined> {
     const row = await this.db<PromotionTableRow>(TABLE).where('idempotency_key', idempotencyKey).first();
     return row ? toRecordRow(row) : undefined;
+  }
+
+  async getActiveByRoute(
+    instance: string,
+    routeId: string,
+    pluginType: string,
+  ): Promise<PromotionRecordRow | undefined> {
+    const row = await this.db<PromotionTableRow>(TABLE)
+      .where({ instance, route_id: routeId, plugin_type: pluginType })
+      .whereIn('state', ACTIVE_PROMOTION_STATES)
+      .orderBy([{ column: 'created_at', order: 'desc' }, { column: 'id', order: 'desc' }])
+      .first();
+    return row ? toRecordRow(row) : undefined;
+  }
+
+  async listByRoute(
+    instance: string,
+    routeId: string,
+    pluginType: string,
+  ): Promise<PromotionRecordRow[]> {
+    const rows = await this.db<PromotionTableRow>(TABLE)
+      .where({ instance, route_id: routeId, plugin_type: pluginType })
+      .orderBy([{ column: 'created_at', order: 'desc' }, { column: 'id', order: 'desc' }]);
+    return rows.map(toRecordRow);
   }
 
   async transition(
