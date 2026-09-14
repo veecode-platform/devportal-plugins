@@ -228,3 +228,28 @@ interval, which the spec's "no manual step" acceptance still satisfies).
 Reaping coordinate-less drafts would require distinguishing "abandoned" from
 "in flight", which the record cannot express; resuming on re-promote is the
 safe recovery path.
+
+## ADR-016: Promotion Preview Is a Side-Effect-Free Twin of Promote; `detail` Reaches the Client Only on Failure
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The promote flow gained a dry-run twin,
+`POST .../plugins/:pluginId/promote/preview`: identical permission gate,
+adapter lookup, chart materialization and renderCheck as promote, but no store
+write, no branch/commit/MR, no Kong tagging. It returns the post-edit contents
+of only the files the adapter's edits touch, plus the normalized config — this
+is what the review dialog renders as the "generated YAML" side of the diff.
+A renderCheck mismatch is `400` on preview (a validation outcome of the dry
+run) while remaining `409` on promote (a conflict mid-flow).
+
+The promotion DTO exposes `detail?: string` only when the record's state is
+`failed-restored`; in every other state the column is omitted from responses.
+
+**Rationale:** Synthesizing the generated YAML client-side would reimplement
+`toChartEdits` and drift from what renderCheck actually verifies the moment an
+adapter changes; the server is the single source of the rendered truth. The
+`detail` column doubles as internal bookkeeping (ADR-014: MR coordinates while
+discardable) — exposing it unconditionally would leak plumbing to the client,
+so it crosses the API boundary only in the one state where it carries the
+human-readable failure diff.
