@@ -23,7 +23,7 @@ The Github Workflows plugin enables manual triggering and monitoring of GitHub A
 Before installing the plugin, ensure you have:
 
 - A working Backstage project (for static installation) **or** a Backstage instance compatible with dynamic plugins (VeeCode DevPortal or Red Hat Developer Hub)
-- **Backend Plugin**: The GitHub Workflows backend plugin must be installed and configured. See the [backend plugin documentation](../github-workflows-backend/README.md)
+- **Backend Plugin**: The GitHub Workflows backend plugin must be installed and configured. See the [backend plugin documentation](../github-workflow-backend/README.md)
 - GitHub integration configured with a `Personal Access Token` or `GitHub App`. See [Backstage GitHub Integration](https://backstage.io/docs/integrations/)
 - GitHub authentication configured. See [GitHub Auth Provider](https://backstage.io/docs/auth/github/provider)
 
@@ -33,7 +33,7 @@ Before installing the plugin, ensure you have:
 
 This plugin supports both **static linking** (traditional Backstage) and **dynamic plugin loading** (VeeCode DevPortal and Red Hat Developer Hub).
 
-> ⚠️ **Backend Plugin Required**: Before installing the frontend plugin, ensure the GitHub Workflows backend plugin is installed. See the [backend plugin documentation](../github-workflows-backend/README.md) for installation instructions.
+> ⚠️ **Backend Plugin Required**: Before installing the frontend plugin, ensure the GitHub Workflows backend plugin is installed. See the [backend plugin documentation](../github-workflow-backend/README.md) for installation instructions.
 
 ### Static Installation
 
@@ -233,6 +233,8 @@ plugins:
 > **Note**: This section applies only to static installations. For dynamic installations, use the mountpoint configuration shown in the Dynamic Configuration section above.
 
 ### Exported Components
+
+Upgrading from the pre-v2 exports (`GithubWorkflowsContent`, `GithubWorkflowsOverviewContent`, `GithubWorkflowsTabContent`)? See [MIGRATION.md](MIGRATION.md).
 
 The plugin exports the following components:
 
@@ -492,4 +494,4 @@ For questions, issues, or feature requests:
 
 ## License
 
-This plugin is licensed under the Apache License 2.0. See the [LICENSE](../../LICENSE) file for details.
+This plugin is licensed under the Apache License 2.0. See the [LICENSE](https://github.com/veecode-platform/devportal-plugins/blob/main/LICENSE) file at the repository root for details.
