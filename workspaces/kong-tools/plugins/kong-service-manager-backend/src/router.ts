@@ -33,6 +33,7 @@ import { renderCheck } from './services/renderCheck';
 import { GitlabClient } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
+import { EXPERIMENTAL_TAG_PREFIX } from './services/promotionTags';
 
 interface PromotionDto {
   id: number;
@@ -644,7 +645,7 @@ export async function createRouter({
         });
 
         // Step 5: tag the experimental entity.
-        const tag = `promotion-pending:${mr.projectId}-${mr.iid}`;
+        const tag = `${EXPERIMENTAL_TAG_PREFIX}${mr.projectId}-${mr.iid}`;
         const existingTags = plugin.tags ?? [];
         if (!existingTags.includes(tag)) {
           await kongService.editRoutePlugin(instance, routeId, pluginId, {
@@ -696,7 +697,7 @@ export async function createRouter({
         }
 
         const currentTags = plugin?.tags ?? [];
-        const filteredTags = currentTags.filter(t => !t.startsWith('promotion-pending:'));
+        const filteredTags = currentTags.filter(t => !t.startsWith(EXPERIMENTAL_TAG_PREFIX));
         if (plugin && filteredTags.length !== currentTags.length) {
           await kongService.editRoutePlugin(instance, routeId, pluginId, { tags: filteredTags });
         }
