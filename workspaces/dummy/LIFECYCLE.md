@@ -1,142 +1,137 @@
 # Plugin Lifecycle Guide
 
-Reference guide for developing, testing, and releasing a plugin pair
-(frontend + backend). This document uses the `dummy` workspace as the concrete example —
-the same workflow applies to all plugin workspaces in this repository.
+Develop, test and release a plugin pair (frontend + backend), using the `dummy` workspace as
+the concrete example. Every command below exists in this workspace's `Makefile` or
+`package.json`. Other workspaces follow the same Makefile shape; `make help` lists their
+targets.
 
----
+## Artifacts
 
-## Architecture Overview
-
-Each plugin workspace follows this structure:
-
-```
+```pre
 plugins/<plugin>/                → frontend plugin source
 plugins/<plugin>-backend/        → backend plugin source
 
-plugins/<plugin>/dist/               → static build (backstage-cli)
-plugins/<plugin>/dist-dynamic/       → dynamic build (rhdh-cli export-dynamic)
-
+plugins/<plugin>/dist/           → static build (backstage-cli package build)
+plugins/<plugin>/dist-dynamic/   → dynamic export (@red-hat-developer-hub/cli plugin export)
 plugins/<plugin>-backend/dist/
 plugins/<plugin>-backend/dist-dynamic/
 ```
 
-`dist-dynamic/` is always derived from `dist/` — never edited directly.
-It is what gets published to npm and consumed by the DevPortal container.
+`dist-dynamic/` is derived from `dist/` and never edited. The static package is published from
+the plugin directory; the dynamic package is published from inside `dist-dynamic/`.
 
----
-
-## 1. Local Development
+## 1. Local development
 
 ### Static mode (hot reload)
 
-```bash
-make dev
+```sh
+yarn install
+yarn start
 ```
 
-Starts a standalone Backstage app with both plugins loaded statically. Changes to `src/` are
-reflected immediately. Use this for day-to-day development.
+Starts the hosting app with both plugins loaded statically. Changes under `src/` are
+reflected immediately. A single plugin can also run on its own: `yarn start` inside
+`plugins/dummy/` (uses `dev/index.tsx`) or `plugins/dummy-backend/` (uses `dev/index.ts`,
+with mocked auth).
 
-### Dynamic mode (Docker)
+### Dynamic mode (container)
 
-```bash
-make build-all-dynamic
+```sh
+make build-dynamic
 docker compose up
 ```
 
-Builds `dist-dynamic/` for both plugins and mounts them into the DevPortal container via volumes
-(see `docker-compose.yaml`). No npm publish required.
+Builds `dist-dynamic/` for both plugins and mounts them into the DevPortal container (see
+`docker-compose.yaml`). No npm publish required.
 
-> **No hot reload in dynamic mode.** `dynamic-plugins.yaml` and `app-config.dynamic.yaml` are
-> read once at container boot. Code changes require a rebuild + container restart. Config-only
-> changes require only a restart.
+> **No hot reload in dynamic mode.** `dynamic-plugins.yaml` and `app-config.dynamic.yaml`
+> are read once at container boot. Code changes need `make build-dynamic` and
+> `docker compose restart`; config-only changes need only the restart.
 
----
+## 2. Making a code change
 
-## 2. Making a Code Change
-
-1. Edit source under `plugins/<plugin>/src/` or `plugins/<plugin>-backend/src/`
-2. Develop and test in static mode: `make dev`
-3. Build dynamic artifacts: `make build-all-dynamic`
-4. Restart the container: `docker compose restart`
-5. Verify at `http://localhost:7007`
-
----
+1. Edit source under `plugins/dummy/src/` or `plugins/dummy-backend/src/`.
+2. Check and test: `yarn tsc`, `yarn test:all`, `yarn lint:all`. From a plugin directory,
+   `yarn test --watchAll=false`.
+3. Run it statically: `yarn start`.
+4. Prove the dynamic artifact: `make build-dynamic`, `docker compose up`, verify at
+   `http://localhost:7007`, `docker compose down`.
 
 ## 3. Release
 
-### 3.1 Bump the version
+Dummy's packages are `private: true`, so npm refuses to publish them. The steps below are what
+the same targets do in a workspace whose packages are public.
 
-Each workspace defines its own version variable in the Makefile. Check the variable name at the
-top of the `Makefile` (e.g., `DUMMY_VERSION`, `KONG_TOOLS_VERSION`), then run:
+### 3.1 Set the version
 
-```bash
-# dummy workspace example
-make set-version DUMMY_VERSION=0.2.0
+```sh
+make set-version VERSION=0.2.0
 ```
 
-Updates `package.json` in both plugins and cleans `dist-dynamic/` to ensure a fresh build.
+Rewrites `version` in every plugin `package.json`, then runs `yarn install`. The Makefile's own
+`VERSION` variable (default at the top of the file) is what `publish`, `unpublish` and
+`get-version` use, so pass the same `VERSION=` on those calls or change the default.
 
-### 3.2 Build dynamic artifacts
+### 3.2 Build
 
-```bash
-make build-all-dynamic
+```sh
+make build           # yarn install && yarn tsc && yarn build:all
+make build-dynamic   # make build, then export each plugin to dist-dynamic/
 ```
 
-Produces a `dist-dynamic/` for each plugin with a package name following the pattern:
+`build-dynamic` first removes module-federation leftovers from the frontend `dist/`, then runs
+`@red-hat-developer-hub/cli plugin export` in each plugin.
 
-- `@veecode-platform/backstage-plugin-<plugin>-dynamic`
-- `@veecode-platform/backstage-plugin-<plugin>-backend-dynamic`
+### 3.3 Publish
 
-### 3.3 Publish to npm
-
-```bash
-make publish-all-dynamic
+```sh
+make publish            # static packages, from plugins/*/ ; skips versions already published
+make publish-dynamic    # dynamic packages, from plugins/*/dist-dynamic/
 ```
 
-The Makefile checks if the version already exists before publishing — safe to re-run.
+To publish to a private registry (for example a local Verdaccio):
 
-To publish to a private registry:
-
-```bash
-make publish-all-dynamic NPM_REGISTRY=https://your-registry
+```sh
+make publish NPM_REGISTRY=http://localhost:4873
+make publish-dynamic NPM_REGISTRY=http://localhost:4873
 ```
 
-### 3.4 Verify published versions
+### 3.4 Verify, pack or undo
 
-```bash
-make get-version
+```sh
+make get-version    # latest version of each package in the registry
+make pack           # .tgz of each static package
+make pack-dynamic   # .tgz of each dynamic package
+make unpublish      # remove the current VERSION of every package from the registry
 ```
 
----
-
-## 4. Quick Reference
+## 4. Quick reference
 
 | Goal | Command |
-|---|---|
-| Start dev (static, hot reload) | `make dev` |
-| Build dynamic artifacts | `make build-all-dynamic` |
-| Start dynamic container | `docker compose up` |
-| Restart container | `docker compose restart` |
-| Bump version | `make set-version <PLUGIN>_VERSION=x.y.z` |
-| Publish dynamic packages | `make publish-all-dynamic` |
+|------|---------|
+| Start dev (static, hot reload) | `yarn start` |
+| Type check, tests, lint | `yarn tsc`, `yarn test:all`, `yarn lint:all` |
+| Build static packages | `make build` |
+| Build dynamic artifacts | `make build-dynamic` |
+| Start / restart / stop the container | `docker compose up` / `restart` / `down` |
+| Set version | `make set-version VERSION=x.y.z` |
+| Publish static / dynamic | `make publish` / `make publish-dynamic` |
 | Check published versions | `make get-version` |
-| Clean dynamic artifacts | `make clean-dynamic` |
-| Run tests | `make test` |
-| Run linter | `make lint` |
+| Remove dynamic artifacts | `make clean-dynamic` |
+| Remove everything built, including `node_modules` | `make clean` |
 
----
+## 5. Package naming convention
 
-## 5. Package Naming Convention
-
-VeeCode plugins follow this naming pattern on npm:
+Static packages published from this repository follow:
 
 | Role | npm package name |
-|---|---|
-| Frontend — static | `@veecode-platform/backstage-plugin-<plugin>` |
-| Frontend — dynamic | `@veecode-platform/backstage-plugin-<plugin>-dynamic` |
-| Backend — static | `@veecode-platform/backstage-plugin-<plugin>-backend` |
-| Backend — dynamic | `@veecode-platform/backstage-plugin-<plugin>-backend-dynamic` |
+|------|------------------|
+| Frontend | `@veecode-platform/backstage-plugin-<plugin>` |
+| Backend | `@veecode-platform/backstage-plugin-<plugin>-backend` |
+| Common library | `@veecode-platform/backstage-plugin-<plugin>-common` |
 
-Static packages: added as `package.json` dependencies in Backstage apps.
-Dynamic packages: published to npm as standalone artifacts.
+The dynamic export keeps the name with a `-dynamic` suffix; the folder the container expects
+under `/app/dynamic-plugins/dist/` is the scope-less form used in `docker-compose.yaml`
+(`veecode-platform-backstage-plugin-<plugin>-dynamic`). Older packages use the shorter
+`@veecode-platform/plugin-<name>` form; new packages use the `backstage-plugin-` form. The
+full table of patterns in use is in the planning repository (`docs/inventory/plugins.md`).
