@@ -37,4 +37,5 @@ export class GitlabPipelinesApiClient implements GitlabPipelinesApi {
   playJob(e: string, jobId: number, variables: PipelineVariable[]) { return this.call<any>(e, `/jobs/${jobId}/play`, { method: 'POST', body: { variables } }); }
   retryJob(e: string, jobId: number) { return this.call<any>(e, `/jobs/${jobId}/retry`, { method: 'POST' }); }
   cancelJob(e: string, jobId: number) { return this.call<any>(e, `/jobs/${jobId}/cancel`, { method: 'POST' }); }
+  listTeardowns(e: string) { return this.call<any>(e, '/teardowns'); }
 }

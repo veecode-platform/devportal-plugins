@@ -1,5 +1,5 @@
 import { createApiRef } from '@backstage/core-plugin-api';
-import { BranchDto, JobDto, PipelineDto, PipelineVariable } from '@veecode-platform/gitlab-pipelines-common';
+import { BranchDto, JobDto, PipelineDto, PipelineVariable, TeardownOperationDto } from '@veecode-platform/gitlab-pipelines-common';
 
 export const gitlabPipelinesApiRef = createApiRef<GitlabPipelinesApi>({ id: 'plugin.gitlab-pipelines.api' });
 
@@ -14,4 +14,5 @@ export interface GitlabPipelinesApi {
   playJob(entityRef: string, jobId: number, variables: PipelineVariable[]): Promise<JobDto>;
   retryJob(entityRef: string, jobId: number): Promise<JobDto>;
   cancelJob(entityRef: string, jobId: number): Promise<JobDto>;
+  listTeardowns(entityRef: string): Promise<TeardownOperationDto[]>;
 }
