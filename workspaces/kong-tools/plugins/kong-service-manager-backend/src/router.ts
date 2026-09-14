@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { HttpAuthService, PermissionsService, UserInfoService } from '@backstage/backend-plugin-api';
 import { ConflictError, InputError, NotAllowedError, NotFoundError } from '@backstage/errors';
 import { AuthorizeResult, type BasicPermission } from '@backstage/plugin-permission-common';
@@ -28,9 +30,9 @@ import {
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { KongServiceManagerService } from './services/KongServiceManagerService';
 import { getAdapter } from './services/adapters';
-import type { NormalizedConfig } from './services/adapters/types';
-import { renderCheck } from './services/renderCheck';
-import { GitlabClient } from './services/GitlabClient';
+import type { FileEdit, KongPluginAdapter, NormalizedConfig } from './services/adapters/types';
+import { renderCheck, type EquivalenceResult } from './services/renderCheck';
+import { GitlabClient, type ResolvedRepo } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
 import { EXPERIMENTAL_TAG_PREFIX } from './services/promotionTags';
@@ -46,6 +48,8 @@ interface PromotionDto {
   requesterRef: string;
   createdAt: string;
   updatedAt: string;
+  /** Human-readable failure detail — only ever populated in `failed-restored` (see `promotionFinalizer`). In every other state the column carries MR-coordinates JSON, which is internal bookkeeping and never reaches the client. */
+  detail?: string;
 }
 
 function toPromotionDto(row: PromotionRecordRow): PromotionDto {
@@ -60,6 +64,7 @@ function toPromotionDto(row: PromotionRecordRow): PromotionDto {
     requesterRef: row.requester_ref,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+    detail: row.state === 'failed-restored' && row.detail ? row.detail : undefined,
   };
 }
 
@@ -126,6 +131,50 @@ export async function createRouter({
         `Route plugin '${plugin.name}' on route '${routeId}' has an open promotion${link} — edits are frozen until it merges, fails, or is discarded.`,
       );
     }
+  }
+
+  /**
+   * Looks up a route plugin and its promotion adapter together — the same
+   * 404 (plugin not found) / 400 (no adapter registered) gate that both
+   * promote and preview require before doing anything else.
+   */
+  async function resolvePromotableRoutePlugin(
+    instance: string,
+    routeId: string,
+    pluginId: string,
+  ): Promise<{ plugin: AssociatedPluginsResponse; adapter: KongPluginAdapter }> {
+    const plugin = await findRoutePlugin(instance, routeId, pluginId);
+    if (!plugin) {
+      throw new NotFoundError(`Route plugin '${pluginId}' not found on route '${routeId}'`);
+    }
+
+    const adapter = getAdapter(plugin.name);
+    if (!adapter) {
+      throw new InputError(
+        `Plugin type '${plugin.name}' has no promotion adapter and cannot be promoted to code`,
+      );
+    }
+
+    return { plugin, adapter };
+  }
+
+  /**
+   * Materializes the chart at the repo's default branch and runs the
+   * generation-time equivalence check against it (design 02, promotion
+   * mechanics step 3) — shared by promote (which aborts the write on a
+   * mismatch) and preview (which surfaces the mismatch without ever
+   * writing). Caller owns `cleanup()` and decides what a mismatch means.
+   */
+  async function materializeAndCheck(
+    client: GitlabClient,
+    repo: ResolvedRepo,
+    adapter: KongPluginAdapter,
+    edits: FileEdit[],
+    liveConfig: NormalizedConfig,
+  ): Promise<{ dir: string; cleanup: () => Promise<void>; check: EquivalenceResult }> {
+    const { dir, cleanup } = await client.materializeChart(repo, repo.defaultBranch);
+    const check = await renderCheck({ repoDir: dir, adapter, edits, liveConfig });
+    return { dir, cleanup, check };
   }
 
   async function requesterRef(req: express.Request): Promise<string> {
@@ -550,17 +599,7 @@ export async function createRouter({
       const { instance, serviceName, routeId, pluginId } = params.data;
       const { entityRef } = body.data;
 
-      const plugin = await findRoutePlugin(instance, routeId, pluginId);
-      if (!plugin) {
-        throw new NotFoundError(`Route plugin '${pluginId}' not found on route '${routeId}'`);
-      }
-
-      const adapter = getAdapter(plugin.name);
-      if (!adapter) {
-        throw new InputError(
-          `Plugin type '${plugin.name}' has no promotion adapter and cannot be promoted to code`,
-        );
-      }
+      const { plugin, adapter } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
 
       // Step 1: persist the draft before any external write (crash-safety —
       // an in-flight record for this route plugin means a retry resumes it
@@ -593,10 +632,9 @@ export async function createRouter({
       });
 
       const edits = adapter.toChartEdits(snapshot);
-      const { dir, cleanup } = await gitlabClient.materializeChart(repo, repo.defaultBranch);
+      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, snapshot);
 
       try {
-        const check = await renderCheck({ repoDir: dir, adapter, edits, liveConfig: snapshot });
         if (!check.equal) {
           throw new ConflictError(
             `Generated chart does not reproduce the live config for '${adapter.pluginType}': ${check.diff}`,
@@ -656,6 +694,57 @@ export async function createRouter({
         res.status(201).json(
           toPromotionDto({ ...promotion, state: 'mr-open', mr_ref: mr.webUrl }),
         );
+      } finally {
+        await cleanup();
+      }
+    },
+  );
+
+  // POST /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote/preview
+  router.post(
+    '/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote/preview',
+    async (req, res) => {
+      await authorize(req, kongPluginPromotePermission);
+
+      if (!promotionStore || !gitlabClient) {
+        throw new ConflictError('Kong plugin promotion is not enabled on this instance');
+      }
+
+      const params = instanceServiceRoutePluginParams.safeParse(req.params);
+      if (!params.success) throw new InputError(params.error.toString());
+      const body = promoteBody.safeParse(req.body);
+      if (!body.success) throw new InputError(body.error.toString());
+
+      const { instance, routeId, pluginId } = params.data;
+      const { entityRef } = body.data;
+
+      const { plugin, adapter } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
+      const liveConfig = adapter.fromRendered({ config: plugin.config });
+
+      const credentials = await httpAuth.credentials(req, { allow: ['user'] });
+      const repo = await gitlabClient.resolveRepo(entityRef, credentials);
+
+      const edits = adapter.toChartEdits(liveConfig);
+      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, liveConfig);
+
+      try {
+        if (!check.equal) {
+          // Unlike promote, a preview has nothing in flight to conflict
+          // with — a mismatch here just means the current live config
+          // wouldn't reproduce from the chart yet, a client-facing 400.
+          throw new InputError(
+            `Generated chart does not reproduce the live config for '${adapter.pluginType}': ${check.diff}`,
+          );
+        }
+
+        const files = await Promise.all(
+          edits.map(async edit => ({
+            path: edit.path,
+            content: await fs.readFile(path.join(dir, edit.path), 'utf8'),
+          })),
+        );
+
+        res.json({ files, normalizedConfig: liveConfig });
       } finally {
         await cleanup();
       }

@@ -8,11 +8,23 @@ import type { KongServiceManagerService } from './services/KongServiceManagerSer
 import type { GitlabClient } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
 import { copyGoldenPathRepo } from './services/__fixtures__/copyGoldenPathRepo';
+import { renderCheck } from './services/renderCheck';
 import type { AssociatedPluginsResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+
+// Wraps the real `renderCheck` in a jest.fn so a single test can force a
+// mismatch (`mockResolvedValueOnce`) — every other test in this file still
+// exercises the real implementation (real `helm template` against the
+// golden-path fixture) via this same pass-through.
+jest.mock('./services/renderCheck', () => {
+  const actual = jest.requireActual('./services/renderCheck');
+  return { ...actual, renderCheck: jest.fn(actual.renderCheck) };
+});
+const renderCheckMock = renderCheck as jest.MockedFunction<typeof renderCheck>;
 
 const ROUTE_ID = 'route-1';
 const PLUGIN_ID = 'plugin-1';
 const PROMOTE_URL = `/default/services/svc/routes/${ROUTE_ID}/plugins/${PLUGIN_ID}/promote`;
+const PREVIEW_URL = `${PROMOTE_URL}/preview`;
 const PROMOTIONS_URL = `/default/services/svc/routes/${ROUTE_ID}/plugins/${PLUGIN_ID}/promotions`;
 
 const routePlugin: AssociatedPluginsResponse = {
@@ -281,6 +293,99 @@ describe('promote to code (Task P3)', () => {
     });
   });
 
+  describe('POST .../promote/preview', () => {
+    it('happy path: returns the edited files and normalized config without writing to the store or GitLab', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
+
+      const promotionStore = promotionStoreMock();
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient });
+      try {
+        const res = await request(app).post(PREVIEW_URL).send({ entityRef: 'component:default/svc' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.normalizedConfig).toEqual({ minute: 60 });
+        expect(res.body.files).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ path: 'chart/values.yaml' }),
+            expect.objectContaining({ path: 'chart/templates/kongplugin-rate-limiting.yaml' }),
+          ]),
+        );
+        expect(res.body.files).toHaveLength(2);
+
+        // A preview never persists a draft, mutates the chart repo, opens an MR, or tags the plugin.
+        expect(promotionStore.upsertDraft).not.toHaveBeenCalled();
+        expect(promotionStore.transition).not.toHaveBeenCalled();
+        expect(gitlabClient.ensureBranch).not.toHaveBeenCalled();
+        expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
+        expect(gitlabClient.openMergeRequest).not.toHaveBeenCalled();
+        expect(kongService.editRoutePlugin).not.toHaveBeenCalled();
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('refuses a plugin type with no promotion adapter', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([{ ...routePlugin, name: 'jwt' }]);
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+      });
+
+      const res = await request(app).post(PREVIEW_URL).send({ entityRef: 'component:default/svc' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/no promotion adapter/);
+    });
+
+    it('400s with the diff detail when the generated chart does not reproduce the live config', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
+
+      const promotionStore = promotionStoreMock();
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+
+      renderCheckMock.mockResolvedValueOnce({ equal: false, diff: 'live vs rendered mismatch' });
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient });
+      try {
+        const res = await request(app).post(PREVIEW_URL).send({ entityRef: 'component:default/svc' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.message).toMatch(/does not reproduce the live config/);
+        expect(res.body.error.message).toContain('live vs rendered mismatch');
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('403s when permission is denied', async () => {
+      const kongService = kongServiceMock();
+      const router = await createRouter({
+        httpAuth: mockServices.httpAuth(),
+        permissions: mockServices.permissions.mock({
+          authorize: async () => [{ result: AuthorizeResult.DENY }],
+        }),
+        kongService,
+        userInfo: mockServices.userInfo({ userEntityRef: 'user:default/alice' }),
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+      });
+      const app = express();
+      app.use(router);
+      app.use(mockErrorHandler());
+
+      const res = await request(app).post(PREVIEW_URL).send({ entityRef: 'component:default/svc' });
+      expect(res.status).toBe(403);
+    });
+  });
+
   describe('freeze while a promotion is open', () => {
     it('PATCH route plugin is frozen with a 409 and the MR link', async () => {
       const kongService = kongServiceMock();
@@ -416,6 +521,35 @@ describe('promote to code (Task P3)', () => {
       const res = await request(app).get(PROMOTIONS_URL);
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
+    });
+
+    it('exposes detail only for failed-restored records, never for the MR-coordinates JSON of an active state', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.listByRoute.mockResolvedValue([
+        draftRow({
+          id: 2,
+          state: 'failed-restored',
+          detail: 'applyTimeoutMinutes (30) exceeded waiting for the code-owned plugin to converge; experimental plugin restored.',
+        }),
+        draftRow({
+          id: 3,
+          state: 'mr-open',
+          mr_ref: mr.webUrl,
+          detail: JSON.stringify({ host: repo.host, projectSlug: repo.projectSlug, projectId: mr.projectId, iid: mr.iid }),
+        }),
+      ]);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient: gitlabClientMock() });
+      const res = await request(app).get(PROMOTIONS_URL);
+
+      expect(res.status).toBe(200);
+      const failedRestored = res.body.find((r: { id: number }) => r.id === 2);
+      const mrOpen = res.body.find((r: { id: number }) => r.id === 3);
+      expect(failedRestored.detail).toMatch(/applyTimeoutMinutes/);
+      expect(mrOpen).not.toHaveProperty('detail');
     });
   });
 });
