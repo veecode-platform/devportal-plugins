@@ -1,15 +1,11 @@
 #
-# Root Makefile for devportal-plugins monorepo
+# Root Makefile for the devportal-plugins monorepo
 #
-# Each workspace has its own Makefile with build, publish, and utility commands.
-# Use: cd workspaces/<name> && make help
+# Every workspace under workspaces/<name>/ has its own Makefile with build,
+# publish and utility targets. Run: cd workspaces/<name> && make help
+# `make help` here lists the workspaces that have one.
 #
-# Workspaces:
-# - veecode-homepage:         cd workspaces/veecode-homepage && make help
-# - global-header:    cd workspaces/global-header && make help
-# - github-workflows: cd workspaces/github-workflows && make help
-# - ldap-auth:        cd workspaces/ldap-auth && make help
-# - kong-tools:       cd workspaces/kong-tools && make help
+# Root-level targets: help, echo-paths, copy-dynamic-plugins.
 #
 
 # For copying dynamic plugins to a local devportal-base
@@ -24,12 +20,9 @@ help:
 	@echo ""
 	@echo "Each workspace has its own Makefile. Navigate to the workspace first:"
 	@echo ""
-	@echo "  cd workspaces/veecode-homepage && make help"
-	@echo "  cd workspaces/global-header && make help"
-	@echo "  cd workspaces/github-workflows && make help"
-	@echo "  cd workspaces/gitlab-pipelines && make help"
-	@echo "  cd workspaces/ldap-auth && make help"
-	@echo "  cd workspaces/kong-tools && make help"
+	@for d in workspaces/*/; do \
+		if [ -f "$$d/Makefile" ]; then echo "  cd $${d%/} && make help"; fi; \
+	done
 	@echo ""
 	@echo "Root-level commands:"
 	@echo "  make echo-paths              - Show dynamic plugin paths"
