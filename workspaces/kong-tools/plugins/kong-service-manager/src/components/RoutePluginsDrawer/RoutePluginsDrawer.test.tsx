@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RoutePluginsDrawer } from './RoutePluginsDrawer';
 import type {
@@ -57,6 +57,7 @@ const mockFetchRouteAssociatedPlugins = jest.fn();
 const mockFetchAvailablePlugins = jest.fn();
 const mockRemoveRoutePlugin = jest.fn();
 const mockFetchPromotions = jest.fn();
+const mockPreviewPromotion = jest.fn();
 const mockPromotePlugin = jest.fn();
 const mockDiscardPromotion = jest.fn();
 
@@ -80,6 +81,7 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
     fetchAvailablePlugins: mockFetchAvailablePlugins,
     removeRoutePlugin: mockRemoveRoutePlugin,
     fetchPromotions: mockFetchPromotions,
+    previewPromotion: mockPreviewPromotion,
     promotePlugin: mockPromotePlugin,
     discardPromotion: mockDiscardPromotion,
   }),
@@ -93,6 +95,7 @@ describe('RoutePluginsDrawer', () => {
       metadata: { name: 'my-service', annotations: { 'gitlab.com/project-slug': 'team/my-service' } },
     };
     mockPromotionsByPluginId = {};
+    mockPreviewPromotion.mockResolvedValue({ files: [], normalizedConfig: {} });
   });
 
   it('fetches promotion history for each associated route plugin when opened', () => {
@@ -127,6 +130,9 @@ describe('RoutePluginsDrawer', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/rate-limiting/)).toBeInTheDocument();
 
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: /Promote to code/i })).toBeEnabled(),
+    );
     await userEvent.click(within(dialog).getByRole('button', { name: /Promote to code/i }));
     expect(mockPromotePlugin).toHaveBeenCalledWith('route-1', 'plugin-1', expect.any(String));
   });

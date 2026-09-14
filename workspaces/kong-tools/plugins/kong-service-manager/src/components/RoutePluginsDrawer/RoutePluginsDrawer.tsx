@@ -371,6 +371,9 @@ export function RoutePluginsDrawer({
         open={!!reviewPlugin}
         pluginName={reviewPlugin?.name ?? ''}
         liveConfig={reviewPlugin?.config ?? {}}
+        routeId={route?.id ?? null}
+        pluginId={reviewPlugin?.id ?? null}
+        entityRef={entityRef}
         onClose={handleCloseReview}
         onConfirm={handleConfirmPromote}
         submitting={reviewSubmitting}
