@@ -1,11 +1,14 @@
 import {
   startTestBackend,
   mockServices,
+  TestDatabases,
 } from '@backstage/backend-test-utils';
 import request from 'supertest';
 import { kongServiceManagerBackendPlugin } from './plugin';
 
 describe('kongServiceManagerBackendPlugin', () => {
+  const databases = TestDatabases.create({ ids: ['SQLITE_3'] });
+
   it('responds to health check through the full stack', async () => {
     const { server } = await startTestBackend({
       features: [
@@ -46,5 +49,27 @@ describe('kongServiceManagerBackendPlugin', () => {
     );
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  it('migrates the promotion store and still boots when kong.promotion is enabled', async () => {
+    const knex = await databases.init('SQLITE_3');
+
+    const { server } = await startTestBackend({
+      features: [
+        kongServiceManagerBackendPlugin,
+        mockServices.rootConfig.factory({
+          data: { kong: { promotion: { enabled: true } } },
+        }),
+        mockServices.database.factory({ knex }),
+      ],
+    });
+
+    const res = await request(server).get(
+      '/api/kong-service-manager-backend/health',
+    );
+    expect(res.status).toBe(200);
+
+    const hasPromotionsTable = await knex.schema.hasTable('promotions');
+    expect(hasPromotionsTable).toBe(true);
   });
 });
