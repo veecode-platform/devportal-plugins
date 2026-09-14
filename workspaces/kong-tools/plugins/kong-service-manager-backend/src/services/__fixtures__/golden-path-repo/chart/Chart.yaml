@@ -1,0 +1,7 @@
+apiVersion: v2
+name: golden-path-service
+description: >-
+  Generic fixture chart modeling the platform's golden-path Backstage Node
+  service skeleton (Deployment/Service/Ingress). Authored for tests only —
+  not copied from any internal repository.
+version: 0.1.0

@@ -1,0 +1,18 @@
+replicaCount: 1
+
+image:
+  repository: example/golden-path-service
+  tag: latest
+
+service:
+  port: 8080
+
+ingress:
+  enabled: true
+  host: golden-path-service.example.local
+  annotations: {}
+
+# kongPlugins is intentionally empty in the base fixture: it represents a
+# golden-path chart before any plugin has been promoted to code. Promotion
+# FileEdits merge keys under here (e.g. kongPlugins.rateLimiting.minute).
+kongPlugins: {}
