@@ -156,6 +156,17 @@ export type AvailablePluginsResponse = {
   enabled_plugins: string[];
 };
 
+/** Lifecycle state of a promote-to-code record (design 02) */
+export type PromotionState =
+  | 'draft'
+  | 'mr-open'
+  | 'awaiting-deploy'
+  | 'applying'
+  | 'codified'
+  | 'failed-restored'
+  | 'discarded'
+  | 'aborted-teardown';
+
 /** Plugin categories enum */
 export enum PluginCategory {
   AI = 'ai',
