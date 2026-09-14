@@ -38,6 +38,36 @@ annotation from which the GitLab host can be resolved. Its `spec.owner` must
 match the signed-in user's ownership entity refs, either the user itself or a
 group it belongs to. The backend enforces this rule for every operation.
 
+## Lifecycle reconciler
+
+The backend can optionally track "teardown" operations. When a user plays a
+manual job whose name matches the configured teardown job through this
+plugin, the backend records a persistent operation and a scheduled
+reconciler later deletes the catalog descriptor file from the project's
+default branch, once it confirms the teardown job actually succeeded and was
+not superseded by a later deploy. This lets a discovery-based catalog drop
+the entity on its next scan.
+
+The feature is off by default. Enable it with:
+
+```yaml
+gitlabPipelines:
+  lifecycle:
+    enabled: false            # default false — feature fully off unless enabled
+    teardownJobName: destroy  # job name that marks a teardown
+    catalogFile: catalog-info.yaml
+    deployJobName: deploy     # used for the supersede check
+    reconcileIntervalSeconds: 60
+```
+
+Guardrails before the catalog file is deleted: the teardown job's pipeline
+ref must be the project's default branch, and there must be no later
+successful run of `deployJobName` after the teardown job finished. Either
+guardrail failing marks the operation `superseded` or `failed` instead of
+deleting anything. A `GET .../teardowns` endpoint (same entity-anchored
+prefix, `gitlab.pipeline.read` permission) lists the recorded operations for
+a future UI surface.
+
 ## Dynamic V3 loop
 
 The `dynamic/` directory is a local smoke harness for

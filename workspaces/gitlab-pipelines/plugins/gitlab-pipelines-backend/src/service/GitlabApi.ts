@@ -63,11 +63,36 @@ export class GitlabApi {
   }
   retryJob(host: string, slug: string, jobId: number) { return this.call<any>(host, slug, `/jobs/${jobId}/retry`, { method: 'POST' }).then(toJob); }
   cancelJob(host: string, slug: string, jobId: number) { return this.call<any>(host, slug, `/jobs/${jobId}/cancel`, { method: 'POST' }).then(toJob); }
+  getProject(host: string, slug: string) { return this.call<any>(host, slug, '').then(p => ({ defaultBranch: p.default_branch as string })); }
+  listJobsByName(host: string, slug: string, name: string, options: { scopeSuccess?: boolean } = {}) {
+    const query = new URLSearchParams();
+    query.set('per_page', '100');
+    if (options.scopeSuccess) query.append('scope[]', 'success');
+    return this.call<any[]>(host, slug, `/jobs?${query.toString()}`).then(jobs => jobs.filter(j => j.name === name).map(toJob));
+  }
+  async deleteFile(host: string, slug: string, branch: string, filePath: string, commitMessage: string): Promise<{ alreadyAbsent: true } | { commitSha: string }> {
+    try {
+      const commit = await this.call<any>(host, slug, '/repository/commits', {
+        method: 'POST',
+        body: {
+          branch,
+          commit_message: commitMessage,
+          actions: [{ action: 'delete', file_path: filePath }],
+        },
+      });
+      return { commitSha: commit.id };
+    } catch (err: any) {
+      if (err?.status === 400 && /does(?:n't| not) exist/i.test(err.upstreamBody ?? '')) {
+        return { alreadyAbsent: true };
+      }
+      throw err;
+    }
+  }
 }
 
 function toPipeline(p: any): PipelineDto {
   return { id: p.id, projectId: p.project_id, ref: p.ref, sha: p.sha, status: p.status, source: p.source, webUrl: p.web_url, createdAt: p.created_at, updatedAt: p.updated_at };
 }
 function toJob(j: any): JobDto {
-  return { id: j.id, name: j.name, stage: j.stage, status: j.status, manual: j.status === 'manual', allowFailure: !!j.allow_failure, webUrl: j.web_url, startedAt: j.started_at ?? null, finishedAt: j.finished_at ?? null };
+  return { id: j.id, name: j.name, stage: j.stage, status: j.status, manual: j.status === 'manual', allowFailure: !!j.allow_failure, webUrl: j.web_url, startedAt: j.started_at ?? null, finishedAt: j.finished_at ?? null, pipelineId: j.pipeline?.id };
 }

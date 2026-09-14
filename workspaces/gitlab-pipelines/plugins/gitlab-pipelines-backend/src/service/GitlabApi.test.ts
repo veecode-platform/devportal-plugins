@@ -48,4 +48,70 @@ describe('GitlabApi', () => {
     const api = GitlabApi.fromConfig(config);
     await expect(api.listBranches('other.example.com', 'g/r')).rejects.toThrow(/No GitLab integration/);
   });
+
+  it('gets a project and returns its default branch', async () => {
+    server.use(
+      rest.get('https://gitlab.example.com/api/v4/projects/group%2Frepo', (_r, res, ctx) =>
+        res(ctx.json({ id: 3, default_branch: 'main' })),
+      ),
+    );
+    const api = GitlabApi.fromConfig(config);
+    const project = await api.getProject('gitlab.example.com', 'group/repo');
+    expect(project).toEqual({ defaultBranch: 'main' });
+  });
+
+  it('lists jobs filtered client-side by name', async () => {
+    server.use(
+      rest.get('https://gitlab.example.com/api/v4/projects/group%2Frepo/jobs', (req, res, ctx) => {
+        expect(req.url.searchParams.getAll('scope[]')).toEqual(['success']);
+        return res(ctx.json([
+          { id: 1, name: 'deploy', stage: 'deploy', status: 'success', allow_failure: false, web_url: 'u', finished_at: '2026-01-01T00:00:00Z' },
+          { id: 2, name: 'destroy', stage: 'destroy', status: 'success', allow_failure: false, web_url: 'u', finished_at: '2026-01-02T00:00:00Z' },
+        ]));
+      }),
+    );
+    const api = GitlabApi.fromConfig(config);
+    const jobs = await api.listJobsByName('gitlab.example.com', 'group/repo', 'deploy', { scopeSuccess: true });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].name).toBe('deploy');
+  });
+
+  it('deletes a file on the given branch', async () => {
+    let body: any;
+    server.use(
+      rest.post('https://gitlab.example.com/api/v4/projects/group%2Frepo/repository/commits', async (req, res, ctx) => {
+        body = await req.json();
+        return res(ctx.json({ id: 'sha123' }));
+      }),
+    );
+    const api = GitlabApi.fromConfig(config);
+    const result = await api.deleteFile('gitlab.example.com', 'group/repo', 'main', 'catalog-info.yaml', 'chore: unregister');
+    expect(body).toEqual({
+      branch: 'main',
+      commit_message: 'chore: unregister',
+      actions: [{ action: 'delete', file_path: 'catalog-info.yaml' }],
+    });
+    expect(result).toEqual({ commitSha: 'sha123' });
+  });
+
+  it('treats a delete of an already-absent file as success', async () => {
+    server.use(
+      rest.post('https://gitlab.example.com/api/v4/projects/group%2Frepo/repository/commits', (_r, res, ctx) =>
+        res(ctx.status(400), ctx.json({ message: 'A file with this name doesn\'t exist' })),
+      ),
+    );
+    const api = GitlabApi.fromConfig(config);
+    const result = await api.deleteFile('gitlab.example.com', 'group/repo', 'main', 'catalog-info.yaml', 'chore: unregister');
+    expect(result).toEqual({ alreadyAbsent: true });
+  });
+
+  it('rethrows a non-missing-file 400 from delete', async () => {
+    server.use(
+      rest.post('https://gitlab.example.com/api/v4/projects/group%2Frepo/repository/commits', (_r, res, ctx) =>
+        res(ctx.status(400), ctx.json({ message: 'Invalid branch name' })),
+      ),
+    );
+    const api = GitlabApi.fromConfig(config);
+    await expect(api.deleteFile('gitlab.example.com', 'group/repo', 'main', 'catalog-info.yaml', 'chore: unregister')).rejects.toThrow(/GitLab request failed/);
+  });
 });

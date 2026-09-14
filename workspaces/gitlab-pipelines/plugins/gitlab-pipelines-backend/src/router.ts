@@ -3,6 +3,7 @@ import { ConflictError, InputError } from '@backstage/errors';
 import { createPermissionIntegrationRouter } from '@backstage/plugin-permission-node';
 import {
   RESOURCE_TYPE_GITLAB_PIPELINES_ENTITY,
+  TeardownOperationDto,
   gitlabPipelinesPermissions,
   gitlabPipelineCancelPermission,
   gitlabPipelinePlayPermission,
@@ -13,6 +14,7 @@ import express from 'express';
 import Router from 'express-promise-router';
 import { AuthorizedContext } from './auth/authorize';
 import { GitlabApi } from './service/GitlabApi';
+import { TeardownOperationRow, TeardownStore } from './service/teardownStore';
 import {
   createPipelineSchema,
   idParam,
@@ -25,14 +27,35 @@ type Authorize = (
   permission: any,
 ) => Promise<AuthorizedContext>;
 
+function toTeardownOperationDto(row: TeardownOperationRow): TeardownOperationDto {
+  return {
+    id: row.id,
+    host: row.host,
+    projectSlug: row.project_slug,
+    pipelineId: row.pipeline_id,
+    jobId: row.job_id,
+    requesterRef: row.requester_ref,
+    state: row.state,
+    detail: row.detail,
+    unregisterCommitSha: row.unregister_commit_sha,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
 export function createRouter({
   logger,
   authorize,
   gitlab,
+  teardownStore,
+  lifecycle,
 }: {
   logger: LoggerService;
   authorize: Authorize;
   gitlab: GitlabApi;
+  // Present only when gitlabPipelines.lifecycle.enabled is true.
+  teardownStore?: TeardownStore;
+  lifecycle?: { teardownJobName: string };
 }) {
   const router = Router();
   router.use(express.json());
@@ -113,6 +136,15 @@ export function createRouter({
       ),
     );
   });
+  router.get(`${E}/teardowns`, async (req, res) => {
+    const c = await authorize(req, gitlabPipelineReadPermission);
+    if (!teardownStore) {
+      res.json([]);
+      return;
+    }
+    const rows = await teardownStore.listForProject(c.host, c.projectSlug);
+    res.json(rows.map(toTeardownOperationDto));
+  });
   router.post(`${E}/pipelines`, async (req, res) => {
     const c = await authorize(req, gitlabPipelineTriggerPermission);
     const body = parse<{
@@ -179,6 +211,28 @@ export function createRouter({
       gitlab.playJob(c.host, c.projectSlug, id, body.variables),
     );
     audit(c, 'job.play', auditDetails);
+    if (teardownStore && lifecycle && job.name === lifecycle.teardownJobName) {
+      const pipelineId = played.pipelineId ?? job.pipelineId;
+      if (pipelineId === undefined) {
+        logger.error('gitlab-pipelines teardown.capture failed: no pipeline id on job', auditFields(c, auditDetails));
+      } else {
+        try {
+          await teardownStore.insertPending({
+            host: c.host,
+            projectSlug: c.projectSlug,
+            pipelineId,
+            jobId: id,
+            requesterRef: c.userEntityRef,
+          });
+          audit(c, 'teardown.capture', { jobId: id, pipelineId });
+        } catch (err) {
+          logger.error('gitlab-pipelines teardown.capture failed', {
+            ...auditFields(c, auditDetails),
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
     res.json(played);
   });
   router.post(`${E}/jobs/:id/retry`, async (req, res) => {

@@ -1,9 +1,10 @@
 {
   "name": "@veecode-platform/backstage-plugin-gitlab-pipelines-backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "Apache-2.0",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "configSchema": "config.d.ts",
   "publishConfig": {
     "access": "public",
     "main": "dist/index.cjs.js",
@@ -50,6 +51,7 @@
     "supertest": "^6.2.4"
   },
   "files": [
-    "dist"
+    "dist",
+    "migrations"
   ]
 }
