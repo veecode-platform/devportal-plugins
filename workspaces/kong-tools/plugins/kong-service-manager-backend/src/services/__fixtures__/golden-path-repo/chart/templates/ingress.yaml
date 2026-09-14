@@ -1,0 +1,37 @@
+{{- /*
+Documented constraint (design 02): the konghq.com/plugins annotation binds
+the whole Ingress (single route on golden path today), so it's composed
+here from whichever kongPlugins.* keys are present rather than edited
+directly by promotion — a promotion FileEdit only ever touches
+kongPlugins.* in values.yaml, never this annotation.
+*/}}
+{{- $plugins := list }}
+{{- if .Values.kongPlugins.rateLimiting }}
+{{- $plugins = append $plugins (printf "%s-rate-limiting" .Release.Name) }}
+{{- end }}
+{{- if .Values.kongPlugins.correlationId }}
+{{- $plugins = append $plugins (printf "%s-correlation-id" .Release.Name) }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  annotations:
+    {{- if $plugins }}
+    konghq.com/plugins: {{ join "," $plugins | quote }}
+    {{- end }}
+    {{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}
+                port:
+                  number: {{ .Values.service.port }}
