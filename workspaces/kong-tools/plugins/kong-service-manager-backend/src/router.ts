@@ -32,27 +32,7 @@ import type { NormalizedConfig } from './services/adapters/types';
 import { renderCheck } from './services/renderCheck';
 import { GitlabClient } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
-
-/** GitLab project/MR coordinates needed to close the promotion's MR — packed into the `detail` column (design 02's record shape has no dedicated field for these). */
-interface MrDetail {
-  host: string;
-  projectSlug: string;
-  projectId: number;
-  iid: number;
-}
-
-function encodeMrDetail(detail: MrDetail): string {
-  return JSON.stringify(detail);
-}
-
-function decodeMrDetail(detail: string | null): MrDetail | undefined {
-  if (!detail) return undefined;
-  try {
-    return JSON.parse(detail) as MrDetail;
-  } catch {
-    return undefined;
-  }
-}
+import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
 
 interface PromotionDto {
   id: number;
@@ -601,6 +581,16 @@ export async function createRouter({
       // Step 2: generate + render-check (safe to redo on retry — pure function of the snapshot).
       const credentials = await httpAuth.credentials(req, { allow: ['user'] });
       const repo = await gitlabClient.resolveRepo(entityRef, credentials);
+
+      // Persist the repo coordinates on the still-draft record before the MR
+      // exists (P4 handoff note 1): a crash between the MR actually being
+      // created below and the `mr-open` transition would otherwise leave a
+      // `draft` row with no way to find the orphaned MR. `iid` is filled in
+      // once the MR is open.
+      await promotionStore.transition(promotion.id, 'draft', {
+        detail: encodeMrDetail({ host: repo.host, projectSlug: repo.projectSlug, projectId: repo.projectId }),
+      });
+
       const edits = adapter.toChartEdits(snapshot);
       const { dir, cleanup } = await gitlabClient.materializeChart(repo, repo.defaultBranch);
 
@@ -698,7 +688,10 @@ export async function createRouter({
 
       if (active.mr_ref) {
         const mrDetail = decodeMrDetail(active.detail);
-        if (gitlabClient && mrDetail) {
+        // `mr_ref` is only ever set at the mr-open transition, which always
+        // writes `iid` alongside it — this narrows the now-optional field
+        // (P4 draft probe) back for the one caller that requires it.
+        if (gitlabClient && mrDetail?.iid !== undefined) {
           await gitlabClient.closeMergeRequest(mrDetail, mrDetail.iid);
         }
 

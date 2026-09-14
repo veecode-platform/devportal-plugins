@@ -204,8 +204,11 @@ export class GitlabClient {
     return { sha: commit.id };
   }
 
-  /** Reuses an already-open MR from a prior (crashed) attempt instead of opening a second one. */
-  async findOpenMergeRequest(repo: ResolvedRepo, branch: string): Promise<CreatedMergeRequest | undefined> {
+  /** Reuses an already-open MR from a prior (crashed) attempt instead of opening a second one. Also the finalizer's (P4) draft-orphan probe: only `host`/`projectSlug` are used. */
+  async findOpenMergeRequest(
+    repo: { host: string; projectSlug: string },
+    branch: string,
+  ): Promise<CreatedMergeRequest | undefined> {
     const { token, base } = this.target(repo.host, repo.projectSlug);
     const mrs = await this.call<Array<{ project_id: number; iid: number; web_url: string }>>(
       token,
@@ -254,6 +257,76 @@ export class GitlabClient {
       }
       throw err;
     }
+  }
+
+  /** MR state + merge timestamp for the finalizer (P4) loop — `merged_at` anchors the "deploy of the merge commit or newer" check. */
+  async getMergeRequest(
+    repo: { host: string; projectSlug: string },
+    iid: number,
+  ): Promise<{ state: string; mergedAt: string | null }> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    const mr = await this.call<{ state: string; merged_at: string | null }>(
+      token,
+      `${base}/merge_requests/${iid}`,
+    );
+    return { state: mr.state, mergedAt: mr.merged_at };
+  }
+
+  /**
+   * Project status for the finalizer's (P4) teardown interaction and its
+   * default branch for the deploy-pipeline check. Throws (with `.status`
+   * set) on a non-2xx response — a 404 is the caller's signal that the
+   * project itself is gone, not merely archived.
+   */
+  async getProject(repo: { host: string; projectSlug: string }): Promise<{ archived: boolean; defaultBranch: string }> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    const project = await this.call<{ archived: boolean; default_branch: string }>(token, base);
+    return { archived: project.archived, defaultBranch: project.default_branch };
+  }
+
+  /** Shas of every commit on `ref` at or after `since` (a GitLab `merged_at`-style ISO timestamp). */
+  async listCommitShasSince(
+    repo: { host: string; projectSlug: string },
+    ref: string,
+    since: string,
+  ): Promise<Set<string>> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    const commits = await this.call<Array<{ id: string }>>(
+      token,
+      `${base}/repository/commits?ref_name=${encodeURIComponent(ref)}&since=${encodeURIComponent(since)}&per_page=100`,
+    );
+    return new Set(commits.map(c => c.id));
+  }
+
+  /** Successful pipelines run against `ref`, most recent first. */
+  async listSuccessfulPipelines(
+    repo: { host: string; projectSlug: string },
+    ref: string,
+  ): Promise<Array<{ id: number; sha: string }>> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    return this.call<Array<{ id: number; sha: string }>>(
+      token,
+      `${base}/pipelines?ref=${encodeURIComponent(ref)}&status=success&order_by=id&sort=desc&per_page=100`,
+    );
+  }
+
+  /**
+   * Design 02's "successful deploy pipeline of the merge commit (or newer)
+   * on the default branch": true once a successful pipeline exists for a
+   * commit at or after `since` — never assumes the merge itself deployed
+   * anything (a service with auto-deploy off just never returns true here,
+   * and the finalizer stays parked).
+   */
+  async hasSuccessfulDeployAtOrAfter(
+    repo: { host: string; projectSlug: string },
+    ref: string,
+    since: string,
+  ): Promise<boolean> {
+    const [shas, pipelines] = await Promise.all([
+      this.listCommitShasSince(repo, ref, since),
+      this.listSuccessfulPipelines(repo, ref),
+    ]);
+    return pipelines.some(p => shas.has(p.sha));
   }
 
   private target(host: string, projectSlug: string): { token: string; base: string } {
