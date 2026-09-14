@@ -13,6 +13,8 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import type { PluginCard as PluginCardType } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { getPluginImage } from '../../assets/pluginImages';
+import { PromotionBadgeChip } from '../RoutePluginsDrawer/PromotionBadgeChip';
+import type { PromotionBadge } from '../RoutePluginsDrawer/promotionBadge';
 
 type PluginCardProps = {
   plugin: PluginCardType;
@@ -25,6 +27,14 @@ type PluginCardProps = {
   onEnable: (pluginSlug: string) => void;
   onEdit: (pluginId: string, pluginName: string) => void;
   onDisable: (pluginId: string, pluginName: string) => void;
+  /** Promotion state (design 02 / plan P5) — omitted entirely outside route scope, where promotion doesn't apply. */
+  promotionBadge?: PromotionBadge;
+  canPromote?: boolean;
+  /** Set when promotion is unavailable for a structural reason (e.g. no owning repo) — disables the action with this reason shown. */
+  promoteDisabledReason?: string;
+  discardingPromotion?: boolean;
+  onPromote?: (pluginId: string, pluginName: string) => void;
+  onDiscardPromotion?: (pluginId: string, pluginName: string) => void;
 };
 
 export function PluginCard({
@@ -37,8 +47,19 @@ export function PluginCard({
   onEnable,
   onEdit,
   onDisable,
+  promotionBadge,
+  canPromote = true,
+  promoteDisabledReason,
+  discardingPromotion,
+  onPromote,
+  onDiscardPromotion,
 }: PluginCardProps) {
   const isAssociated = !!associatedId;
+  // Frozen (open MR / applying) blocks portal edits server-side (409); codified is terminal and read-only.
+  const isFrozen = promotionBadge?.kind === 'mr-open' || promotionBadge?.kind === 'pending-deploy';
+  const isCodified = promotionBadge?.kind === 'codified';
+  const showPromote = isAssociated && !!promotionBadge && !isFrozen && !isCodified;
+  const showDiscard = isAssociated && isFrozen;
 
   return (
     <Card
@@ -58,7 +79,7 @@ export function PluginCard({
           </Typography>
         }
         action={
-          isAssociated && canEdit ? (
+          isAssociated && canEdit && !isCodified && !isFrozen ? (
             <Tooltip title="Edit plugin configuration">
               <IconButton
                 size="small"
@@ -70,6 +91,15 @@ export function PluginCard({
           ) : undefined
         }
       />
+
+      {promotionBadge && (
+        <Box display="flex" justifyContent="center" px={1.5} pb={0.5}>
+          <PromotionBadgeChip
+            badge={promotionBadge}
+            onRetry={onPromote ? () => onPromote(associatedId!, plugin.slug) : undefined}
+          />
+        </Box>
+      )}
 
       <Box display="flex" justifyContent="center" py={1}>
         <Box
@@ -93,19 +123,49 @@ export function PluginCard({
         </Typography>
       </CardContent>
 
-      <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
+      <CardActions sx={{ justifyContent: 'center', gap: 1, pb: 2, flexWrap: 'wrap' }}>
         {isAssociated ? (
-          canDisable && (
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              disabled={disabling}
-              onClick={() => onDisable(associatedId, plugin.slug)}
-            >
-              {disabling ? <CircularProgress size={18} /> : 'Disable'}
-            </Button>
-          )
+          <>
+            {showDiscard ? (
+              <Button
+                variant="outlined"
+                color="secondary"
+                size="small"
+                disabled={discardingPromotion}
+                onClick={() => onDiscardPromotion?.(associatedId, plugin.slug)}
+              >
+                {discardingPromotion ? <CircularProgress size={18} /> : 'Descartar promoção'}
+              </Button>
+            ) : (
+              canDisable &&
+              !isCodified && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="small"
+                  disabled={disabling}
+                  onClick={() => onDisable(associatedId, plugin.slug)}
+                >
+                  {disabling ? <CircularProgress size={18} /> : 'Disable'}
+                </Button>
+              )
+            )}
+            {showPromote && (
+              <Tooltip title={promoteDisabledReason ?? ''}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    size="small"
+                    disabled={!canPromote || !!promoteDisabledReason}
+                    onClick={() => onPromote?.(associatedId, plugin.slug)}
+                  >
+                    Promote to code
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+          </>
         ) : (
           canEnable && (
             <Button
@@ -119,6 +179,13 @@ export function PluginCard({
           )
         )}
       </CardActions>
+      {showPromote && promoteDisabledReason && (
+        <Box px={1.5} pb={1.5} textAlign="center">
+          <Typography variant="caption" color="text.secondary">
+            {promoteDisabledReason}
+          </Typography>
+        </Box>
+      )}
     </Card>
   );
 }
