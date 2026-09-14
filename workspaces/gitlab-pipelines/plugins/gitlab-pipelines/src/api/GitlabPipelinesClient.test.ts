@@ -33,4 +33,11 @@ describe('GitlabPipelinesApiClient', () => {
     const client = new GitlabPipelinesApiClient({ discoveryApi, fetchApi });
     await expect(client.listBranches('resource:default/box')).rejects.toThrow(/not an owner/);
   });
+  it('lists teardown operations for the entity-anchored route', async () => {
+    const calls: string[] = [];
+    const fetchApi = new MockFetchApi({ baseImplementation: async (input: any, init: any) => { calls.push(`${init?.method ?? 'GET'} ${input}`); return new Response(JSON.stringify([]), { status: 200 }); } });
+    const client = new GitlabPipelinesApiClient({ discoveryApi, fetchApi });
+    await client.listTeardowns('resource:default/box');
+    expect(calls).toEqual(['GET http://backend/api/gitlab-pipelines/entities/default/resource/box/teardowns']);
+  });
 });

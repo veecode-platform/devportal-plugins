@@ -65,8 +65,15 @@ ref must be the project's default branch, and there must be no later
 successful run of `deployJobName` after the teardown job finished. Either
 guardrail failing marks the operation `superseded` or `failed` instead of
 deleting anything. A `GET .../teardowns` endpoint (same entity-anchored
-prefix, `gitlab.pipeline.read` permission) lists the recorded operations for
-a future UI surface.
+prefix, `gitlab.pipeline.read` permission) lists the recorded operations.
+
+The CI/CD tab (`GitlabPipelineList`) surfaces these operations in a
+"Teardown Operations" card below the pipelines table: state (pending,
+failed, superseded, consumed, flagged, each with its own icon and label),
+who requested the teardown, when, and the short unregister commit sha once
+an operation is `consumed`. The card renders nothing when the entity has no
+teardown operations, which is also what the endpoint returns while the
+feature is disabled.
 
 ## Dynamic V3 loop
 

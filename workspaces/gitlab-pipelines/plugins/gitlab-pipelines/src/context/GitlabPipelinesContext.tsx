@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 import { Entity } from '@backstage/catalog-model';
-import { PipelineVariable } from '@veecode-platform/gitlab-pipelines-common';
+import { PipelineVariable, TeardownOperationDto } from '@veecode-platform/gitlab-pipelines-common';
 import {
   Job,
   JobAnnotationProps,
@@ -34,6 +34,7 @@ export type GitlabPipelinesContextType = {
   playJob: (jobId: number, variables: PipelineVariable[]) => Promise<Job | null>;
   cancelJob: (jobId: number) => Promise<Job | null>;
   retryJob: (jobId: number) => Promise<Job | null>;
+  listTeardowns: () => Promise<TeardownOperationDto[]>;
 };
 
 export const GitlabPipelinesContext = createContext<GitlabPipelinesContextType>(null!);
