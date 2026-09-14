@@ -26,8 +26,9 @@ The GitHub Workflows plugin has been refactored to improve code clarity, follow 
 ### 1. Update Overview Page (Card View)
 
 **Before:**
+
 ```tsx
-import { GithubWorkflowsOverviewContent } from '@veecode-platform/plugin-github-workflows';
+import { GithubWorkflowsOverviewContent } from '@veecode-platform/backstage-plugin-github-workflows';
 
 const overviewContent = (
   <Grid item md={6}>
@@ -37,8 +38,9 @@ const overviewContent = (
 ```
 
 **After:**
+
 ```tsx
-import { EntityGithubWorkflowsCard } from '@veecode-platform/plugin-github-workflows';
+import { EntityGithubWorkflowsCard } from '@veecode-platform/backstage-plugin-github-workflows';
 
 const overviewContent = (
   <Grid item md={6}>
@@ -50,8 +52,9 @@ const overviewContent = (
 ### 2. Update Entity Page (Tab View)
 
 **Before:**
+
 ```tsx
-import { GithubWorkflowsContent } from '@veecode-platform/plugin-github-workflows';
+import { GithubWorkflowsContent } from '@veecode-platform/backstage-plugin-github-workflows';
 
 const serviceEntityPage = (
   <EntityLayout.Route path="/github-workflows" title="Workflows">
@@ -61,8 +64,9 @@ const serviceEntityPage = (
 ```
 
 **After:**
+
 ```tsx
-import { EntityGithubWorkflowsContent } from '@veecode-platform/plugin-github-workflows';
+import { EntityGithubWorkflowsContent } from '@veecode-platform/backstage-plugin-github-workflows';
 
 const serviceEntityPage = (
   <EntityLayout.Route path="/github-workflows" title="Workflows">
@@ -74,6 +78,7 @@ const serviceEntityPage = (
 ## Backward Compatibility
 
 The old exports are still available but marked as deprecated:
+
 - `GithubWorkflowsOverviewContent` → use `EntityGithubWorkflowsCard`
 - `GithubWorkflowsContent` → use `EntityGithubWorkflowsContent`
 - `GithubWorkflowsTabContent` → use `EntityGithubWorkflowsContent`
@@ -90,6 +95,7 @@ Your existing code will continue to work, but you'll see deprecation warnings. W
 ## Card View Changes
 
 The new `EntityGithubWorkflowsCard` displays the **full workflow list** with:
+
 - All workflows with their current status
 - **Action buttons to start/stop workflows**
 - Settings button for workflows with parameters
