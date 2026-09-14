@@ -152,3 +152,53 @@ building multi-user auth infrastructure, a simple env var lets developers
 test all three permission profiles with a backend restart. The permission
 policy, catalog entities, and auth identity all use the same user references,
 so the full chain works end-to-end.
+
+## ADR-012: Promotion Records Use a Surrogate PK plus an Idempotency Key
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The `promotions` table uses a surrogate integer primary key, a unique
+`idempotency_key` column, and a nullable `mr_ref` set when the promotion
+transitions to `mr-open`. The implementation plan originally described a
+primary key that changed value from a provisional uuid to
+`<project-id>-<mr-iid>` once the MR existed, while also serving as the
+retry-dedupe key.
+
+**Rationale:** Those two roles contradict each other — at promote time the MR
+does not exist, so an MR-derived key cannot dedupe pre-MR retries, and a
+mutating primary key complicates any later foreign key. The idempotency key is
+server-generated on the first attempt; retry safety comes from the at-most-one
+active promotion per (instance, route, plugin type) invariant, so a repeated
+promote resumes the active record instead of opening a second MR.
+
+## ADR-013: FileEdit Is a Two-Variant Type; the Ingress Annotation Is Not an Edit
+
+**Date:** 2026-09
+**Status:** Accepted
+
+Adapters emit `FileEdit` values of exactly two kinds: `{ op: 'merge' }` into
+`chart/values.yaml` and `{ op: 'create' }` of
+`chart/templates/kongplugin-<type>.yaml`. The Ingress `konghq.com/plugins`
+annotation is never a third edit — the golden-path chart's own Ingress
+template composes it from whichever `kongPlugins.*` values keys are present.
+
+**Rationale:** Keeps adapters pure functions of the live plugin config with no
+chart context, and keeps the equivalence check (`renderCheck`) comparing the
+one artifact that matters — the rendered `KongPlugin` manifest — rather than
+chasing annotation formatting.
+
+## ADR-014: MR Coordinates Ride the `detail` Column
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The promote endpoint packs the MR coordinates
+(`{ host, projectSlug, projectId, iid }`) as JSON into the promotion record's
+existing `detail` column at the `mr-open` transition; discard reads them back
+to close the MR.
+
+**Rationale:** Avoids a schema change for data only needed while a promotion
+is discardable. Constraint on the finalizer (P4): it must not clobber `detail`
+on any transition where the record can still be discarded; once the MR is
+merged, `detail` is free for human-readable failure diffs.

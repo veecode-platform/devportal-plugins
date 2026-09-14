@@ -100,4 +100,47 @@ describe('KnexPromotionStore', () => {
       await expect(store.getByIdempotencyKey('nothing-here')).resolves.toBeUndefined();
     },
   );
+
+  it.each(databases.eachSupportedId())(
+    'getActiveByRoute finds a non-terminal record and ignores other routes/types, %p',
+    async databaseId => {
+      const store = await KnexPromotionStore.create(await databases.init(databaseId));
+      const created = await store.upsertDraft(draft());
+      await store.upsertDraft(
+        draft({ idempotencyKey: 'other-route', routeId: 'route-2' }),
+      );
+      await store.upsertDraft(
+        draft({ idempotencyKey: 'other-type', pluginType: 'correlation-id' }),
+      );
+
+      const active = await store.getActiveByRoute('default', 'route-1', 'rate-limiting');
+      expect(active?.id).toBe(created.id);
+    },
+  );
+
+  it.each(databases.eachSupportedId())(
+    'getActiveByRoute returns undefined once the record reaches a terminal state, %p',
+    async databaseId => {
+      const store = await KnexPromotionStore.create(await databases.init(databaseId));
+      const created = await store.upsertDraft(draft());
+      await store.transition(created.id, 'discarded');
+
+      await expect(
+        store.getActiveByRoute('default', 'route-1', 'rate-limiting'),
+      ).resolves.toBeUndefined();
+    },
+  );
+
+  it.each(databases.eachSupportedId())(
+    'listByRoute returns the full history for a route plugin, newest first, %p',
+    async databaseId => {
+      const store = await KnexPromotionStore.create(await databases.init(databaseId));
+      const first = await store.upsertDraft(draft());
+      await store.transition(first.id, 'discarded');
+      const second = await store.upsertDraft(draft({ idempotencyKey: 'retry' }));
+
+      const history = await store.listByRoute('default', 'route-1', 'rate-limiting');
+      expect(history.map(r => r.id)).toEqual([second.id, first.id]);
+    },
+  );
 });

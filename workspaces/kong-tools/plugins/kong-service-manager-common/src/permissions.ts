@@ -78,6 +78,12 @@ export const kongDisableRoutePluginPermission = createPermission({
   attributes: { action: 'delete' },
 });
 
+/** Permission to promote a Kong route plugin to code (design 02) */
+export const kongPluginPromotePermission = createPermission({
+  name: 'kong.plugin.promote',
+  attributes: { action: 'create' },
+});
+
 /** All Kong Service Manager permissions */
 export const kongPermissions = [
   kongServiceReadPermission,
@@ -93,4 +99,5 @@ export const kongPermissions = [
   kongUpdateRoutePluginPermission,
   kongDisableRoutePluginPermission,
   kongInstancesReadPermission,
+  kongPluginPromotePermission,
 ];

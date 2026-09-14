@@ -3,6 +3,7 @@ import {
   mockServices,
   TestDatabases,
 } from '@backstage/backend-test-utils';
+import { catalogServiceMock } from '@backstage/plugin-catalog-node/testUtils';
 import request from 'supertest';
 import { kongServiceManagerBackendPlugin } from './plugin';
 
@@ -13,6 +14,7 @@ describe('kongServiceManagerBackendPlugin', () => {
     const { server } = await startTestBackend({
       features: [
         kongServiceManagerBackendPlugin,
+        catalogServiceMock.factory({ entities: [] }),
         mockServices.rootConfig.factory({
           data: {
             kong: {
@@ -40,6 +42,7 @@ describe('kongServiceManagerBackendPlugin', () => {
     const { server } = await startTestBackend({
       features: [
         kongServiceManagerBackendPlugin,
+        catalogServiceMock.factory({ entities: [] }),
         mockServices.rootConfig.factory({ data: {} }),
       ],
     });
@@ -57,8 +60,16 @@ describe('kongServiceManagerBackendPlugin', () => {
     const { server } = await startTestBackend({
       features: [
         kongServiceManagerBackendPlugin,
+        catalogServiceMock.factory({ entities: [] }),
         mockServices.rootConfig.factory({
-          data: { kong: { promotion: { enabled: true } } },
+          data: {
+            kong: { promotion: { enabled: true } },
+            integrations: {
+              gitlab: [
+                { host: 'gitlab.example.com', token: 'glpat-test', apiBaseUrl: 'https://gitlab.example.com/api/v4' },
+              ],
+            },
+          },
         }),
         mockServices.database.factory({ knex }),
       ],
