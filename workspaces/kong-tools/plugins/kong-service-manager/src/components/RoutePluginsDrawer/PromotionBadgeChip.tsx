@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Box, Button, Chip, Link } from '@mui/material';
 import type { PromotionBadge } from './promotionBadge';
 
@@ -29,6 +30,7 @@ type PromotionBadgeChipProps = {
 };
 
 export function PromotionBadgeChip({ badge, onRetry }: PromotionBadgeChipProps) {
+  const [diffOpen, setDiffOpen] = useState(false);
   const meta = KIND_META[badge.kind];
   const label = `${meta.emoji} ${meta.label} · ${formatAge(badge.ageMs)}`;
 
@@ -39,19 +41,45 @@ export function PromotionBadgeChip({ badge, onRetry }: PromotionBadgeChipProps) 
       ? badge.record.mrRef
       : undefined;
 
+  // `detail` only ever arrives on failed-restored records (backend never
+  // sends it for any other state) — the finalizer's human-readable diff.
+  const diff = badge.kind === 'failed-restored' ? badge.record?.detail : undefined;
+
   return (
-    <Box display="flex" alignItems="center" gap={1}>
-      {href ? (
-        <Link href={href} target="_blank" rel="noopener noreferrer" underline="hover">
-          <Chip label={label} size="small" color={meta.color} clickable component="span" />
-        </Link>
-      ) : (
-        <Chip label={label} size="small" color={meta.color} />
-      )}
-      {badge.kind === 'failed-restored' && onRetry && (
-        <Button size="small" variant="outlined" color="warning" onClick={onRetry}>
-          Retry
-        </Button>
+    <Box display="flex" flexDirection="column" gap={0.5}>
+      <Box display="flex" alignItems="center" gap={1}>
+        {href ? (
+          <Link href={href} target="_blank" rel="noopener noreferrer" underline="hover">
+            <Chip label={label} size="small" color={meta.color} clickable component="span" />
+          </Link>
+        ) : (
+          <Chip label={label} size="small" color={meta.color} />
+        )}
+        {badge.kind === 'failed-restored' && onRetry && (
+          <Button size="small" variant="outlined" color="warning" onClick={onRetry}>
+            Retry
+          </Button>
+        )}
+        {diff && (
+          <Button size="small" onClick={() => setDiffOpen(o => !o)}>
+            {diffOpen ? 'Hide diff' : 'Show diff'}
+          </Button>
+        )}
+      </Box>
+      {diff && diffOpen && (
+        <Box
+          component="pre"
+          sx={{
+            bgcolor: 'background.default',
+            p: 1,
+            borderRadius: 1,
+            overflow: 'auto',
+            fontSize: '0.75rem',
+            m: 0,
+          }}
+        >
+          {diff}
+        </Box>
       )}
     </Box>
   );

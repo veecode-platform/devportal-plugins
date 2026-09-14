@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { PromotionBadgeChip } from './PromotionBadgeChip';
 import type { PromotionBadge } from './promotionBadge';
 
@@ -69,5 +70,36 @@ describe('PromotionBadgeChip', () => {
     expect(screen.getByText(/Aplicação falhou/)).toBeInTheDocument();
     screen.getByRole('button', { name: 'Retry' }).click();
     expect(onRetry).toHaveBeenCalled();
+  });
+
+  it('does not offer a diff toggle for failed-restored when no detail is present', () => {
+    const badge: PromotionBadge = { kind: 'failed-restored', ageMs: ONE_DAY_MS };
+    render(<PromotionBadgeChip badge={badge} />);
+    expect(screen.queryByRole('button', { name: /Show diff/i })).not.toBeInTheDocument();
+  });
+
+  it('shows a diff toggle for failed-restored with detail, revealing the diff text on click', async () => {
+    const badge: PromotionBadge = {
+      kind: 'failed-restored',
+      ageMs: ONE_DAY_MS,
+      record: {
+        id: 1,
+        instance: 'default',
+        serviceName: 'svc',
+        routeId: 'route-1',
+        pluginType: 'rate-limiting',
+        state: 'failed-restored',
+        mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
+        requesterRef: 'user:default/alice',
+        createdAt: '2026-09-13T12:00:00.000Z',
+        updatedAt: '2026-09-13T12:00:00.000Z',
+        detail: '- minute: 60\n+ minute: 100\n',
+      },
+    };
+    render(<PromotionBadgeChip badge={badge} />);
+
+    expect(screen.queryByText(/minute: 100/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Show diff/i }));
+    expect(screen.getByText(/minute: 100/)).toBeInTheDocument();
   });
 });
