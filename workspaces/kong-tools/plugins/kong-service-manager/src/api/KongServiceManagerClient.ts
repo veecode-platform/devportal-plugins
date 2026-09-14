@@ -12,6 +12,7 @@ import type {
   AvailablePluginsResponse,
   PluginCategory,
   PromotionRecord,
+  PromotionPreview,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 const PLUGIN_CATEGORY_MAP: Record<string, PluginCategory> = {
@@ -294,6 +295,19 @@ export class KongServiceManagerClient implements KongServiceManagerApi {
     pluginId: string,
   ): string {
     return `/${encodeURIComponent(instance)}/services/${encodeURIComponent(serviceName)}/routes/${encodeURIComponent(routeId)}/plugins/${encodeURIComponent(pluginId)}`;
+  }
+
+  async previewPromotion(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionPreview> {
+    return this.request(
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promote/preview`,
+      { method: 'POST', body: JSON.stringify({ entityRef }) },
+    );
   }
 
   async promotePlugin(

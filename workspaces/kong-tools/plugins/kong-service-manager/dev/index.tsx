@@ -11,6 +11,7 @@ import type {
   PluginFieldsResponse,
   PluginPerCategory,
   PromotionRecord,
+  PromotionPreview,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
   kongServiceManagerPlugin,
@@ -136,6 +137,16 @@ const mockPromotion: PromotionRecord = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
+const mockPromotionPreview: PromotionPreview = {
+  files: [
+    {
+      path: 'chart/values.yaml',
+      content: 'kong:\n  rateLimit:\n    minute: 100\n',
+    },
+  ],
+  normalizedConfig: { minute: 100 },
+};
+
 // ---------------------------------------------------------------------------
 // Mock API implementation
 // ---------------------------------------------------------------------------
@@ -160,6 +171,7 @@ const mockApi: KongServiceManagerApi = {
   addPluginToRoute: async () => mockPlugin,
   editRoutePlugin: async () => mockPlugin,
   removeRoutePlugin: async () => {},
+  previewPromotion: async () => mockPromotionPreview,
   promotePlugin: async () => mockPromotion,
   discardPromotion: async () => {},
   getPromotions: async () => [mockPromotion],

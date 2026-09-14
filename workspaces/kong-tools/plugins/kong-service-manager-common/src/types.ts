@@ -179,6 +179,20 @@ export type PromotionRecord = {
   requesterRef: string;
   createdAt: string;
   updatedAt: string;
+  /** Human-readable failure diff — only ever present when `state === 'failed-restored'` (plan P5-follow-up / P4's finalizer). */
+  detail?: string;
+};
+
+/** A single chart file as it would read after a promotion's edits (design 02, review step). */
+export type PromotionPreviewFile = {
+  path: string;
+  content: string;
+};
+
+/** Dry-run result of a promotion — no side effects, mirrors what promote would generate and verify. */
+export type PromotionPreview = {
+  files: PromotionPreviewFile[];
+  normalizedConfig: Record<string, unknown>;
 };
 
 /** Plugin categories enum */

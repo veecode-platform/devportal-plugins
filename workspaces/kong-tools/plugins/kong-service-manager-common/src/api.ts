@@ -8,6 +8,7 @@ import type {
   CreatePlugin,
   PluginPerCategory,
   PromotionRecord,
+  PromotionPreview,
 } from './types';
 
 /** Frontend API contract for Kong Service Manager */
@@ -117,6 +118,15 @@ export interface KongServiceManagerApi {
     routeId: string,
     pluginId: string,
   ): Promise<void>;
+
+  /** Dry-run of a promotion — no side effects. Same permission/adapter gate as promote; surfaces a renderCheck mismatch as a 400. */
+  previewPromotion(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionPreview>;
 
   /** Promote an experimental route plugin to code (design 02) — opens an MR in the owning repo. */
   promotePlugin(

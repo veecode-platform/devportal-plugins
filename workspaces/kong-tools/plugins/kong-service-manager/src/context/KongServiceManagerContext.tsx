@@ -17,6 +17,7 @@ import {
   type CreatePlugin,
   type PluginFieldsResponse,
   type PromotionRecord,
+  type PromotionPreview,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 type State = {
@@ -123,6 +124,7 @@ type KongServiceManagerContextValue = {
   editRoutePlugin: (routeId: string, pluginId: string, plugin: Partial<CreatePlugin>) => Promise<void>;
   removeRoutePlugin: (routeId: string, pluginId: string) => Promise<void>;
   fetchPromotions: (routeId: string, pluginId: string) => Promise<void>;
+  previewPromotion: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionPreview>;
   promotePlugin: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionRecord>;
   discardPromotion: (routeId: string, pluginId: string) => Promise<void>;
 };
@@ -383,6 +385,16 @@ export function KongServiceManagerProvider({
     [api, state.instance, state.serviceName, withLoading],
   );
 
+  // No side effects (design 02's preview) and dialog-scoped — unlike the
+  // other actions this deliberately skips withLoading/dispatch so a preview
+  // never toggles the page-wide loading spinner or surfaces its error in the
+  // global error snackbar; the caller (the review dialog) owns that state.
+  const previewPromotion = useCallback(
+    async (routeId: string, pluginId: string, entityRef: string) =>
+      api.previewPromotion(state.instance, state.serviceName, routeId, pluginId, entityRef),
+    [api, state.instance, state.serviceName],
+  );
+
   const promotePluginAction = useCallback(
     async (routeId: string, pluginId: string, entityRef: string) => {
       let result!: PromotionRecord;
@@ -430,6 +442,7 @@ export function KongServiceManagerProvider({
       editRoutePlugin,
       removeRoutePlugin,
       fetchPromotions,
+      previewPromotion,
       promotePlugin: promotePluginAction,
       discardPromotion,
     }),
@@ -455,6 +468,7 @@ export function KongServiceManagerProvider({
       editRoutePlugin,
       removeRoutePlugin,
       fetchPromotions,
+      previewPromotion,
       promotePluginAction,
       discardPromotion,
     ],
