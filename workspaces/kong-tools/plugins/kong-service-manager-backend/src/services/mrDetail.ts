@@ -1,6 +1,6 @@
 /**
  * Codec for the promotion record's `detail` column while the record is still
- * non-terminal (design 02 / ADR-014). `detail` is the finalizer's (P4) only
+ * non-terminal (design 02 / PDR-014). `detail` is the finalizer's (P4) only
  * handle on which GitLab project a record belongs to — the `promotions`
  * table has no dedicated project/host columns — so every non-terminal state
  * that needs to reach GitLab again must keep these coordinates readable.
@@ -16,7 +16,7 @@
  * finalizer uses as clocks (`applyTimeoutMinutes`, parked age) — every
  * finalizer write must decode-merge-encode rather than replace the object,
  * or a later write silently drops the coordinates a still-discardable
- * record needs (ADR-014: never clobber `detail` while the record can still
+ * record needs (PDR-014: never clobber `detail` while the record can still
  * be discarded).
  */
 export interface MrDetail {
