@@ -73,3 +73,11 @@ backend must be restarted when switching profiles.
 ## Original code
 
 The original code for the "kong-service-manager*" plugins can be found at <https://github.com/veecode-platform/platform-backstage-plugins/tree/master/plugins>, specifically in the `kong-service-manager`, `kong-service-manager-backend` and `kong-service-manager-common` directories.
+
+## Roadmap and decisions
+
+The workspace's phase roadmap moved on 2026-09-14 to the planning repository
+`veecode-platform/devportal-plugins-parent`
+(`docs/planning/m5-plugin-feature-roadmap/kong-tools-roadmap.md`), unchanged; reconciling its
+phases with the promote-to-code work is tracked there. Design decisions stay here in
+[DECISIONS.md](DECISIONS.md) as plugin decision records, cited as `kong-tools PDR-NNN`.
