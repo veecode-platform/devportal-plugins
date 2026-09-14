@@ -1,24 +1,27 @@
 # AI Agent Guidelines
 
-This document provides detailed technical context for AI agents working with this repository. Humans should read `README.md` instead.
+Technical context for agents working in this repository. Humans should start with `README.md`. Every workspace carries its own `AGENTS.md` with plugin-level context; this file covers only how the repository works.
 
-This project is a collection of Backstage plugins for the VeeCode Platform. Each top level workspace is a self-contained Backstage hosting app (packages "app" and "backend" under "packages" folder) with Yarn workspaces for the plugins (under "plugins" folder). This way correlated plugins are grouped together and tested together in the same hosting app.
+This repository is a collection of Backstage plugins for VeeCode DevPortal. Each directory under `workspaces/` is a self-contained Backstage hosting app (`packages/app` and `packages/backend`) with Yarn workspaces for its plugins (under `plugins/`), so related plugins are developed and tested together. Five workspaces ship a single package and have no hosting app today: `ai-resources`, `aws-s3-catalog`, `marketplace`, `veecode-theme`, `vertigo-theme`.
+
+## Where things live
+
+- **Here**: how to build, test, export and publish; per-workspace agent context; the `dummy` reference implementation; CI workflows and prompts.
+- **Planning repository** `veecode-platform/devportal-plugins-parent` (a sibling checkout in the same workspace shell): inventory of workspaces and packages, status, roadmap, architecture decisions (cited as `plugins ADR-NNNN`), standards and operations runbooks. Do not add status tables, inventories or roadmaps to this repository; link there instead (plugins ADR-0002).
+- **Workspace-local design decisions** live in that workspace's `DECISIONS.md` as plugin decision records, numbered `PDR-001`, `PDR-002`, … and cited as `<workspace> PDR-NNN`. They are never called ADRs.
 
 ## Repository Layout
 
 ```pre
 devportal-plugins/
-├── workspaces/                    # All workspaces live here
+├── workspaces/                   # One directory per workspace; README.md lists them
 │   ├── dummy/                    # Reference implementation — start here
-│   ├── homepage/
-│   ├── global-header/
-│   ├── github-workflows/
-│   ├── ldap-auth/
-│   ├── kong-tools/
-│   ├── kubernetes/
-│   └── about/
+│   └── <name>/
+├── .github/workflows/            # publish.yml, automated-update.yml
+├── .github/prompts/              # Prompts used by the automated update
+├── .claude/commands/             # Claude Code commands (create-workspace, upgrade-workspace, …)
 ├── Makefile                      # Root-level cross-workspace utilities
-├── ROADMAP.md                    # Current project roadmap and task tracking
+├── catalog-info.yaml             # Catalog entity for this repository
 ├── CLAUDE.md                     # Claude Code-specific instructions
 └── AGENTS.md                     # This file
 ```
@@ -45,32 +48,24 @@ workspaces/<name>/
 │   │   ├── dev/index.tsx         # Standalone dev mode
 │   │   └── package.json
 │   ├── <plugin-name-backend>/    # Backend plugin (if workspace has both)
-│   ├── <plugin-name-common>/     # Common library (ex: shared types, utils, etc., if present)
-│   └── <plugin-name-another>/    # Other plugins (scaffolders, modules, etc.)
+│   ├── <plugin-name-common>/     # Common library (shared types, API interfaces; if present)
+│   └── <plugin-name-another>/    # Other plugins (scaffolder modules, backend modules, etc.)
+├── README.md                     # For humans: what the plugins do, how to run and publish
+├── AGENTS.md                     # For agents: architecture, mocks, gotchas (template: workspaces/dummy/AGENTS.md)
+├── CLAUDE.md                     # Thin pointer to AGENTS.md
+├── DECISIONS.md                  # Plugin decision records PDR-NNN (optional)
 ├── package.json                  # Workspace root — scripts, devDependencies
+├── backstage.json                # Backstage release the workspace is on
 ├── Makefile                      # Build, publish, clean targets
 ├── app-config.yaml               # Backstage config for local dev
 ├── tsconfig.json                 # TypeScript configuration
-├── docker-compose.yaml           # Dynamic plugin testing (if present)
-├── dynamic-plugins.yaml          # Dynamic plugin config (if present)
-└── app-config.dynamic.yaml       # Dynamic app config overlay (if present)
+├── docker-compose.yaml           # Container harness for dynamic plugins (if present)
+├── dynamic-plugins.yaml          # Dynamic plugin config for that harness (if present)
+├── app-config.dynamic.yaml       # App config overlay for that harness (if present)
+└── dynamic/                      # Alternative harness folder used by some workspaces (if present)
 ```
 
 **The hosting app is not published.** Only the `plugins/*` packages are released. The hosting app exists solely for development and testing.
-
-## Workspace Inventory
-
-| Workspace | Plugin Directories | NPM Packages | Dynamic | Notes |
-|-----------|-------------------|--------------|---------|-------|
-| dummy | `plugins/dummy`, `plugins/dummy-backend` | `@veecode-platform/backstage-plugin-dummy`, `@veecode-platform/backstage-plugin-dummy-backend` | Yes | Reference implementation |
-| homepage | `plugins/veecode-homepage` | `@veecode-platform/backstage-plugin-veecode-homepage` | Yes | Also has `mui4-test`, `mui5-test` helper plugins |
-| global-header | `plugins/veecode-global-header` | `@veecode-platform/backstage-plugin-veecode-global-header` | Yes | |
-| github-workflows | `plugins/github-workflows`, `plugins/github-workflows-common`, `plugins/github-workflow-backend` | `@veecode-platform/backstage-plugin-github-workflows`, `-common`, `-backend` | Yes | Has `replace-workspace`/`restore-workspace` Makefile targets for `workspace:*` dep handling |
-| gitlab-pipelines | `plugins/gitlab-pipelines`, `plugins/gitlab-pipelines-common`, `plugins/gitlab-pipelines-backend` | `@veecode-platform/backstage-plugin-gitlab-pipelines`, `@veecode-platform/gitlab-pipelines-common`, `@veecode-platform/backstage-plugin-gitlab-pipelines-backend` | Yes | Entity-anchored GitLab Pipelines frontend/backend plugins with a V3 dynamic smoke loop |
-| ldap-auth | `plugins/ldap-auth`, `plugins/ldap-auth-backend` | `@veecode-platform/backstage-plugin-ldap-auth`, `-backend` | **No** | Static only — no dynamic plugin support |
-| kong-tools | `plugins/scaffolder-backend-module-kong`, `plugins/kong-service-manager`, `plugins/kong-service-manager-backend`, `plugins/kong-service-manager-common`, `plugins/scaffolder-field-extensions-kong` | `@veecode-platform/backstage-plugin-*` | Yes | Largest workspace (5 plugins) |
-| kubernetes | `plugins/kubernetes-backend-module-getsecret` | `@veecode-platform/backstage-plugin-kubernetes-backend-module-getsecret` | Yes | WIP |
-| about | `plugins/about`, `plugins/about-backend` | `@veecode-platform/backstage-plugin-about`, `-backend` | Yes | Ready to use. |
 
 ## Commands Reference
 
@@ -85,7 +80,7 @@ workspaces/<name>/
 | `yarn test:all --coverage` | Run all tests with coverage report |
 | `yarn lint:all` | Lint all files |
 | `yarn start` | Start the Backstage hosting app |
-| `yarn update-backstage` | Upgrade Backstage dependencies |
+| `yarn update-backstage` | Run `backstage-cli versions:bump`. Workspaces track the DevPortal host's Backstage release (plugins ADR-0004); check the target release before bumping |
 
 ### Per-Plugin (run from `plugins/<name>/`)
 
@@ -114,172 +109,37 @@ workspaces/<name>/
 
 | Target | Purpose |
 |--------|---------|
-| `make copy-dynamic-plugins` | Copy built dynamic plugins to local devportal-base |
+| `make help` | List the workspaces that have a Makefile |
+| `make copy-dynamic-plugins` | Copy two built dynamic plugins to a local DevPortal checkout (`DEVPORTAL_BASE_PATH`) |
 | `make echo-paths` | Show `DEVPORTAL_BASE_PATH` and `DYNAMIC_PLUGIN_ROOT` |
 
-## Plugin Architecture
+## Rules
 
-### Static vs Dynamic Plugins
+Patterns and code samples live in `workspaces/dummy/AGENTS.md`. The rules they encode:
 
-- **Static plugins** are standard npm packages imported at build time via `yarn add` and registered in `packages/app/src/App.tsx` (frontend) or `packages/backend/src/index.ts` (backend).
-- **Dynamic plugins** are exported using `@red-hat-developer-hub/cli plugin export`, which creates a `dist-dynamic/` directory inside each plugin. Dynamic plugins are loaded at runtime by RHDH/DevPortal without rebuilding the app.
+1. **Static vs dynamic.** Static plugins are registered in the hosting app (`packages/app/src/App.tsx`, `packages/backend/src/index.ts`). Dynamic plugins are exported with `@red-hat-developer-hub/cli plugin export` into `dist-dynamic/`, which is derived from `dist/` and never edited by hand.
+2. **Identifiers.** A backend plugin's `pluginId` (from `createBackendPlugin`) sets its API path `/api/<pluginId>/`; a frontend plugin's `id` (from `createPlugin`) is its identity. Choose them once.
+3. **Internal dependencies** use `workspace:^` (some workspaces `workspace:*`) and must be resolved to real versions before `npm publish`; see the `replace-workspace` target in `workspaces/github-workflows/Makefile`.
+4. **Frontend tests** that reach a backend mock both `discoveryApiRef` and `fetchApiRef`. **Backend tests** use `startTestBackend` for the integration test and a mocked service for the router unit test.
+5. **`--watchAll=false`** on every Jest run from the command line.
+6. **Prove dynamic artifacts on a DevPortal container** before releasing them. Two harness generations exist: compose files at the workspace root (`dummy`, `about`, `kong-tools`) and a `dynamic/` folder (`github-workflows`, `gitlab-pipelines`, `kubernetes`). Use the one the workspace already has; the convergence is decided in the planning repository.
 
-### Frontend Plugin Pattern
+## Conventions
 
-```typescript
-// plugin.ts — define the plugin and its extensions
-export const myPlugin = createPlugin({ id: 'my-plugin', routes: { root: rootRouteRef } });
-export const MyPage = myPlugin.provide(createRoutableExtension({ ... }));
-
-// index.ts — public exports
-export { myPlugin, MyPage } from './plugin';
-export { MyCard } from './components/MyCard';
-```
-
-### Backend Plugin Pattern
-
-```typescript
-// plugin.ts — define the backend plugin with dependency injection
-export const myBackendPlugin = createBackendPlugin({
-  pluginId: 'my-plugin-backend',
-  register(env) {
-    env.registerInit({
-      deps: { httpRouter: coreServices.httpRouter, myService: myServiceRef },
-      async init({ httpRouter, myService }) {
-        httpRouter.use(await createRouter({ myService }));
-      },
-    });
-  },
-});
-
-// index.ts — default export for backend.add(import(...))
-export { myBackendPlugin as default } from './plugin';
-```
-
-### Workspace Dependencies
-
-Plugins within the same workspace use `workspace:^` in `package.json` for internal dependencies (e.g., a frontend plugin depending on a common package). Before publishing, some workspaces replace these with real version numbers via Makefile `replace-workspace` target.
-
-## Testing Patterns
-
-### Test Stack
-
-- **Frontend plugins**: Jest + `@testing-library/react` + `@backstage/test-utils` (`renderInTestApp`, `TestApiProvider`)
-- **Backend plugins**: Jest + `supertest` + `@backstage/backend-test-utils` (`startTestBackend`)
-- **Hosting app**: Same stack as frontend for `packages/app`, backend-test-utils for `packages/backend`
-- **E2E**: Playwright (config exists in dummy, not extensively used yet)
-
-### Test Organization (reference: dummy workspace)
-
-```pre
-plugins/dummy/src/
-├── plugin.test.ts                              # Plugin export verification
-└── components/
-    ├── DummyComponent/DummyComponent.test.tsx   # Full-page component rendering
-    ├── DummyFetchComponent/DummyFetchComponent.test.tsx  # API integration with mocked fetch
-    ├── DummyCard/DummyCard.test.tsx             # Entity card rendering
-    └── DummyContent/DummyContent.test.tsx       # Entity tab content rendering
-
-plugins/dummy-backend/src/
-├── plugin.test.ts                              # Integration test with real service (startTestBackend)
-└── router.test.ts                              # Unit test with mocked service
-
-packages/app/src/
-└── App.test.tsx                                # App render + plugin export wiring verification
-
-packages/backend/src/
-└── index.test.ts                               # Backend wiring — verifies plugin endpoint responds
-```
-
-### Frontend Test Pattern
-
-Frontend tests must mock both `discoveryApiRef` and `fetchApiRef` when testing components that call the backend:
-
-```tsx
-const mockDiscoveryApi = {
-  getBaseUrl: jest.fn().mockResolvedValue('http://localhost:7007/api/my-plugin-backend'),
-};
-const mockFetchApi = {
-  fetch: jest.fn().mockResolvedValue({
-    ok: true,
-    headers: new Headers({ 'content-type': 'application/json' }),
-    json: async () => ({ /* mock response */ }),
-  }),
-} as any;
-
-await renderInTestApp(
-  <TestApiProvider apis={[[discoveryApiRef, mockDiscoveryApi], [fetchApiRef, mockFetchApi]]}>
-    <MyComponent />
-  </TestApiProvider>,
-);
-```
-
-### Backend Test Patterns
-
-**Integration test** (uses real service implementation):
-
-```typescript
-const { server } = await startTestBackend({ features: [myBackendPlugin] });
-const res = await request(server).get('/api/my-plugin-backend/endpoint');
-expect(res.status).toBe(200);
-```
-
-**Unit test** (mocked service):
-
-```typescript
-const mockService = { myMethod: jest.fn().mockResolvedValue(data) };
-const router = await createRouter({ myService: mockService });
-const app = express().use(router);
-const res = await request(app).get('/endpoint');
-```
-
-### Running Tests
-
-Always use `--watchAll=false` when running tests from the command line to prevent Jest from hanging in watch mode:
-
-```bash
-# All tests in a workspace
-cd workspaces/<name> && yarn test:all --watchAll=false
-
-# Single plugin
-cd workspaces/<name>/plugins/<plugin> && yarn test --watchAll=false
-```
-
-## Dynamic Plugin Testing with Docker
-
-Workspaces with dynamic plugin support include Docker Compose files:
-
-- `docker-compose.yaml` — runs `veecode/devportal:latest` container on port 7007
-- `dynamic-plugins.yaml` — enables plugins and configures frontend routes/mount points
-- `app-config.dynamic.yaml` — minimal app config overlay
-
-Workflow:
-
-```bash
-make build-dynamic          # Build dynamic plugin bundles
-docker compose up           # Start DevPortal container with plugins mounted
-# Verify at http://localhost:7007
-docker compose down
-```
-
-The `dist-dynamic/` directories are mounted into `/app/dynamic-plugins/dist/` inside the container.
+- **en-US** for every artifact: docs, agent files, decision records, commit messages.
+- Every workspace carries a `README.md` (for humans), an `AGENTS.md` (for agents) and a thin `CLAUDE.md` that points at `AGENTS.md`. `workspaces/dummy/` holds the template for the pair.
+- Workspace docs describe the code as it is. Status, roadmap and history belong in the planning repository.
 
 ## Key Constraints
 
 1. **No root package.json** — each workspace is fully independent. Do not try to run `yarn` from the repo root.
 2. **Always `cd` into a workspace first** — all `yarn` and `make` commands must run from within a workspace directory.
 3. **`--watchAll=false` is mandatory** for CI/scripted test runs — Jest watch mode will hang.
-4. **ldap-auth is static-only** — it does not support dynamic plugin export.
-5. **`about` workspace has no hosting app** — it cannot run `yarn start` yet.
-6. **Plugin IDs matter** — backend plugins use `pluginId` from `createBackendPlugin`, which determines the API path (`/api/<pluginId>/`). Frontend plugins use `id` from `createPlugin`.
-7. **`workspace:^` dependencies** — must be resolved before npm publish. Some workspaces handle this via Makefile targets.
+4. **`ldap-auth` is static-only** — it does not support dynamic plugin export.
+5. **Plugin IDs matter** — backend plugins use `pluginId` from `createBackendPlugin`, which determines the API path (`/api/<pluginId>/`). Frontend plugins use `id` from `createPlugin`.
+6. **`workspace:^` dependencies** — must be resolved before npm publish. Some workspaces handle this via Makefile targets.
+7. **No GitHub workflow runs the test suites** — `publish.yml` and `automated-update.yml` are the only workflows. Run tests locally before pushing.
 
 ## Reference Implementation
 
-The **dummy workspace** (`workspaces/dummy/`) is the canonical example. When creating a new workspace or standardizing an existing one, refer to dummy for:
-
-- Makefile structure and targets
-- Plugin package.json scripts and metadata (`backstage.role`, `pluginId`, `publishConfig`)
-- Test patterns and coverage (plugin tests, wiring tests)
-- Docker Compose dynamic plugin testing setup
-- README documentation structure
+The **dummy workspace** (`workspaces/dummy/`) is the reference implementation (plugins ADR-0003): a catalogue of elements (frontend plugin, backend plugin, hosting app, Makefile, tests, container harness) that new workspaces assemble from, never copy wholesale. Read `workspaces/dummy/AGENTS.md` for the patterns and `workspaces/dummy/README.md` for the human-facing shape of a workspace.
