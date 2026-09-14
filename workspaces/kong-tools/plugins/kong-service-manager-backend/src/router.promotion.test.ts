@@ -316,12 +316,13 @@ describe('promote to code (Task P3)', () => {
         );
         expect(res.body.files).toHaveLength(2);
 
-        // A preview never persists a draft, mutates the chart repo, or opens an MR.
+        // A preview never persists a draft, mutates the chart repo, opens an MR, or tags the plugin.
         expect(promotionStore.upsertDraft).not.toHaveBeenCalled();
         expect(promotionStore.transition).not.toHaveBeenCalled();
         expect(gitlabClient.ensureBranch).not.toHaveBeenCalled();
         expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
         expect(gitlabClient.openMergeRequest).not.toHaveBeenCalled();
+        expect(kongService.editRoutePlugin).not.toHaveBeenCalled();
       } finally {
         await chart.cleanup();
       }
