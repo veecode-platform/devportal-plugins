@@ -151,6 +151,9 @@ export function KongServiceManagerHomepage() {
         canEnable={permissions.canAddRoutePlugin}
         canDisable={permissions.canDisableRoutePlugin}
         canEdit={permissions.canUpdateRoutePlugin}
+        canPromote={permissions.canPromotePlugin}
+        onPromoted={name => setSuccessMessage(`Plugin "${name}" promotion opened — see the MR link on its badge`)}
+        onPromotionDiscarded={name => setSuccessMessage(`Promotion for plugin "${name}" discarded`)}
       />
 
       <PluginConfigDrawer

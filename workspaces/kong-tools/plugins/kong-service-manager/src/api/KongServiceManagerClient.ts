@@ -11,6 +11,8 @@ import type {
   PluginPerCategory,
   AvailablePluginsResponse,
   PluginCategory,
+  PromotionRecord,
+  PromotionPreview,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 const PLUGIN_CATEGORY_MAP: Record<string, PluginCategory> = {
@@ -283,6 +285,64 @@ export class KongServiceManagerClient implements KongServiceManagerApi {
     await this.request(
       `/${encodeURIComponent(instance)}/routes/${encodeURIComponent(routeId)}/plugins/${encodeURIComponent(pluginId)}`,
       { method: 'DELETE' },
+    );
+  }
+
+  private promotionPath(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+  ): string {
+    return `/${encodeURIComponent(instance)}/services/${encodeURIComponent(serviceName)}/routes/${encodeURIComponent(routeId)}/plugins/${encodeURIComponent(pluginId)}`;
+  }
+
+  async previewPromotion(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionPreview> {
+    return this.request(
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promote/preview`,
+      { method: 'POST', body: JSON.stringify({ entityRef }) },
+    );
+  }
+
+  async promotePlugin(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionRecord> {
+    return this.request(
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promote`,
+      { method: 'POST', body: JSON.stringify({ entityRef }) },
+    );
+  }
+
+  async discardPromotion(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+  ): Promise<void> {
+    await this.request(
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promote`,
+      { method: 'DELETE' },
+    );
+  }
+
+  async getPromotions(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+  ): Promise<PromotionRecord[]> {
+    return this.request(
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promotions`,
     );
   }
 }

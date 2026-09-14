@@ -16,12 +16,24 @@ import {
   ItemCardGrid,
   TabbedCard,
 } from '@backstage/core-components';
+import { useEntity } from '@backstage/plugin-catalog-react';
+import { stringifyEntityRef } from '@backstage/catalog-model';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
 import { PluginCard } from '../PluginsList/PluginCard';
+import { derivePromotionBadge } from './promotionBadge';
+import { PromotionReviewDialog } from './PromotionReviewDialog';
 import type {
+  AssociatedPluginsResponse,
   PluginPerCategory,
   RouteResponse,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+
+/** Mirrors GitlabClient's annotation key (backend, not exported to common) — the same key resolves the owning repo for promotion. */
+const GITLAB_PROJECT_SLUG_ANNOTATION = 'gitlab.com/project-slug';
+
+/** Spec 02's exact wording for the pure-route guardrail — a signposted dead end, not a silent one. */
+const PURE_ROUTE_REASON =
+  'No owning repo — exposure of repo-less APIs is a future milestone';
 
 const CATEGORY_LABELS: Record<string, string> = {
   ai: 'AI',
@@ -52,6 +64,9 @@ type RoutePluginsDrawerProps = {
   canEnable?: boolean;
   canDisable?: boolean;
   canEdit?: boolean;
+  canPromote?: boolean;
+  onPromoted?: (pluginName: string) => void;
+  onPromotionDiscarded?: (pluginName: string) => void;
 };
 
 export function RoutePluginsDrawer({
@@ -63,18 +78,41 @@ export function RoutePluginsDrawer({
   canEnable,
   canDisable,
   canEdit,
+  canPromote,
+  onPromoted,
+  onPromotionDiscarded,
 }: RoutePluginsDrawerProps) {
   const {
     state,
     fetchRouteAssociatedPlugins,
     fetchAvailablePlugins,
     removeRoutePlugin,
+    fetchPromotions,
+    promotePlugin,
+    discardPromotion,
   } = useKongServiceManager();
+  const { entity } = useEntity();
 
-  const { routeAssociatedPlugins, availablePlugins, loading, instance, serviceName } = state;
+  const {
+    routeAssociatedPlugins,
+    availablePlugins,
+    loading,
+    instance,
+    serviceName,
+    promotionsByPluginId,
+  } = state;
 
   const [search, setSearch] = useState('');
   const [disablingId, setDisablingId] = useState<string | null>(null);
+  const [discardingId, setDiscardingId] = useState<string | null>(null);
+  const [reviewPlugin, setReviewPlugin] = useState<{ id: string; name: string; config: Record<string, unknown> } | null>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
+  const entityRef = useMemo(() => stringifyEntityRef(entity), [entity]);
+  const promoteDisabledReason = entity.metadata.annotations?.[GITLAB_PROJECT_SLUG_ANNOTATION]
+    ? undefined
+    : PURE_ROUTE_REASON;
 
   useEffect(() => {
     if (open && route && instance && serviceName) {
@@ -91,10 +129,30 @@ export function RoutePluginsDrawer({
     }
   }, [open]);
 
+  // Promotion history is fetched per associated route plugin only (bounded
+  // fan-out) — an unassociated plugin can't have a promotion.
+  useEffect(() => {
+    if (!open || !route) return;
+    for (const plugin of routeAssociatedPlugins) {
+      fetchPromotions(route.id, plugin.id);
+    }
+    // fetchPromotions is stable (useCallback in the provider); routeAssociatedPlugins
+    // driving this is exactly the fan-out bound we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, route, routeAssociatedPlugins]);
+
   const associatedMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const p of routeAssociatedPlugins) {
       map.set(p.name, p.id);
+    }
+    return map;
+  }, [routeAssociatedPlugins]);
+
+  const associatedPluginById = useMemo(() => {
+    const map = new Map<string, AssociatedPluginsResponse>();
+    for (const p of routeAssociatedPlugins) {
+      map.set(p.id, p);
     }
     return map;
   }, [routeAssociatedPlugins]);
@@ -124,6 +182,51 @@ export function RoutePluginsDrawer({
       if (route) onEditPlugin(route.id, pluginId, pluginName);
     },
     [route, onEditPlugin],
+  );
+
+  const handleOpenReview = useCallback(
+    (pluginId: string, pluginName: string) => {
+      const plugin = associatedPluginById.get(pluginId);
+      setReviewError(null);
+      setReviewPlugin({ id: pluginId, name: pluginName, config: plugin?.config ?? {} });
+    },
+    [associatedPluginById],
+  );
+
+  const handleCloseReview = useCallback(() => {
+    if (reviewSubmitting) return;
+    setReviewPlugin(null);
+    setReviewError(null);
+  }, [reviewSubmitting]);
+
+  const handleConfirmPromote = useCallback(async () => {
+    if (!route || !reviewPlugin) return;
+    setReviewSubmitting(true);
+    setReviewError(null);
+    try {
+      await promotePlugin(route.id, reviewPlugin.id, entityRef);
+      const promotedName = reviewPlugin.name;
+      setReviewPlugin(null);
+      onPromoted?.(promotedName);
+    } catch (e: unknown) {
+      setReviewError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReviewSubmitting(false);
+    }
+  }, [route, reviewPlugin, entityRef, promotePlugin, onPromoted]);
+
+  const handleDiscard = useCallback(
+    async (pluginId: string, pluginName: string) => {
+      if (!route) return;
+      setDiscardingId(pluginId);
+      try {
+        await discardPromotion(route.id, pluginId);
+        onPromotionDiscarded?.(pluginName);
+      } finally {
+        setDiscardingId(null);
+      }
+    },
+    [route, discardPromotion, onPromotionDiscarded],
   );
 
   const filterCategories = useCallback(
@@ -185,20 +288,33 @@ export function RoutePluginsDrawer({
           {formatCategory(cat.category)}
         </Typography>
         <ItemCardGrid>
-          {cat.plugins.map(plugin => (
-            <PluginCard
-              key={plugin.slug}
-              plugin={plugin}
-              associatedId={associatedMap.get(plugin.slug)}
-              disabling={disablingId === associatedMap.get(plugin.slug)}
-              canEnable={canEnable}
-              canDisable={canDisable}
-              canEdit={canEdit}
-              onEnable={handleEnable}
-              onEdit={handleEdit}
-              onDisable={handleDisable}
-            />
-          ))}
+          {cat.plugins.map(plugin => {
+            const pluginId = associatedMap.get(plugin.slug);
+            const assocPlugin = pluginId ? associatedPluginById.get(pluginId) : undefined;
+            const promotionBadge = pluginId
+              ? derivePromotionBadge(promotionsByPluginId[pluginId], assocPlugin?.created_at ?? 0)
+              : undefined;
+            return (
+              <PluginCard
+                key={plugin.slug}
+                plugin={plugin}
+                associatedId={pluginId}
+                disabling={disablingId === pluginId}
+                canEnable={canEnable}
+                canDisable={canDisable}
+                canEdit={canEdit}
+                onEnable={handleEnable}
+                onEdit={handleEdit}
+                onDisable={handleDisable}
+                promotionBadge={promotionBadge}
+                canPromote={canPromote}
+                promoteDisabledReason={promoteDisabledReason}
+                discardingPromotion={discardingId === pluginId}
+                onPromote={handleOpenReview}
+                onDiscardPromotion={handleDiscard}
+              />
+            );
+          })}
         </ItemCardGrid>
       </Box>
     ));
@@ -250,6 +366,19 @@ export function RoutePluginsDrawer({
           </TabbedCard>
         </Box>
       </Box>
+
+      <PromotionReviewDialog
+        open={!!reviewPlugin}
+        pluginName={reviewPlugin?.name ?? ''}
+        liveConfig={reviewPlugin?.config ?? {}}
+        routeId={route?.id ?? null}
+        pluginId={reviewPlugin?.id ?? null}
+        entityRef={entityRef}
+        onClose={handleCloseReview}
+        onConfirm={handleConfirmPromote}
+        submitting={reviewSubmitting}
+        error={reviewError}
+      />
     </Drawer>
   );
 }

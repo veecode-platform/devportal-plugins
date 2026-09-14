@@ -169,4 +169,79 @@ describe('KongServiceManagerClient', () => {
       expect.anything(),
     );
   });
+
+  // --- Promotion methods (design 02 / plan P5) ---
+
+  it('constructs correct URL and body for previewPromotion', async () => {
+    const { client, mockFetch } = createMocks();
+    const mockPreview = { files: [{ path: 'chart/values.yaml', content: 'kong: {}\n' }], normalizedConfig: { minute: 60 } };
+    mockFetch.mockResolvedValue(jsonResponse(mockPreview));
+
+    const result = await client.previewPromotion(
+      'default',
+      'my-service',
+      'route-abc',
+      'plugin-xyz',
+      'component:default/my-service',
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/services/my-service/routes/route-abc/plugins/plugin-xyz/promote/preview`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ entityRef: 'component:default/my-service' }),
+      }),
+    );
+    expect(result).toEqual(mockPreview);
+  });
+
+  it('constructs correct URL and body for promotePlugin', async () => {
+    const { client, mockFetch } = createMocks();
+    const mockPromotion = { id: 1, state: 'mr-open' };
+    mockFetch.mockResolvedValue(jsonResponse(mockPromotion, 201));
+
+    const result = await client.promotePlugin(
+      'default',
+      'my-service',
+      'route-abc',
+      'plugin-xyz',
+      'component:default/my-service',
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/services/my-service/routes/route-abc/plugins/plugin-xyz/promote`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ entityRef: 'component:default/my-service' }),
+      }),
+    );
+    expect(result).toEqual(mockPromotion);
+  });
+
+  it('constructs correct URL for discardPromotion and handles 204', async () => {
+    const { client, mockFetch } = createMocks();
+    mockFetch.mockResolvedValue(
+      new Response(null, { status: 204, statusText: 'No Content' }),
+    );
+
+    await client.discardPromotion('default', 'my-service', 'route-abc', 'plugin-xyz');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/services/my-service/routes/route-abc/plugins/plugin-xyz/promote`,
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('constructs correct URL for getPromotions', async () => {
+    const { client, mockFetch } = createMocks();
+    mockFetch.mockResolvedValue(jsonResponse([]));
+
+    const result = await client.getPromotions('default', 'my-service', 'route-abc', 'plugin-xyz');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/services/my-service/routes/route-abc/plugins/plugin-xyz/promotions`,
+      expect.anything(),
+    );
+    expect(result).toEqual([]);
+  });
 });

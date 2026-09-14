@@ -9,6 +9,7 @@ import {
   kongApplyPluginRoutePermission,
   kongUpdateRoutePluginPermission,
   kongDisableRoutePluginPermission,
+  kongPluginPromotePermission,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 export function useKongPermissions() {
@@ -21,6 +22,7 @@ export function useKongPermissions() {
   const addRoutePlugin = usePermission({ permission: kongApplyPluginRoutePermission });
   const updateRoutePlugin = usePermission({ permission: kongUpdateRoutePluginPermission });
   const disableRoutePlugin = usePermission({ permission: kongDisableRoutePluginPermission });
+  const promotePlugin = usePermission({ permission: kongPluginPromotePermission });
 
   const loading =
     addServicePlugin.loading ||
@@ -31,7 +33,8 @@ export function useKongPermissions() {
     deleteRoute.loading ||
     addRoutePlugin.loading ||
     updateRoutePlugin.loading ||
-    disableRoutePlugin.loading;
+    disableRoutePlugin.loading ||
+    promotePlugin.loading;
 
   return {
     loading,
@@ -44,5 +47,6 @@ export function useKongPermissions() {
     canAddRoutePlugin: addRoutePlugin.allowed,
     canUpdateRoutePlugin: updateRoutePlugin.allowed,
     canDisableRoutePlugin: disableRoutePlugin.allowed,
+    canPromotePlugin: promotePlugin.allowed,
   };
 }
