@@ -1,10 +1,15 @@
-import { HttpAuthService, PermissionsService } from '@backstage/backend-plugin-api';
-import { InputError, NotAllowedError } from '@backstage/errors';
+import { randomUUID } from 'crypto';
+import { HttpAuthService, PermissionsService, UserInfoService } from '@backstage/backend-plugin-api';
+import { ConflictError, InputError, NotAllowedError, NotFoundError } from '@backstage/errors';
 import { AuthorizeResult, type BasicPermission } from '@backstage/plugin-permission-common';
 import { z } from 'zod';
 import express from 'express';
 import Router from 'express-promise-router';
-import type { CreateRoute } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+import type {
+  AssociatedPluginsResponse,
+  CreateRoute,
+  PromotionState,
+} from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
   kongServiceReadPermission,
   kongPluginsReadPermission,
@@ -19,17 +24,80 @@ import {
   kongUpdateRoutePluginPermission,
   kongDisableRoutePluginPermission,
   kongInstancesReadPermission,
+  kongPluginPromotePermission,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { KongServiceManagerService } from './services/KongServiceManagerService';
+import { getAdapter } from './services/adapters';
+import type { NormalizedConfig } from './services/adapters/types';
+import { renderCheck } from './services/renderCheck';
+import { GitlabClient } from './services/GitlabClient';
+import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
+
+/** GitLab project/MR coordinates needed to close the promotion's MR — packed into the `detail` column (design 02's record shape has no dedicated field for these). */
+interface MrDetail {
+  host: string;
+  projectSlug: string;
+  projectId: number;
+  iid: number;
+}
+
+function encodeMrDetail(detail: MrDetail): string {
+  return JSON.stringify(detail);
+}
+
+function decodeMrDetail(detail: string | null): MrDetail | undefined {
+  if (!detail) return undefined;
+  try {
+    return JSON.parse(detail) as MrDetail;
+  } catch {
+    return undefined;
+  }
+}
+
+interface PromotionDto {
+  id: number;
+  instance: string;
+  serviceName: string;
+  routeId: string;
+  pluginType: string;
+  state: PromotionState;
+  mrRef: string | null;
+  requesterRef: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function toPromotionDto(row: PromotionRecordRow): PromotionDto {
+  return {
+    id: row.id,
+    instance: row.instance,
+    serviceName: row.service_name,
+    routeId: row.route_id,
+    pluginType: row.plugin_type,
+    state: row.state,
+    mrRef: row.mr_ref,
+    requesterRef: row.requester_ref,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
+    updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
+  };
+}
 
 export async function createRouter({
   httpAuth,
   permissions,
   kongService,
+  userInfo,
+  promotionStore,
+  gitlabClient,
 }: {
   httpAuth: HttpAuthService;
   permissions: PermissionsService;
   kongService: KongServiceManagerService;
+  /** Requester identity for promotion audit records — only needed when promotion is enabled. */
+  userInfo?: UserInfoService;
+  /** Present only when `kong.promotion.enabled` is true. */
+  promotionStore?: PromotionStore;
+  gitlabClient?: GitlabClient;
 }): Promise<express.Router> {
   const router = Router();
   router.use(express.json());
@@ -43,6 +111,47 @@ export async function createRouter({
     if (decision[0].result !== AuthorizeResult.ALLOW) {
       throw new NotAllowedError('Permission denied');
     }
+  }
+
+  // --- Promotion helpers (design 02 / plan P3) ---
+
+  async function findRoutePlugin(
+    instance: string,
+    routeId: string,
+    pluginId: string,
+  ): Promise<AssociatedPluginsResponse | undefined> {
+    const plugins = await kongService.getRouteAssociatedPlugins(instance, routeId);
+    return plugins.find(p => p.id === pluginId);
+  }
+
+  /**
+   * Blocks edits to a route plugin that has an open promotion (design 02,
+   * "Freeze semantics"). A plugin type with no adapter is never promotable,
+   * so it's never frozen; a plugin the freeze check can't find (already
+   * gone) has nothing left to protect.
+   */
+  async function assertNotFrozen(instance: string, routeId: string, pluginId: string): Promise<void> {
+    if (!promotionStore) return;
+
+    const plugin = await findRoutePlugin(instance, routeId, pluginId);
+    if (!plugin) return;
+    const adapter = getAdapter(plugin.name);
+    if (!adapter) return;
+
+    const active = await promotionStore.getActiveByRoute(instance, routeId, adapter.pluginType);
+    if (active) {
+      const link = active.mr_ref ? ` (${active.mr_ref})` : '';
+      throw new ConflictError(
+        `Route plugin '${plugin.name}' on route '${routeId}' has an open promotion${link} — edits are frozen until it merges, fails, or is discarded.`,
+      );
+    }
+  }
+
+  async function requesterRef(req: express.Request): Promise<string> {
+    if (!userInfo) return 'user:default/unknown';
+    const credentials = await httpAuth.credentials(req, { allow: ['user'] });
+    const info = await userInfo.getUserInfo(credentials);
+    return info.userEntityRef;
   }
 
   // --- Validation schemas ---
@@ -73,6 +182,18 @@ export async function createRouter({
     instance: z.string(),
     routeId: z.string(),
     pluginId: z.string(),
+  });
+
+  const instanceServiceRoutePluginParams = z.object({
+    instance: z.string(),
+    serviceName: z.string(),
+    routeId: z.string(),
+    pluginId: z.string(),
+  });
+
+  const promoteBody = z.object({
+    /** Backstage entity ref of the service owning the plugin's route — resolves the target repo via its GitLab annotations. */
+    entityRef: z.string(),
   });
 
   const createRouteBody = z.object({
@@ -396,6 +517,8 @@ export async function createRouter({
       const body = editPluginBody.safeParse(req.body);
       if (!body.success) throw new InputError(body.error.toString());
 
+      await assertNotFrozen(params.data.instance, params.data.routeId, params.data.pluginId);
+
       const result = await kongService.editRoutePlugin(
         params.data.instance,
         params.data.routeId,
@@ -415,12 +538,201 @@ export async function createRouter({
       const params = instanceRoutePluginParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
 
+      await assertNotFrozen(params.data.instance, params.data.routeId, params.data.pluginId);
+
       await kongService.removeRoutePlugin(
         params.data.instance,
         params.data.routeId,
         params.data.pluginId,
       );
       res.status(204).end();
+    },
+  );
+
+  // --- Promote to code (Task P3, design 02) ---
+
+  // POST /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote
+  router.post(
+    '/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote',
+    async (req, res) => {
+      await authorize(req, kongPluginPromotePermission);
+
+      if (!promotionStore || !gitlabClient) {
+        throw new ConflictError('Kong plugin promotion is not enabled on this instance');
+      }
+
+      const params = instanceServiceRoutePluginParams.safeParse(req.params);
+      if (!params.success) throw new InputError(params.error.toString());
+      const body = promoteBody.safeParse(req.body);
+      if (!body.success) throw new InputError(body.error.toString());
+
+      const { instance, serviceName, routeId, pluginId } = params.data;
+      const { entityRef } = body.data;
+
+      const plugin = await findRoutePlugin(instance, routeId, pluginId);
+      if (!plugin) {
+        throw new NotFoundError(`Route plugin '${pluginId}' not found on route '${routeId}'`);
+      }
+
+      const adapter = getAdapter(plugin.name);
+      if (!adapter) {
+        throw new InputError(
+          `Plugin type '${plugin.name}' has no promotion adapter and cannot be promoted to code`,
+        );
+      }
+
+      // Step 1: persist the draft before any external write (crash-safety —
+      // an in-flight record for this route plugin means a retry resumes it
+      // instead of starting a second attempt).
+      let promotion = await promotionStore.getActiveByRoute(instance, routeId, adapter.pluginType);
+      if (!promotion) {
+        promotion = await promotionStore.upsertDraft({
+          idempotencyKey: randomUUID(),
+          instance,
+          serviceName,
+          routeId,
+          pluginType: adapter.pluginType,
+          configSnapshot: adapter.fromRendered({ config: plugin.config }),
+          requesterRef: await requesterRef(req),
+        });
+      }
+      const snapshot = promotion.config_snapshot as NormalizedConfig;
+
+      // Step 2: generate + render-check (safe to redo on retry — pure function of the snapshot).
+      const credentials = await httpAuth.credentials(req, { allow: ['user'] });
+      const repo = await gitlabClient.resolveRepo(entityRef, credentials);
+      const edits = adapter.toChartEdits(snapshot);
+      const { dir, cleanup } = await gitlabClient.materializeChart(repo, repo.defaultBranch);
+
+      try {
+        const existing = await gitlabClient.pathsExisting(dir, edits.map(e => e.path));
+        const check = await renderCheck({ repoDir: dir, adapter, edits, liveConfig: snapshot });
+        if (!check.equal) {
+          throw new ConflictError(
+            `Generated chart does not reproduce the live config for '${adapter.pluginType}': ${check.diff}`,
+          );
+        }
+
+        // Step 3: branch/commit/MR (idempotent — reuses a branch/MR left by a crashed prior attempt).
+        const branch = `kong-promote/${adapter.pluginType}`;
+        await gitlabClient.ensureBranch(repo, branch);
+        await gitlabClient.commitEdits(
+          repo,
+          branch,
+          dir,
+          edits,
+          existing,
+          `kong: promote ${adapter.pluginType} on route ${routeId} to code`,
+        );
+
+        let mr = await gitlabClient.findOpenMergeRequest(repo, branch);
+        if (!mr) {
+          mr = await gitlabClient.openMergeRequest(
+            repo,
+            branch,
+            `Promote Kong plugin '${adapter.pluginType}' to code`,
+            [
+              `Promotes the experimental \`${adapter.pluginType}\` plugin on route \`${routeId}\` `,
+              `(service \`${serviceName}\`, Kong instance \`${instance}\`) from ClickOps to the chart.`,
+              '',
+              'Generated by the DevPortal Kong plugin promotion flow. Once this merges and deploys, ',
+              'the portal verifies the code-owned plugin converges to the same config before removing ',
+              'the experimental one.',
+            ].join('\n'),
+          );
+        }
+
+        // Step 4: record mr-open with mr_ref.
+        await promotionStore.transition(promotion.id, 'mr-open', {
+          mrRef: mr.webUrl,
+          detail: encodeMrDetail({ host: repo.host, projectSlug: repo.projectSlug, projectId: mr.projectId, iid: mr.iid }),
+        });
+
+        // Step 5: tag the experimental entity.
+        const tag = `promotion-pending:${mr.projectId}-${mr.iid}`;
+        const existingTags = plugin.tags ?? [];
+        if (!existingTags.includes(tag)) {
+          await kongService.editRoutePlugin(instance, routeId, pluginId, {
+            tags: [...existingTags, tag],
+          });
+        }
+
+        res.status(201).json(
+          toPromotionDto({ ...promotion, state: 'mr-open', mr_ref: mr.webUrl }),
+        );
+      } finally {
+        await cleanup();
+      }
+    },
+  );
+
+  // DELETE /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote
+  router.delete(
+    '/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote',
+    async (req, res) => {
+      await authorize(req, kongPluginPromotePermission);
+
+      if (!promotionStore) {
+        throw new ConflictError('Kong plugin promotion is not enabled on this instance');
+      }
+
+      const params = instanceServiceRoutePluginParams.safeParse(req.params);
+      if (!params.success) throw new InputError(params.error.toString());
+      const { instance, routeId, pluginId } = params.data;
+
+      const plugin = await findRoutePlugin(instance, routeId, pluginId);
+      const adapter = plugin ? getAdapter(plugin.name) : undefined;
+      if (!adapter) {
+        throw new NotFoundError(`No promotable plugin '${pluginId}' found on route '${routeId}'`);
+      }
+
+      const active = await promotionStore.getActiveByRoute(instance, routeId, adapter.pluginType);
+      if (!active) {
+        throw new NotFoundError(`No open promotion for plugin '${pluginId}' on route '${routeId}'`);
+      }
+
+      if (active.mr_ref) {
+        const mrDetail = decodeMrDetail(active.detail);
+        if (gitlabClient && mrDetail) {
+          await gitlabClient.closeMergeRequest(mrDetail, mrDetail.iid);
+        }
+
+        const currentTags = plugin?.tags ?? [];
+        const filteredTags = currentTags.filter(t => !t.startsWith('promotion-pending:'));
+        if (plugin && filteredTags.length !== currentTags.length) {
+          await kongService.editRoutePlugin(instance, routeId, pluginId, { tags: filteredTags });
+        }
+      }
+
+      await promotionStore.transition(active.id, 'discarded');
+      res.status(204).end();
+    },
+  );
+
+  // GET /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promotions
+  router.get(
+    '/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promotions',
+    async (req, res) => {
+      await authorize(req, kongPluginsReadPermission);
+
+      if (!promotionStore) {
+        res.json([]);
+        return;
+      }
+
+      const params = instanceServiceRoutePluginParams.safeParse(req.params);
+      if (!params.success) throw new InputError(params.error.toString());
+      const { instance, routeId, pluginId } = params.data;
+
+      const plugin = await findRoutePlugin(instance, routeId, pluginId);
+      const adapter = plugin ? getAdapter(plugin.name) : undefined;
+      if (!adapter) {
+        res.json([]);
+        return;
+      }
+
+      const rows = await promotionStore.listByRoute(instance, routeId, adapter.pluginType);
+      res.json(rows.map(toPromotionDto));
     },
   );
 
