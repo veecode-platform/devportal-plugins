@@ -16,6 +16,7 @@ import {
   type CreateRoute,
   type CreatePlugin,
   type PluginFieldsResponse,
+  type PromotionRecord,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 type State = {
@@ -28,6 +29,8 @@ type State = {
   selectedRoute: RouteResponse | null;
   routeAssociatedPlugins: AssociatedPluginsResponse[];
   pluginFields: PluginFieldsResponse | null;
+  /** Promotion history per route plugin id (design 02 / plan P5) — only populated for plugins the drawer has fetched. */
+  promotionsByPluginId: Record<string, PromotionRecord[]>;
   loading: boolean;
   error: string | null;
 };
@@ -42,6 +45,7 @@ type Action =
   | { type: 'SET_SELECTED_ROUTE'; data: RouteResponse | null }
   | { type: 'SET_ROUTE_ASSOCIATED_PLUGINS'; data: AssociatedPluginsResponse[] }
   | { type: 'SET_PLUGIN_FIELDS'; data: PluginFieldsResponse | null }
+  | { type: 'SET_PROMOTIONS_FOR_PLUGIN'; pluginId: string; data: PromotionRecord[] }
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null };
 
@@ -65,6 +69,14 @@ function reducer(state: State, action: Action): State {
       return { ...state, routeAssociatedPlugins: action.data };
     case 'SET_PLUGIN_FIELDS':
       return { ...state, pluginFields: action.data };
+    case 'SET_PROMOTIONS_FOR_PLUGIN':
+      return {
+        ...state,
+        promotionsByPluginId: {
+          ...state.promotionsByPluginId,
+          [action.pluginId]: action.data,
+        },
+      };
     case 'SET_LOADING':
       return { ...state, loading: action.loading };
     case 'SET_ERROR':
@@ -84,6 +96,7 @@ const initialState: State = {
   selectedRoute: null,
   routeAssociatedPlugins: [],
   pluginFields: null,
+  promotionsByPluginId: {},
   loading: false,
   error: null,
 };
@@ -109,6 +122,9 @@ type KongServiceManagerContextValue = {
   addPluginToRoute: (routeId: string, plugin: CreatePlugin) => Promise<void>;
   editRoutePlugin: (routeId: string, pluginId: string, plugin: Partial<CreatePlugin>) => Promise<void>;
   removeRoutePlugin: (routeId: string, pluginId: string) => Promise<void>;
+  fetchPromotions: (routeId: string, pluginId: string) => Promise<void>;
+  promotePlugin: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionRecord>;
+  discardPromotion: (routeId: string, pluginId: string) => Promise<void>;
 };
 
 const KongServiceManagerContext =
@@ -357,6 +373,40 @@ export function KongServiceManagerProvider({
     [api, state.instance, withLoading],
   );
 
+  const fetchPromotions = useCallback(
+    async (routeId: string, pluginId: string) => {
+      await withLoading(async () => {
+        const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId);
+        dispatch({ type: 'SET_PROMOTIONS_FOR_PLUGIN', pluginId, data });
+      });
+    },
+    [api, state.instance, state.serviceName, withLoading],
+  );
+
+  const promotePluginAction = useCallback(
+    async (routeId: string, pluginId: string, entityRef: string) => {
+      let result!: PromotionRecord;
+      await withLoading(async () => {
+        result = await api.promotePlugin(state.instance, state.serviceName, routeId, pluginId, entityRef);
+        const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId);
+        dispatch({ type: 'SET_PROMOTIONS_FOR_PLUGIN', pluginId, data });
+      });
+      return result;
+    },
+    [api, state.instance, state.serviceName, withLoading],
+  );
+
+  const discardPromotion = useCallback(
+    async (routeId: string, pluginId: string) => {
+      await withLoading(async () => {
+        await api.discardPromotion(state.instance, state.serviceName, routeId, pluginId);
+        const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId);
+        dispatch({ type: 'SET_PROMOTIONS_FOR_PLUGIN', pluginId, data });
+      });
+    },
+    [api, state.instance, state.serviceName, withLoading],
+  );
+
   const value = useMemo<KongServiceManagerContextValue>(
     () => ({
       state,
@@ -379,6 +429,9 @@ export function KongServiceManagerProvider({
       addPluginToRoute,
       editRoutePlugin,
       removeRoutePlugin,
+      fetchPromotions,
+      promotePlugin: promotePluginAction,
+      discardPromotion,
     }),
     [
       state,
@@ -401,6 +454,9 @@ export function KongServiceManagerProvider({
       addPluginToRoute,
       editRoutePlugin,
       removeRoutePlugin,
+      fetchPromotions,
+      promotePluginAction,
+      discardPromotion,
     ],
   );
 
