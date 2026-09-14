@@ -202,3 +202,29 @@ to close the MR.
 is discardable. Constraint on the finalizer (P4): it must not clobber `detail`
 on any transition where the record can still be discarded; once the MR is
 merged, `detail` is free for human-readable failure diffs.
+
+## ADR-015: Finalizer Advances One State Per Tick and Leaves Coordinate-less Drafts Alone
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The promotion finalizer (P4) advances each active record at most one state per
+scheduled tick — no same-tick chaining across `mr-open → awaiting-deploy →
+applying → codified`. Drafts that crashed before any repo/MR coordinates were
+persisted are never reaped: the route stays frozen via the active-promotion
+lookup, and re-invoking promote resumes the same record. Teardown detection is
+project-level only (project archived or 404); entity-level detection would
+require an `entity_ref` column and is deferred until a concrete need.
+
+Amendment to ADR-014: the promote endpoint now persists the repo coordinates
+(`{ host, projectSlug, projectId }`) into `detail` immediately after repo
+resolution — before the MR exists — so the finalizer's draft-orphan probe can
+find an already-opened MR after a crash. ADR-014's constraint stands: the
+finalizer never clobbers `detail` while the record is still discardable.
+
+**Rationale:** One-state-per-tick keeps every transition individually
+crash-safe and observable (worst case ~4 ticks ≈ 4 minutes at the default 60s
+interval, which the spec's "no manual step" acceptance still satisfies).
+Reaping coordinate-less drafts would require distinguishing "abandoned" from
+"in flight", which the record cannot express; resuming on re-promote is the
+safe recovery path.
