@@ -1,7 +1,7 @@
 import React from 'react';
 import { errorApiRef, useApi } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
-import { PipelineVariable } from '@veecode-platform/gitlab-pipelines-common';
+import { PipelineVariable, TeardownOperationDto } from '@veecode-platform/gitlab-pipelines-common';
 import { GitlabPipelinesContext } from './GitlabPipelinesContext';
 import { Job, Pipeline } from '../utils/types';
 import { gitlabPipelinesApiRef } from '../api';
@@ -153,6 +153,15 @@ export const GitlabPipelinesProvider: React.FC<GitlabPipelinesProviderProps> = (
     }
   };
 
+  const listTeardowns = async (): Promise<TeardownOperationDto[]> => {
+    try {
+      return await api.listTeardowns(entityRef);
+    } catch (e: any) {
+      errorApi.post(e);
+      return [];
+    }
+  };
+
   return (
     <GitlabPipelinesContext.Provider
       value={{
@@ -177,6 +186,7 @@ export const GitlabPipelinesProvider: React.FC<GitlabPipelinesProviderProps> = (
         playJob,
         cancelJob,
         retryJob,
+        listTeardowns,
       }}
     >
       {children}
