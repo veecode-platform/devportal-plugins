@@ -521,5 +521,34 @@ describe('promote to code (Task P3)', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
     });
+
+    it('exposes detail only for failed-restored records, never for the MR-coordinates JSON of an active state', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.listByRoute.mockResolvedValue([
+        draftRow({
+          id: 2,
+          state: 'failed-restored',
+          detail: 'applyTimeoutMinutes (30) exceeded waiting for the code-owned plugin to converge; experimental plugin restored.',
+        }),
+        draftRow({
+          id: 3,
+          state: 'mr-open',
+          mr_ref: mr.webUrl,
+          detail: JSON.stringify({ host: repo.host, projectSlug: repo.projectSlug, projectId: mr.projectId, iid: mr.iid }),
+        }),
+      ]);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient: gitlabClientMock() });
+      const res = await request(app).get(PROMOTIONS_URL);
+
+      expect(res.status).toBe(200);
+      const failedRestored = res.body.find((r: { id: number }) => r.id === 2);
+      const mrOpen = res.body.find((r: { id: number }) => r.id === 3);
+      expect(failedRestored.detail).toMatch(/applyTimeoutMinutes/);
+      expect(mrOpen).not.toHaveProperty('detail');
+    });
   });
 });
