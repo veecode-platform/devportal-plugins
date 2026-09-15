@@ -20,6 +20,25 @@ export interface Config {
        * @default 60
        */
       reconcileIntervalSeconds?: number;
+      /**
+       * Path (or bare command, resolved on PATH) to the `helm` CLI binary.
+       * Promote-to-code renders the target chart with `helm template` to
+       * verify equivalence before writing — this is a **deployment
+       * prerequisite**: the portal image does not bundle helm, so whatever
+       * deploys this backend must provide the binary and point this setting
+       * at it. When it can't be found, preview and promote return 503
+       * instead of applying; everything else (including the finalizer,
+       * which never renders) keeps working. See the backend package's
+       * README, "Prerequisites".
+       * @default "helm"
+       */
+      helmPath?: string;
+      /**
+       * Timeout for each `helm` invocation (both the startup capability
+       * probe and every render during preview/promote), in seconds.
+       * @default 60
+       */
+      helmTimeoutSeconds?: number;
     };
   };
 }

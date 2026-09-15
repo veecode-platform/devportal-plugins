@@ -8,6 +8,7 @@ import { KongServiceManagerService } from './services/KongServiceManagerService'
 import { KnexPromotionStore } from './services/promotionStore';
 import { GitlabClient } from './services/GitlabClient';
 import { reconcilePromotions } from './services/promotionFinalizer';
+import { createHelmCapabilityGate, probeHelm } from './services/helmCapability';
 
 /**
  * Kong Service Manager backend plugin
@@ -46,6 +47,27 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
           ? GitlabClient.fromConfig(config, catalog)
           : undefined;
 
+        // Helm is a declared deployment prerequisite for promote/preview
+        // (ADR-018) — the portal image doesn't bundle it, so it's probed
+        // once at startup here and re-probed lazily by the gate while
+        // unavailable, rather than surfacing as a raw 500 mid-request.
+        const helmPath = config.getOptionalString('kong.promotion.helmPath') ?? 'helm';
+        const helmTimeoutSeconds = config.getOptionalNumber('kong.promotion.helmTimeoutSeconds') ?? 60;
+        let helmGate: ReturnType<typeof createHelmCapabilityGate> | undefined;
+        if (promotionEnabled) {
+          const initialHelmCapability = await probeHelm(helmPath, helmTimeoutSeconds);
+          if (!initialHelmCapability.available) {
+            logger.warn(
+              `Kong plugin promotion: helm CLI unavailable at "${helmPath}" — promote and preview will return 503 until the deployment provides it. See the kong-service-manager-backend README, "Prerequisites". (${initialHelmCapability.error})`,
+            );
+          }
+          helmGate = createHelmCapabilityGate({
+            helmPath,
+            timeoutSeconds: helmTimeoutSeconds,
+            initial: initialHelmCapability,
+          });
+        }
+
         const router = await createRouter({
           httpAuth,
           permissions,
@@ -53,6 +75,9 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
           userInfo,
           promotionStore,
           gitlabClient,
+          helmGate,
+          helmPath,
+          helmTimeoutSeconds,
         });
 
         httpRouter.use(router);
