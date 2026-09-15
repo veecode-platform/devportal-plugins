@@ -92,10 +92,12 @@ GitLab is the external dependency, reached only from the backend. A database is 
 
 - Frontend and backend share `pluginId: gitlab-pipelines`, so the API path is `/api/gitlab-pipelines/` and `discoveryApi.getBaseUrl('gitlab-pipelines')` is what the client resolves.
 - The lifecycle feature deletes a file from a default branch. It is off by default, and both guardrails must stay in place; the read endpoint returns nothing while it is disabled.
-- `plugins/gitlab-pipelines-common/src/permissions.test.ts` describes the permissions as coming from "ADR-009". That document exists only as a draft in the separate `devportal-planning` repository, and the number collides with a different accepted ADR there. It is a known dangling citation tracked in the planning repository's ghost register; leave the text as written until that is resolved.
+- Older commit messages in this workspace cite "ADR-009 §N". That was a draft in the separate `devportal-planning` repository which was never merged, and whose number collides with a different accepted decision there. The design is recorded in this workspace as [`PDR-001`](DECISIONS.md) since 2026-09-15, and its section numbers still line up with those citations.
 - `backstage.json` pins 1.49.2 while the DevPortal host declares 1.52.0. Moving to the host line is a planned milestone; do not bump ad hoc.
 - The common package's name drops the `backstage-plugin-` prefix that other workspaces keep.
 
 ## Decisions
 
-This workspace keeps no `DECISIONS.md`. If one is added, entries are plugin decision records numbered `PDR-001`, `PDR-002`, … and cited as `gitlab-pipelines PDR-NNN`, never as ADRs. Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.
+Design decisions live in [`DECISIONS.md`](DECISIONS.md) as plugin decision records, cited elsewhere as `gitlab-pipelines PDR-NNN`, never as ADRs. `PDR-001` is the one to read before touching the request path: why the GitLab token is held by the backend, why every route is anchored on a catalog entity, and why the authorization funnel runs in the order it does. New entries start at `PDR-002`; the lifecycle reconciler has no record yet.
+
+Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.
