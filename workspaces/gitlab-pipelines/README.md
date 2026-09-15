@@ -67,6 +67,15 @@ guardrail failing marks the operation `superseded` or `failed` instead of
 deleting anything. A `GET .../teardowns` endpoint (same entity-anchored
 prefix, `gitlab.pipeline.read` permission) lists the recorded operations.
 
+The unregister commit message ends with `[skip ci]`, so deleting the catalog
+file does not start a pipeline. Without it the pipeline runs on the deletion
+commit and its deploy job reinstalls the service the teardown just destroyed.
+The directive is the first of three layers: the scaffolder templates
+additionally gate the deploy job on the catalog file still existing and
+re-check the default branch at deploy time, because `[skip ci]` does not cover a human
+retrying an older deploy job or a project whose CI policy ignores skip
+directives. See [ADR-001](DECISIONS.md).
+
 The CI/CD tab (`GitlabPipelineList`) surfaces these operations in a
 "Teardown Operations" card below the pipelines table: state (pending,
 failed, superseded, consumed, flagged, each with its own icon and label),
