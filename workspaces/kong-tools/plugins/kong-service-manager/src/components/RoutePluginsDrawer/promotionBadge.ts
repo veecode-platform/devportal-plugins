@@ -1,11 +1,13 @@
 import type { PromotionRecord } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 /**
- * The five UX states from design 02 — a route plugin badge is derived from
- * its promotion history, not carried as its own field.
+ * The five UX states from design 02, plus `code-owned` (ADR-017) — a route
+ * plugin badge is derived from its promotion history and ownership, not
+ * carried as its own field.
  */
 export type PromotionBadgeKind =
   | 'experimental'
+  | 'code-owned'
   | 'mr-open'
   | 'pending-deploy'
   | 'codified'
@@ -39,22 +41,40 @@ function badgeKind(state: PromotionRecord['state']): PromotionBadgeKind {
   }
 }
 
+/** Ownership inputs (ADR-017) — absent/empty `instanceDefaultTags` means the instance has no ownership signal, so every plugin is treated as promotable (unchanged behaviour). */
+export type PromotionOwnership = {
+  pluginTags?: string[] | null;
+  instanceDefaultTags?: string[];
+};
+
+function isPortalManaged(
+  { pluginTags, instanceDefaultTags }: PromotionOwnership,
+): boolean {
+  if (!instanceDefaultTags || instanceDefaultTags.length === 0) return true;
+  const tags = pluginTags ?? [];
+  return instanceDefaultTags.every(tag => tags.includes(tag));
+}
+
 /**
  * Derives the badge to show for a route plugin from its promotion history
- * (newest-first or not — this sorts). `pluginCreatedAtSeconds` is the Kong
- * plugin's own `created_at` (epoch seconds, Admin API shape), used for the
- * experimental badge's age when there is no promotion record yet.
+ * (newest-first or not — this sorts) and ownership (ADR-017).
+ * `pluginCreatedAtSeconds` is the Kong plugin's own `created_at` (epoch
+ * seconds, Admin API shape), used for the experimental/code-owned badge's
+ * age when there is no promotion record yet. Promotion records only ever
+ * exist for portal-managed plugins (the backend gate refuses to promote a
+ * code-owned one), so ownership only matters in the no-record branch.
  */
 export function derivePromotionBadge(
   records: PromotionRecord[] | undefined,
   pluginCreatedAtSeconds: number,
   now: number = Date.now(),
+  ownership: PromotionOwnership = {},
 ): PromotionBadge {
   const relevant = (records ?? []).filter(r => !RESET_STATES.has(r.state));
 
   if (relevant.length === 0) {
     return {
-      kind: 'experimental',
+      kind: isPortalManaged(ownership) ? 'experimental' : 'code-owned',
       ageMs: now - pluginCreatedAtSeconds * 1000,
     };
   }
