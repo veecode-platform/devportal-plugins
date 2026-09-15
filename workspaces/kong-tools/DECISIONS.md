@@ -253,3 +253,34 @@ adapter changes; the server is the single source of the rendered truth. The
 discardable) — exposing it unconditionally would leak plumbing to the client,
 so it crosses the API boundary only in the one state where it carries the
 human-readable failure diff.
+
+## ADR-017: Plugin Ownership Is Derived From Instance defaultTags, Not Stored
+
+**Date:** 2026-09
+**Status:** Accepted
+
+Promotion only makes sense for a route plugin the portal itself created
+("portal-managed") — not one reconciled onto Kong by an external controller
+(e.g. the Kong Ingress Controller) from the service's chart ("code-owned").
+Ownership is derived, not a stored field: an instance configuring
+`kong.instances[].defaultTags` is treated as marking every entity it creates
+with those tags (`KongServiceManagerService.tagsForCreate`), so a plugin is
+portal-managed iff its own tags carry all of the instance's `defaultTags`.
+An instance with no `defaultTags` configured has no ownership signal, so
+every plugin on it is treated as promotable — today's behaviour, unchanged.
+
+`resolvePromotableRoutePlugin` (shared by the promote and preview endpoints)
+refuses a code-owned plugin with a `400`. The frontend mirrors the same
+derivation in `derivePromotionBadge`: a route plugin with no promotion
+history renders `code-owned` instead of `experimental` when it fails the
+tag check, and `PluginCard` hides both Promote and Discard for it — read
+only, same as a `codified` plugin, but without a promotion record.
+
+**Rationale:** A stored ownership flag would need to be set at creation time
+and kept in sync with tag edits made outside the portal; deriving it from
+tags already present on every read keeps ownership a projection of Kong's
+own state rather than a second source of truth that can drift from it. Tying
+the signal to the same `defaultTags` the portal already writes at create
+time (ADR predates this doc — see `KongInstanceConfig.defaultTags`) means an
+operator who has not opted into tagging gets no gate at all, matching the
+plugin's existing "stays unopinionated about coexistence strategy" stance.
