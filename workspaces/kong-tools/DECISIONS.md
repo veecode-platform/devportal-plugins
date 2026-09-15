@@ -319,3 +319,37 @@ request-response cycle — the equivalence check is inline for a reason: a
 mismatch aborts before any write). Declared prerequisite plus graceful
 degradation keeps the real Helm engine (no semantic risk) while making the
 dependency visible and the failure mode actionable instead of silent.
+
+## ADR-019: "Deployed" Means a Successful GitLab Deployment, Not a Successful Pipeline
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The finalizer's `awaiting-deploy → applying` transition (design 02: "wait for
+the merged deploy to succeed; never assume merge means applied") was keyed on
+a *pipeline* with `status=success` for a commit at or after the merge. First
+live promotion (2026-09-15): the golden-path pipeline carries a manual
+`destroy` job with `allow_failure: false` — deliberately, so a refused destroy
+cannot leave the pipeline green — and GitLab reports such a pipeline as
+`manual` (blocked) forever, never `success`. The deploy job had succeeded, the
+chart was applied, and the finalizer stayed parked; meanwhile the Kong Ingress
+Controller could not create the code-owned plugin next to the still-present
+experimental one (409, one plugin per type per route) and stopped syncing the
+whole dataplane until an operator deleted the experiment by hand.
+
+The primary signal is now the GitLab **deployments** API: a deployment of the
+default branch with `status=success` created at or after `merged_at`
+(`GitlabClient.listSuccessfulDeploymentsSince`). A deployment record is exactly
+"the deploy job ran and finished", independent of sibling jobs; `created_at`
+is when that job started, so a record at/after the merge deployed the merge
+commit or a descendant. The pipeline check stays as a fallback for repos whose
+deploy job declares no `environment:` and therefore records no deployments.
+
+**Rationale:** pipeline status aggregates every job in the pipeline, so any
+blocking manual job (teardown, approvals) makes it a wrong proxy for "was
+deployed"; the deployments API is the object GitLab itself maintains for that
+question. Residual edge: a manual re-run of an *older* pipeline's deploy job
+after the merge also records a deployment — the finalizer then moves to
+`applying`, and the existing `applyTimeoutMinutes` restore path (ADR-014)
+handles a code-owned plugin that never converges. Prerequisite for services:
+the deploy job must declare a GitLab `environment:` (the golden path does).
