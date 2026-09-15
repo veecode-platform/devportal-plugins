@@ -327,7 +327,9 @@ export class GitlabClient {
       Array<{ id: number; sha: string; ref: string; status: string; created_at: string }>
     >(
       token,
-      `${base}/deployments?status=success&updated_after=${encodeURIComponent(since)}&order_by=created_at&sort=desc&per_page=100`,
+      // GitLab rejects `updated_after` unless the sort is `updated_at` (400:
+      // "`updated_at` filter requires `updated_at` sort") — seen live on 18.1.
+      `${base}/deployments?status=success&updated_after=${encodeURIComponent(since)}&order_by=updated_at&sort=desc&per_page=100`,
     );
     const sinceMs = Date.parse(since);
     return deployments
