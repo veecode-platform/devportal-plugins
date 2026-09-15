@@ -163,6 +163,13 @@ export type PromotionState =
   | 'awaiting-deploy'
   | 'applying'
   | 'codified'
+  /**
+   * The code-owned plugin never converged after a successful deploy of the
+   * merged chart. The experiment was already removed at merge and is
+   * deliberately not restored (ADR-020) — `detail` says what to check.
+   */
+  | 'failed'
+  /** Legacy terminal state: no longer produced by the finalizer since ADR-020, kept so stored records still parse. */
   | 'failed-restored'
   | 'discarded'
   | 'aborted-teardown';
@@ -179,7 +186,7 @@ export type PromotionRecord = {
   requesterRef: string;
   createdAt: string;
   updatedAt: string;
-  /** Human-readable failure diff — only ever present when `state === 'failed-restored'` (plan P5-follow-up / P4's finalizer). */
+  /** Human-readable failure detail — only ever present on the failure states `failed` and `failed-restored` (plan P5-follow-up / P4's finalizer). */
   detail?: string;
 };
 

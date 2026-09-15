@@ -84,13 +84,64 @@ describe('PromotionBadgeChip', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it('does not offer a diff toggle for failed-restored when no detail is present', () => {
+  it('does not offer a details toggle for a failure badge when no detail is present', () => {
     const badge: PromotionBadge = { kind: 'failed-restored', ageMs: ONE_DAY_MS };
     render(<PromotionBadgeChip badge={badge} />);
-    expect(screen.queryByRole('button', { name: /Show diff/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Show details/i })).not.toBeInTheDocument();
   });
 
-  it('shows a diff toggle for failed-restored with detail, revealing the diff text on click', async () => {
+  it('surfaces the finalizer message of a `failed` record on hover and in the details toggle', async () => {
+    const detail =
+      "code-owned 'rate-limiting' plugin did not converge on route 'route-1' within 10 min; the experiment was removed at merge and is intentionally not restored.";
+    const badge: PromotionBadge = {
+      kind: 'failed-restored',
+      ageMs: ONE_DAY_MS,
+      record: {
+        id: 1,
+        instance: 'default',
+        serviceName: 'svc',
+        routeId: 'route-1',
+        pluginType: 'rate-limiting',
+        state: 'failed',
+        mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
+        requesterRef: 'user:default/alice',
+        createdAt: '2026-09-13T12:00:00.000Z',
+        updatedAt: '2026-09-13T12:00:00.000Z',
+        detail,
+      },
+    };
+    render(<PromotionBadgeChip badge={badge} />);
+
+    await userEvent.hover(screen.getByText(/Aplicação falhou/));
+    expect(await screen.findByText(detail)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Show details/i }));
+    expect(screen.getAllByText(detail).length).toBeGreaterThan(1);
+  });
+
+  it('offers no Retry for a `failed` record (ADR-020: the experiment is gone, recovery is manual)', () => {
+    const badge: PromotionBadge = {
+      kind: 'failed-restored',
+      ageMs: ONE_DAY_MS,
+      record: {
+        id: 1,
+        instance: 'default',
+        serviceName: 'svc',
+        routeId: 'route-1',
+        pluginType: 'rate-limiting',
+        state: 'failed',
+        mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
+        requesterRef: 'user:default/alice',
+        createdAt: '2026-09-13T12:00:00.000Z',
+        updatedAt: '2026-09-13T12:00:00.000Z',
+        detail: 'did not converge; not restored',
+      },
+    };
+    render(<PromotionBadgeChip badge={badge} onRetry={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('shows a details toggle for failed-restored with detail, revealing the diff text on click', async () => {
     const badge: PromotionBadge = {
       kind: 'failed-restored',
       ageMs: ONE_DAY_MS,
@@ -111,7 +162,7 @@ describe('PromotionBadgeChip', () => {
     render(<PromotionBadgeChip badge={badge} />);
 
     expect(screen.queryByText(/minute: 100/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Show diff/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Show details/i }));
     expect(screen.getByText(/minute: 100/)).toBeInTheDocument();
   });
 });

@@ -220,6 +220,40 @@ describe('PluginCard', () => {
     expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
   });
 
+  it('hides Promote after a failed handover (ADR-020: nothing left to promote)', () => {
+    const badge: PromotionBadge = {
+      kind: 'failed-restored',
+      ageMs: 60_000,
+      record: {
+        id: 1,
+        instance: 'default',
+        serviceName: 'svc',
+        routeId: 'route-1',
+        pluginType: 'rate-limiting',
+        state: 'failed',
+        mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
+        requesterRef: 'user:default/alice',
+        createdAt: '2026-09-13T12:00:00.000Z',
+        updatedAt: '2026-09-13T12:00:00.000Z',
+        detail: 'did not converge; not restored',
+      },
+    };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onPromote={noop}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
   it('hides Promote and Discard for a code-owned plugin, but keeps Disable (ADR-017)', () => {
     const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
     render(

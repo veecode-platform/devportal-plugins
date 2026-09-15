@@ -353,3 +353,66 @@ after the merge also records a deployment — the finalizer then moves to
 `applying`, and the existing `applyTimeoutMinutes` restore path (ADR-014)
 handles a code-owned plugin that never converges. Prerequisite for services:
 the deploy job must declare a GitLab `environment:` (the golden path does).
+
+## ADR-020: Handover — the Experiment Is Removed at Merge and Never Coexists With the Code-Owned Plugin
+
+**Date:** 2026-09
+**Status:** Accepted
+
+Invariant: **once the promoted chart is on the default branch, the
+experimental plugin must not exist on the route.**
+
+The finalizer used to delete the experiment in `applying` — i.e. *after* CI
+had deployed the merged chart. Kong allows one plugin instance per (type,
+route), so between that deploy and the next finalizer tick the ingress
+controller got a `409` uniqueness violation creating the code-owned plugin;
+on a db-backed Kong that failure aborts the whole configuration sync, not
+just the one plugin, and the dataplane keeps serving the last good config
+until someone deletes the experiment by hand. Observed in production
+(2026-09-15) as a route returning 504 — the same incident ADR-019 documents
+from the other side, where the finalizer stayed parked because pipeline
+status never turned green and so never reached its delete step at all.
+
+What changed:
+
+- `mr-open` → `awaiting-deploy` deletes the experimental plugin **first**,
+  then transitions, recording `experimentRemovedAt` beside `mergedAt` and
+  `parkedSince`. The delete is idempotent: a crash between it and the
+  transition leaves the record in `mr-open`, and the next tick finds nothing
+  to delete and transitions anyway. The `closed` → `discarded` branch is
+  unchanged — before the merge the experiment legitimately stays live.
+- `awaiting-deploy` has no timeout and no restore. A merged-but-never-deployed
+  chart simply stays parked: the route runs without the plugin because its
+  owner merged the chart that removes it, and the badge says so.
+- `applying` no longer deletes anything, and a record that exceeds
+  `applyTimeoutMinutes` becomes `failed` — a new terminal state carrying an
+  actionable `detail` — instead of restoring the experiment. Restoring after
+  the merge is precisely what caused the incident: the recreated plugin
+  collides with the code-owned one on the controller's next sync.
+- `failed-restored` remains in the state enums so stored records keep
+  parsing, but nothing produces it any more.
+
+Amendment to ADR-016: `detail` crosses the API boundary on **both** failure
+states (`failed` and the legacy `failed-restored`), not only the latter.
+
+Amendment to ADR-019: the residual edge in its last paragraph — a manual
+re-run of an older pipeline's deploy job records a deployment, so the record
+advances to `applying` before the merge is really out — now ends in `failed`
+rather than in a restore.
+
+**Residual race:** a deploy that lands before the finalizer has seen the
+merge still collides for at most one tick, and self-heals as soon as that
+tick deletes the experiment. Deployments whose pipelines are fast should set
+`kong.promotion.reconcileIntervalSeconds: 30` to shrink the window.
+
+**Rationale:** the merge is the earliest moment at which the route's owner
+has committed to the code-owned plugin, and it is strictly before anything
+can deploy it — so it is the only point where the delete cannot race the
+controller. Options considered: keeping restore-after-merge but tagging the
+recreated plugin so the controller ignores it (Kong's uniqueness constraint
+is on (type, route) regardless of tags, so the collision stands); deleting
+the experiment at promote time, before review (leaves the route unprotected
+for the entire review window, and every closed MR would have to recreate it);
+keeping the restore but gating it on the code-owned plugin being absent
+(a check that is racy by construction — the controller can create it a
+millisecond later).

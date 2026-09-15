@@ -59,6 +59,11 @@ describe('derivePromotionBadge', () => {
     expect(badge.kind).toBe('failed-restored');
   });
 
+  it('maps the new failed state to the same ⚠️ badge as the legacy failed-restored (ADR-020)', () => {
+    const badge = derivePromotionBadge([record({ state: 'failed' })], 1757764800, NOW);
+    expect(badge.kind).toBe('failed-restored');
+  });
+
   it('picks the most recently updated non-terminal record when history has several', () => {
     const older = record({ id: 1, state: 'discarded', updatedAt: '2026-09-10T12:00:00.000Z' });
     const newer = record({ id: 2, state: 'mr-open', updatedAt: '2026-09-13T12:00:00.000Z' });

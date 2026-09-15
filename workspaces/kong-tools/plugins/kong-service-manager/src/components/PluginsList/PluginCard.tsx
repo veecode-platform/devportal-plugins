@@ -61,7 +61,11 @@ export function PluginCard({
   // Code-owned (ADR-017): the plugin was never portal-created, so it never
   // has a promotion to start or discard — read-only, same as codified.
   const isCodeOwned = promotionBadge?.kind === 'code-owned';
-  const showPromote = isAssociated && !!promotionBadge && !isFrozen && !isCodified && !isCodeOwned;
+  // Failed handover (ADR-020): the experiment was removed at merge and the
+  // chart already carries the plugin — there is nothing left to promote.
+  const isFailedHandover = promotionBadge?.record?.state === 'failed';
+  const showPromote =
+    isAssociated && !!promotionBadge && !isFrozen && !isCodified && !isCodeOwned && !isFailedHandover;
   const showDiscard = isAssociated && isFrozen && !isCodeOwned;
 
   return (
