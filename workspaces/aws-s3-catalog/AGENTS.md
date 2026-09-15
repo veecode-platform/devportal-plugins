@@ -8,7 +8,7 @@ One package, no hosting app.
 
 - `plugins/aws-s3-catalog-module` — `@aws/aws-s3-catalog-module-for-backstage`, `backstage.role: backend-plugin-module` for `pluginId: 'catalog'` (`pluginPackage: @backstage/plugin-catalog-backend`). Its whole source is `src/index.ts`, which re-exports the default export of `@backstage/plugin-catalog-backend-module-aws`, the upstream Backstage module for AWS S3 catalog discovery. The package exists to be exported as a dynamic plugin: its description reads "Dynamic-plugin wrapper for Backstage AWS S3 catalog discovery" and it carries an `export-dynamic` script.
 
-The package was vendored from `awslabs/backstage-plugins-for-aws` through the retired fork `veecode-platform/backstage-plugins-for-aws` (commit `cf408c11`), Apache-2.0, copyright Amazon.com, Inc. or its affiliates. `plugins/aws-s3-catalog-module/NOTICE` is the provenance record and `src/index.ts` keeps the Amazon license header; leave both as they are.
+The package was vendored from `awslabs/backstage-plugins-for-aws` through the retired fork `veecode-platform/backstage-plugins-for-aws` (commit `cf408c11`), Apache-2.0, copyright Amazon.com, Inc. or its affiliates. `plugins/aws-s3-catalog-module/NOTICE` is the provenance record and `src/index.ts` keeps the Amazon license header; leave both as they are. Why the package is vendored unmodified, and why its embedded dependency is pinned exactly, is [`aws-s3-catalog PDR-001`](DECISIONS.md).
 
 ## Layout
 
@@ -81,4 +81,8 @@ What does not: there is no `docker-compose.yaml`, `dynamic-plugins.yaml`, `app-c
 
 ## Decisions
 
-No `DECISIONS.md` in this workspace. If one is added, entries are plugin decision records (`PDR-NNN`), cited as `aws-s3-catalog PDR-NNN`. Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.
+Design decisions live in [`DECISIONS.md`](DECISIONS.md) as plugin decision records, cited elsewhere as `aws-s3-catalog PDR-NNN`, never as ADRs. `PDR-001` records why the module is vendored unmodified and why its embedded dependency is pinned exactly; `PDR-002` records the byte-parity gate used to prove the cutover and its removal the next day. New entries start at `PDR-003`.
+
+The sibling `aws-cost-insights` workspace took its own decisions on the same questions and keeps its own log; the two are independent records, not one decision spanning both.
+
+Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.
