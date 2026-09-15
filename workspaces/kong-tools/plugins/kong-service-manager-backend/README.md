@@ -120,6 +120,24 @@ ADR-019), not from pipeline status: a pipeline with a blocking manual job
 recorded, and the finalizer falls back to "a successful pipeline for a commit
 at or after the merge" — which such pipelines never satisfy.
 
+**The experimental plugin is deleted when the merge request is merged**, not
+when the deploy lands (ADR-020). Kong allows one plugin per (type, route), so
+an experiment still on the route when the merged chart reaches the gateway
+makes the ingress controller fail to create the code-owned plugin — and a
+DB-backed Kong stops syncing the whole dataplane, not just that plugin. The
+finalizer therefore removes the experiment at merge and never recreates it:
+
+| State | What it means |
+|---|---|
+| `awaiting-deploy` | Merged, experiment removed, waiting for the deploy. No timeout: the route runs without the plugin until the chart lands. |
+| `applying` | Deployed; waiting for the code-owned plugin to match the promoted config. |
+| `codified` | The code-owned plugin converged. Terminal. |
+| `failed` | `applyTimeoutMinutes` elapsed without convergence. Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, or revert the merge request. |
+
+Where pipelines are fast, lower `kong.promotion.reconcileIntervalSeconds`
+(e.g. `30`): a deploy that lands before the finalizer has seen the merge
+collides with the experiment for at most one tick, then self-heals.
+
 If `helm` can't be found or run, the plugin doesn't fail to start: routes
 that don't render a chart (browsing services, routes, and plugins; the
 promotion finalizer, which reads Kong's Admin API rather than rendering)

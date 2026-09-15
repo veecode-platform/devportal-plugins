@@ -7,10 +7,13 @@ export interface Config {
        */
       enabled?: boolean;
       /**
-       * How long an in-flight promotion waits for the merged deploy to
-       * reconcile (the code-owned plugin to converge) before the finalizer
-       * restores the experimental plugin and marks the promotion failed, in
-       * minutes.
+       * How long a deployed promotion waits for the code-owned plugin to
+       * converge before the finalizer gives up and marks the promotion
+       * `failed`, in minutes. Nothing is restored on timeout: the
+       * experimental plugin is removed when the merge request is merged and
+       * recreating it would collide with the merged chart's own plugin
+       * (one plugin per type per route). Recovery is manual — fix the chart
+       * or revert the merge request.
        * @default 10
        */
       applyTimeoutMinutes?: number;

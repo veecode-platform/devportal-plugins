@@ -63,8 +63,10 @@ The two paths combine into a workflow rather than a fork:
    it against real traffic, adjusts values — feedback in seconds.
 2. Once satisfied, they **export the validated change** as configuration files (path 2) and
    merge them into the Git repository that owns Kong's configuration.
-3. The temporary change created during the experiment is **removed** when the exported version
-   lands — otherwise the same route or plugin would exist twice and conflict.
+3. The temporary change created during the experiment is **removed the moment the export is
+   merged**, before it reaches the gateway — otherwise the same plugin would exist twice on the
+   route and conflict, and a gateway backed by a database can stop applying configuration
+   entirely while that lasts.
 
 This requires a Kong with a database for the experimentation surface. That gateway does not
 have to be your production one: a dedicated db-backed Kong for experiments, with production
