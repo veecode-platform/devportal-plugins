@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { HttpAuthService, PermissionsService, UserInfoService } from '@backstage/backend-plugin-api';
-import { ConflictError, InputError, NotAllowedError, NotFoundError } from '@backstage/errors';
+import { ConflictError, InputError, NotAllowedError, NotFoundError, ServiceUnavailableError } from '@backstage/errors';
 import { AuthorizeResult, type BasicPermission } from '@backstage/plugin-permission-common';
 import { z } from 'zod';
 import express from 'express';
@@ -10,6 +10,7 @@ import Router from 'express-promise-router';
 import type {
   AssociatedPluginsResponse,
   CreateRoute,
+  PromotionCapabilities,
   PromotionState,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
@@ -32,6 +33,7 @@ import { KongServiceManagerService } from './services/KongServiceManagerService'
 import { getAdapter } from './services/adapters';
 import type { FileEdit, KongPluginAdapter, NormalizedConfig } from './services/adapters/types';
 import { renderCheck, type EquivalenceResult } from './services/renderCheck';
+import type { HelmCapabilityGate } from './services/helmCapability';
 import { GitlabClient, type ResolvedRepo } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
@@ -75,6 +77,9 @@ export async function createRouter({
   userInfo,
   promotionStore,
   gitlabClient,
+  helmGate,
+  helmPath = 'helm',
+  helmTimeoutSeconds = 60,
 }: {
   httpAuth: HttpAuthService;
   permissions: PermissionsService;
@@ -84,6 +89,17 @@ export async function createRouter({
   /** Present only when `kong.promotion.enabled` is true. */
   promotionStore?: PromotionStore;
   gitlabClient?: GitlabClient;
+  /**
+   * Gates preview/promote on the startup helm probe, re-probing lazily while
+   * unavailable (ADR-018). Absent in tests that don't care about the helm
+   * prerequisite — preview/promote then proceed ungated, same as before this
+   * was added.
+   */
+  helmGate?: HelmCapabilityGate;
+  /** `kong.promotion.helmPath` — also the path reported by `GET .../promotion/capabilities` when `helmGate` is absent. @default 'helm' */
+  helmPath?: string;
+  /** `kong.promotion.helmTimeoutSeconds`, forwarded to `renderCheck`. @default 60 */
+  helmTimeoutSeconds?: number;
 }): Promise<express.Router> {
   const router = Router();
   router.use(express.json());
@@ -193,8 +209,23 @@ export async function createRouter({
     liveConfig: NormalizedConfig,
   ): Promise<{ dir: string; cleanup: () => Promise<void>; check: EquivalenceResult }> {
     const { dir, cleanup } = await client.materializeChart(repo, repo.defaultBranch);
-    const check = await renderCheck({ repoDir: dir, adapter, edits, liveConfig });
+    const check = await renderCheck({ repoDir: dir, adapter, edits, liveConfig, helmPath, helmTimeoutSeconds });
     return { dir, cleanup, check };
+  }
+
+  /**
+   * Gates preview/promote on the startup helm capability probe (helm is a
+   * declared deployment prerequisite — ADR-018): 503 with an actionable
+   * message instead of letting `renderCheck` fail deep inside with a raw
+   * ENOENT. No-op when `helmGate` wasn't wired (promotion disabled, or a
+   * caller that doesn't care about the prerequisite).
+   */
+  async function assertHelmAvailable(): Promise<void> {
+    if (!helmGate) return;
+    const capability = await helmGate.getCapability();
+    if (!capability.available) {
+      throw new ServiceUnavailableError(capability.error);
+    }
   }
 
   async function requesterRef(req: express.Request): Promise<string> {
@@ -599,6 +630,31 @@ export async function createRouter({
     },
   );
 
+  // --- Promotion capabilities (helm-prerequisite follow-up, ADR-018) ---
+
+  // GET /:instance/promotion/capabilities
+  router.get('/:instance/promotion/capabilities', async (req, res) => {
+    await authorize(req, kongPluginsReadPermission);
+
+    const parsed = z.object({ instance: z.string() }).safeParse(req.params);
+    if (!parsed.success) throw new InputError(parsed.error.toString());
+
+    if (!helmGate) {
+      const capabilities: PromotionCapabilities = {
+        helm: {
+          available: false,
+          path: helmPath,
+          error: 'Kong plugin promotion is not enabled on this instance',
+        },
+      };
+      res.json(capabilities);
+      return;
+    }
+
+    const capabilities: PromotionCapabilities = { helm: await helmGate.getCapability() };
+    res.json(capabilities);
+  });
+
   // --- Promote to code (Task P3, design 02) ---
 
   // POST /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote
@@ -610,6 +666,7 @@ export async function createRouter({
       if (!promotionStore || !gitlabClient) {
         throw new ConflictError('Kong plugin promotion is not enabled on this instance');
       }
+      await assertHelmAvailable();
 
       const params = instanceServiceRoutePluginParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());
@@ -729,6 +786,7 @@ export async function createRouter({
       if (!promotionStore || !gitlabClient) {
         throw new ConflictError('Kong plugin promotion is not enabled on this instance');
       }
+      await assertHelmAvailable();
 
       const params = instanceServiceRoutePluginParams.safeParse(req.params);
       if (!params.success) throw new InputError(params.error.toString());

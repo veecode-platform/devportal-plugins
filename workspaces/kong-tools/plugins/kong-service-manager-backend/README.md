@@ -79,6 +79,67 @@ kong:
           value: Bearer ${KONG_PROD_TOKEN}
 ```
 
+### Prerequisites
+
+Promote-to-code (turning an experimental Kong plugin change into a merge
+request against the service's chart) renders the target chart with
+`helm template` before writing, to verify the generated chart reproduces the
+live config. **The `helm` CLI is not bundled with this plugin** — the
+deployment running the backend must provide it and point
+`kong.promotion.helmPath` at it:
+
+```yaml
+kong:
+  promotion:
+    enabled: true
+    helmPath: /opt/helm/helm      # default: "helm" (resolved on PATH)
+    helmTimeoutSeconds: 60         # default: 60
+```
+
+The backend probes `helm` once at startup (and again, lazily, on every
+gated request while it stays unavailable — no restart needed once fixed) and
+never falls back to running it with `$HOME` as its cache/config/data
+directory, since the portal typically runs with a read-only root filesystem.
+
+If `helm` can't be found or run, the plugin doesn't fail to start: routes
+that don't render a chart (browsing services, routes, and plugins; the
+promotion finalizer, which reads Kong's Admin API rather than rendering)
+keep working normally. Only `POST .../promote` and
+`POST .../promote/preview` are affected, and they respond `503` with an
+actionable message instead of a raw error. The frontend also disables the
+"Promote to code" button with the same message as a tooltip once it detects
+this via `GET /:instance/promotion/capabilities`.
+
+**Worked example (generic Kubernetes):** copy a pinned `helm` binary into the
+backend's pod with an init container, and point `helmPath` at the mounted
+copy:
+
+```yaml
+initContainers:
+  - name: helm-provision
+    image: alpine/helm:3.15.0
+    command: ['cp', '/usr/bin/helm', '/opt/helm/helm']
+    volumeMounts:
+      - name: helm-bin
+        mountPath: /opt/helm
+containers:
+  - name: backend
+    # ...
+    volumeMounts:
+      - name: helm-bin
+        mountPath: /opt/helm
+        readOnly: true
+volumes:
+  - name: helm-bin
+    emptyDir: {}
+```
+
+```yaml
+kong:
+  promotion:
+    helmPath: /opt/helm/helm
+```
+
 ### Annotate your catalog entities
 
 Add the `kong-manager/service-name` annotation to any Component that should
@@ -141,6 +202,12 @@ All endpoints are served under `/api/kong-service-manager-backend`.
 | `POST` | `/:instance/routes/:routeId/plugins` | Add plugin to route. |
 | `PATCH` | `/:instance/routes/:routeId/plugins/:pluginId` | Update route plugin. |
 | `DELETE` | `/:instance/routes/:routeId/plugins/:pluginId` | Remove route plugin. |
+
+### Promotion capabilities
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/:instance/promotion/capabilities` | Runtime prerequisites for promote-to-code (currently: helm — see [Prerequisites](#prerequisites)). |
 
 ## RBAC note
 

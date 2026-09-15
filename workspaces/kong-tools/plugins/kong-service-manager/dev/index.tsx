@@ -172,6 +172,7 @@ const mockApi: KongServiceManagerApi = {
   addPluginToRoute: async () => mockPlugin,
   editRoutePlugin: async () => mockPlugin,
   removeRoutePlugin: async () => {},
+  getPromotionCapabilities: async () => ({ helm: { available: true, path: 'helm', version: 'v3.15.0' } }),
   previewPromotion: async () => mockPromotionPreview,
   promotePlugin: async () => mockPromotion,
   discardPromotion: async () => {},

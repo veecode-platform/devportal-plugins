@@ -58,11 +58,13 @@ const mockFetchAvailablePlugins = jest.fn();
 const mockRemoveRoutePlugin = jest.fn();
 const mockFetchPromotions = jest.fn();
 const mockFetchInstances = jest.fn();
+const mockFetchPromotionCapabilities = jest.fn();
 const mockPreviewPromotion = jest.fn();
 const mockPromotePlugin = jest.fn();
 const mockDiscardPromotion = jest.fn();
 
 let mockPromotionsByPluginId: Record<string, unknown[]> = {};
+let mockPromotionCapabilities: { helm: { available: boolean; path: string; error?: string } } | null = null;
 
 jest.mock('@backstage/plugin-catalog-react', () => ({
   useEntity: () => ({ entity: mockEntity }),
@@ -78,12 +80,14 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
       serviceName: 'my-service',
       promotionsByPluginId: mockPromotionsByPluginId,
       kongInstances: [],
+      promotionCapabilities: mockPromotionCapabilities,
     },
     fetchRouteAssociatedPlugins: mockFetchRouteAssociatedPlugins,
     fetchAvailablePlugins: mockFetchAvailablePlugins,
     removeRoutePlugin: mockRemoveRoutePlugin,
     fetchPromotions: mockFetchPromotions,
     fetchInstances: mockFetchInstances,
+    fetchPromotionCapabilities: mockFetchPromotionCapabilities,
     previewPromotion: mockPreviewPromotion,
     promotePlugin: mockPromotePlugin,
     discardPromotion: mockDiscardPromotion,
@@ -98,6 +102,7 @@ describe('RoutePluginsDrawer', () => {
       metadata: { name: 'my-service', annotations: { 'gitlab.com/project-slug': 'team/my-service' } },
     };
     mockPromotionsByPluginId = {};
+    mockPromotionCapabilities = { helm: { available: true, path: 'helm' } };
     mockPreviewPromotion.mockResolvedValue({ files: [], normalizedConfig: {} });
   });
 
@@ -155,6 +160,45 @@ describe('RoutePluginsDrawer', () => {
 
     expect(screen.getByRole('button', { name: /Promote to code/i })).toBeDisabled();
     expect(screen.getByText(/No owning repo/)).toBeInTheDocument();
+  });
+
+  it('fetches promotion capabilities once when opened', () => {
+    mockPromotionCapabilities = null;
+    render(
+      <RoutePluginsDrawer
+        open
+        route={mockRoute}
+        onClose={jest.fn()}
+        onEnablePlugin={jest.fn()}
+        onEditPlugin={jest.fn()}
+        canPromote
+      />,
+    );
+
+    expect(mockFetchPromotionCapabilities).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables promote with the backend message when helm is unavailable', () => {
+    mockPromotionCapabilities = {
+      helm: {
+        available: false,
+        path: '/opt/helm/helm',
+        error: 'promotion unavailable: helm not found at "/opt/helm/helm" — the deployment must provide the helm CLI and point kong.promotion.helmPath at it (see README, "Prerequisites")',
+      },
+    };
+    render(
+      <RoutePluginsDrawer
+        open
+        route={mockRoute}
+        onClose={jest.fn()}
+        onEnablePlugin={jest.fn()}
+        onEditPlugin={jest.fn()}
+        canPromote
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Promote to code/i })).toBeDisabled();
+    expect(screen.getByText(/helm not found at "\/opt\/helm\/helm"/)).toBeInTheDocument();
   });
 
   it('discards an open promotion', async () => {

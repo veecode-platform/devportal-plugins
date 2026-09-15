@@ -10,6 +10,7 @@ import type {
   PromotionRecord,
   PromotionPreview,
   KongInstanceInfo,
+  PromotionCapabilities,
 } from './types';
 
 /** Frontend API contract for Kong Service Manager */
@@ -122,6 +123,9 @@ export interface KongServiceManagerApi {
     routeId: string,
     pluginId: string,
   ): Promise<void>;
+
+  /** Runtime prerequisites for promote-to-code (currently: helm) — fetch once and use it to disable the Promote action when unavailable. */
+  getPromotionCapabilities(instance: string): Promise<PromotionCapabilities>;
 
   /** Dry-run of a promotion — no side effects. Same permission/adapter gate as promote; surfaces a renderCheck mismatch as a 400. */
   previewPromotion(

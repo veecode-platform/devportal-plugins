@@ -210,6 +210,21 @@ export type KongInstanceInfo = {
   defaultTags?: string[];
 };
 
+/**
+ * Runtime prerequisites promote-to-code needs, checked at plugin startup and
+ * re-probed lazily while unavailable (design 02's helm-prerequisite
+ * follow-up, ADR-018). `helm.error`, when present, is the same actionable
+ * message the 503 gate returns — safe to show verbatim in a tooltip.
+ */
+export type PromotionCapabilities = {
+  helm: {
+    available: boolean;
+    path: string;
+    version?: string;
+    error?: string;
+  };
+};
+
 /** Plugin categories enum */
 export enum PluginCategory {
   AI = 'ai',

@@ -18,7 +18,7 @@ else follows from this:
 | How Kong runs | How configuration gets in | What this plugin can do |
 |---|---|---|
 | **With a database** ("db-backed": Kong + PostgreSQL, standalone or hybrid) | Kong's management REST API (the **Admin API**) accepts create/update/delete calls | Full functionality: every action in the portal UI is applied immediately |
-| **Without a database** ("db-less": common when Kong is a Kubernetes ingress controller) | An automated process pushes the complete configuration, generated from files or Kubernetes resources kept in Git | Read-only today: the portal shows routes and plugins, but Kong itself rejects direct writes in this mode. Applying changes from the portal will be possible through the export path (roadmap) |
+| **Without a database** ("db-less": common when Kong is a Kubernetes ingress controller) | An automated process pushes the complete configuration, generated from files or Kubernetes resources kept in Git | Read-only: the portal shows routes and plugins, but Kong itself rejects direct writes in this mode. Path 2 (below) applies to plugins promoted from a db-backed experimentation gateway, not to a db-less one directly |
 
 Not sure which one you run? Call the root of your Admin API (`GET /`) and check the
 `configuration.database` field: `postgres` means db-backed, `off` means db-less.
@@ -37,15 +37,23 @@ immediately. Requirements:
 This is the path to pick when your team manages Kong by hand or wants the portal to be the
 main interface for day-to-day gateway changes.
 
-### Path 2 — the portal produces configuration files (roadmap)
+### Path 2 — the portal produces configuration files
 
-Instead of writing to Kong, the portal exports the change as declarative artifacts — Kubernetes
-resources (for Kong's Ingress Controller) or configuration files (for decK) — that your
+Instead of writing to Kong, the portal exports the change as declarative artifacts that your
 existing automation reviews and applies. Kong itself stays untouched by the portal.
 
 This is the path for teams that manage Kong from Git ("GitOps"): the files in Git remain the
 single source of truth, and portal changes go through the same review pipeline as any other
 change. The trade-off is speed: a change is only live after your pipeline applies it.
+
+**Currently shipped:** promote-to-code for Kong plugins. From an experimental plugin
+created on a db-backed Kong (path 1), the "Promote to code" action on a route plugin
+generates the equivalent chart edit, verifies it renders to the same config, and opens a
+merge request against the service's chart repository — no manual step. This covers plugin
+config only (a route or service's own definition isn't exported yet) and needs the `helm`
+CLI as a deployment prerequisite for the backend (see the `kong-service-manager-backend`
+README, "Prerequisites"). Exporting full Kubernetes resources for an Ingress Controller, or
+decK-format files, remains on the roadmap.
 
 ## Using both: experiment first, make it permanent after
 
@@ -102,6 +110,6 @@ has **no built-in authentication**, so:
 | Your situation | Suggested path |
 |---|---|
 | Kong with a database, changes made by people | Path 1 (direct) |
-| Kong db-less behind an ingress controller, configuration in Git | Read-only today; path 2 (export) when available |
+| Kong db-less behind an ingress controller, configuration in Git | Read-only for that gateway; use path 2 from a separate db-backed experimentation Kong to promote plugin changes into the same chart |
 | Configuration in Git, but developers need to try things quickly | Both: experiment on a db-backed Kong (path 1), promote to Git (path 2) |
 | Multiple teams/tools writing to one gateway | Whatever the path: enforce tag scoping on every writer |

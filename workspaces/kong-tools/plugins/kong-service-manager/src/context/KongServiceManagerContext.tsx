@@ -19,6 +19,7 @@ import {
   type PromotionRecord,
   type PromotionPreview,
   type KongInstanceInfo,
+  type PromotionCapabilities,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 type State = {
@@ -35,6 +36,8 @@ type State = {
   promotionsByPluginId: Record<string, PromotionRecord[]>;
   /** Configured Kong instances, including ownership-marker defaultTags — empty until fetchInstances resolves. */
   kongInstances: KongInstanceInfo[];
+  /** Runtime prerequisites for promote-to-code (currently: helm) — null until the drawer's first fetch. */
+  promotionCapabilities: PromotionCapabilities | null;
   loading: boolean;
   error: string | null;
 };
@@ -51,6 +54,7 @@ type Action =
   | { type: 'SET_PLUGIN_FIELDS'; data: PluginFieldsResponse | null }
   | { type: 'SET_PROMOTIONS_FOR_PLUGIN'; pluginId: string; data: PromotionRecord[] }
   | { type: 'SET_KONG_INSTANCES'; data: KongInstanceInfo[] }
+  | { type: 'SET_PROMOTION_CAPABILITIES'; data: PromotionCapabilities }
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null };
 
@@ -84,6 +88,8 @@ function reducer(state: State, action: Action): State {
       };
     case 'SET_KONG_INSTANCES':
       return { ...state, kongInstances: action.data };
+    case 'SET_PROMOTION_CAPABILITIES':
+      return { ...state, promotionCapabilities: action.data };
     case 'SET_LOADING':
       return { ...state, loading: action.loading };
     case 'SET_ERROR':
@@ -105,6 +111,7 @@ const initialState: State = {
   pluginFields: null,
   promotionsByPluginId: {},
   kongInstances: [],
+  promotionCapabilities: null,
   loading: false,
   error: null,
 };
@@ -133,6 +140,7 @@ type KongServiceManagerContextValue = {
   fetchPromotions: (routeId: string, pluginId: string) => Promise<void>;
   /** Fetches the configured Kong instances (for ownership-marker defaultTags). Best-effort: a denied/failed call leaves `kongInstances` empty rather than surfacing the global error, since only the promotion badge depends on it and an empty list degrades safely to "no ownership gate". */
   fetchInstances: () => Promise<void>;
+  fetchPromotionCapabilities: () => Promise<void>;
   previewPromotion: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionPreview>;
   promotePlugin: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionRecord>;
   discardPromotion: (routeId: string, pluginId: string) => Promise<void>;
@@ -409,6 +417,13 @@ export function KongServiceManagerProvider({
     }
   }, [api]);
 
+  const fetchPromotionCapabilities = useCallback(async () => {
+    await withLoading(async () => {
+      const data = await api.getPromotionCapabilities(state.instance);
+      dispatch({ type: 'SET_PROMOTION_CAPABILITIES', data });
+    });
+  }, [api, state.instance, withLoading]);
+
   // No side effects (design 02's preview) and dialog-scoped — unlike the
   // other actions this deliberately skips withLoading/dispatch so a preview
   // never toggles the page-wide loading spinner or surfaces its error in the
@@ -467,6 +482,7 @@ export function KongServiceManagerProvider({
       removeRoutePlugin,
       fetchPromotions,
       fetchInstances,
+      fetchPromotionCapabilities,
       previewPromotion,
       promotePlugin: promotePluginAction,
       discardPromotion,
@@ -494,6 +510,7 @@ export function KongServiceManagerProvider({
       removeRoutePlugin,
       fetchPromotions,
       fetchInstances,
+      fetchPromotionCapabilities,
       previewPromotion,
       promotePluginAction,
       discardPromotion,

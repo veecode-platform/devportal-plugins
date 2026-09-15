@@ -89,6 +89,7 @@ export function RoutePluginsDrawer({
     removeRoutePlugin,
     fetchPromotions,
     fetchInstances,
+    fetchPromotionCapabilities,
     promotePlugin,
     discardPromotion,
   } = useKongServiceManager();
@@ -102,6 +103,7 @@ export function RoutePluginsDrawer({
     serviceName,
     promotionsByPluginId,
     kongInstances,
+    promotionCapabilities,
   } = state;
 
   const [search, setSearch] = useState('');
@@ -112,9 +114,14 @@ export function RoutePluginsDrawer({
   const [reviewError, setReviewError] = useState<string | null>(null);
 
   const entityRef = useMemo(() => stringifyEntityRef(entity), [entity]);
-  const promoteDisabledReason = entity.metadata.annotations?.[GITLAB_PROJECT_SLUG_ANNOTATION]
-    ? undefined
-    : PURE_ROUTE_REASON;
+  // Pure-route (no owning repo) takes priority — helm availability is moot
+  // when there's nowhere to promote to. Otherwise, an unavailable helm
+  // prerequisite reuses the backend's own actionable message verbatim.
+  const promoteDisabledReason = !entity.metadata.annotations?.[GITLAB_PROJECT_SLUG_ANNOTATION]
+    ? PURE_ROUTE_REASON
+    : promotionCapabilities && !promotionCapabilities.helm.available
+      ? promotionCapabilities.helm.error
+      : undefined;
 
   useEffect(() => {
     if (open && route && instance && serviceName) {
@@ -137,6 +144,14 @@ export function RoutePluginsDrawer({
     fetchInstances,
     kongInstances.length,
   ]);
+
+  // Fetched once per drawer session — helm availability doesn't change
+  // request-to-request, and a fixed deployment is picked up on next open.
+  useEffect(() => {
+    if (open && instance && promotionCapabilities === null) {
+      fetchPromotionCapabilities();
+    }
+  }, [open, instance, promotionCapabilities, fetchPromotionCapabilities]);
 
   useEffect(() => {
     if (!open) {
