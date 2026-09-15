@@ -111,6 +111,15 @@ default (`{{ .Values.image.tag | default .Chart.AppVersion }}`) and keep the
 relies on: values that only CI overrides never influence the rendered
 `KongPlugin` objects — only those are compared.
 
+**The deploy job must declare a GitLab `environment:`.** The promotion
+finalizer decides "the merge was deployed" from the GitLab *deployments* API
+(a successful deployment of the default branch created at or after the merge —
+ADR-019), not from pipeline status: a pipeline with a blocking manual job
+(e.g. a teardown job with `allow_failure: false`) reports `manual`, never
+`success`. Without an `environment:` on the deploy job no deployment is
+recorded, and the finalizer falls back to "a successful pipeline for a commit
+at or after the merge" — which such pipelines never satisfy.
+
 If `helm` can't be found or run, the plugin doesn't fail to start: routes
 that don't render a chart (browsing services, routes, and plugins; the
 promotion finalizer, which reads Kong's Admin API rather than rendering)

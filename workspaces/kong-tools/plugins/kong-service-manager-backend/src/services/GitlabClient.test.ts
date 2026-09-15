@@ -350,14 +350,70 @@ describe('GitlabClient', () => {
 
   describe('hasSuccessfulDeployAtOrAfter', () => {
     const repo = { host: 'gitlab.example.com', projectSlug: 'group/box' };
+    const since = '2026-09-01T00:00:00Z';
+    const noDeployments = rest.get(
+      'https://gitlab.example.com/api/v4/projects/group%2Fbox/deployments',
+      (_req, res, ctx) => res(ctx.json([])),
+    );
 
-    it('is true when a successful pipeline ran for a commit at or after "since"', async () => {
+    it('is true on a successful deployment of the ref created at or after "since" — pipeline status is not consulted (ADR-019)', async () => {
+      let pipelinesQueried = false;
       server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/deployments',
+          (req, res, ctx) => {
+            expect(req.url.searchParams.get('status')).toBe('success');
+            expect(req.url.searchParams.get('updated_after')).toBe(since);
+            return res(
+              ctx.json([
+                { id: 7, sha: 'merge-sha', ref: 'main', status: 'success', created_at: '2026-09-01T00:02:00Z' },
+              ]),
+            );
+          },
+        ),
+        rest.get('https://gitlab.example.com/api/v4/projects/group%2Fbox/pipelines', (_req, res, ctx) => {
+          pipelinesQueried = true;
+          return res(ctx.json([]));
+        }),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(client.hasSuccessfulDeployAtOrAfter(repo, 'main', since)).resolves.toBe(true);
+      expect(pipelinesQueried).toBe(false);
+    });
+
+    it('ignores deployments of another ref or created before "since"', async () => {
+      server.use(
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/deployments',
+          (_req, res, ctx) =>
+            res(
+              ctx.json([
+                { id: 8, sha: 'feature-sha', ref: 'feature/x', status: 'success', created_at: '2026-09-01T00:05:00Z' },
+                { id: 6, sha: 'old-sha', ref: 'main', status: 'success', created_at: '2026-08-31T23:59:00Z' },
+              ]),
+            ),
+        ),
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/commits',
+          (_req, res, ctx) => res(ctx.json([{ id: 'merge-sha' }])),
+        ),
+        rest.get(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/pipelines',
+          (_req, res, ctx) => res(ctx.json([{ id: 1, sha: 'stale-sha' }])),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(client.hasSuccessfulDeployAtOrAfter(repo, 'main', since)).resolves.toBe(false);
+    });
+
+    it('falls back to a successful pipeline for a commit at or after "since" when the repo records no deployments', async () => {
+      server.use(
+        noDeployments,
         rest.get(
           'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/commits',
           (req, res, ctx) => {
             expect(req.url.searchParams.get('ref_name')).toBe('main');
-            expect(req.url.searchParams.get('since')).toBe('2026-09-01T00:00:00Z');
+            expect(req.url.searchParams.get('since')).toBe(since);
             return res(ctx.json([{ id: 'merge-sha' }, { id: 'later-sha' }]));
           },
         ),
@@ -370,13 +426,12 @@ describe('GitlabClient', () => {
         ),
       );
       const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
-      await expect(
-        client.hasSuccessfulDeployAtOrAfter(repo, 'main', '2026-09-01T00:00:00Z'),
-      ).resolves.toBe(true);
+      await expect(client.hasSuccessfulDeployAtOrAfter(repo, 'main', since)).resolves.toBe(true);
     });
 
-    it('is false when every successful pipeline predates "since"', async () => {
+    it('is false when there are no deployments and every successful pipeline predates "since"', async () => {
       server.use(
+        noDeployments,
         rest.get(
           'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/commits',
           (_req, res, ctx) => res(ctx.json([{ id: 'merge-sha' }])),
@@ -387,9 +442,7 @@ describe('GitlabClient', () => {
         ),
       );
       const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
-      await expect(
-        client.hasSuccessfulDeployAtOrAfter(repo, 'main', '2026-09-01T00:00:00Z'),
-      ).resolves.toBe(false);
+      await expect(client.hasSuccessfulDeployAtOrAfter(repo, 'main', since)).resolves.toBe(false);
     });
   });
 

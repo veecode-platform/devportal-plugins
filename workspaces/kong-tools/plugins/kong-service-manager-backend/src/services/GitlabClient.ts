@@ -311,17 +311,50 @@ export class GitlabClient {
   }
 
   /**
-   * Design 02's "successful deploy pipeline of the merge commit (or newer)
-   * on the default branch": true once a successful pipeline exists for a
-   * commit at or after `since` — never assumes the merge itself deployed
-   * anything (a service with auto-deploy off just never returns true here,
-   * and the finalizer stays parked).
+   * Successful GitLab deployments of `ref` created at or after `since`
+   * (a `merged_at`-style ISO timestamp). A deployment record exists only when
+   * the deploy job declares an `environment:`; `created_at` is when that job
+   * started, so a record at/after the merge timestamp deployed the merge
+   * commit or a descendant of it.
+   */
+  async listSuccessfulDeploymentsSince(
+    repo: { host: string; projectSlug: string },
+    ref: string,
+    since: string,
+  ): Promise<Array<{ id: number; sha: string; ref: string; createdAt: string }>> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    const deployments = await this.call<
+      Array<{ id: number; sha: string; ref: string; status: string; created_at: string }>
+    >(
+      token,
+      `${base}/deployments?status=success&updated_after=${encodeURIComponent(since)}&order_by=created_at&sort=desc&per_page=100`,
+    );
+    const sinceMs = Date.parse(since);
+    return deployments
+      .filter(d => d.ref === ref && d.status === 'success' && Date.parse(d.created_at) >= sinceMs)
+      .map(d => ({ id: d.id, sha: d.sha, ref: d.ref, createdAt: d.created_at }));
+  }
+
+  /**
+   * Design 02's "successful deploy of the merge commit (or newer) on the
+   * default branch". Primary signal (ADR-019): a successful GitLab
+   * *deployment* of `ref` created at or after `since` — pipeline status is
+   * not a deploy signal, because a pipeline carrying a blocking manual job
+   * (the golden path's `destroy`, `allow_failure: false`) reports `manual`
+   * forever, never `success`. Fallback for repos whose deploy job declares no
+   * `environment:` (so no deployment records exist): a successful pipeline
+   * for a commit at or after `since`. Never assumes the merge itself deployed
+   * anything — a service with auto-deploy off just never returns true here,
+   * and the finalizer stays parked.
    */
   async hasSuccessfulDeployAtOrAfter(
     repo: { host: string; projectSlug: string },
     ref: string,
     since: string,
   ): Promise<boolean> {
+    const deployments = await this.listSuccessfulDeploymentsSince(repo, ref, since);
+    if (deployments.length > 0) return true;
+
     const [shas, pipelines] = await Promise.all([
       this.listCommitShasSince(repo, ref, since),
       this.listSuccessfulPipelines(repo, ref),
