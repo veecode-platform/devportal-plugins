@@ -11,7 +11,7 @@ AWS Cost Explorer spend inside the catalog (per user group, per linked account o
 - `plugins/cost-insights-common` — `@aws/cost-insights-plugin-for-backstage-common`, vendored. Annotation constants (`aws.amazon.com/cost-insights-tags`, `aws.amazon.com/cost-insights-cost-categories`, `aws.amazon.com/account-id`) and `costInsightsAwsReadPermission`.
 - `plugins/aws-core-common` — `@aws/aws-core-plugin-for-backstage-common`, vendored. `getOneOfEntityAnnotations`, `generateShortcutLink`, `AWS_SDK_CUSTOM_USER_AGENT`.
 
-Each `@aws` package carries a `NOTICE`: vendored from `awslabs/backstage-plugins-for-aws` through the retired fork `veecode-platform/backstage-plugins-for-aws` at commit `cf408c11`, Apache-2.0, with VeeCode modifications (RBAC permission gate, org-wide route, per-account projects, entity account-id filter). The NOTICE cites "ADR-011 in devportal-planning"; that citation is unresolved (planning repository ghost register, row #1). Leave it exactly as written.
+Each `@aws` package carries a `NOTICE`: vendored from `awslabs/backstage-plugins-for-aws` through the retired fork `veecode-platform/backstage-plugins-for-aws` at commit `cf408c11`, Apache-2.0, with VeeCode modifications (RBAC permission gate, org-wide route, per-account projects, entity account-id filter). Each NOTICE cites `aws-cost-insights PDR-001` in [`DECISIONS.md`](DECISIONS.md) for those modifications.
 
 ## Layout
 
@@ -126,4 +126,6 @@ Only the frontend is exported: `make build-dynamic` or `yarn export-dynamic` pro
 
 ## Decisions
 
-No `DECISIONS.md` in this workspace. If one is added, entries are plugin decision records (`PDR-NNN`), cited as `aws-cost-insights PDR-NNN`. Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.
+Design decisions live in [`DECISIONS.md`](DECISIONS.md) as plugin decision records, cited elsewhere as `aws-cost-insights PDR-NNN`, never as ADRs. `PDR-001` records why the `@aws` packages are vendored rather than forked and what VeeCode changed in them; `PDR-002` records the byte-parity gate used to prove the cutover and its removal the next day. New entries start at `PDR-003`.
+
+Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.
