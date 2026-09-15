@@ -74,8 +74,8 @@ None. The plugin calls no backend and reads no config; it needs only `@backstage
 ## Gotchas
 
 - `backstage.json` says 1.49.4 (matching `backstage.supported-versions` in the plugin) while the DevPortal host declares 1.52.0. Moving workspaces onto the host line is planned in the planning repository (ADR-0004; dummy first in M6, the others follow); do not bump ad hoc. `yarn update-backstage` bumps to latest, unpinned.
-- `ADR-011` ("frontend design system", "phase 1", "phase E", "validation criterion #5") is cited in `README.md`, `src/index.ts`, `src/styles/bui-tokens.css`, `src/themes/veecodeLight.ts` and `src/themes/veecodeDark.ts`. No such document exists anywhere; it is ghost #2 in the planning repository. Leave the citations as written until that row is resolved.
-- The README's "How it's wired" and "Build" sections, and the config file named in the `src/plugin.ts` / `src/providers.tsx` comments, describe a retired enablement path from a repository that no longer exists (ghost #10 in the planning repository). Follow the Makefile and the `export-dynamic` script instead; do not copy those steps into other docs.
+- The sources used to cite an `ADR-011` ("frontend design system") that exists in no repository. The mechanism it described is recorded in [`DECISIONS.md`](DECISIONS.md) as `veecode-theme PDR-001`, and the four source comments now cite that. Its "phase 1" and "phase E" numbering is deliberately not carried over: the phase plan lived in the missing document.
+- The config file named in the `src/plugin.ts` and `src/providers.tsx` comments belongs to a retired enablement path from a repository that no longer exists. Follow the Makefile and the `export-dynamic` script instead, and read `PDR-001` for the mechanism; do not copy those steps into other docs.
 - `src/index.ts` states that the CSS import breaks `backstage-cli package build` (Rollup) and that `export-dynamic` needs only `tsc`. `make build-dynamic` nevertheless depends on `make build`, which runs `yarn build:all`. This file does not verify either claim; check the actual behavior before relying on those targets.
 - Names are load-bearing and differ from the scoped `@veecode-platform/...` packages elsewhere in the repository: the npm name is unscoped (`veecode-platform-plugin-veecode-theme`), the scalprum name uses a dot (`veecode-platform.plugin-veecode-theme`), the plugin id is `veecode-theme`. Renaming any of them renames the dynamic artifact or the host config key.
 - `make build-dynamic` deletes `remoteEntry.js`, `mf-manifest.json`, `mf-stats.json`, `@mf-types` and `compiled-types` from `dist/` before exporting, as dummy does; keep that step.
@@ -83,4 +83,6 @@ None. The plugin calls no backend and reads no config; it needs only `@backstage
 
 ## Decisions
 
-No `DECISIONS.md` in this workspace. If one is added, entries are plugin decision records (`PDR-NNN`), cited as `veecode-theme PDR-NNN`. Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`; product decisions about the theme, including whether a host enables it by default, live there.
+Design decisions live in [`DECISIONS.md`](DECISIONS.md) as plugin decision records, cited elsewhere as `veecode-theme PDR-NNN`, never as ADRs. `PDR-001` records the three mechanisms that govern how this theme reaches a portal (delivery as a dynamic plugin, replacement by id collision, and brand CSS shipped inside the bundle) together with the current implementation's known limitations. New entries start at `PDR-002`.
+
+Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`; product decisions about the theme, including whether a host enables it by default, live there.

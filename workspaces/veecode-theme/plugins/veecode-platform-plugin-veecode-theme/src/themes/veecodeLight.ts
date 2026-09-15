@@ -12,7 +12,7 @@ const sidebar = '#1b1f23';
 
 const header = genPageTheme({ colors: [accent, accentBright], shape: shapes.wave });
 
-/** The VeeCode light theme. POC palette — refined in ADR-011 phase E. */
+/** The VeeCode light theme. POC palette; see veecode-theme PDR-001. */
 export const veecodeLight = createUnifiedTheme({
   palette: {
     ...palettes.light,
