@@ -192,6 +192,20 @@ describe('KongServiceManagerClient', () => {
 
   // --- Promotion methods (design 02 / plan P5) ---
 
+  it('constructs correct URL for getPromotionCapabilities', async () => {
+    const { client, mockFetch } = createMocks();
+    const mockCapabilities = { helm: { available: true, path: 'helm', version: 'v3.15.0' } };
+    mockFetch.mockResolvedValue(jsonResponse(mockCapabilities));
+
+    const result = await client.getPromotionCapabilities('default');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/promotion/capabilities`,
+      expect.anything(),
+    );
+    expect(result).toEqual(mockCapabilities);
+  });
+
   it('constructs correct URL and body for previewPromotion', async () => {
     const { client, mockFetch } = createMocks();
     const mockPreview = { files: [{ path: 'chart/values.yaml', content: 'kong: {}\n' }], normalizedConfig: { minute: 60 } };
