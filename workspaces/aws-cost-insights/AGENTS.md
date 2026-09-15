@@ -128,4 +128,6 @@ Only the frontend is exported: `make build-dynamic` or `yarn export-dynamic` pro
 
 Design decisions live in [`DECISIONS.md`](DECISIONS.md) as plugin decision records, cited elsewhere as `aws-cost-insights PDR-NNN`, never as ADRs. `PDR-001` records why the `@aws` packages are vendored rather than forked and what VeeCode changed in them; `PDR-002` records the byte-parity gate used to prove the cutover and its removal the next day. New entries start at `PDR-003`.
 
+The sibling `aws-s3-catalog` workspace took its own decisions on the same questions and keeps its own log; the two are independent records, not one decision spanning both.
+
 Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.

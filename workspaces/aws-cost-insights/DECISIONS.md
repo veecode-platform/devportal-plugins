@@ -25,9 +25,10 @@ copyright Amazon.com, Inc. or its affiliates:
 `plugins/aws-cost-insights` (`@veecode-platform/plugin-aws-cost-insights`) is in-house and
 is not vendored.
 
-The same decision covered the sibling `aws-s3-catalog` workspace, whose module was vendored
-from the same fork commit in the same pull request. Its `NOTICE` records the provenance but
-cites no decision record, because that package carries no VeeCode modification.
+The sibling `aws-s3-catalog` workspace faced the same question at the same time and answered
+it the same way, but that is its own decision and its own record (`aws-s3-catalog PDR-001`).
+The two are independent, not one decision spanning both: this workspace vendored packages it
+goes on to modify, while that one vendored a wrapper it keeps unmodified.
 
 **The VeeCode modifications carried in the vendored backend** are the four the `NOTICE`
 files name: an RBAC permission gate (every `/v1/*` route requires
@@ -66,10 +67,10 @@ vendored file:
    versions at once, so both locks were regenerated from the fork's lock at `cf408c11`, the
    input that produced the running images.
 
-The gate was verified per plugin against the production bundles, compared recursively at
-every `node_modules` depth: 205 against 205 packages for the backend, 238 against 238 for the
-S3 module, nothing extra on either side, all 9 and 25 multi-version packages reproduced, and
-a byte diff of a single line, the intended version field.
+The gate was verified against the production bundle, compared recursively at every
+`node_modules` depth: 205 packages against 205, nothing extra on either side, all 9
+multi-version packages reproduced, and a byte diff of a single line, the intended version
+field.
 
 **Amendment, 2026-09-09.** The scaffolding was removed as planned. `@backstage/cli` returned
 to `^0.36.0`, `typescript` to `~5.8.0`, and the esbuild and `@backstage/plugin-catalog-node`
