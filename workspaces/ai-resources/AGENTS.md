@@ -79,8 +79,10 @@ None. The module has no external service, no configuration schema (`config.d.ts`
 - The tilde pins on `@backstage/catalog-model` (`~1.9.0`) and `@backstage/plugin-catalog-node` (`~2.2.2`) are deliberate (`src/module.ts`). The automated update runs `backstage-cli versions:bump` in every workspace with a `package.json`, this one included; review any change to those two ranges against the host image before merging.
 - `aiResourceEntityModel`, `mcpServerApiEntityModel`, `CatalogModelSources` and `catalogModelExtensionPoint` are only available from the `/alpha` entry points of their packages.
 - `backstage.json` says 1.52.0, the release the DevPortal host declares (see dummy's Gotchas).
-- The plugin README and `src/module.ts` cite `devportal-planning ADR-007`. That is a different ADR series from `plugins ADR-NNNN`; leave the citation exactly as written.
+- `src/module.ts` cites `devportal-planning ADR-007`, the fork mission's product decision to catalog AI resources at all. That is a different series from `plugins ADR-NNNN`, it lives in a repository that is not part of this workspace shell, and it is not ours to restate; leave the citation as written. How this module implements it is [`PDR-001`](DECISIONS.md).
 
 ## Decisions
 
-No `DECISIONS.md` in this workspace. If one is added, entries are plugin decision records (`PDR-NNN`), cited as `ai-resources PDR-NNN`. Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`. The record behind this module is `devportal-planning ADR-007`, as cited in `src/module.ts` and the plugin README; it belongs to a separate series and is not a `plugins ADR`.
+Design decisions live in [`DECISIONS.md`](DECISIONS.md) as plugin decision records, cited elsewhere as `ai-resources PDR-NNN`, never as ADRs. `PDR-001` records why the module is registration-only and why its pins track the host's model version; read it before widening a dependency range. New entries start at `PDR-002`.
+
+The product decision this module implements, whether the DevPortal catalogs AI resources and why it activates core's `AiResource` kind, belongs to the RHDH-fork mission as `devportal-planning ADR-007`. Cross-workspace decisions for this program are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.

@@ -8,8 +8,10 @@ export.
 
 It is registration-only — no schema, validator, processor, or relation logic
 lives here. Everything comes from the host's own catalog-model, so the kind's
-vocabulary advances automatically when the DevPortal image upgrades. See
-devportal-planning ADR-007 for the decision record.
+vocabulary advances automatically when the DevPortal image upgrades. The
+dependency pins deliberately track the model version verified against that
+image, so this module can never register schemas the host does not itself
+carry. See `DECISIONS.md` at the root of this workspace, entry `PDR-001`.
 
 Deployments enabling this module must also allow the kind in `catalog.rules`:
 
