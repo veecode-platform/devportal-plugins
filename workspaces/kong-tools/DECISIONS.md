@@ -284,3 +284,38 @@ the signal to the same `defaultTags` the portal already writes at create
 time (ADR predates this doc — see `KongInstanceConfig.defaultTags`) means an
 operator who has not opted into tagging gets no gate at all, matching the
 plugin's existing "stays unopinionated about coexistence strategy" stance.
+
+## ADR-018: Helm Is a Declared Deployment Prerequisite, Detected at Startup
+
+**Date:** 2026-09
+**Status:** Accepted
+
+`renderCheck` (ADR-013, used by both promote and preview) shells out to
+`helm template` to verify a generated chart reproduces the live config. A
+production deployment hit this as a `500 helm CLI not found on PATH` on the
+preview endpoint — the portal image doesn't bundle helm, and that dependency
+was never declared. `kong.promotion.helmPath` (default `helm`, resolved on
+PATH) and `kong.promotion.helmTimeoutSeconds` make the prerequisite
+explicit; the backend probes it once at startup, logs a warning naming the
+configured path when it's missing, and gates `POST .../promote` and
+`POST .../promote/preview` on the result — `503` with an actionable message
+instead of a raw exec failure deep inside `renderCheck`. The gate re-probes
+lazily on every gated request while unavailable, so a deployment that fixes
+the prerequisite recovers without a backend restart, and stops re-probing
+once healthy. `GET /:instance/promotion/capabilities` exposes the same
+result so the frontend can disable "Promote to code" with the identical
+message as a tooltip instead of letting the user hit the 503. Every `helm
+template` invocation runs against a per-call scratch directory
+(`HELM_CACHE_HOME`/`HELM_CONFIG_HOME`/`HELM_DATA_HOME`), since the portal
+runs with a read-only root filesystem and helm's defaults for those write
+under `$HOME`.
+
+Options considered: bundling a pinned `helm` binary in the npm package (ties
+a binary release to every plugin version bump, and gives the package
+platform-specific variants); a from-scratch JS re-implementation of `helm
+template` (large surface, permanent drift risk against real Helm semantics);
+moving the render to CI instead of the backend (breaks the promote/preview
+request-response cycle — the equivalence check is inline for a reason: a
+mismatch aborts before any write). Declared prerequisite plus graceful
+degradation keeps the real Helm engine (no semantic risk) while making the
+dependency visible and the failure mode actionable instead of silent.
