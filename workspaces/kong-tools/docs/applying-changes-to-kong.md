@@ -8,7 +8,7 @@ modes.
 
 A deliberate product decision: the plugin supports both paths and does not enforce either.
 The team deploying the portal should read this page and recommend one path for its own
-context. (Recorded internally as plugins ADR-0005.)
+context. (Recorded as kong-tools PDR-016 in the workspace's DECISIONS.md.)
 
 ## First: how do you run Kong?
 

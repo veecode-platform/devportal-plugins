@@ -4,7 +4,7 @@ Workspace-local design decisions for `kong-tools`, numbered `PDR-001`, `PDR-002`
 cited outside this workspace as `kong-tools PDR-NNN`. They are plugin decision records, not
 ADRs: decisions with cross-workspace or lasting weight live in the planning repository
 `veecode-platform/devportal-plugins-parent` as `plugins ADR-NNNN`. Entries 001–015 were
-written as `ADR-NNN` and renamed on 2026-09-14; new entries start at `PDR-016`.
+written as `ADR-NNN` and renamed on 2026-09-14; new entries start at `PDR-017`.
 
 Entries 001–011 were taken during the migration of the kong-service-manager plugins from
 [platform-backstage-plugins](https://github.com/veecode-platform/platform-backstage-plugins)
@@ -235,3 +235,64 @@ interval, which the spec's "no manual step" acceptance still satisfies).
 Reaping coordinate-less drafts would require distinguishing "abandoned" from
 "in flight", which the record cannot express; resuming on re-promote is the
 safe recovery path.
+
+## PDR-016: Two Ways of Applying Changes to Kong, With No Default
+
+**Date:** 2026-09-10 (owner decision); recorded here 2026-09-15
+**Status:** Accepted
+**Deciders:** André Fernandes (program owner), Giovani Corrêa
+
+This plugin lets a developer manage Kong from the portal: create routes, enable and disable
+Kong plugins on a service. It does that today by calling Kong's Admin API directly, which
+requires a Kong running in database-backed mode.
+
+Many teams run Kong differently. The gateway's configuration is generated from files or
+Kubernetes resources kept in Git, and an automated process applies them through Kong's Ingress
+Controller, decK or similar. In that model the gateway either rejects direct writes
+(database-less mode) or an automated sync overwrites them, so the same button in the portal is
+"works instantly" for one customer and "does nothing" for another.
+
+**Decision:**
+
+1. The plugin supports **two write paths**: direct writes to the Admin API, immediate, for
+   database-backed gateways; and export of the same change as declarative artifacts
+   (Kubernetes resources or configuration files) for teams that manage Kong from Git.
+2. The plugin ships **no default and enforces neither path**. The documentation describes both
+   with their requirements and trade-offs, and the team deploying the portal recommends a path
+   for its own context.
+3. Every entity the plugin creates through the Admin API carries a distinctive, configurable
+   tag, so an automated sync scoped by its own tags leaves portal-created entities alone. This
+   is the coexistence convention Kong's own tooling uses.
+4. This workspace carries a deployment blueprint, the "which path fits my setup" guide, written
+   for readers with no prior context: [`docs/applying-changes-to-kong.md`](docs/applying-changes-to-kong.md).
+
+**Evidence gathered before deciding** (research 2026-09-10, primary sources): Kong's Ingress
+Controller only reconciles entities carrying its own tag, `managed-by-ingress-controller` by
+default, and preserves entities another tool created with a different tag, verified in the
+controller's source (KIC 3.x, `go-database-reconciler`) and a mechanism present since 2019
+(issues #105, #219, #246). decK documents the same pattern with `select_tags`, which "ignores
+any resources that don't have that tag", and Kong's federated-configuration guide builds on it.
+Kong's own commercial product, Konnect, enforces no lock between its UI, the Admin API and
+decK; coexistence there is also convention by tags. Across the gateway market the surviving
+patterns are read-only UIs or UIs that write through the declarative pipeline; UIs writing to
+the same store as an automated sync with no safeguard are discouraged even by their own
+communities, for example the APISIX Dashboard.
+
+**Rationale:** one plugin serves both operating models instead of two forks, the
+experiment-then-promote workflow becomes possible, and no customer is forced to change how they
+operate Kong. The trade-offs are real and accepted: the tag convention is cooperative rather
+than enforced, since Kong has no ownership concept, so a misconfigured sync that scopes no tags
+can still wipe portal entities; and supporting two paths costs more documentation and, once
+export lands, more code.
+
+**Alternatives considered:** an opinionated default, with the plugin recommending one path,
+rejected by the program owner because deployers know their own context, so the plugin documents
+and the deployer recommends. Admin API only, the status quo, rejected because it excludes every
+customer running Kong database-less behind an ingress controller, including VeeCode's own
+internal portal. Declarative export only, rejected because it loses the instant feedback that
+makes the portal useful as an experimentation surface and punishes customers already running
+database-backed Kong.
+
+**Follow-ups:** the declarative-export feature design, and name-collision handling between
+portal-created routes and Git-managed ones. The deployment blueprint named above has since been
+written.

@@ -9,7 +9,7 @@ they survive — depends on how your team runs Kong. Read
 [Applying changes to Kong: pick the path that matches your setup](docs/applying-changes-to-kong.md)
 before installing this plugin anywhere. The plugin supports two paths (direct writes and,
 on the roadmap, export as configuration files) and deliberately recommends neither — that
-choice belongs to the team deploying it (recorded internally as plugins ADR-0005).
+choice belongs to the team deploying it (recorded as kong-tools PDR-016 in DECISIONS.md).
 
 ## Reference implementation
 

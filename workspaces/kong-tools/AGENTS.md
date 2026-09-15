@@ -96,4 +96,6 @@ docker compose up
 
 Design decisions for these plugins live in [`DECISIONS.md`](DECISIONS.md) as plugin decision records `PDR-001` to `PDR-015`, cited elsewhere as `kong-tools PDR-NNN`. New entries start at `PDR-016`. They are never called ADRs.
 
-Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`. `plugins ADR-0005` is the one that matters here: the plugin supports both direct Admin API writes and export as declarative artifacts, and ships no default. [`docs/applying-changes-to-kong.md`](docs/applying-changes-to-kong.md) is its consumer-facing explanation.
+`PDR-016` is the one to read before changing how the plugin writes to Kong: two write paths, no default, and a tag convention so an automated sync leaves portal-created entities alone. [`docs/applying-changes-to-kong.md`](docs/applying-changes-to-kong.md) is its consumer-facing explanation.
+
+Cross-workspace decisions are `plugins ADR-NNNN` in the planning repository `veecode-platform/devportal-plugins-parent`.
