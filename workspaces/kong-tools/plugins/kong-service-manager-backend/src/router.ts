@@ -39,6 +39,13 @@ import type { PromotionRecordRow, PromotionStore } from './services/promotionSto
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
 import { EXPERIMENTAL_TAG_PREFIX } from './services/promotionTags';
 
+/**
+ * States whose `detail` column carries a human-readable failure message
+ * rather than internal MR-coordinates JSON, and may therefore cross the API
+ * boundary (ADR-016, extended by ADR-020 with `failed`).
+ */
+const FAILURE_STATES: ReadonlySet<PromotionState> = new Set<PromotionState>(['failed', 'failed-restored']);
+
 interface PromotionDto {
   id: number;
   instance: string;
@@ -50,7 +57,7 @@ interface PromotionDto {
   requesterRef: string;
   createdAt: string;
   updatedAt: string;
-  /** Human-readable failure detail — only ever populated in `failed-restored` (see `promotionFinalizer`). In every other state the column carries MR-coordinates JSON, which is internal bookkeeping and never reaches the client. */
+  /** Human-readable failure detail — only ever populated in a failure state (see `promotionFinalizer`). In every other state the column carries MR-coordinates JSON, which is internal bookkeeping and never reaches the client. */
   detail?: string;
 }
 
@@ -66,7 +73,7 @@ function toPromotionDto(row: PromotionRecordRow): PromotionDto {
     requesterRef: row.requester_ref,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
-    detail: row.state === 'failed-restored' && row.detail ? row.detail : undefined,
+    detail: FAILURE_STATES.has(row.state) && row.detail ? row.detail : undefined,
   };
 }
 

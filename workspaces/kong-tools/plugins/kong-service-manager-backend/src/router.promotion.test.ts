@@ -636,7 +636,7 @@ describe('promote to code (Task P3)', () => {
       expect(res.body).toEqual([]);
     });
 
-    it('exposes detail only for failed-restored records, never for the MR-coordinates JSON of an active state', async () => {
+    it('exposes detail only for failure records, never for the MR-coordinates JSON of an active state', async () => {
       const kongService = kongServiceMock();
       kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
 
@@ -653,6 +653,11 @@ describe('promote to code (Task P3)', () => {
           mr_ref: mr.webUrl,
           detail: JSON.stringify({ host: repo.host, projectSlug: repo.projectSlug, projectId: mr.projectId, iid: mr.iid }),
         }),
+        draftRow({
+          id: 4,
+          state: 'failed',
+          detail: "code-owned 'rate-limiting' plugin did not converge on route 'route-1' within 10 min",
+        }),
       ]);
 
       const app = await buildApp({ kongService, promotionStore, gitlabClient: gitlabClientMock() });
@@ -661,8 +666,10 @@ describe('promote to code (Task P3)', () => {
       expect(res.status).toBe(200);
       const failedRestored = res.body.find((r: { id: number }) => r.id === 2);
       const mrOpen = res.body.find((r: { id: number }) => r.id === 3);
+      const failed = res.body.find((r: { id: number }) => r.id === 4);
       expect(failedRestored.detail).toMatch(/applyTimeoutMinutes/);
       expect(mrOpen).not.toHaveProperty('detail');
+      expect(failed.detail).toMatch(/did not converge/);
     });
   });
 });

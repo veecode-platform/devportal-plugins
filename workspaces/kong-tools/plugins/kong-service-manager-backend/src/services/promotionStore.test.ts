@@ -132,6 +132,20 @@ describe('KnexPromotionStore', () => {
   );
 
   it.each(databases.eachSupportedId())(
+    'a record that timed out into `failed` is terminal — it unfreezes the route and leaves the finalizer queue, %p',
+    async databaseId => {
+      const store = await KnexPromotionStore.create(await databases.init(databaseId));
+      const created = await store.upsertDraft(draft());
+      await store.transition(created.id, 'failed', { detail: 'did not converge' });
+
+      await expect(
+        store.getActiveByRoute('default', 'route-1', 'rate-limiting'),
+      ).resolves.toBeUndefined();
+      await expect(store.listActive()).resolves.toEqual([]);
+    },
+  );
+
+  it.each(databases.eachSupportedId())(
     'listByRoute returns the full history for a route plugin, newest first, %p',
     async databaseId => {
       const store = await KnexPromotionStore.create(await databases.init(databaseId));

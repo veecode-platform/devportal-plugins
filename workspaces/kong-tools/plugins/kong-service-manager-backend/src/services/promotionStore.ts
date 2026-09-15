@@ -87,9 +87,10 @@ export interface PromotionStore {
   ): Promise<PromotionRecordRow[]>;
   /**
    * Every non-terminal record, oldest first — the finalizer's (P4) work
-   * queue. Terminal states (`codified`, `failed-restored`, `discarded`,
-   * `aborted-teardown`) never come back from here, so a record the
-   * finalizer has already resolved is never re-processed.
+   * queue. Terminal states (`codified`, `failed`, the legacy
+   * `failed-restored`, `discarded`, `aborted-teardown`) never come back from
+   * here, so a record the finalizer has already resolved is never
+   * re-processed.
    */
   listActive(): Promise<PromotionRecordRow[]>;
   transition(
