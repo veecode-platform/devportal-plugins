@@ -6,6 +6,18 @@ import { TeardownOperationRow, TeardownStore } from './teardownStore';
 // talk to GitLab is marked failed instead of staying pending forever.
 const MAX_RECONCILE_ATTEMPTS = 50;
 
+// GitLab honours this directive in the commit message of API-created commits
+// too (Files API `commit_message`), so the unregister commit does not start a
+// pipeline. Without it the pipeline runs on the deletion commit and its deploy
+// job reinstalls the service the teardown just destroyed.
+//
+// This is the first of three layers: the scaffolder templates additionally
+// gate the deploy job on `catalog-info.yaml` still existing and re-check the
+// default branch at deploy time, because `[skip ci]` does not cover a human
+// retrying an older deploy job or a project whose CI policy ignores skip
+// directives.
+const SKIP_CI_DIRECTIVE = '[skip ci]';
+
 export interface LifecycleReconcilerConfig {
   catalogFile: string;
   deployJobName: string;
@@ -100,7 +112,7 @@ async function reconcileOne(deps: {
     return;
   }
 
-  const commitMessage = `chore: unregister from catalog (teardown requested by ${op.requester_ref} via portal)`;
+  const commitMessage = `chore: unregister from catalog (teardown requested by ${op.requester_ref} via portal) ${SKIP_CI_DIRECTIVE}`;
   const result = await gitlab.deleteFile(op.host, op.project_slug, projectInfo.defaultBranch, config.catalogFile, commitMessage);
   if ('alreadyAbsent' in result) {
     await store.markState(op.id, 'consumed', { detail: 'catalog file already absent' });

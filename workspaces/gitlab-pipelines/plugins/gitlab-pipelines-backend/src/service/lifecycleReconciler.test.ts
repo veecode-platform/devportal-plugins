@@ -61,6 +61,22 @@ describe('reconcileTeardowns', () => {
     expect(store.markCalls).toEqual([[1, 'consumed', { unregisterCommitSha: 'sha1' }]]);
   });
 
+  it('ends the unregister commit message with the skip-ci directive', async () => {
+    const store = fakeStore([op()]);
+    const gitlab: any = {
+      getJob: jest.fn().mockResolvedValue(job()),
+      getProject: jest.fn().mockResolvedValue({ defaultBranch: 'main' }),
+      getPipeline: jest.fn().mockResolvedValue({ ref: 'main', status: 'success' }),
+      listJobsByName: jest.fn().mockResolvedValue([]),
+      deleteFile: jest.fn().mockResolvedValue({ commitSha: 'sha1' }),
+    };
+    await reconcileTeardowns({ logger, gitlab, store, config });
+    expect(gitlab.deleteFile).toHaveBeenCalledWith(
+      'gitlab.example.com', 'g/box', 'main', 'catalog-info.yaml',
+      'chore: unregister from catalog (teardown requested by user:default/alice via portal) [skip ci]',
+    );
+  });
+
   it('marks failed when the teardown job failed', async () => {
     const store = fakeStore([op()]);
     const gitlab: any = {
