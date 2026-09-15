@@ -119,6 +119,28 @@ describe('PromotionBadgeChip', () => {
     expect(screen.getAllByText(detail).length).toBeGreaterThan(1);
   });
 
+  it('offers no Retry for a `failed` record (ADR-020: the experiment is gone, recovery is manual)', () => {
+    const badge: PromotionBadge = {
+      kind: 'failed-restored',
+      ageMs: ONE_DAY_MS,
+      record: {
+        id: 1,
+        instance: 'default',
+        serviceName: 'svc',
+        routeId: 'route-1',
+        pluginType: 'rate-limiting',
+        state: 'failed',
+        mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
+        requesterRef: 'user:default/alice',
+        createdAt: '2026-09-13T12:00:00.000Z',
+        updatedAt: '2026-09-13T12:00:00.000Z',
+        detail: 'did not converge; not restored',
+      },
+    };
+    render(<PromotionBadgeChip badge={badge} onRetry={jest.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
   it('shows a details toggle for failed-restored with detail, revealing the diff text on click', async () => {
     const badge: PromotionBadge = {
       kind: 'failed-restored',

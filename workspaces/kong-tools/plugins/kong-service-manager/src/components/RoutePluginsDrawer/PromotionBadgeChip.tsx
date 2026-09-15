@@ -69,7 +69,12 @@ export function PromotionBadgeChip({ badge, onRetry }: PromotionBadgeChipProps) 
         ) : (
           <Chip label={label} size="small" color={meta.color} />
         )}
-        {badge.kind === 'failed-restored' && onRetry && (
+        {/* Retry re-runs promote on the live experiment. After a `failed` handover
+            (ADR-020) there is no experiment any more — the route already carries the
+            code-owned plugin — so retrying would 404, or worse promote the controller's
+            plugin on an instance with no ownership gate. Recovery is the human path
+            the detail describes: fix the chart or revert the merge request. */}
+        {badge.kind === 'failed-restored' && badge.record?.state !== 'failed' && onRetry && (
           <Button size="small" variant="outlined" color="warning" onClick={onRetry}>
             Retry
           </Button>
