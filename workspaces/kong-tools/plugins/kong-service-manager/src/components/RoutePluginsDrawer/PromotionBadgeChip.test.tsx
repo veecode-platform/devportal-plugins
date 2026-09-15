@@ -13,6 +13,18 @@ describe('PromotionBadgeChip', () => {
     expect(screen.getByText(/3d/)).toBeInTheDocument();
   });
 
+  it('renders the code-owned badge read-only, with a tooltip and no link', async () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: ONE_DAY_MS };
+    render(<PromotionBadgeChip badge={badge} />);
+    expect(screen.getByText(/Code-owned/)).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+
+    await userEvent.hover(screen.getByText(/Code-owned/));
+    expect(
+      await screen.findByText("Defined in the service's chart; edit it there"),
+    ).toBeInTheDocument();
+  });
+
   it('renders the mr-open badge as a link to the MR', () => {
     const badge: PromotionBadge = {
       kind: 'mr-open',

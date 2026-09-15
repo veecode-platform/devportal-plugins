@@ -76,4 +76,38 @@ describe('derivePromotionBadge', () => {
     const badge = derivePromotionBadge([record({ updatedAt: '2026-09-13T12:00:00.000Z' })], 1757764800, NOW);
     expect(badge.ageMs).toBe(NOW - new Date('2026-09-13T12:00:00.000Z').getTime());
   });
+
+  describe('ownership (ADR-017)', () => {
+    it('returns code-owned when the instance has defaultTags the plugin does not carry', () => {
+      const badge = derivePromotionBadge([], 1757764800, NOW, {
+        pluginTags: null,
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('code-owned');
+    });
+
+    it('returns experimental when the plugin carries all of the instance defaultTags', () => {
+      const badge = derivePromotionBadge([], 1757764800, NOW, {
+        pluginTags: ['portal-managed', 'team-a'],
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('experimental');
+    });
+
+    it('returns experimental when the instance has no defaultTags configured (generic behaviour)', () => {
+      const badge = derivePromotionBadge([], 1757764800, NOW, {
+        pluginTags: null,
+        instanceDefaultTags: undefined,
+      });
+      expect(badge.kind).toBe('experimental');
+    });
+
+    it('ignores ownership once a promotion record exists — records only ever belong to portal-managed plugins', () => {
+      const badge = derivePromotionBadge([record({ state: 'mr-open' })], 1757764800, NOW, {
+        pluginTags: null,
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('mr-open');
+    });
+  });
 });

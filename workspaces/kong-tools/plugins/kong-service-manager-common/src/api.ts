@@ -9,10 +9,14 @@ import type {
   PluginPerCategory,
   PromotionRecord,
   PromotionPreview,
+  KongInstanceInfo,
 } from './types';
 
 /** Frontend API contract for Kong Service Manager */
 export interface KongServiceManagerApi {
+  /** List configured Kong instances, including their ownership-marker defaultTags */
+  getInstances(): Promise<KongInstanceInfo[]>;
+
   /** Get service details */
   getServiceInfo(
     instance: string,

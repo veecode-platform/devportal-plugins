@@ -58,8 +58,11 @@ export function PluginCard({
   // Frozen (open MR / applying) blocks portal edits server-side (409); codified is terminal and read-only.
   const isFrozen = promotionBadge?.kind === 'mr-open' || promotionBadge?.kind === 'pending-deploy';
   const isCodified = promotionBadge?.kind === 'codified';
-  const showPromote = isAssociated && !!promotionBadge && !isFrozen && !isCodified;
-  const showDiscard = isAssociated && isFrozen;
+  // Code-owned (ADR-017): the plugin was never portal-created, so it never
+  // has a promotion to start or discard — read-only, same as codified.
+  const isCodeOwned = promotionBadge?.kind === 'code-owned';
+  const showPromote = isAssociated && !!promotionBadge && !isFrozen && !isCodified && !isCodeOwned;
+  const showDiscard = isAssociated && isFrozen && !isCodeOwned;
 
   return (
     <Card

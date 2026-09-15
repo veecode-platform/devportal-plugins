@@ -219,4 +219,24 @@ describe('PluginCard', () => {
     expect(screen.queryByRole('button', { name: 'Edit plugin configuration' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
   });
+
+  it('hides Promote and Discard for a code-owned plugin, but keeps Disable (ADR-017)', () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onDiscardPromotion={noop}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Descartar promoção' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
+  });
 });

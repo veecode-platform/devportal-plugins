@@ -18,6 +18,7 @@ import {
   type PluginFieldsResponse,
   type PromotionRecord,
   type PromotionPreview,
+  type KongInstanceInfo,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 type State = {
@@ -32,6 +33,8 @@ type State = {
   pluginFields: PluginFieldsResponse | null;
   /** Promotion history per route plugin id (design 02 / plan P5) — only populated for plugins the drawer has fetched. */
   promotionsByPluginId: Record<string, PromotionRecord[]>;
+  /** Configured Kong instances, including ownership-marker defaultTags — empty until fetchInstances resolves. */
+  kongInstances: KongInstanceInfo[];
   loading: boolean;
   error: string | null;
 };
@@ -47,6 +50,7 @@ type Action =
   | { type: 'SET_ROUTE_ASSOCIATED_PLUGINS'; data: AssociatedPluginsResponse[] }
   | { type: 'SET_PLUGIN_FIELDS'; data: PluginFieldsResponse | null }
   | { type: 'SET_PROMOTIONS_FOR_PLUGIN'; pluginId: string; data: PromotionRecord[] }
+  | { type: 'SET_KONG_INSTANCES'; data: KongInstanceInfo[] }
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null };
 
@@ -78,6 +82,8 @@ function reducer(state: State, action: Action): State {
           [action.pluginId]: action.data,
         },
       };
+    case 'SET_KONG_INSTANCES':
+      return { ...state, kongInstances: action.data };
     case 'SET_LOADING':
       return { ...state, loading: action.loading };
     case 'SET_ERROR':
@@ -98,6 +104,7 @@ const initialState: State = {
   routeAssociatedPlugins: [],
   pluginFields: null,
   promotionsByPluginId: {},
+  kongInstances: [],
   loading: false,
   error: null,
 };
@@ -124,6 +131,8 @@ type KongServiceManagerContextValue = {
   editRoutePlugin: (routeId: string, pluginId: string, plugin: Partial<CreatePlugin>) => Promise<void>;
   removeRoutePlugin: (routeId: string, pluginId: string) => Promise<void>;
   fetchPromotions: (routeId: string, pluginId: string) => Promise<void>;
+  /** Fetches the configured Kong instances (for ownership-marker defaultTags). Best-effort: a denied/failed call leaves `kongInstances` empty rather than surfacing the global error, since only the promotion badge depends on it and an empty list degrades safely to "no ownership gate". */
+  fetchInstances: () => Promise<void>;
   previewPromotion: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionPreview>;
   promotePlugin: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionRecord>;
   discardPromotion: (routeId: string, pluginId: string) => Promise<void>;
@@ -385,6 +394,21 @@ export function KongServiceManagerProvider({
     [api, state.instance, state.serviceName, withLoading],
   );
 
+  // Deliberately skips withLoading: withLoading dispatches SET_ERROR and
+  // rethrows on failure, which would pop the global error snackbar and
+  // interrupt a drawer that otherwise worked fine. A denied or failed
+  // /instances call just leaves kongInstances empty, which is the same as
+  // "no ownership signal" — the promotion badge falls back to today's
+  // behaviour instead of the request surfacing as a user-facing error.
+  const fetchInstances = useCallback(async () => {
+    try {
+      const data = await api.getInstances();
+      dispatch({ type: 'SET_KONG_INSTANCES', data });
+    } catch {
+      // best-effort — see comment above
+    }
+  }, [api]);
+
   // No side effects (design 02's preview) and dialog-scoped — unlike the
   // other actions this deliberately skips withLoading/dispatch so a preview
   // never toggles the page-wide loading spinner or surfaces its error in the
@@ -442,6 +466,7 @@ export function KongServiceManagerProvider({
       editRoutePlugin,
       removeRoutePlugin,
       fetchPromotions,
+      fetchInstances,
       previewPromotion,
       promotePlugin: promotePluginAction,
       discardPromotion,
@@ -468,6 +493,7 @@ export function KongServiceManagerProvider({
       editRoutePlugin,
       removeRoutePlugin,
       fetchPromotions,
+      fetchInstances,
       previewPromotion,
       promotePluginAction,
       discardPromotion,

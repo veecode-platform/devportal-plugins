@@ -195,6 +195,21 @@ export type PromotionPreview = {
   normalizedConfig: Record<string, unknown>;
 };
 
+/** A configured Kong instance, as exposed for discovery by `GET /instances`. */
+export type KongInstanceInfo = {
+  id: string;
+  apiBaseUrl: string;
+  workspace?: string;
+  description?: string;
+  /**
+   * Tags the backend merges into every entity it creates on this instance.
+   * Presence means the instance distinguishes portal-managed entities from
+   * code-owned ones — the signal `derivePromotionBadge` uses to tell a
+   * code-owned route plugin apart from a plain experiment.
+   */
+  defaultTags?: string[];
+};
+
 /** Plugin categories enum */
 export enum PluginCategory {
   AI = 'ai',

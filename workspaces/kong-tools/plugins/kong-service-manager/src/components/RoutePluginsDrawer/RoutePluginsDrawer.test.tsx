@@ -57,6 +57,7 @@ const mockFetchRouteAssociatedPlugins = jest.fn();
 const mockFetchAvailablePlugins = jest.fn();
 const mockRemoveRoutePlugin = jest.fn();
 const mockFetchPromotions = jest.fn();
+const mockFetchInstances = jest.fn();
 const mockPreviewPromotion = jest.fn();
 const mockPromotePlugin = jest.fn();
 const mockDiscardPromotion = jest.fn();
@@ -76,11 +77,13 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
       instance: 'default',
       serviceName: 'my-service',
       promotionsByPluginId: mockPromotionsByPluginId,
+      kongInstances: [],
     },
     fetchRouteAssociatedPlugins: mockFetchRouteAssociatedPlugins,
     fetchAvailablePlugins: mockFetchAvailablePlugins,
     removeRoutePlugin: mockRemoveRoutePlugin,
     fetchPromotions: mockFetchPromotions,
+    fetchInstances: mockFetchInstances,
     previewPromotion: mockPreviewPromotion,
     promotePlugin: mockPromotePlugin,
     discardPromotion: mockDiscardPromotion,

@@ -183,13 +183,28 @@ export class KongServiceManagerService {
 
   // --- Instance operations ---
 
-  getInstances(): Array<{ id: string; apiBaseUrl: string; workspace?: string; description?: string }> {
+  getInstances(): Array<{
+    id: string;
+    apiBaseUrl: string;
+    workspace?: string;
+    description?: string;
+    defaultTags?: string[];
+  }> {
     return this.#instances.map(i => ({
       id: i.id,
       apiBaseUrl: i.apiBaseUrl,
       workspace: i.workspace,
       description: i.description,
+      defaultTags: i.defaultTags,
     }));
+  }
+
+  /**
+   * The instance's `defaultTags`, if any — the ownership signal a promotable
+   * plugin's own tags are checked against (router's `resolvePromotableRoutePlugin`).
+   */
+  getInstanceDefaultTags(instanceName: string): string[] | undefined {
+    return this.getInstance(instanceName).defaultTags;
   }
 
   // --- Service operations ---

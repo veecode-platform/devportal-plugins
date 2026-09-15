@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Button, Chip, Link } from '@mui/material';
+import { Box, Button, Chip, Link, Tooltip } from '@mui/material';
 import type { PromotionBadge } from './promotionBadge';
 
 /** Formats an age in milliseconds as a short, human-scale duration (design 02: every badge shows age). */
@@ -14,9 +14,15 @@ function formatAge(ageMs: number): string {
 
 const KIND_META: Record<
   PromotionBadge['kind'],
-  { emoji: string; label: string; color: 'default' | 'primary' | 'warning' | 'success' | 'info' }
+  { emoji: string; label: string; color: 'default' | 'primary' | 'warning' | 'success' | 'info'; tooltip?: string }
 > = {
   experimental: { emoji: '🧪', label: 'Experimental', color: 'default' },
+  'code-owned': {
+    emoji: '✅',
+    label: 'Code-owned',
+    color: 'default',
+    tooltip: "Defined in the service's chart; edit it there",
+  },
   'mr-open': { emoji: '🔀', label: 'Promoção aberta', color: 'info' },
   'pending-deploy': { emoji: '⏳', label: 'Aplicando', color: 'primary' },
   codified: { emoji: '✅', label: 'Codificado', color: 'success' },
@@ -52,6 +58,10 @@ export function PromotionBadgeChip({ badge, onRetry }: PromotionBadgeChipProps) 
           <Link href={href} target="_blank" rel="noopener noreferrer" underline="hover">
             <Chip label={label} size="small" color={meta.color} clickable component="span" />
           </Link>
+        ) : meta.tooltip ? (
+          <Tooltip title={meta.tooltip}>
+            <Chip label={label} size="small" color={meta.color} />
+          </Tooltip>
         ) : (
           <Chip label={label} size="small" color={meta.color} />
         )}
