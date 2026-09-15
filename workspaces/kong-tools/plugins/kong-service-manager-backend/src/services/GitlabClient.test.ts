@@ -364,6 +364,8 @@ describe('GitlabClient', () => {
           (req, res, ctx) => {
             expect(req.url.searchParams.get('status')).toBe('success');
             expect(req.url.searchParams.get('updated_after')).toBe(since);
+            // GitLab 400s on updated_after without order_by=updated_at (seen live).
+            expect(req.url.searchParams.get('order_by')).toBe('updated_at');
             return res(
               ctx.json([
                 { id: 7, sha: 'merge-sha', ref: 'main', status: 'success', created_at: '2026-09-01T00:02:00Z' },
