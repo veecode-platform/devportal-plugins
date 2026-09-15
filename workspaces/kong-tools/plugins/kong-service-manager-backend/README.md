@@ -101,6 +101,16 @@ gated request while it stays unavailable — no restart needed once fixed) and
 never falls back to running it with `$HOME` as its cache/config/data
 directory, since the portal typically runs with a read-only root filesystem.
 
+**The target chart must render with its default values.** The check runs
+exactly `helm template <release> chart/` — no `--set`, no extra values files —
+so a chart whose templates `required` a value that only CI supplies (a typical
+one: `image.tag` pinned to the commit SHA at deploy time) aborts the render and
+the promote/preview fails with the helm error. Give such values a legitimate
+default (`{{ .Values.image.tag | default .Chart.AppVersion }}`) and keep the
+"must be pinned" guard in the deploy pipeline instead. Assumption this check
+relies on: values that only CI overrides never influence the rendered
+`KongPlugin` objects — only those are compared.
+
 If `helm` can't be found or run, the plugin doesn't fail to start: routes
 that don't render a chart (browsing services, routes, and plugins; the
 promotion finalizer, which reads Kong's Admin API rather than rendering)
