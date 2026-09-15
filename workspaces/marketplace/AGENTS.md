@@ -1,6 +1,6 @@
 # AGENTS.md — marketplace workspace
 
-Agent context for this workspace. Repository-wide rules are in the root [`AGENTS.md`](../../AGENTS.md); the section order follows [`workspaces/dummy/AGENTS.md`](../dummy/AGENTS.md).
+Agent context for this workspace. Repository-wide rules, including the shape this file follows, are in the root [`AGENTS.md`](../../AGENTS.md).
 
 ## What the plugins do
 

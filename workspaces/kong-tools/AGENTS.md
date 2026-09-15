@@ -1,6 +1,6 @@
 # AGENTS.md — kong-tools workspace
 
-Agent context for this workspace. Repository-wide rules are in the root [`AGENTS.md`](../../AGENTS.md); the section order follows [`workspaces/dummy/AGENTS.md`](../dummy/AGENTS.md). This is the largest workspace in the repository: five packages.
+Agent context for this workspace. Repository-wide rules, including the shape this file follows, are in the root [`AGENTS.md`](../../AGENTS.md). This is the largest workspace in the repository: five packages.
 
 ## What the plugins do
 

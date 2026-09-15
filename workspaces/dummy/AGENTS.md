@@ -1,8 +1,6 @@
 # AGENTS.md — dummy workspace
 
-Agent context for the reference workspace. Repository-wide rules are in the root [`AGENTS.md`](../../AGENTS.md); this file adds what is specific to `dummy` and carries the patterns and samples every workspace follows.
-
-It is also the **template** for a workspace `AGENTS.md`. Keep these sections, in this order: What the plugins do, Layout, Commands, Architecture, Testing, Dynamic loading, Mocks and external dependencies, Gotchas, Decisions.
+Agent context for the reference workspace. Repository-wide rules, including the shape this file follows, are in the root [`AGENTS.md`](../../AGENTS.md). This file adds what is specific to `dummy` and carries the plugin patterns and code samples the other workspaces refer to.
 
 ## What the plugins do
 

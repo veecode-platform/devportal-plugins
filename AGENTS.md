@@ -51,7 +51,7 @@ workspaces/<name>/
 │   ├── <plugin-name-common>/     # Common library (shared types, API interfaces; if present)
 │   └── <plugin-name-another>/    # Other plugins (scaffolder modules, backend modules, etc.)
 ├── README.md                     # For humans: what the plugins do, how to run and publish
-├── AGENTS.md                     # For agents: architecture, mocks, gotchas (template: workspaces/dummy/AGENTS.md)
+├── AGENTS.md                     # For agents: architecture, mocks, gotchas (sections below)
 ├── CLAUDE.md                     # Thin pointer to AGENTS.md
 ├── DECISIONS.md                  # Plugin decision records PDR-NNN (optional)
 ├── package.json                  # Workspace root — scripts, devDependencies
@@ -127,7 +127,8 @@ Patterns and code samples live in `workspaces/dummy/AGENTS.md`. The rules they e
 ## Conventions
 
 - **en-US** for every artifact: docs, agent files, decision records, commit messages.
-- Every workspace carries a `README.md` (for humans), an `AGENTS.md` (for agents) and a thin `CLAUDE.md` that points at `AGENTS.md`. `workspaces/dummy/` holds the template for the pair.
+- Every workspace carries a `README.md` (for humans), an `AGENTS.md` (for agents) and a thin `CLAUDE.md` that points at `AGENTS.md`.
+- A workspace `AGENTS.md` uses these sections, in this order: What the plugins do, Layout, Commands, Architecture, Testing, Dynamic loading, Mocks and external dependencies, Gotchas, Decisions. Every workspace already follows it, so read any of them for a worked example; `workspaces/dummy/` is the most complete. The normative version of this rule is standard 05 in the planning repository, still to be written; until it exists, this line is the rule.
 - Workspace docs describe the code as it is. Status, roadmap and history belong in the planning repository.
 
 ## Key Constraints
