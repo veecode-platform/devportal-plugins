@@ -30,6 +30,8 @@ export interface MrDetail {
   mergedAt?: string;
   /** ISO timestamp set once when the record enters `applying`; anchors the `applyTimeoutMinutes` clock. Never rewritten after, so a per-tick write elsewhere can't reset the timeout. */
   applyingSince?: string;
+  /** ISO timestamp of the experimental plugin's removal, written on the `mr-open` → `awaiting-deploy` transition (ADR-020: the experiment goes at merge, never coexists with the code-owned plugin). Never rewritten after. */
+  experimentRemovedAt?: string;
 }
 
 export function encodeMrDetail(detail: MrDetail): string {

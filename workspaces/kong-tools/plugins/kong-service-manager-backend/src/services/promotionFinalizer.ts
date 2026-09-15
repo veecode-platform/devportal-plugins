@@ -9,7 +9,7 @@ import { getAdapter } from './adapters';
 import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG } from './promotionTags';
 
 export interface PromotionFinalizerConfig {
-  /** Minutes a record may sit in `applying` before the finalizer restores the experimental plugin and marks it `failed-restored`. */
+  /** Minutes a record may sit in `applying` before the finalizer gives up and marks it `failed` (ADR-020: nothing is restored). */
   applyTimeoutMinutes: number;
 }
 
@@ -20,6 +20,14 @@ export interface PromotionFinalizerConfig {
  * rest of the queue, and there is no attempt cap: `mr-open` and
  * `awaiting-deploy` are meant to wait indefinitely per spec, and `applying`
  * is bounded by `applyTimeoutMinutes`, not by a retry count.
+ *
+ * Handover invariant (ADR-020): once the promoted chart is on the default
+ * branch, the experimental plugin must not exist on the route — Kong allows
+ * one plugin per (type, route), so an experiment still sitting there makes
+ * the Kong Ingress Controller fail to create the code-owned plugin and, in
+ * DB mode, stop syncing the dataplane. The experiment is therefore deleted
+ * at merge (`mr-open` → `awaiting-deploy`), never later, and a timed-out
+ * `applying` record ends in `failed` without recreating it.
  */
 export async function reconcilePromotions(deps: {
   logger: LoggerService;
@@ -107,13 +115,7 @@ async function abortForTeardown(deps: {
   record: PromotionRecordRow;
 }): Promise<void> {
   const { logger, kong, store, record } = deps;
-  const experimental = await findPluginByTag(
-    kong,
-    record.instance,
-    record.route_id,
-    record.plugin_type,
-    p => (p.tags ?? []).some(t => t.startsWith(EXPERIMENTAL_TAG_PREFIX)),
-  );
+  const experimental = await findExperimentalPlugin(kong, record);
   if (experimental) {
     await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
   }
@@ -171,11 +173,23 @@ async function handleMrOpen(deps: {
   }
   if (mr.state !== 'merged') return; // still opened (or locked) — check again next tick
 
+  // Handover (ADR-020): the experiment goes the moment the chart is on the
+  // default branch, BEFORE CI can deploy it — from that point on the route
+  // belongs to the code-owned plugin, and two of them cannot coexist.
+  // Idempotent: if the process crashed between this delete and the
+  // transition below, the record is still `mr-open`, the next tick finds no
+  // experiment and just transitions.
+  const experimental = await findExperimentalPlugin(kong, record);
+  if (experimental) {
+    await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+  }
+
   await store.transition(record.id, 'awaiting-deploy', {
     detail: encodeMrDetail({
       ...detail,
       parkedSince: new Date().toISOString(),
       mergedAt: mr.mergedAt ?? new Date().toISOString(),
+      experimentRemovedAt: new Date().toISOString(),
     }),
   });
 }
@@ -193,6 +207,11 @@ async function handleAwaitingDeploy(deps: {
   const deployed = await gitlab.hasSuccessfulDeployAtOrAfter(detail, project.defaultBranch, detail.mergedAt);
   if (!deployed) return; // parked — never assumes merge means applied (design 02)
 
+  // Unbounded on purpose (ADR-020): a merged-but-never-deployed chart just
+  // stays parked. The route already runs without the plugin because its
+  // owner merged the chart; recreating the experiment here would collide
+  // with the code-owned one on the next sync. The spread keeps `mergedAt`
+  // and `experimentRemovedAt` readable for the badge.
   await store.transition(record.id, 'applying', {
     detail: encodeMrDetail({ ...detail, applyingSince: new Date().toISOString() }),
   });
@@ -208,22 +227,11 @@ async function handleApplying(deps: {
 }): Promise<void> {
   const { logger, kong, store, config, record, detail } = deps;
 
-  // Step 3: delete the experimental plugin FIRST — Kong allows only one
-  // plugin instance per (type, route), so the KIC-owned one cannot exist
-  // until this is gone (design 02's ordering constraint). Idempotent: a
-  // crash-retry that finds it already deleted just proceeds to step 4.
-  const experimental = await findPluginByTag(
-    kong,
-    record.instance,
-    record.route_id,
-    record.plugin_type,
-    p => (p.tags ?? []).some(t => t.startsWith(EXPERIMENTAL_TAG_PREFIX)),
-  );
-  if (experimental) {
-    await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
-  }
-
-  // Step 4: converged only when the KIC-owned plugin exists AND its
+  // No delete here (ADR-020): the experiment was removed at merge, so by the
+  // time a record reaches `applying` the route is already free for the
+  // code-owned plugin.
+  //
+  // Converged only when the KIC-owned plugin exists AND its
   // normalized config equals the promoted snapshot — existence alone would
   // also match an already-codified plugin from an earlier promotion of the
   // same type/route (the update case), so it is never sufficient on its own.
@@ -256,41 +264,41 @@ async function handleApplying(deps: {
   const elapsedMs = Date.now() - Date.parse(applyingSince);
   if (elapsedMs < config.applyTimeoutMinutes * 60_000) return;
 
-  // Timeout exceeded — restore the experimental plugin from the promoted
-  // snapshot (P3 handoff note 3: config_snapshot is normalized-only; Kong
-  // applies schema defaults for the rest) and stop automating. Retry is
-  // explicit, from the UI (design 02) — no retry endpoint exists yet (P4
-  // report).
-  const restoreTag =
-    detail?.projectId !== undefined && detail?.iid !== undefined
-      ? `${EXPERIMENTAL_TAG_PREFIX}${detail.projectId}-${detail.iid}`
-      : undefined;
-  await kong.addPluginToRoute(record.instance, record.route_id, {
-    name: record.plugin_type,
-    config: record.config_snapshot as Record<string, unknown>,
-    tags: restoreTag ? [restoreTag] : undefined,
+  // Timeout exceeded — stop automating and hand the route back to a human.
+  // Nothing is restored (ADR-020): recreating the experiment would collide
+  // with the merged chart's plugin on the next controller sync, which is the
+  // incident this ordering exists to prevent. Recovery is a human decision —
+  // fix the chart, or revert the merge request.
+  await store.transition(record.id, 'failed', {
+    detail:
+      `code-owned '${record.plugin_type}' plugin did not converge on route '${record.route_id}' within ` +
+      `${config.applyTimeoutMinutes} min after a successful deploy of the merged chart; the experiment was ` +
+      `removed at merge and is intentionally not restored (one plugin per type per route). Check the Kong ` +
+      `Ingress Controller events for the KongPlugin, or revert the merge request.`,
   });
-  await store.transition(record.id, 'failed-restored', {
-    detail: `applyTimeoutMinutes (${config.applyTimeoutMinutes}) exceeded waiting for the code-owned '${record.plugin_type}' plugin to converge on route '${record.route_id}'; experimental plugin restored from the promoted snapshot.`,
-  });
-  logger.info('kong-service-manager promotion timed out, restored the experimental plugin', {
+  logger.warn('kong-service-manager promotion timed out without converging', {
     promotionId: record.id,
     routeId: record.route_id,
     pluginType: record.plugin_type,
+    applyTimeoutMinutes: config.applyTimeoutMinutes,
   });
 }
 
 async function untagExperimental(kong: KongServiceManagerService, record: PromotionRecordRow): Promise<void> {
-  const plugin = await findPluginByTag(
-    kong,
-    record.instance,
-    record.route_id,
-    record.plugin_type,
-    p => (p.tags ?? []).some(t => t.startsWith(EXPERIMENTAL_TAG_PREFIX)),
-  );
+  const plugin = await findExperimentalPlugin(kong, record);
   if (!plugin) return;
   const filteredTags = (plugin.tags ?? []).filter(t => !t.startsWith(EXPERIMENTAL_TAG_PREFIX));
   await kong.editRoutePlugin(record.instance, record.route_id, plugin.id, { tags: filteredTags });
+}
+
+/** The live experimental plugin for this record's route, if it is still there — the delete is idempotent everywhere it is used. */
+async function findExperimentalPlugin(
+  kong: KongServiceManagerService,
+  record: PromotionRecordRow,
+): Promise<AssociatedPluginsResponse | undefined> {
+  return findPluginByTag(kong, record.instance, record.route_id, record.plugin_type, p =>
+    (p.tags ?? []).some(t => t.startsWith(EXPERIMENTAL_TAG_PREFIX)),
+  );
 }
 
 async function findPluginByTag(
