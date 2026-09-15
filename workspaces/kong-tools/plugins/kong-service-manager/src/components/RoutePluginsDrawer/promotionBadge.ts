@@ -34,6 +34,10 @@ function badgeKind(state: PromotionRecord['state']): PromotionBadgeKind {
       return 'pending-deploy';
     case 'codified':
       return 'codified';
+    // Both failure states share one badge: `failed` (ADR-020) and the legacy
+    // `failed-restored` differ in what the backend did to the experiment, not
+    // in what the user sees — a promotion that needs a human.
+    case 'failed':
     case 'failed-restored':
       return 'failed-restored';
     default:
