@@ -13,6 +13,7 @@ import type {
   PluginCategory,
   PromotionRecord,
   PromotionPreview,
+  KongInstanceInfo,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 const PLUGIN_CATEGORY_MAP: Record<string, PluginCategory> = {
@@ -105,6 +106,10 @@ export class KongServiceManagerClient implements KongServiceManagerApi {
     }
 
     return response.json() as Promise<T>;
+  }
+
+  async getInstances(): Promise<KongInstanceInfo[]> {
+    return this.request('/instances');
   }
 
   async getServiceInfo(

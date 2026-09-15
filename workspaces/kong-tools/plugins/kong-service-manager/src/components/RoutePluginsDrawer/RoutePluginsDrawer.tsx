@@ -88,6 +88,7 @@ export function RoutePluginsDrawer({
     fetchAvailablePlugins,
     removeRoutePlugin,
     fetchPromotions,
+    fetchInstances,
     promotePlugin,
     discardPromotion,
   } = useKongServiceManager();
@@ -100,6 +101,7 @@ export function RoutePluginsDrawer({
     instance,
     serviceName,
     promotionsByPluginId,
+    kongInstances,
   } = state;
 
   const [search, setSearch] = useState('');
@@ -120,8 +122,21 @@ export function RoutePluginsDrawer({
       if (availablePlugins.length === 0) {
         fetchAvailablePlugins();
       }
+      if (kongInstances.length === 0) {
+        fetchInstances();
+      }
     }
-  }, [open, route, instance, serviceName, fetchRouteAssociatedPlugins, fetchAvailablePlugins, availablePlugins.length]);
+  }, [
+    open,
+    route,
+    instance,
+    serviceName,
+    fetchRouteAssociatedPlugins,
+    fetchAvailablePlugins,
+    availablePlugins.length,
+    fetchInstances,
+    kongInstances.length,
+  ]);
 
   useEffect(() => {
     if (!open) {
@@ -156,6 +171,14 @@ export function RoutePluginsDrawer({
     }
     return map;
   }, [routeAssociatedPlugins]);
+
+  // Ownership signal (ADR-017) for the current instance — undefined while
+  // fetchInstances hasn't resolved yet or found no match, which
+  // derivePromotionBadge treats the same as "no ownership gate configured".
+  const instanceDefaultTags = useMemo(
+    () => kongInstances.find(i => i.id === instance)?.defaultTags,
+    [kongInstances, instance],
+  );
 
   const handleDisable = useCallback(
     async (pluginId: string, _pluginName: string) => {
@@ -292,7 +315,12 @@ export function RoutePluginsDrawer({
             const pluginId = associatedMap.get(plugin.slug);
             const assocPlugin = pluginId ? associatedPluginById.get(pluginId) : undefined;
             const promotionBadge = pluginId
-              ? derivePromotionBadge(promotionsByPluginId[pluginId], assocPlugin?.created_at ?? 0)
+              ? derivePromotionBadge(
+                  promotionsByPluginId[pluginId],
+                  assocPlugin?.created_at ?? 0,
+                  Date.now(),
+                  { pluginTags: assocPlugin?.tags, instanceDefaultTags },
+                )
               : undefined;
             return (
               <PluginCard

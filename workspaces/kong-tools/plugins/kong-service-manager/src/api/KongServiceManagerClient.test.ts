@@ -37,6 +37,26 @@ describe('KongServiceManagerClient', () => {
     ).rejects.toThrow('404 Not Found');
   });
 
+  // --- getInstances ---
+
+  it('calls correct URL for getInstances', async () => {
+    const { client, mockFetch } = createMocks();
+    const mockData = [{ id: 'default', apiBaseUrl: 'http://kong:8001', defaultTags: ['portal-managed'] }];
+    mockFetch.mockResolvedValue(jsonResponse(mockData));
+
+    const result = await client.getInstances();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/instances`,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    );
+    expect(result).toEqual(mockData);
+  });
+
   // --- getServiceInfo ---
 
   it('calls correct URL for getServiceInfo', async () => {

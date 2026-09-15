@@ -152,6 +152,7 @@ const mockPromotionPreview: PromotionPreview = {
 // ---------------------------------------------------------------------------
 
 const mockApi: KongServiceManagerApi = {
+  getInstances: async () => [{ id: 'default', apiBaseUrl: 'http://localhost:8001' }],
   getServiceInfo: async () => mockServiceInfo,
   getRoutesFromService: async (): Promise<RoutesResponse> => ({
     data: [mockRoute],
