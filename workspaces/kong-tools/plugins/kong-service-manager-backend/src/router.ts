@@ -135,8 +135,17 @@ export async function createRouter({
 
   /**
    * Looks up a route plugin and its promotion adapter together — the same
-   * 404 (plugin not found) / 400 (no adapter registered) gate that both
-   * promote and preview require before doing anything else.
+   * 404 (plugin not found) / 400 (no adapter registered) / 400 (code-owned)
+   * gate that both promote and preview require before doing anything else.
+   *
+   * Ownership: promotion only applies to plugins the portal itself created.
+   * When the instance configures `defaultTags`, those tags are the portal's
+   * marker (`KongServiceManagerService.tagsForCreate`) — a plugin missing
+   * any of them was never portal-created (e.g. reconciled onto Kong by the
+   * Kong Ingress Controller from the service's chart) and promoting it makes
+   * no sense. An instance with no `defaultTags` configured has no ownership
+   * signal at all, so every plugin is treated as promotable (today's
+   * behaviour, unchanged).
    */
   async function resolvePromotableRoutePlugin(
     instance: string,
@@ -153,6 +162,17 @@ export async function createRouter({
       throw new InputError(
         `Plugin type '${plugin.name}' has no promotion adapter and cannot be promoted to code`,
       );
+    }
+
+    const defaultTags = kongService.getInstanceDefaultTags(instance);
+    if (defaultTags && defaultTags.length > 0) {
+      const tags = plugin.tags ?? [];
+      const isPortalManaged = defaultTags.every(tag => tags.includes(tag));
+      if (!isPortalManaged) {
+        throw new InputError(
+          `Plugin '${plugin.name}' on route '${routeId}' is not portal-managed (code-owned); promotion applies to experiments created from the portal`,
+        );
+      }
     }
 
     return { plugin, adapter };

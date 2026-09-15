@@ -67,6 +67,9 @@ function kongServiceMock(): jest.Mocked<KongServiceManagerService> {
     getRouteAssociatedPlugins: jest.fn(),
     editRoutePlugin: jest.fn(),
     removeRoutePlugin: jest.fn(),
+    // No defaultTags by default — matches an instance with no ownership
+    // signal, where every plugin is promotable (today's behaviour).
+    getInstanceDefaultTags: jest.fn(),
   } as unknown as jest.Mocked<KongServiceManagerService>;
 }
 
@@ -383,6 +386,116 @@ describe('promote to code (Task P3)', () => {
 
       const res = await request(app).post(PREVIEW_URL).send({ entityRef: 'component:default/svc' });
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe('plugin ownership gate (code-owned vs portal-managed)', () => {
+    it('promote 400s a code-owned plugin — missing the instance defaultTags', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]); // tags: null
+      kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+      });
+
+      const res = await request(app).post(PROMOTE_URL).send({ entityRef: 'component:default/svc' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/not portal-managed \(code-owned\)/);
+    });
+
+    it('preview 400s a code-owned plugin — missing the instance defaultTags', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]); // tags: null
+      kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+      });
+
+      const res = await request(app).post(PREVIEW_URL).send({ entityRef: 'component:default/svc' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/not portal-managed \(code-owned\)/);
+    });
+
+    it('promote is unchanged (201) for a plugin carrying all of the instance defaultTags', async () => {
+      const kongService = kongServiceMock();
+      const managedPlugin = { ...routePlugin, tags: ['portal-managed'] };
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([managedPlugin]);
+      kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+      kongService.editRoutePlugin.mockResolvedValue({
+        ...managedPlugin,
+        tags: ['portal-managed', 'promotion-pending:42-7'],
+      });
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(draftRow());
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+      gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+      gitlabClient.openMergeRequest.mockResolvedValue(mr);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient });
+      try {
+        const res = await request(app).post(PROMOTE_URL).send({ entityRef: 'component:default/svc' });
+        expect(res.status).toBe(201);
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('preview is unchanged (200) for a plugin carrying all of the instance defaultTags', async () => {
+      const kongService = kongServiceMock();
+      const managedPlugin = { ...routePlugin, tags: ['portal-managed'] };
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([managedPlugin]);
+      kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+      const promotionStore = promotionStoreMock();
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient });
+      try {
+        const res = await request(app).post(PREVIEW_URL).send({ entityRef: 'component:default/svc' });
+        expect(res.status).toBe(200);
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('promote is unchanged (201) when the instance has no defaultTags configured', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]); // tags: null
+      kongService.getInstanceDefaultTags.mockReturnValue(undefined);
+      kongService.editRoutePlugin.mockResolvedValue({
+        ...routePlugin,
+        tags: ['promotion-pending:42-7'],
+      });
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(draftRow());
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+      gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+      gitlabClient.openMergeRequest.mockResolvedValue(mr);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient });
+      try {
+        const res = await request(app).post(PROMOTE_URL).send({ entityRef: 'component:default/svc' });
+        expect(res.status).toBe(201);
+      } finally {
+        await chart.cleanup();
+      }
     });
   });
 

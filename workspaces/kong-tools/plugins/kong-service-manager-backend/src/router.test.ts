@@ -39,6 +39,7 @@ describe('createRouter', () => {
       editRoutePlugin: jest.fn(),
       removeRoutePlugin: jest.fn(),
       getInstances: jest.fn(),
+      getInstanceDefaultTags: jest.fn(),
     } as unknown as jest.Mocked<KongServiceManagerService>;
 
     const router = await createRouter({
@@ -74,6 +75,19 @@ describe('createRouter', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual(instances);
     expect(kongService.getInstances).toHaveBeenCalled();
+  });
+
+  it('GET /instances exposes each instance defaultTags', async () => {
+    const instances = [
+      { id: 'default', apiBaseUrl: 'http://kong:8001', defaultTags: ['portal-managed'] },
+      { id: 'staging', apiBaseUrl: 'http://kong-staging:8001', workspace: 'dev' },
+    ];
+    kongService.getInstances.mockReturnValue(instances);
+
+    const res = await request(app).get('/instances');
+    expect(res.status).toBe(200);
+    expect(res.body[0].defaultTags).toEqual(['portal-managed']);
+    expect(res.body[1].defaultTags).toBeUndefined();
   });
 
   it('GET /instances returns 403 when permission denied', async () => {
