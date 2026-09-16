@@ -64,11 +64,15 @@ export function PluginCard({
   const isFrozen = promotionBadge?.kind === 'mr-open' || promotionBadge?.kind === 'pending-deploy';
   const isCodified = promotionBadge?.kind === 'codified';
   // Code-owned (ADR-017): the plugin was never portal-created, so it never
-  // has a promotion to start or discard — read-only, same as codified.
-  // While a code-only promotion (issue #135) is active, the badge reads
+  // has a promotion to start or discard. Read-only like codified (#136):
+  // editing or disabling it through the Admin API is drift the ingress
+  // controller reverts on its next push — change it in the repository, or,
+  // when kong.promotion.editInCode is on, through the Edit-in-code action
+  // (issue #135). While a code-only promotion is active the badge reads
   // mr-open/pending-deploy instead (active records win over ownership), so
   // this only matches a code-owned plugin with no open edit.
   const isCodeOwned = promotionBadge?.kind === 'code-owned';
+  const isReadOnly = isCodified || isCodeOwned;
   // Failed handover (ADR-020): the experiment was removed at merge and the
   // chart already carries the plugin — there is nothing left to promote.
   const isFailedHandover = promotionBadge?.record?.state === 'failed';
@@ -95,7 +99,7 @@ export function PluginCard({
           </Typography>
         }
         action={
-          isAssociated && canEdit && !isCodified && !isFrozen ? (
+          isAssociated && canEdit && !isReadOnly && !isFrozen ? (
             <Tooltip title="Edit plugin configuration">
               <IconButton
                 size="small"
@@ -154,7 +158,7 @@ export function PluginCard({
               </Button>
             ) : (
               canDisable &&
-              !isCodified && (
+              !isReadOnly && (
                 <Button
                   variant="contained"
                   color="primary"
@@ -210,6 +214,13 @@ export function PluginCard({
           )
         )}
       </CardActions>
+      {isReadOnly && !showEditInCode && (
+        <Box px={1.5} pb={1.5} textAlign="center">
+          <Typography variant="caption" color="text.secondary">
+            Managed from the repository — change it in code.
+          </Typography>
+        </Box>
+      )}
       {(showPromote || showEditInCode) && promoteDisabledReason && (
         <Box px={1.5} pb={1.5} textAlign="center">
           <Typography variant="caption" color="text.secondary">

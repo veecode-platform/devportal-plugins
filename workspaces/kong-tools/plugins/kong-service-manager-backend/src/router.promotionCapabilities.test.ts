@@ -111,6 +111,7 @@ describe('helm capability gate (ADR-018)', () => {
       expect(res.body).toEqual({
         helm: { available: true, path: '/opt/helm/helm', version: 'v3.15.0' },
         editInCode: false,
+        adapters: ['correlation-id', 'rate-limiting'],
       });
     });
 
@@ -140,6 +141,7 @@ describe('helm capability gate (ADR-018)', () => {
           error: 'Kong plugin promotion is not enabled on this instance',
         },
         editInCode: false,
+        adapters: ['correlation-id', 'rate-limiting'],
       });
     });
 

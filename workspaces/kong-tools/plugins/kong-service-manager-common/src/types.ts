@@ -243,6 +243,12 @@ export type PromotionCapabilities = {
   };
   /** `kong.promotion.editInCode` (issue #135) — whether a code-owned (KIC-managed) plugin can be edited directly via a merge request, with no experiment ever created in Kong. */
   editInCode: boolean;
+  /**
+   * Plugin types that have a promotion adapter — the promotion allowlist. The
+   * UI disables "Promote to code" up front for any other type instead of
+   * letting the request fail with a 400 (#136). Absent on backends < 1.5.0.
+   */
+  adapters?: string[];
 };
 
 /** Plugin categories enum */
