@@ -192,7 +192,7 @@ export type PromotionRecord = {
   pluginType: string;
   state: PromotionState;
   /** @default 'experiment' — absent on records written before issue #135. */
-  mode: PromotionMode;
+  mode?: PromotionMode;
   mrRef: string | null;
   requesterRef: string;
   createdAt: string;

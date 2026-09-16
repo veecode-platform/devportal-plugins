@@ -120,7 +120,9 @@ describe('RoutePluginsDrawer', () => {
     mockPromotionsByPluginId = {};
     mockPromotionCapabilities = { helm: { available: true, path: 'helm' } };
     mockKongInstances = [];
-    mockPluginFields = { fields: [{ minute: { type: 'number' } }] };
+    // parseConfigFields only reads the top-level 'config' field's own
+    // `fields` array — this mirrors the real Kong schema shape.
+    mockPluginFields = { fields: [{ config: { type: 'record', fields: [{ minute: { type: 'number' } }] } }] };
     mockPreviewPromotion.mockResolvedValue({ files: [], normalizedConfig: {} });
   });
 

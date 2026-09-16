@@ -545,7 +545,11 @@ describe('promote to code (Task P3)', () => {
       const promotionStore = promotionStoreMock();
       promotionStore.getActiveByRoute.mockResolvedValue(undefined);
       promotionStore.upsertDraft.mockResolvedValue(
-        draftRow({ mode: 'code-only', config_snapshot: { minute: 30, policy: 'local', hour: null } }),
+        // config_snapshot mirrors what rateLimitingAdapter.fromRendered actually
+        // produces ({ minute }) — the same normalized shape renderCheck's own
+        // fromRendered comparison expects; extra raw-config keys here would
+        // make renderCheck see a (false) mismatch and 409.
+        draftRow({ mode: 'code-only', config_snapshot: { minute: 30 } }),
       );
       promotionStore.transition.mockResolvedValue(undefined);
 
