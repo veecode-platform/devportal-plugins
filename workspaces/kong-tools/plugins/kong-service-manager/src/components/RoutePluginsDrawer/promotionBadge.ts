@@ -31,6 +31,9 @@ const RESET_STATES = new Set(['discarded', 'aborted-teardown']);
  */
 const STALE_WHEN_PORTAL_MANAGED = new Set(['codified', 'failed']);
 
+/** States a promotion never leaves on its own. */
+const TERMINAL_STATES = new Set(['codified', 'failed', 'failed-restored']);
+
 function badgeKind(state: PromotionRecord['state']): PromotionBadgeKind {
   switch (state) {
     case 'draft':
@@ -110,6 +113,19 @@ export function derivePromotionBadge(
     isPortalManaged(ownership)
   ) {
     return { kind: 'experimental', ageMs: now - pluginCreatedAtSeconds * 1000 };
+  }
+
+  // A finished `code-only` promotion (issue #135) describes an edit to a
+  // plugin that was code-owned before the promotion and stays code-owned
+  // after it — there was never an experiment. Keeping its terminal
+  // `codified`/`failed` badge would strip the plugin of every action the card
+  // offers, including a second edit in code, with no way back.
+  if (TERMINAL_STATES.has(latest.state) && latest.mode === 'code-only') {
+    return {
+      kind: 'code-owned',
+      record: latest,
+      ageMs: now - pluginCreatedAtSeconds * 1000,
+    };
   }
 
   return {

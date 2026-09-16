@@ -39,7 +39,7 @@ import type { HelmCapabilityGate } from './services/helmCapability';
 import { GitlabClient, type ResolvedRepo } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
-import { EXPERIMENTAL_TAG_PREFIX } from './services/promotionTags';
+import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG } from './services/promotionTags';
 
 /**
  * States whose `detail` column carries a human-readable failure message
@@ -233,6 +233,7 @@ export async function createRouter({
     config: Record<string, unknown> | undefined,
     pluginName: string,
     routeId: string,
+    pluginTags: string[] = [],
   ): PromotionMode {
     if (ownership === 'portal-managed') {
       if (config !== undefined) {
@@ -244,6 +245,20 @@ export async function createRouter({
     }
     if (!editInCodeEnabled || config === undefined) {
       throw codeOwnedError(pluginName, routeId);
+    }
+    // The finalizer only ever recognizes convergence on a plugin carrying the
+    // Kong Ingress Controller's ownership tag (`handleApplying`). "Not
+    // portal-managed" is a wider set than that — a plugin created straight
+    // through the Admin API matches it too — and offering edit-in-code for one
+    // of those opens a merge request the finalizer can never finish, leaving
+    // the record to time out in `failed`. Gate on the same signal the
+    // finalizer reads.
+    if (!pluginTags.includes(KIC_OWNERSHIP_TAG)) {
+      throw new InputError(
+        `Plugin '${pluginName}' on route '${routeId}' is not managed by the Kong Ingress Controller ` +
+          `(no '${KIC_OWNERSHIP_TAG}' tag), so an edit in code could never be reconciled back onto the ` +
+          `gateway; edit it wherever it is currently managed`,
+      );
     }
     return 'code-only';
   }
@@ -742,7 +757,7 @@ export async function createRouter({
       const { entityRef, config: editedConfigInput } = body.data;
 
       const { plugin, adapter, ownership } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
-      const mode = resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId);
+      const mode = resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId, plugin.tags ?? []);
 
       const activeBeforeStart = await promotionStore.getActiveByRoute(instance, routeId, adapter.pluginType);
 
@@ -920,7 +935,7 @@ export async function createRouter({
       // Preview stays permissive on the equality check (unlike promote): it
       // shows the generated YAML for an edited config even when that config
       // happens to match the live one.
-      resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId);
+      resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId, plugin.tags ?? []);
       const previewConfig =
         editedConfigInput !== undefined
           ? adapter.fromRendered({ config: editedConfigInput })

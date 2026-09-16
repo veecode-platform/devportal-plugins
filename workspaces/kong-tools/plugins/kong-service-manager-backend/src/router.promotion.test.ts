@@ -509,7 +509,10 @@ describe('promote to code (Task P3)', () => {
   });
 
   describe('edit in code (issue #135)', () => {
-    const codeOwnedPlugin = { ...routePlugin, tags: [] }; // missing the instance defaultTags => code-owned
+    // Code-owned in the only shape edit-in-code accepts: no portal
+    // defaultTags, and reconciled by the Kong Ingress Controller — the same
+    // signal the finalizer needs to ever see it converge.
+    const codeOwnedPlugin = { ...routePlugin, tags: ['managed-by-ingress-controller'] };
 
     function kongServiceForCodeOwned(): jest.Mocked<KongServiceManagerService> {
       const kongService = kongServiceMock();
@@ -574,6 +577,26 @@ describe('promote to code (Task P3)', () => {
       } finally {
         await chart.cleanup();
       }
+    });
+
+    it('promote 400s a code-owned plugin the ingress controller does not manage — the finalizer could never converge it', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([{ ...routePlugin, tags: [] }]);
+      kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+        editInCodeEnabled: true,
+      });
+
+      const res = await request(app)
+        .post(PROMOTE_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/managed-by-ingress-controller/);
     });
 
     it('promote 400s a code-owned plugin without editInCode enabled — verbatim pre-existing message', async () => {

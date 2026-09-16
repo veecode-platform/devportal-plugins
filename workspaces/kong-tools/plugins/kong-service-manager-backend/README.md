@@ -198,6 +198,13 @@ kong:
     editInCode: true
 ```
 
+Edit in code is offered only for a plugin that carries the Kong Ingress
+Controller's `managed-by-ingress-controller` tag. "Not portal-managed" is a
+wider set than that — a plugin created straight through the Admin API matches
+it too — and the finalizer only ever recognizes convergence on a
+controller-managed plugin, so a merge request for any other plugin could
+never finish. Those are refused with `400`.
+
 The record this writes carries `mode: 'code-only'` (as opposed to the
 default `experiment`) and is otherwise reconciled by the same finalizer
 states — `mr-open`, `awaiting-deploy`, `applying`, `codified`/`failed` — but
