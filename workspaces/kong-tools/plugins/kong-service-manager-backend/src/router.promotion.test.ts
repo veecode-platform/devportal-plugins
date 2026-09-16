@@ -53,6 +53,7 @@ function draftRow(overrides: Partial<PromotionRecordRow> = {}): PromotionRecordR
     plugin_type: 'rate-limiting',
     config_snapshot: { minute: 60 },
     state: 'draft',
+    mode: 'experiment',
     mr_ref: null,
     requester_ref: 'user:default/alice',
     detail: null,
@@ -101,6 +102,9 @@ async function buildApp(deps: {
   kongService: jest.Mocked<KongServiceManagerService>;
   promotionStore?: jest.Mocked<PromotionStore>;
   gitlabClient?: jest.Mocked<GitlabClient>;
+  editInCodeEnabled?: boolean;
+  /** Stubs the ADR-018 helm gate present whenever promotion is actually enabled — needed to exercise the capabilities endpoint's non-disabled branch. */
+  helmAvailable?: boolean;
 }) {
   const router = await createRouter({
     httpAuth: mockServices.httpAuth(),
@@ -111,6 +115,11 @@ async function buildApp(deps: {
     userInfo: mockServices.userInfo({ userEntityRef: 'user:default/alice' }),
     promotionStore: deps.promotionStore,
     gitlabClient: deps.gitlabClient,
+    editInCodeEnabled: deps.editInCodeEnabled,
+    helmGate:
+      deps.helmAvailable === undefined
+        ? undefined
+        : { getCapability: async () => ({ available: deps.helmAvailable!, path: 'helm' }) },
   });
   const app = express();
   app.use(router);
@@ -496,6 +505,206 @@ describe('promote to code (Task P3)', () => {
       } finally {
         await chart.cleanup();
       }
+    });
+  });
+
+  describe('edit in code (issue #135)', () => {
+    const codeOwnedPlugin = { ...routePlugin, tags: [] }; // missing the instance defaultTags => code-owned
+
+    function kongServiceForCodeOwned(): jest.Mocked<KongServiceManagerService> {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([codeOwnedPlugin]);
+      kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+      return kongService;
+    }
+
+    it('promote 400s a portal-managed plugin that sends a config — its config always comes from Kong', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([{ ...routePlugin, tags: ['portal-managed'] }]);
+      kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+        editInCodeEnabled: true,
+      });
+
+      const res = await request(app)
+        .post(PROMOTE_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/portal-managed/);
+      expect(res.body.error.message).toMatch(/does not accept an edited/);
+    });
+
+    it('promote 201s a code-owned plugin with editInCode on and a config — mode code-only, no experiment tagged', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(
+        draftRow({ mode: 'code-only', config_snapshot: { minute: 30, policy: 'local', hour: null } }),
+      );
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+      gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+      gitlabClient.openMergeRequest.mockResolvedValue(mr);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+      try {
+        const res = await request(app)
+          .post(PROMOTE_URL)
+          .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+        expect(res.status).toBe(201);
+        expect(res.body.mode).toBe('code-only');
+        expect(promotionStore.upsertDraft).toHaveBeenCalledWith(
+          expect.objectContaining({ mode: 'code-only' }),
+        );
+        // No experiment ever existed for a code-only edit — nothing to tag.
+        expect(kongService.editRoutePlugin).not.toHaveBeenCalled();
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('promote 400s a code-owned plugin without editInCode enabled — verbatim pre-existing message', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+        editInCodeEnabled: false,
+      });
+
+      const res = await request(app)
+        .post(PROMOTE_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/not portal-managed \(code-owned\)/);
+    });
+
+    it('promote 400s a code-owned plugin with editInCode on but no config — same gate as no switch at all', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+        editInCodeEnabled: true,
+      });
+
+      const res = await request(app).post(PROMOTE_URL).send({ entityRef: 'component:default/svc' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/not portal-managed \(code-owned\)/);
+    });
+
+    it('promote 409s when the edited config equals the live config — nothing to promote', async () => {
+      const kongService = kongServiceForCodeOwned(); // config: { minute: 60, policy: 'local', hour: null }
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+        editInCodeEnabled: true,
+      });
+
+      const res = await request(app)
+        .post(PROMOTE_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 60, policy: 'local', hour: null } });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.message).toMatch(/nothing to promote/);
+    });
+
+    it('promote 409s a code-only request while another promotion is already open for the route plugin', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(
+        draftRow({ state: 'mr-open', mr_ref: mr.webUrl }),
+      );
+
+      const app = await buildApp({
+        kongService,
+        promotionStore,
+        gitlabClient: gitlabClientMock(),
+        editInCodeEnabled: true,
+      });
+
+      const res = await request(app)
+        .post(PROMOTE_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.message).toContain(mr.webUrl);
+      expect(promotionStore.upsertDraft).not.toHaveBeenCalled();
+    });
+
+    it('preview stays permissive on an edited config that equals the live config (unlike promote)', async () => {
+      const kongService = kongServiceForCodeOwned();
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient,
+        editInCodeEnabled: true,
+      });
+      try {
+        const res = await request(app)
+          .post(PREVIEW_URL)
+          .send({ entityRef: 'component:default/svc', config: { minute: 60, policy: 'local', hour: null } });
+
+        expect(res.status).toBe(200);
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('GET .../promotion/capabilities exposes editInCode', async () => {
+      const kongService = kongServiceMock();
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+        editInCodeEnabled: true,
+        helmAvailable: true,
+      });
+
+      const res = await request(app).get('/default/promotion/capabilities');
+      expect(res.status).toBe(200);
+      expect(res.body.editInCode).toBe(true);
+    });
+
+    it('GET .../promotion/capabilities defaults editInCode to false', async () => {
+      const kongService = kongServiceMock();
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient: gitlabClientMock(),
+        helmAvailable: true,
+      });
+
+      const res = await request(app).get('/default/promotion/capabilities');
+      expect(res.status).toBe(200);
+      expect(res.body.editInCode).toBe(false);
+    });
+
+    it('GET .../promotion/capabilities reports editInCode false when promotion (and its helm gate) are not enabled at all', async () => {
+      const kongService = kongServiceMock();
+      const app = await buildApp({ kongService, editInCodeEnabled: true }); // no store/gitlabClient/helmGate — disabled instance
+      const res = await request(app).get('/default/promotion/capabilities');
+      expect(res.status).toBe(200);
+      expect(res.body.editInCode).toBe(false);
     });
   });
 
