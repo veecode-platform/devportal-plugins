@@ -5,7 +5,7 @@ import { createTranslationRef } from '@backstage/core-plugin-api/alpha';
 export const kongServiceManagerMessages = {
   homepage: {
     intro:
-      "Manage this service's Kong API-gateway configuration: its routes and the plugins that shape traffic. A plugin you add here takes effect in the gateway immediately but lives only in the gateway until you promote it to code (a merge request into the service's chart).",
+      "Manage this service's Kong API-gateway configuration: its routes and the plugins that shape traffic. A plugin takes effect in the gateway immediately; on a route, you can promote it to code — a merge request into the service's chart — to manage it from Git instead.",
     tabs: {
       service: 'Service',
       plugins: 'Plugins',

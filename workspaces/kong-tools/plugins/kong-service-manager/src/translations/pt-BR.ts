@@ -6,7 +6,7 @@ const kongServiceManagerTranslationPtBR = createTranslationMessages({
   full: true,
   messages: {
     'homepage.intro':
-      'Gerencie a configuração do gateway Kong deste serviço: suas rotas e os plugins que moldam o tráfego. Um plugin adicionado aqui passa a valer no gateway imediatamente, mas só existe no gateway até você promovê-lo para código (uma merge request no chart do serviço).',
+      'Gerencie a configuração do gateway Kong deste serviço: suas rotas e os plugins que moldam o tráfego. Um plugin passa a valer no gateway imediatamente; numa rota, você pode promovê-lo para código — uma merge request no chart do serviço — e gerenciá-lo pelo Git.',
     'homepage.tabs.service': 'Serviço',
     'homepage.tabs.plugins': 'Plugins',
     'homepage.tabs.routes': 'Rotas',
