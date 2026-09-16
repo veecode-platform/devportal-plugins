@@ -94,7 +94,16 @@ kong:
     enabled: true
     helmPath: /opt/helm/helm      # default: "helm" (resolved on PATH)
     helmTimeoutSeconds: 60         # default: 60
+    editInCode: true               # default: false — see below
 ```
+
+`kong.promotion.editInCode` (default `false`) additionally offers **edit in
+code** for a plugin already owned by the chart and managed by the Kong Ingress
+Controller: the portal opens a merge request that changes the plugin's values in
+the chart instead of writing to the gateway. It uses the same `helm` render
+check, and each edit is gated on the controller's ownership tag and refuses
+fields the chart can't reproduce. See
+[Applying changes to Kong](../../docs/applying-changes-to-kong.md).
 
 The backend probes `helm` once at startup (and again, lazily, on every
 gated request while it stays unavailable — no restart needed once fixed) and
