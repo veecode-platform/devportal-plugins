@@ -1,8 +1,11 @@
 import path from 'path';
 import type { Knex } from 'knex';
-import type { PromotionState } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+import type { PromotionMode, PromotionState } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 const TABLE = 'promotions';
+
+/** Nullable column default (older rows, and any backend not yet aware of `mode`) — issue #135. */
+const DEFAULT_MODE: PromotionMode = 'experiment';
 
 interface PromotionTableRow {
   id: number;
@@ -13,6 +16,7 @@ interface PromotionTableRow {
   plugin_type: string;
   config_snapshot: string;
   state: PromotionState;
+  mode: PromotionMode | null;
   mr_ref: string | null;
   requester_ref: string;
   detail: string | null;
@@ -29,6 +33,7 @@ export interface PromotionRecordRow {
   plugin_type: string;
   config_snapshot: unknown;
   state: PromotionState;
+  mode: PromotionMode;
   mr_ref: string | null;
   requester_ref: string;
   detail: string | null;
@@ -44,6 +49,8 @@ export interface NewPromotionDraft {
   pluginType: string;
   configSnapshot: unknown;
   requesterRef: string;
+  /** @default 'experiment' (issue #135) */
+  mode?: PromotionMode;
 }
 
 /**
@@ -101,7 +108,7 @@ export interface PromotionStore {
 }
 
 function toRecordRow(row: PromotionTableRow): PromotionRecordRow {
-  return { ...row, config_snapshot: JSON.parse(row.config_snapshot) };
+  return { ...row, config_snapshot: JSON.parse(row.config_snapshot), mode: row.mode ?? DEFAULT_MODE };
 }
 
 export class KnexPromotionStore implements PromotionStore {
@@ -125,6 +132,7 @@ export class KnexPromotionStore implements PromotionStore {
         plugin_type: draft.pluginType,
         config_snapshot: JSON.stringify(draft.configSnapshot),
         state: 'draft',
+        mode: draft.mode ?? DEFAULT_MODE,
         requester_ref: draft.requesterRef,
         updated_at: this.db.fn.now(),
       })

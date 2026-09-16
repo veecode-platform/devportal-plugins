@@ -160,6 +160,17 @@ async function deletePromotionBranchIfUnused(
   await gitlab.deleteBranch(repo, branch);
 }
 
+/**
+ * `mode === 'code-only'` (issue #135) means this record never created,
+ * tagged, or froze anything in Kong — it edits an already code-owned plugin
+ * directly. Every Kong-write site in the finalizer must skip its write for
+ * such a record; reads (e.g. `handleApplying`'s convergence check) are
+ * unaffected and need no guard.
+ */
+function isCodeOnly(record: PromotionRecordRow): boolean {
+  return record.mode === 'code-only';
+}
+
 async function abortForTeardown(deps: {
   logger: LoggerService;
   gitlab: GitlabClient;
@@ -170,9 +181,13 @@ async function abortForTeardown(deps: {
   reason: 'archived' | 'gone' | 'unregistered';
 }): Promise<void> {
   const { logger, gitlab, kong, store, record, detail, reason } = deps;
-  const experimental = await findExperimentalPlugin(kong, record);
-  if (experimental) {
-    await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+  // A code-only record (issue #135) never created an experiment in Kong, so
+  // there is nothing to remove — only the MR/branch cleanup below applies.
+  if (!isCodeOnly(record)) {
+    const experimental = await findExperimentalPlugin(kong, record);
+    if (experimental) {
+      await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+    }
   }
   // Close the promotion MR so the repo does not keep an orphan (ADR-023).
   // Best-effort: a gone project has no MR to close, and a failure here must
@@ -189,7 +204,9 @@ async function abortForTeardown(deps: {
     }
   }
   await store.transition(record.id, 'aborted-teardown', {
-    detail: `project ${reason} during an open promotion; leftover experimental plugin removed, merge request closed`,
+    detail: isCodeOnly(record)
+      ? `project ${reason} during an open code-only edit; merge request closed (no experiment in Kong)`
+      : `project ${reason} during an open promotion; leftover experimental plugin removed, merge request closed`,
   });
   logger.info('kong-service-manager promotion aborted by teardown', {
     promotionId: record.id,
@@ -238,7 +255,11 @@ async function handleMrOpen(deps: {
 
   const mr = await gitlab.getMergeRequest(detail, detail.iid);
   if (mr.state === 'closed') {
-    await untagExperimental(kong, record);
+    // A code-only record (issue #135) never tagged an experiment — nothing
+    // to untag; the branch cleanup below applies to both modes.
+    if (!isCodeOnly(record)) {
+      await untagExperimental(kong, record);
+    }
     // The branch would otherwise outlive the MR and be found stale by the
     // next promote of this type (ADR-022). Best-effort: a failure here must
     // not keep the record out of `discarded`.
@@ -261,9 +282,13 @@ async function handleMrOpen(deps: {
   // Idempotent: if the process crashed between this delete and the
   // transition below, the record is still `mr-open`, the next tick finds no
   // experiment and just transitions.
-  const experimental = await findExperimentalPlugin(kong, record);
-  if (experimental) {
-    await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+  // A `code-only` record (issue #135) never created an experiment — the
+  // plugin it edited was already code-owned — so there is nothing to remove.
+  if (!isCodeOnly(record)) {
+    const experimental = await findExperimentalPlugin(kong, record);
+    if (experimental) {
+      await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+    }
   }
 
   await store.transition(record.id, 'awaiting-deploy', {

@@ -11,6 +11,7 @@ function record(overrides: Partial<PromotionRecord> = {}): PromotionRecord {
     routeId: 'route-1',
     pluginType: 'rate-limiting',
     state: 'mr-open',
+    mode: 'experiment',
     mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
     requesterRef: 'user:default/alice',
     createdAt: '2026-09-13T12:00:00.000Z',
@@ -133,6 +134,26 @@ describe('derivePromotionBadge', () => {
         instanceDefaultTags: ['portal-managed'],
       });
       expect(badge.kind).toBe('codified');
+    });
+
+    it('falls back to code-owned when a finished code-only promotion ends — the plugin is editable in code again (issue #135)', () => {
+      const badge = derivePromotionBadge(
+        [record({ state: 'codified', mode: 'code-only' })],
+        1757764800,
+        NOW,
+        { pluginTags: ['managed-by-ingress-controller'], instanceDefaultTags: ['portal-managed'] },
+      );
+      expect(badge.kind).toBe('code-owned');
+    });
+
+    it('falls back to code-owned for a failed code-only promotion too — nothing to promote or discard', () => {
+      const badge = derivePromotionBadge(
+        [record({ state: 'failed', mode: 'code-only' })],
+        1757764800,
+        NOW,
+        { pluginTags: ['managed-by-ingress-controller'], instanceDefaultTags: ['portal-managed'] },
+      );
+      expect(badge.kind).toBe('code-owned');
     });
 
     it('keeps the codified badge when the instance has no ownership signal (cannot tell a stale record apart)', () => {

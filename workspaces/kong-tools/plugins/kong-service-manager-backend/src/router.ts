@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { isDeepStrictEqual } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { HttpAuthService, PermissionsService, UserInfoService } from '@backstage/backend-plugin-api';
@@ -11,6 +12,7 @@ import type {
   AssociatedPluginsResponse,
   CreateRoute,
   PromotionCapabilities,
+  PromotionMode,
   PromotionState,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
@@ -37,7 +39,7 @@ import type { HelmCapabilityGate } from './services/helmCapability';
 import { GitlabClient, type ResolvedRepo } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
-import { EXPERIMENTAL_TAG_PREFIX, promotionBranch } from './services/promotionTags';
+import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG, promotionBranch } from './services/promotionTags';
 
 /**
  * States whose `detail` column carries a human-readable failure message
@@ -53,6 +55,7 @@ interface PromotionDto {
   routeId: string;
   pluginType: string;
   state: PromotionState;
+  mode: PromotionMode;
   mrRef: string | null;
   requesterRef: string;
   createdAt: string;
@@ -78,6 +81,7 @@ function toPromotionDto(row: PromotionRecordRow): PromotionDto {
     routeId: row.route_id,
     pluginType: row.plugin_type,
     state: row.state,
+    mode: row.mode,
     mrRef: row.mr_ref,
     requesterRef: row.requester_ref,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
@@ -96,6 +100,7 @@ export async function createRouter({
   helmGate,
   helmPath = 'helm',
   helmTimeoutSeconds = 60,
+  editInCodeEnabled = false,
 }: {
   httpAuth: HttpAuthService;
   permissions: PermissionsService;
@@ -116,6 +121,13 @@ export async function createRouter({
   helmPath?: string;
   /** `kong.promotion.helmTimeoutSeconds`, forwarded to `renderCheck`. @default 60 */
   helmTimeoutSeconds?: number;
+  /**
+   * `kong.promotion.editInCode` (issue #135) — whether a code-owned
+   * (KIC-managed) route plugin can be promoted directly from an edited
+   * config, with no experiment ever created in Kong (mode `code-only`).
+   * @default false
+   */
+  editInCodeEnabled?: boolean;
 }): Promise<express.Router> {
   const router = Router();
   router.use(express.json());
@@ -165,25 +177,29 @@ export async function createRouter({
     }
   }
 
+  type PluginOwnership = 'portal-managed' | 'code-owned';
+
   /**
    * Looks up a route plugin and its promotion adapter together — the same
-   * 404 (plugin not found) / 400 (no adapter registered) / 400 (code-owned)
-   * gate that both promote and preview require before doing anything else.
+   * 404 (plugin not found) / 400 (no adapter registered) gate that both
+   * promote and preview require before doing anything else, plus its
+   * ownership (ADR-017) so each caller can decide what a code-owned plugin
+   * means for it (refuse, or accept an edit-in-code — issue #135).
    *
    * Ownership: promotion only applies to plugins the portal itself created.
    * When the instance configures `defaultTags`, those tags are the portal's
    * marker (`KongServiceManagerService.tagsForCreate`) — a plugin missing
    * any of them was never portal-created (e.g. reconciled onto Kong by the
-   * Kong Ingress Controller from the service's chart) and promoting it makes
-   * no sense. An instance with no `defaultTags` configured has no ownership
-   * signal at all, so every plugin is treated as promotable (today's
-   * behaviour, unchanged).
+   * Kong Ingress Controller from the service's chart). An instance with no
+   * `defaultTags` configured has no ownership signal at all, so every
+   * plugin is treated as portal-managed (today's behaviour, unchanged) —
+   * and `editInCode` can never fire there, since it has nothing to key on.
    */
   async function resolvePromotableRoutePlugin(
     instance: string,
     routeId: string,
     pluginId: string,
-  ): Promise<{ plugin: AssociatedPluginsResponse; adapter: KongPluginAdapter }> {
+  ): Promise<{ plugin: AssociatedPluginsResponse; adapter: KongPluginAdapter; ownership: PluginOwnership }> {
     const plugin = await findRoutePlugin(instance, routeId, pluginId);
     if (!plugin) {
       throw new NotFoundError(`Route plugin '${pluginId}' not found on route '${routeId}'`);
@@ -197,17 +213,63 @@ export async function createRouter({
     }
 
     const defaultTags = kongService.getInstanceDefaultTags(instance);
+    let ownership: PluginOwnership = 'portal-managed';
     if (defaultTags && defaultTags.length > 0) {
       const tags = plugin.tags ?? [];
       const isPortalManaged = defaultTags.every(tag => tags.includes(tag));
-      if (!isPortalManaged) {
-        throw new InputError(
-          `Plugin '${plugin.name}' on route '${routeId}' is not portal-managed (code-owned); promotion applies to experiments created from the portal`,
-        );
-      }
+      ownership = isPortalManaged ? 'portal-managed' : 'code-owned';
     }
 
-    return { plugin, adapter };
+    return { plugin, adapter, ownership };
+  }
+
+  /** Verbatim message the code-owned gate has always thrown (400) — kept identical for callers that don't (or can't) accept an edit-in-code config. */
+  function codeOwnedError(pluginName: string, routeId: string): InputError {
+    return new InputError(
+      `Plugin '${pluginName}' on route '${routeId}' is not portal-managed (code-owned); promotion applies to experiments created from the portal`,
+    );
+  }
+
+  /**
+   * Decides which of the two promotion modes a request maps to (issue #135)
+   * — shared by promote and preview so both apply the same four outcomes:
+   * portal-managed + config → 400 (a portal-managed plugin's config always
+   * comes from Kong); code-owned + editInCode + config → `code-only`;
+   * code-owned without either → the pre-existing 400, verbatim.
+   */
+  function resolvePromotionMode(
+    ownership: PluginOwnership,
+    config: Record<string, unknown> | undefined,
+    pluginName: string,
+    routeId: string,
+    pluginTags: string[] = [],
+  ): PromotionMode {
+    if (ownership === 'portal-managed') {
+      if (config !== undefined) {
+        throw new InputError(
+          `Plugin '${pluginName}' on route '${routeId}' is portal-managed; its config comes from Kong and does not accept an edited 'config'`,
+        );
+      }
+      return 'experiment';
+    }
+    if (!editInCodeEnabled || config === undefined) {
+      throw codeOwnedError(pluginName, routeId);
+    }
+    // The finalizer only ever recognizes convergence on a plugin carrying the
+    // Kong Ingress Controller's ownership tag (`handleApplying`). "Not
+    // portal-managed" is a wider set than that — a plugin created straight
+    // through the Admin API matches it too — and offering edit-in-code for one
+    // of those opens a merge request the finalizer can never finish, leaving
+    // the record to time out in `failed`. Gate on the same signal the
+    // finalizer reads.
+    if (!pluginTags.includes(KIC_OWNERSHIP_TAG)) {
+      throw new InputError(
+        `Plugin '${pluginName}' on route '${routeId}' is not managed by the Kong Ingress Controller ` +
+          `(no '${KIC_OWNERSHIP_TAG}' tag), so an edit in code could never be reconciled back onto the ` +
+          `gateway; edit it wherever it is currently managed`,
+      );
+    }
+    return 'code-only';
   }
 
   /**
@@ -291,6 +353,13 @@ export async function createRouter({
   const promoteBody = z.object({
     /** Backstage entity ref of the service owning the plugin's route — resolves the target repo via its GitLab annotations. */
     entityRef: z.string(),
+    /**
+     * Edited config (issue #135, "edit in code") — accepted only when the
+     * target plugin is code-owned and `kong.promotion.editInCode` is on;
+     * a portal-managed plugin's config always comes from Kong itself and
+     * rejects this field.
+     */
+    config: z.record(z.unknown()).optional(),
   });
 
   const createRouteBody = z.object({
@@ -662,12 +731,16 @@ export async function createRouter({
           path: helmPath,
           error: 'Kong plugin promotion is not enabled on this instance',
         },
+        editInCode: false,
       };
       res.json(capabilities);
       return;
     }
 
-    const capabilities: PromotionCapabilities = { helm: await helmGate.getCapability() };
+    const capabilities: PromotionCapabilities = {
+      helm: await helmGate.getCapability(),
+      editInCode: editInCodeEnabled,
+    };
     res.json(capabilities);
   });
 
@@ -690,24 +763,62 @@ export async function createRouter({
       if (!body.success) throw new InputError(body.error.toString());
 
       const { instance, serviceName, routeId, pluginId } = params.data;
-      const { entityRef } = body.data;
+      const { entityRef, config: editedConfigInput } = body.data;
 
-      const { plugin, adapter } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
+      const { plugin, adapter, ownership } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
+      const mode = resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId, plugin.tags ?? []);
 
-      // Step 1: persist the draft before any external write (crash-safety —
-      // an in-flight record for this route plugin means a retry resumes it
-      // instead of starting a second attempt).
-      let promotion = await promotionStore.getActiveByRoute(instance, routeId, adapter.pluginType);
-      if (!promotion) {
+      const activeBeforeStart = await promotionStore.getActiveByRoute(instance, routeId, adapter.pluginType);
+
+      let promotion: PromotionRecordRow;
+      if (mode === 'code-only') {
+        // Edit-in-code never resumes an active record (ADR-024): resuming a
+        // crashed draft could take the wrong Step-4 branch (experiment vs.
+        // code-only) or silently discard the config the user just edited in
+        // favor of a stale snapshot. An active record for this route/type —
+        // of either mode — is always a conflict, same wording family as
+        // `assertNotFrozen`.
+        if (activeBeforeStart) {
+          const link = activeBeforeStart.mr_ref ? ` (${activeBeforeStart.mr_ref})` : '';
+          throw new ConflictError(
+            `Route plugin '${plugin.name}' on route '${routeId}' has an open promotion${link} — edits are frozen until it merges, fails, or is discarded.`,
+          );
+        }
+
+        const editedSnapshot = adapter.fromRendered({ config: editedConfigInput! });
+        const liveSnapshot = adapter.fromRendered({ config: plugin.config });
+        if (isDeepStrictEqual(editedSnapshot, liveSnapshot)) {
+          throw new ConflictError(
+            `Edited config for '${adapter.pluginType}' on route '${routeId}' is identical to the live config — nothing to promote`,
+          );
+        }
+
         promotion = await promotionStore.upsertDraft({
           idempotencyKey: randomUUID(),
           instance,
           serviceName,
           routeId,
           pluginType: adapter.pluginType,
-          configSnapshot: adapter.fromRendered({ config: plugin.config }),
+          configSnapshot: editedSnapshot,
           requesterRef: await requesterRef(req),
+          mode: 'code-only',
         });
+      } else {
+        // Step 1 (experiment, unchanged): persist the draft before any
+        // external write — a retry resumes the same in-flight record
+        // instead of starting a second attempt.
+        promotion =
+          activeBeforeStart ??
+          (await promotionStore.upsertDraft({
+            idempotencyKey: randomUUID(),
+            instance,
+            serviceName,
+            routeId,
+            pluginType: adapter.pluginType,
+            configSnapshot: adapter.fromRendered({ config: plugin.config }),
+            requesterRef: await requesterRef(req),
+            mode: 'experiment',
+          }));
       }
       const snapshot = promotion.config_snapshot as NormalizedConfig;
 
@@ -766,22 +877,35 @@ export async function createRouter({
           dir,
           edits,
           existing,
-          `kong: promote ${adapter.pluginType} on route ${routeId} to code`,
+          mode === 'code-only'
+            ? `kong: edit ${adapter.pluginType} on route ${routeId} in code`
+            : `kong: promote ${adapter.pluginType} on route ${routeId} to code`,
         );
 
         if (!mr) {
           mr = await gitlabClient.openMergeRequest(
             repo,
             branch,
-            `Promote Kong plugin '${adapter.pluginType}' to code`,
-            [
-              `Promotes the experimental \`${adapter.pluginType}\` plugin on route \`${routeId}\` `,
-              `(service \`${serviceName}\`, Kong instance \`${instance}\`) from ClickOps to the chart.`,
-              '',
-              'Generated by the DevPortal Kong plugin promotion flow. Once this merges and deploys, ',
-              'the portal verifies the code-owned plugin converges to the same config before removing ',
-              'the experimental one.',
-            ].join('\n'),
+            mode === 'code-only'
+              ? `Edit Kong plugin '${adapter.pluginType}' in code`
+              : `Promote Kong plugin '${adapter.pluginType}' to code`,
+            mode === 'code-only'
+              ? [
+                  `Edits the code-owned \`${adapter.pluginType}\` plugin on route \`${routeId}\` `,
+                  `(service \`${serviceName}\`, Kong instance \`${instance}\`) directly in the chart.`,
+                  '',
+                  'Generated by the DevPortal Kong plugin "edit in code" flow. This plugin is already ',
+                  'managed by the Kong Ingress Controller from the chart — there is no experiment to ',
+                  'remove.',
+                ].join('\n')
+              : [
+                  `Promotes the experimental \`${adapter.pluginType}\` plugin on route \`${routeId}\` `,
+                  `(service \`${serviceName}\`, Kong instance \`${instance}\`) from ClickOps to the chart.`,
+                  '',
+                  'Generated by the DevPortal Kong plugin promotion flow. Once this merges and deploys, ',
+                  'the portal verifies the code-owned plugin converges to the same config before removing ',
+                  'the experimental one.',
+                ].join('\n'),
           );
         }
 
@@ -791,13 +915,17 @@ export async function createRouter({
           detail: encodeMrDetail({ host: repo.host, projectSlug: repo.projectSlug, projectId: mr.projectId, iid: mr.iid }),
         });
 
-        // Step 5: tag the experimental entity.
-        const tag = `${EXPERIMENTAL_TAG_PREFIX}${mr.projectId}-${mr.iid}`;
-        const existingTags = plugin.tags ?? [];
-        if (!existingTags.includes(tag)) {
-          await kongService.editRoutePlugin(instance, routeId, pluginId, {
-            tags: [...existingTags, tag],
-          });
+        // Step 5: tag the experimental entity — skipped for `code-only`
+        // (issue #135): there is no experiment in Kong to mark, freeze, or
+        // later remove; the plugin being edited is already code-owned.
+        if (mode === 'experiment') {
+          const tag = `${EXPERIMENTAL_TAG_PREFIX}${mr.projectId}-${mr.iid}`;
+          const existingTags = plugin.tags ?? [];
+          if (!existingTags.includes(tag)) {
+            await kongService.editRoutePlugin(instance, routeId, pluginId, {
+              tags: [...existingTags, tag],
+            });
+          }
         }
 
         res.status(201).json(
@@ -826,16 +954,23 @@ export async function createRouter({
       if (!body.success) throw new InputError(body.error.toString());
 
       const { instance, routeId, pluginId } = params.data;
-      const { entityRef } = body.data;
+      const { entityRef, config: editedConfigInput } = body.data;
 
-      const { plugin, adapter } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
-      const liveConfig = adapter.fromRendered({ config: plugin.config });
+      const { plugin, adapter, ownership } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
+      // Preview stays permissive on the equality check (unlike promote): it
+      // shows the generated YAML for an edited config even when that config
+      // happens to match the live one.
+      resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId, plugin.tags ?? []);
+      const previewConfig =
+        editedConfigInput !== undefined
+          ? adapter.fromRendered({ config: editedConfigInput })
+          : adapter.fromRendered({ config: plugin.config });
 
       const credentials = await httpAuth.credentials(req, { allow: ['user'] });
       const repo = await gitlabClient.resolveRepo(entityRef, credentials);
 
-      const edits = adapter.toChartEdits(liveConfig);
-      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, liveConfig);
+      const edits = adapter.toChartEdits(previewConfig);
+      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, previewConfig);
 
       try {
         if (!check.equal) {
@@ -854,7 +989,7 @@ export async function createRouter({
           })),
         );
 
-        res.json({ files, normalizedConfig: liveConfig });
+        res.json({ files, normalizedConfig: previewConfig });
       } finally {
         await cleanup();
       }

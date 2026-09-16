@@ -179,6 +179,41 @@ kong:
     helmPath: /opt/helm/helm
 ```
 
+### Edit in code
+
+A plugin already reconciled onto Kong by an external controller (e.g. the
+Kong Ingress Controller, from the service's own chart) is **code-owned**
+(ADR-017) and read-only in the portal — there's no live experiment to
+promote. `kong.promotion.editInCode` lets the portal edit such a plugin
+directly instead: the user edits its config in the portal form, and the
+backend opens a merge request with the edited config, with **no experiment
+ever created, tagged, or frozen in Kong** for it.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `kong.promotion.editInCode` | `boolean` | No | Enables editing an already code-owned route plugin by opening a merge request against the edited config. `false` by default — a code-owned plugin stays read-only. |
+
+```yaml
+kong:
+  promotion:
+    enabled: true
+    editInCode: true
+```
+
+Edit in code is offered only for a plugin that carries the Kong Ingress
+Controller's `managed-by-ingress-controller` tag. "Not portal-managed" is a
+wider set than that — a plugin created straight through the Admin API matches
+it too — and the finalizer only ever recognizes convergence on a
+controller-managed plugin, so a merge request for any other plugin could
+never finish. Those are refused with `400`.
+
+The record this writes carries `mode: 'code-only'` (as opposed to the
+default `experiment`) and is otherwise reconciled by the same finalizer
+states — `mr-open`, `awaiting-deploy`, `applying`, `codified`/`failed` — but
+every Kong write the finalizer would normally make for an experiment (tag
+removal, deleting the experimental plugin) is skipped for it, since none of
+those ever happened.
+
 ### Annotate your catalog entities
 
 Add the `kong-manager/service-name` annotation to any Component that should

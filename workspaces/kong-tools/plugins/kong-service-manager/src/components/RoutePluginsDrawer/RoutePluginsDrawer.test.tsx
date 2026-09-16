@@ -64,7 +64,13 @@ const mockPromotePlugin = jest.fn();
 const mockDiscardPromotion = jest.fn();
 
 let mockPromotionsByPluginId: Record<string, unknown[]> = {};
-let mockPromotionCapabilities: { helm: { available: boolean; path: string; error?: string } } | null = null;
+let mockPromotionCapabilities: { helm: { available: boolean; path: string; error?: string }; editInCode?: boolean } | null = null;
+let mockKongInstances: Array<{ id: string; apiBaseUrl: string; defaultTags?: string[] }> = [];
+const mockFetchPluginFields = jest.fn();
+const mockAddPluginToRoute = jest.fn();
+const mockEditRoutePlugin = jest.fn();
+const mockClearError = jest.fn();
+let mockPluginFields: unknown = null;
 
 jest.mock('@backstage/plugin-catalog-react', () => ({
   useEntity: () => ({ entity: mockEntity }),
@@ -79,8 +85,9 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
       instance: 'default',
       serviceName: 'my-service',
       promotionsByPluginId: mockPromotionsByPluginId,
-      kongInstances: [],
+      kongInstances: mockKongInstances,
       promotionCapabilities: mockPromotionCapabilities,
+      pluginFields: mockPluginFields,
     },
     fetchRouteAssociatedPlugins: mockFetchRouteAssociatedPlugins,
     fetchAvailablePlugins: mockFetchAvailablePlugins,
@@ -91,6 +98,15 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
     previewPromotion: mockPreviewPromotion,
     promotePlugin: mockPromotePlugin,
     discardPromotion: mockDiscardPromotion,
+    // PluginConfigDrawer's dependencies — the code-mode edit-in-code instance
+    // mounted inside RoutePluginsDrawer (issue #135) shares this same mocked
+    // context, so it needs these even though most tests here never open it.
+    fetchPluginFields: mockFetchPluginFields,
+    addPluginToRoute: mockAddPluginToRoute,
+    editRoutePlugin: mockEditRoutePlugin,
+    addPluginToService: jest.fn(),
+    editServicePlugin: jest.fn(),
+    clearError: mockClearError,
   }),
 }));
 
@@ -103,6 +119,10 @@ describe('RoutePluginsDrawer', () => {
     };
     mockPromotionsByPluginId = {};
     mockPromotionCapabilities = { helm: { available: true, path: 'helm' } };
+    mockKongInstances = [];
+    // parseConfigFields only reads the top-level 'config' field's own
+    // `fields` array — this mirrors the real Kong schema shape.
+    mockPluginFields = { fields: [{ config: { type: 'record', fields: [{ minute: { type: 'number' } }] } }] };
     mockPreviewPromotion.mockResolvedValue({ files: [], normalizedConfig: {} });
   });
 
@@ -142,7 +162,7 @@ describe('RoutePluginsDrawer', () => {
       expect(within(dialog).getByRole('button', { name: /Promote to code/i })).toBeEnabled(),
     );
     await userEvent.click(within(dialog).getByRole('button', { name: /Promote to code/i }));
-    expect(mockPromotePlugin).toHaveBeenCalledWith('route-1', 'plugin-1', expect.any(String));
+    expect(mockPromotePlugin).toHaveBeenCalledWith('route-1', 'plugin-1', expect.any(String), undefined);
   });
 
   it('disables promote with a reason when the entity has no owning repo (pure route)', () => {
@@ -233,5 +253,69 @@ describe('RoutePluginsDrawer', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Descartar promoção' }));
     expect(mockDiscardPromotion).toHaveBeenCalledWith('route-1', 'plugin-1');
+  });
+
+  describe('edit in code (issue #135)', () => {
+    beforeEach(() => {
+      mockPromotionCapabilities = { helm: { available: true, path: 'helm' }, editInCode: true };
+      // No defaultTags on the plugin's own tags (null) but the instance
+      // carries one => ADR-017 code-owned.
+      mockKongInstances = [{ id: 'default', apiBaseUrl: 'https://kong.example.com', defaultTags: ['portal-managed'] }];
+    });
+
+    it('opens the code form, then the review dialog, and promotes with the edited config', async () => {
+      mockPromotePlugin.mockResolvedValue({ id: 1, state: 'mr-open', mode: 'code-only' });
+      render(
+        <RoutePluginsDrawer
+          open
+          route={mockRoute}
+          onClose={jest.fn()}
+          onEnablePlugin={jest.fn()}
+          onEditPlugin={jest.fn()}
+          canPromote
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Edit in code' }));
+      expect(screen.getByRole('button', { name: /Review promotion/i })).toBeInTheDocument();
+
+      const minuteField = screen.getByLabelText('config.minute');
+      await userEvent.clear(minuteField);
+      await userEvent.type(minuteField, '30');
+      await userEvent.click(screen.getByRole('button', { name: /Review promotion/i }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText(/Edit rate-limiting in code/)).toBeInTheDocument();
+      await waitFor(() =>
+        expect(within(dialog).getByRole('button', { name: /Promote to code/i })).toBeEnabled(),
+      );
+      await userEvent.click(within(dialog).getByRole('button', { name: /Promote to code/i }));
+
+      expect(mockPromotePlugin).toHaveBeenCalledWith(
+        'route-1',
+        'plugin-1',
+        expect.any(String),
+        expect.objectContaining({ minute: 30 }),
+      );
+      // Edit-in-code never touches the Kong plugin CRUD endpoints.
+      expect(mockEditRoutePlugin).not.toHaveBeenCalled();
+      expect(mockAddPluginToRoute).not.toHaveBeenCalled();
+    });
+
+    it('hides Edit in code when the capability is off', () => {
+      mockPromotionCapabilities = { helm: { available: true, path: 'helm' }, editInCode: false };
+      render(
+        <RoutePluginsDrawer
+          open
+          route={mockRoute}
+          onClose={jest.fn()}
+          onEnablePlugin={jest.fn()}
+          onEditPlugin={jest.fn()}
+          canPromote
+        />,
+      );
+
+      expect(screen.queryByRole('button', { name: 'Edit in code' })).not.toBeInTheDocument();
+    });
   });
 });

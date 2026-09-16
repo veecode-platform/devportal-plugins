@@ -511,3 +511,72 @@ project is readable again). The `unregistered` signal needs no grace: it is a
 confirmed 404 on one file of a project that answered 200 a moment earlier.
 Any other GitLab error skips the record for this tick and is logged; it never
 triggers cleanup.
+
+## ADR-024: Edit in Code — a `code-only` Promotion Mode With No Experiment in Kong
+
+**Date:** 2026-09
+**Status:** Accepted
+
+A code-owned plugin (ADR-017: reconciled onto Kong by an external
+controller from the service's chart, not created by the portal) was
+read-only — the only path to changing it was editing the chart by hand.
+Issue #135 adds "edit in code": the user edits the config in the existing
+plugin form, and the backend opens a merge request with the edited config
+directly, gated by `kong.promotion.editInCode`.
+
+The `promotions` table gains a nullable `mode` column
+(`'experiment' | 'code-only'`, migration `20260916010000_promotions_mode.js`,
+defaulting a null/missing value to `'experiment'` so a backend from before
+this change keeps reading its own rows unchanged). A `code-only` record's
+`config_snapshot` is the *edited* config (`adapter.fromRendered({ config })`
+on the client's `config` body field), not the live one — render-check runs
+against that snapshot instead of the live plugin's. Every Kong write the
+`experiment` mode makes — tagging the plugin (Step 4 of promote), untagging
+it on a closed MR, deleting it at merge, restoring it on teardown — is
+skipped for `code-only`: none of those things ever happened, because no
+experiment was ever created. The finalizer's `isCodeOnly()` guards exactly
+those three write sites; `handleApplying`'s convergence check only reads
+Kong and needed no change.
+
+**Ownership check reused as-is (ADR-017), not the KIC tag.** The gate is
+`resolvePromotableRoutePlugin`'s existing `defaultTags` derivation — the
+same one the frontend's `derivePromotionBadge` already keys its `code-owned`
+badge on — not the Kong Ingress Controller's `managed-by-ingress-controller`
+tag. The two signals usually agree, but only the `defaultTags` derivation is
+visible to the frontend; gating the backend on the KIC tag instead would let
+a card show "Edit in code" for a plugin the backend then rejects. Corollary:
+an instance with no `defaultTags` configured has no ownership signal at all
+(ADR-017), so `editInCode` can never fire there — every plugin reads as
+portal-managed.
+
+**A `code-only` request never resumes an active record.** The `experiment`
+flow resumes an in-flight draft by (instance, route, plugin type) so a
+retried promote doesn't open a second MR (ADR-012). Resuming for
+`code-only` would either take the Step-4 branch of whatever mode the
+stale record was actually in, or silently promote a snapshot from a
+previous edit instead of the config the user just submitted. An active
+record of *either* mode for the same route/type is therefore always a 409
+for a `code-only` request, with the MR link when one exists — the same
+freeze wording `assertNotFrozen` already uses elsewhere. `experiment`
+promotes keep the pre-existing resume behaviour unchanged.
+
+**Promote refuses a no-op edit (409); preview stays permissive.** An edited
+config that normalizes identically to the live config has nothing to
+promote — promote 409s before writing a draft. Preview's job is to show
+the generated YAML for whatever the user typed, including a config that
+happens to match live, so it runs the equivalence render-check but skips
+the no-op comparison (ADR-016 precedent: promote and preview already differ
+on status for the same renderCheck mismatch, 409 vs. 400).
+
+**MR title/description/commit message name the mode.** A `code-only` MR
+says it edits an already code-owned plugin directly and that there is no
+experiment to remove — the reviewer reading the MR shouldn't have to infer
+that from the diff alone.
+
+Rejected: keying the mode off the KIC tag instead of `defaultTags` (drifts
+from what the frontend can see, per above); recreating a shadow experiment
+in Kong for `code-only` so the existing finalizer logic needs no `mode`
+branch (defeats the point — the plugin already exists and works, tagging
+and possibly clashing with it serves no purpose); letting `code-only`
+resume an active record like `experiment` does (silently promotes a stale
+edit, per above).

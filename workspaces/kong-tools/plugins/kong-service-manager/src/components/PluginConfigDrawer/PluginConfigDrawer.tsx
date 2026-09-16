@@ -34,6 +34,14 @@ type PluginConfigDrawerProps = {
   routeId?: string;
   onClose: () => void;
   onSaved?: () => void;
+  /**
+   * `'code'` (issue #135, "edit in code") replaces the Kong mutation on
+   * submit with `onSubmitCode` — used to edit an already code-owned plugin
+   * by opening a merge request, never by calling Kong. @default 'kong'
+   */
+  mode?: 'kong' | 'code';
+  /** Required when `mode: 'code'` — receives the edited `config` (the `enabled` flag is not part of a code-mode submit; the adapter only consumes `config`). */
+  onSubmitCode?: (config: Record<string, unknown>) => void;
 };
 
 export function PluginConfigDrawer({
@@ -45,6 +53,8 @@ export function PluginConfigDrawer({
   routeId,
   onClose,
   onSaved,
+  mode = 'kong',
+  onSubmitCode,
 }: PluginConfigDrawerProps) {
   const {
     state,
@@ -107,6 +117,14 @@ export function PluginConfigDrawer({
   );
 
   const handleSave = useCallback(async () => {
+    if (mode === 'code') {
+      // Edit-in-code (issue #135) never calls Kong — the config goes to the
+      // review dialog, which previews and promotes it as a merge request.
+      onSubmitCode?.(configState);
+      onClose();
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     try {
@@ -138,6 +156,8 @@ export function PluginConfigDrawer({
       setSaving(false);
     }
   }, [
+    mode,
+    onSubmitCode,
     configState,
     enabled,
     pluginName,
@@ -367,6 +387,8 @@ export function PluginConfigDrawer({
                 {isEdit ? 'Saving...' : 'Installing...'}
                 <CircularProgress size={18} sx={{ ml: 1 }} />
               </>
+            ) : mode === 'code' ? (
+              'Review promotion'
             ) : isEdit ? (
               'Save Changes'
             ) : (

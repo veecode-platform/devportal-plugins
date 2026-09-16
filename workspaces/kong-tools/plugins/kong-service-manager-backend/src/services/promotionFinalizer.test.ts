@@ -17,6 +17,7 @@ function row(overrides: Partial<PromotionRecordRow> = {}): PromotionRecordRow {
     plugin_type: 'rate-limiting',
     config_snapshot: { minute: 60 },
     state: 'draft',
+    mode: 'experiment',
     mr_ref: null,
     requester_ref: 'user:default/alice',
     detail: null,
@@ -273,6 +274,56 @@ describe('reconcilePromotions', () => {
       expect(kong.removeRoutePlugin).toHaveBeenCalledWith('default', 'route-1', 'plugin-1');
       expect(experimentalDeleted).toBe(true);
       expect(store.transitionCalls[0][1]).toBe('awaiting-deploy');
+    });
+  });
+
+  describe('code-only (issue #135) — never touches Kong for a write', () => {
+    const detail = JSON.stringify({ host: repo.host, projectSlug: repo.projectSlug, projectId: repo.projectId, iid: repo.iid });
+
+    it('discards a closed MR without calling editRoutePlugin (no tag to remove)', async () => {
+      const record = row({ state: 'mr-open', mode: 'code-only', mr_ref: 'mr-url', detail });
+      const store = fakeStore([record]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        getMergeRequest: jest.fn().mockResolvedValue({ state: 'closed', mergedAt: null }),
+      };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn(), editRoutePlugin: jest.fn(), removeRoutePlugin: jest.fn() };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(kong.getRouteAssociatedPlugins).not.toHaveBeenCalled();
+      expect(kong.editRoutePlugin).not.toHaveBeenCalled();
+      expect(store.transitionCalls).toEqual([[1, 'discarded', undefined]]);
+    });
+
+    it('parks a merged MR in awaiting-deploy without calling removeRoutePlugin (no experiment to remove)', async () => {
+      const record = row({ state: 'mr-open', mode: 'code-only', mr_ref: 'mr-url', detail });
+      const store = fakeStore([record]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        getMergeRequest: jest.fn().mockResolvedValue({ state: 'merged', mergedAt: '2026-09-01T00:00:00Z' }),
+      };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn(), removeRoutePlugin: jest.fn() };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(kong.getRouteAssociatedPlugins).not.toHaveBeenCalled();
+      expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
+      expect(store.transitionCalls).toHaveLength(1);
+      expect(store.transitionCalls[0][1]).toBe('awaiting-deploy');
+    });
+
+    it('aborts for teardown without calling removeRoutePlugin', async () => {
+      const record = row({ state: 'mr-open', mode: 'code-only', mr_ref: 'mr-url', detail });
+      const store = fakeStore([record]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: true, defaultBranch: 'main' }) };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn(), removeRoutePlugin: jest.fn() };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(kong.getRouteAssociatedPlugins).not.toHaveBeenCalled();
+      expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
+      expect(store.transitionCalls[0][1]).toBe('aborted-teardown');
     });
   });
 

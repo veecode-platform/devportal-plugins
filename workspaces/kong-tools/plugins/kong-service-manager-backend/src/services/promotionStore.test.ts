@@ -94,6 +94,24 @@ describe('KnexPromotionStore', () => {
   );
 
   it.each(databases.eachSupportedId())(
+    'defaults mode to experiment when not given, and round-trips code-only (#135), %p',
+    async databaseId => {
+      const store = await KnexPromotionStore.create(await databases.init(databaseId));
+
+      const defaulted = await store.upsertDraft(draft());
+      expect(defaulted.mode).toBe('experiment');
+
+      const codeOnly = await store.upsertDraft(
+        draft({ idempotencyKey: 'code-only', mode: 'code-only' }),
+      );
+      expect(codeOnly.mode).toBe('code-only');
+
+      const fetched = await store.getById(codeOnly.id);
+      expect(fetched?.mode).toBe('code-only');
+    },
+  );
+
+  it.each(databases.eachSupportedId())(
     'getByIdempotencyKey returns undefined for an unknown key, %p',
     async databaseId => {
       const store = await KnexPromotionStore.create(await databases.init(databaseId));
