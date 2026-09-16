@@ -133,6 +133,8 @@ finalizer therefore removes the experiment at merge and never recreates it:
 | `applying` | Deployed; waiting for the code-owned plugin to match the promoted config. |
 | `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (ADR-021). |
 | `failed` | `applyTimeoutMinutes` elapsed without convergence. Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, or revert the merge request. |
+| `aborted-teardown` | The service was torn down mid-promotion: project archived, deleted, or unregistered (`catalog-info.yaml` gone from the default branch, ADR-023). Leftover experiment removed, merge request closed, branch deleted. Terminal. |
+| `discarded` | The merge request was closed without merging (or the promotion discarded from the UI): the plugin is a plain experiment again and the promotion branch is deleted (ADR-022). Terminal. |
 
 Where pipelines are fast, lower `kong.promotion.reconcileIntervalSeconds`
 (e.g. `30`): a deploy that lands before the finalizer has seen the merge

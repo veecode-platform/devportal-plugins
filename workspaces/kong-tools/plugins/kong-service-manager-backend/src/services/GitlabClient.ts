@@ -34,6 +34,8 @@ export interface CreatedMergeRequest {
   projectId: number;
   iid: number;
   webUrl: string;
+  /** Present on lookups (`findOpenMergeRequest`); lets the caller tell whose promotion an open MR belongs to (ADR-022). */
+  description?: string;
 }
 
 export interface MaterializedChart {
@@ -171,8 +173,35 @@ export class GitlabClient {
     } catch (err) {
       const e = err as GitlabRequestError;
       if (e.status === 400 && /already exists/i.test(e.upstreamBody ?? '')) {
-        return; // crash-retry: branch survived from a prior attempt — reuse it
+        return; // reuse: the caller has verified an MR is still open for it (ADR-022)
       }
+      throw err;
+    }
+  }
+
+  /** True when `path` exists on `ref` (raw-file HEAD-equivalent; 404 = absent). */
+  async fileExistsOnRef(repo: { host: string; projectSlug: string }, ref: string, path: string): Promise<boolean> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    try {
+      await this.callRaw(token, `${base}/repository/files/${encodeURIComponent(path)}/raw?ref=${encodeURIComponent(ref)}`);
+      return true;
+    } catch (err) {
+      const e = err as GitlabRequestError;
+      if (e.status === 404) return false;
+      throw err;
+    }
+  }
+
+  /** Idempotent: deleting a branch that is already gone is a no-op success. */
+  async deleteBranch(repo: { host: string; projectSlug: string }, branch: string): Promise<void> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    try {
+      await this.call(token, `${base}/repository/branches/${encodeURIComponent(branch)}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      const e = err as GitlabRequestError;
+      if (e.status === 404) return;
       throw err;
     }
   }
@@ -210,12 +239,14 @@ export class GitlabClient {
     branch: string,
   ): Promise<CreatedMergeRequest | undefined> {
     const { token, base } = this.target(repo.host, repo.projectSlug);
-    const mrs = await this.call<Array<{ project_id: number; iid: number; web_url: string }>>(
+    const mrs = await this.call<Array<{ project_id: number; iid: number; web_url: string; description?: string }>>(
       token,
       `${base}/merge_requests?source_branch=${encodeURIComponent(branch)}&state=opened`,
     );
     const mr = mrs[0];
-    return mr ? { projectId: mr.project_id, iid: mr.iid, webUrl: mr.web_url } : undefined;
+    return mr
+      ? { projectId: mr.project_id, iid: mr.iid, webUrl: mr.web_url, description: mr.description ?? '' }
+      : undefined;
   }
 
   async openMergeRequest(

@@ -442,3 +442,72 @@ Rejected: storing the plugin id on the record (Kong ids change when an
 experiment is recreated; the type/route key is what the finalizer needs);
 reaping terminal records server-side when the plugin disappears (a
 finalizer tick per codified record forever, for a purely visual problem).
+
+## ADR-022: The Promotion Branch Is Reused Only While Its MR Is Open; Otherwise It Is Recreated From the Default Branch
+
+**Date:** 2026-09
+**Status:** Accepted
+
+`ensureBranch` treated "branch already exists" as success so a promote retried
+after a crash would find its own commit and MR again (ADR-015 idiom). That
+rule also reused a branch **nobody was using**: GitLab did not honour
+`remove_source_branch` on a merge performed from its UI (2026-09-15), and a
+discard closes the MR without touching the branch. The next promotion of the
+same type on the same repo committed on top of the stale branch and opened an
+MR 12 commits behind the default branch, in conflict (2026-09-16).
+
+Decision: the branch (`kong-promote/<type>`, one per plugin type) is reused
+**only when an open MR exists for it** — that is the crash-retry case. In every
+other case the promote endpoint deletes it (404 = already gone) and recreates
+it from the default branch head before committing. The finalizer deletes the
+branch when it discards a closed MR, best-effort, so leftovers are rare rather
+than merely harmless. Create-vs-update detection keeps running against the
+promotion branch (ADR-015).
+
+Rejected: unique branch names per promotion (`kong-promote/<type>-<ts>`) — the
+crash-retry would then have to find its branch through the record, and the
+"one open promotion per type" rule would need a second index; rebasing the
+stale branch server-side — GitLab has no rebase-branch API outside an MR.
+
+Hardening (cross-vendor review, 2026-09-16): the branch is per type per
+*repository*, so a second route of the same repo promoting the same type
+would find the other route's open MR and land its commit there. The promote
+endpoint therefore refuses (409) when the open MR on the branch does not name
+its route (the generated description carries the route id); and every branch
+deletion — discard, teardown abort — first checks that no MR is open on the
+branch, so a delayed finalizer never deletes a newer promotion's branch.
+
+## ADR-023: An Unregistered Service Is a Teardown; the Finalizer Aborts and Closes the MR
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The finalizer aborted an open promotion only when the GitLab project was
+archived or deleted. M20 design 01 later re-based the portal teardown on the
+lifecycle reconciler: it removes `catalog-info.yaml` from the default branch
+and lets discovery drop the entity — the project stays active and unarchived.
+Live on 2026-09-16 (acceptance item 6): destroy + unregister with an MR open
+left the record in `mr-open` and the MR open forever; the experiment was gone
+only because the route went with the helm release.
+
+Decision: `getProjectStatus` also reports `unregistered` when
+`catalog-info.yaml` is absent from the default branch (the same signal the
+reconciler and the template's deploy guard use). Any of archived / gone /
+unregistered aborts the promotion: leftover experiment removed, **MR closed
+and promotion branch deleted** (best-effort), record `aborted-teardown` with
+the reason in `detail`. One extra GitLab read per active record per tick.
+
+Rejected: asking the catalog whether the entity still exists — discovery lags
+the file by up to a cycle and the finalizer would abort a promotion whose
+service was merely re-scaffolded; the file on the default branch is the
+source of truth the whole lifecycle is built on.
+
+Hardening (cross-vendor review, 2026-09-16): GitLab masks "not authorised" as
+404, so a project that was readable at promote time answering 404 may be a
+token or permission problem rather than a deletion. A 404 on the project only
+counts as `gone` after it has persisted for `GONE_CONFIRMATION_MS` (2 min)
+across ticks (`projectGoneSince` in the record detail, cleared when the
+project is readable again). The `unregistered` signal needs no grace: it is a
+confirmed 404 on one file of a project that answered 200 a moment earlier.
+Any other GitLab error skips the record for this tick and is logged; it never
+triggers cleanup.
