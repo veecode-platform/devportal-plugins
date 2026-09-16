@@ -285,6 +285,9 @@ describe('reconcilePromotions', () => {
       const store = fakeStore([record]);
       const gitlab: any = {
         getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        // Registered service (catalog-info.yaml present) — the teardown probe
+        // #137 added runs for every tick before handleMrOpen dispatches.
+        fileExistsOnRef: jest.fn().mockResolvedValue(true),
         getMergeRequest: jest.fn().mockResolvedValue({ state: 'closed', mergedAt: null }),
       };
       const kong: any = { getRouteAssociatedPlugins: jest.fn(), editRoutePlugin: jest.fn(), removeRoutePlugin: jest.fn() };
@@ -301,6 +304,7 @@ describe('reconcilePromotions', () => {
       const store = fakeStore([record]);
       const gitlab: any = {
         getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        fileExistsOnRef: jest.fn().mockResolvedValue(true),
         getMergeRequest: jest.fn().mockResolvedValue({ state: 'merged', mergedAt: '2026-09-01T00:00:00Z' }),
       };
       const kong: any = { getRouteAssociatedPlugins: jest.fn(), removeRoutePlugin: jest.fn() };
