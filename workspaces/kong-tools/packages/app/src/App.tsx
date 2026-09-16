@@ -47,6 +47,11 @@ import { kongServiceManagerTranslations } from '@veecode-platform/backstage-plug
 const app = createApp({
   apis,
   __experimentalTranslations: {
+    // pt-BR must be declared here, not only shipped as a resource: the
+    // AppLanguageApi rejects any language not in this list (it resets the
+    // stored preference back to en), so without it the Settings language
+    // toggle never appears and the plugin's pt-BR messages are unreachable.
+    availableLanguages: ['en', 'pt-BR'],
     resources: [kongServiceManagerTranslations],
   },
   bindRoutes({ bind }) {
