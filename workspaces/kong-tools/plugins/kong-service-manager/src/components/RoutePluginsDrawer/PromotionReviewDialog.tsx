@@ -18,6 +18,13 @@ type PromotionReviewDialogProps = {
   pluginName: string;
   /** The plugin's live config, as read from Kong — shown immediately, before the preview resolves. */
   liveConfig: Record<string, unknown>;
+  /**
+   * Edit-in-code (issue #135): the config the user just edited for an
+   * already code-owned plugin. When present, the preview and the confirm
+   * step both use this instead of the live config, and the copy explains
+   * there is no experiment involved.
+   */
+  editedConfig?: Record<string, unknown>;
   /** Needed to call the preview endpoint — null while there's nothing to preview yet (dialog closed). */
   routeId: string | null;
   pluginId: string | null;
@@ -68,6 +75,7 @@ export function PromotionReviewDialog({
   open,
   pluginName,
   liveConfig,
+  editedConfig,
   routeId,
   pluginId,
   entityRef,
@@ -91,7 +99,7 @@ export function PromotionReviewDialog({
     setPreview(null);
     setPreviewError(null);
     setPreviewLoading(true);
-    previewPromotion(routeId, pluginId, entityRef)
+    previewPromotion(routeId, pluginId, entityRef, editedConfig)
       .then(result => {
         if (!cancelled) setPreview(result);
       })
@@ -104,22 +112,22 @@ export function PromotionReviewDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, routeId, pluginId, entityRef, previewPromotion]);
+  }, [open, routeId, pluginId, entityRef, editedConfig, previewPromotion]);
 
   const confirmDisabled = submitting || previewLoading || !!previewError;
 
   return (
     <Dialog open={open} onClose={submitting ? undefined : onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Promote {pluginName} to code</DialogTitle>
+      <DialogTitle>{editedConfig ? `Edit ${pluginName} in code` : `Promote ${pluginName} to code`}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          This opens a merge request in the service&apos;s repository with the
-          equivalent chart configuration. Once it merges and deploys, the
-          portal verifies the code-owned plugin and removes this experiment.
+          {editedConfig
+            ? "This opens a merge request in the service's repository with the edited configuration. This plugin is already managed by the Kong Ingress Controller from the chart — no experiment is created, tagged, or removed."
+            : "This opens a merge request in the service's repository with the equivalent chart configuration. Once it merges and deploys, the portal verifies the code-owned plugin and removes this experiment."}
         </Typography>
 
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          Live config
+          {editedConfig ? 'Live config (current)' : 'Live config'}
         </Typography>
         <Box
           component="pre"
@@ -135,6 +143,28 @@ export function PromotionReviewDialog({
         >
           {JSON.stringify(liveConfig, null, 2)}
         </Box>
+
+        {editedConfig && (
+          <>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Edited config
+            </Typography>
+            <Box
+              component="pre"
+              sx={{
+                bgcolor: 'background.default',
+                p: 1.5,
+                borderRadius: 1,
+                overflow: 'auto',
+                fontSize: '0.8rem',
+                m: 0,
+                mb: 2,
+              }}
+            >
+              {JSON.stringify(editedConfig, null, 2)}
+            </Box>
+          </>
+        )}
 
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
           Generated chart
