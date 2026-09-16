@@ -76,8 +76,31 @@ async function reconcileOne(deps: {
   let project: { archived: boolean; defaultBranch: string } | undefined;
   if (detail?.host && detail?.projectSlug) {
     const status = await getProjectStatus(gitlab, detail);
-    if (status === 'gone' || status === 'unregistered' || status.archived) {
-      await abortForTeardown({ logger, gitlab, kong, store, record, detail, reason: status === 'gone' ? 'gone' : status === 'unregistered' ? 'unregistered' : 'archived' });
+    if (status === 'gone') {
+      // GitLab masks "not authorised" as 404, so a project that was readable
+      // at promote time answering 404 may be a token/permission problem, not
+      // a deletion. Destructive cleanup needs the observation to persist for
+      // at least GONE_CONFIRMATION_MS across ticks (ADR-023 hardening).
+      const firstSeen = detail.projectGoneSince ?? new Date().toISOString();
+      if (Date.now() - Date.parse(firstSeen) < GONE_CONFIRMATION_MS) {
+        if (!detail.projectGoneSince) {
+          await store.transition(record.id, record.state, { detail: encodeMrDetail({ ...detail, projectGoneSince: firstSeen }) });
+        }
+        logger.warn('kong-service-manager promotion: project answers 404; waiting for confirmation before aborting', {
+          promotionId: record.id,
+          since: firstSeen,
+        });
+        return;
+      }
+      await abortForTeardown({ logger, gitlab, kong, store, record, detail, reason: 'gone' });
+      return;
+    }
+    if (detail.projectGoneSince) {
+      // Readable again: the 404 was transient — forget it.
+      await store.transition(record.id, record.state, { detail: encodeMrDetail({ ...detail, projectGoneSince: undefined }) });
+    }
+    if (status === 'unregistered' || status.archived) {
+      await abortForTeardown({ logger, gitlab, kong, store, record, detail, reason: status === 'unregistered' ? 'unregistered' : 'archived' });
       return;
     }
     project = status;
@@ -98,6 +121,9 @@ async function reconcileOne(deps: {
   }
 }
 
+/** A project 404 must persist this long before it counts as "gone" (ADR-023 hardening). */
+export const GONE_CONFIRMATION_MS = 2 * 60 * 1000;
+
 /** The file whose presence on the default branch means "this service is registered" (spec 01). */
 export const CATALOG_INFO_PATH = 'catalog-info.yaml';
 
@@ -116,6 +142,22 @@ async function getProjectStatus(
   if (project.archived) return project;
   const registered = await gitlab.fileExistsOnRef(detail, project.defaultBranch, CATALOG_INFO_PATH);
   return registered ? project : 'unregistered';
+}
+
+/**
+ * Deletes the per-type promotion branch unless an MR is still open on it —
+ * that MR belongs to a newer promotion (another route, or a promote that
+ * raced this tick) and its branch must survive (ADR-022 hardening).
+ */
+async function deletePromotionBranchIfUnused(
+  gitlab: GitlabClient,
+  repo: { host: string; projectSlug: string },
+  pluginType: string,
+): Promise<void> {
+  const branch = promotionBranch(pluginType);
+  const open = await gitlab.findOpenMergeRequest(repo, branch);
+  if (open) return;
+  await gitlab.deleteBranch(repo, branch);
 }
 
 async function abortForTeardown(deps: {
@@ -138,7 +180,7 @@ async function abortForTeardown(deps: {
   if (reason !== 'gone' && detail.iid !== undefined) {
     try {
       await gitlab.closeMergeRequest(detail, detail.iid);
-      await gitlab.deleteBranch(detail, promotionBranch(record.plugin_type));
+      await deletePromotionBranchIfUnused(gitlab, detail, record.plugin_type);
     } catch (err) {
       logger.warn('kong-service-manager promotion: could not close the MR after teardown', {
         promotionId: record.id,
@@ -201,7 +243,7 @@ async function handleMrOpen(deps: {
     // next promote of this type (ADR-022). Best-effort: a failure here must
     // not keep the record out of `discarded`.
     try {
-      await gitlab.deleteBranch(detail, promotionBranch(record.plugin_type));
+      await deletePromotionBranchIfUnused(gitlab, detail, record.plugin_type);
     } catch (err) {
       deps.logger.warn('kong-service-manager promotion: could not delete the promotion branch after discard', {
         promotionId: record.id,

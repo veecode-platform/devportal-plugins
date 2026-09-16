@@ -61,6 +61,15 @@ interface PromotionDto {
   detail?: string;
 }
 
+/**
+ * The promote MR description names the route it was generated for (see the
+ * `openMergeRequest` call); an open MR on the shared per-type branch is ours
+ * only when it names this route (ADR-022).
+ */
+export function mergeRequestBelongsToRoute(mr: { description?: string }, routeId: string): boolean {
+  return (mr.description ?? '').includes(`\`${routeId}\``);
+}
+
 function toPromotionDto(row: PromotionRecordRow): PromotionDto {
   return {
     id: row.id,
@@ -738,6 +747,14 @@ export async function createRouter({
         // `create` for a file that already exists there is a GitLab 400.
         const branch = promotionBranch(adapter.pluginType);
         let mr = await gitlabClient.findOpenMergeRequest(repo, branch);
+        if (mr && !mergeRequestBelongsToRoute(mr, routeId)) {
+          // The branch is per plugin type per repo, so a second route of the
+          // same repo promoting the same type would land its commit on the
+          // other route's open MR. Refuse instead (ADR-022 ownership guard).
+          throw new ConflictError(
+            `Another promotion of '${adapter.pluginType}' is open in this repository (${mr.webUrl}); merge or close it first`,
+          );
+        }
         if (!mr) {
           await gitlabClient.deleteBranch(repo, branch);
         }

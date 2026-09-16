@@ -276,7 +276,7 @@ describe('GitlabClient', () => {
       );
       const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
       const mr = await client.findOpenMergeRequest(repo, 'kong-promote/rate-limiting');
-      expect(mr).toEqual({ projectId: 42, iid: 7, webUrl: 'https://gitlab.example.com/group/box/-/merge_requests/7' });
+      expect(mr).toEqual({ projectId: 42, iid: 7, webUrl: 'https://gitlab.example.com/group/box/-/merge_requests/7', description: expect.any(String) });
     });
 
     it('returns undefined when no MR is open for the branch', async () => {

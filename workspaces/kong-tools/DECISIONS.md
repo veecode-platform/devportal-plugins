@@ -469,6 +469,14 @@ crash-retry would then have to find its branch through the record, and the
 "one open promotion per type" rule would need a second index; rebasing the
 stale branch server-side — GitLab has no rebase-branch API outside an MR.
 
+Hardening (cross-vendor review, 2026-09-16): the branch is per type per
+*repository*, so a second route of the same repo promoting the same type
+would find the other route's open MR and land its commit there. The promote
+endpoint therefore refuses (409) when the open MR on the branch does not name
+its route (the generated description carries the route id); and every branch
+deletion — discard, teardown abort — first checks that no MR is open on the
+branch, so a delayed finalizer never deletes a newer promotion's branch.
+
 ## ADR-023: An Unregistered Service Is a Teardown; the Finalizer Aborts and Closes the MR
 
 **Date:** 2026-09
@@ -493,3 +501,13 @@ Rejected: asking the catalog whether the entity still exists — discovery lags
 the file by up to a cycle and the finalizer would abort a promotion whose
 service was merely re-scaffolded; the file on the default branch is the
 source of truth the whole lifecycle is built on.
+
+Hardening (cross-vendor review, 2026-09-16): GitLab masks "not authorised" as
+404, so a project that was readable at promote time answering 404 may be a
+token or permission problem rather than a deletion. A 404 on the project only
+counts as `gone` after it has persisted for `GONE_CONFIRMATION_MS` (2 min)
+across ticks (`projectGoneSince` in the record detail, cleared when the
+project is readable again). The `unregistered` signal needs no grace: it is a
+confirmed 404 on one file of a project that answered 200 a moment earlier.
+Any other GitLab error skips the record for this tick and is logged; it never
+triggers cleanup.

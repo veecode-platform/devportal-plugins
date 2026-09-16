@@ -41,7 +41,13 @@ const routePlugin: AssociatedPluginsResponse = {
 };
 
 const repo = { host: 'gitlab.example.com', projectSlug: 'group/box', projectId: 42, defaultBranch: 'main' };
-const mr = { projectId: 42, iid: 7, webUrl: 'https://gitlab.example.com/group/box/-/merge_requests/7' };
+const mr = {
+  projectId: 42,
+  iid: 7,
+  webUrl: 'https://gitlab.example.com/group/box/-/merge_requests/7',
+  // What the promote endpoint writes: the open-MR lookup returns it and the ownership guard reads the route id from it (ADR-022).
+  description: `Promotes the experimental \`rate-limiting\` plugin on route \`${ROUTE_ID}\` (service \`svc\`, Kong instance \`default\`) from ClickOps to the chart.`,
+};
 
 function draftRow(overrides: Partial<PromotionRecordRow> = {}): PromotionRecordRow {
   return {
@@ -261,6 +267,30 @@ describe('promote to code (Task P3)', () => {
 
       const res = await request(app).post(PROMOTE_URL).send({ entityRef: 'component:default/svc' });
       expect(res.status).toBe(409);
+    });
+
+    it('refuses (409) when the per-type branch already carries an open MR for ANOTHER route (ADR-022 ownership guard)', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(draftRow());
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withRealChart(gitlabClient);
+      gitlabClient.findOpenMergeRequest.mockResolvedValue({ ...mr, description: 'Promotes the experimental `rate-limiting` plugin on route `route-OTHER` …' });
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient });
+      try {
+        const res = await request(app).post(PROMOTE_URL).send({ entityRef: 'component:default/svc' });
+        expect(res.status).toBe(409);
+        expect(res.body.error.message).toMatch(/Another promotion of 'rate-limiting' is open/);
+        expect(gitlabClient.deleteBranch).not.toHaveBeenCalled();
+        expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
+      } finally {
+        await chart.cleanup();
+      }
     });
 
     it('a retry after a crash before mr-open resumes the same draft and never opens a second MR', async () => {

@@ -34,6 +34,8 @@ export interface CreatedMergeRequest {
   projectId: number;
   iid: number;
   webUrl: string;
+  /** Present on lookups (`findOpenMergeRequest`); lets the caller tell whose promotion an open MR belongs to (ADR-022). */
+  description?: string;
 }
 
 export interface MaterializedChart {
@@ -237,12 +239,14 @@ export class GitlabClient {
     branch: string,
   ): Promise<CreatedMergeRequest | undefined> {
     const { token, base } = this.target(repo.host, repo.projectSlug);
-    const mrs = await this.call<Array<{ project_id: number; iid: number; web_url: string }>>(
+    const mrs = await this.call<Array<{ project_id: number; iid: number; web_url: string; description?: string }>>(
       token,
       `${base}/merge_requests?source_branch=${encodeURIComponent(branch)}&state=opened`,
     );
     const mr = mrs[0];
-    return mr ? { projectId: mr.project_id, iid: mr.iid, webUrl: mr.web_url } : undefined;
+    return mr
+      ? { projectId: mr.project_id, iid: mr.iid, webUrl: mr.web_url, description: mr.description ?? '' }
+      : undefined;
   }
 
   async openMergeRequest(

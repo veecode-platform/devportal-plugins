@@ -142,6 +142,7 @@ describe('reconcilePromotions', () => {
         getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
         fileExistsOnRef: jest.fn().mockResolvedValue(true),
         getMergeRequest: jest.fn().mockResolvedValue({ state: 'closed', mergedAt: null }),
+        findOpenMergeRequest: jest.fn().mockResolvedValue(undefined),
         deleteBranch: jest.fn().mockResolvedValue(undefined),
       };
       const kong: any = {
@@ -160,6 +161,27 @@ describe('reconcilePromotions', () => {
       expect(store.transitionCalls).toEqual([[1, 'discarded', undefined]]);
     });
 
+    it('closed MR: keeps the branch when another MR is already open on it — it belongs to a newer promotion (ADR-022 hardening)', async () => {
+      const record = row({ state: 'mr-open', mr_ref: 'mr-url', detail });
+      const store = fakeStore([record]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        fileExistsOnRef: jest.fn().mockResolvedValue(true),
+        getMergeRequest: jest.fn().mockResolvedValue({ state: 'closed', mergedAt: null }),
+        findOpenMergeRequest: jest.fn().mockResolvedValue({ projectId: 1, iid: 99, webUrl: 'newer', description: '' }),
+        deleteBranch: jest.fn(),
+      };
+      const kong: any = {
+        getRouteAssociatedPlugins: jest.fn().mockResolvedValue([plugin()]),
+        editRoutePlugin: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(gitlab.deleteBranch).not.toHaveBeenCalled();
+      expect(store.transitionCalls).toEqual([[1, 'discarded', undefined]]);
+    });
+
     it('closed MR: still discards when the branch delete fails (best-effort, ADR-022)', async () => {
       const record = row({ state: 'mr-open', mr_ref: 'mr-url', detail });
       const store = fakeStore([record]);
@@ -167,6 +189,7 @@ describe('reconcilePromotions', () => {
         getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
         fileExistsOnRef: jest.fn().mockResolvedValue(true),
         getMergeRequest: jest.fn().mockResolvedValue({ state: 'closed', mergedAt: null }),
+        findOpenMergeRequest: jest.fn().mockResolvedValue(undefined),
         deleteBranch: jest.fn().mockRejectedValue(new Error('403 forbidden')),
       };
       const kong: any = {
@@ -429,6 +452,7 @@ describe('reconcilePromotions', () => {
         getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
         fileExistsOnRef: jest.fn().mockResolvedValue(false),
         closeMergeRequest: jest.fn().mockResolvedValue(undefined),
+        findOpenMergeRequest: jest.fn().mockResolvedValue(undefined),
         deleteBranch: jest.fn().mockResolvedValue(undefined),
         getMergeRequest: jest.fn(),
       };
@@ -461,11 +485,49 @@ describe('reconcilePromotions', () => {
       expect(store.transitionCalls).toEqual([]);
     });
 
-    it('aborts the promotion when the project itself is gone (404)', async () => {
+    it('a first project 404 only records the observation — GitLab masks "not authorised" as 404 (ADR-023 hardening)', async () => {
+      const record = row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, iid: 10 }) });
+      const store = fakeStore([record]);
+      const gitlab: any = {
+        getProject: jest.fn().mockRejectedValue(Object.assign(new Error('gone'), { status: 404 })),
+        closeMergeRequest: jest.fn(),
+      };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn(), removeRoutePlugin: jest.fn() };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
+      expect(gitlab.closeMergeRequest).not.toHaveBeenCalled();
+      expect(store.transitionCalls).toHaveLength(1);
+      const [id, state, extra] = store.transitionCalls[0];
+      expect([id, state]).toEqual([1, 'mr-open']);
+      expect(JSON.parse(extra.detail).projectGoneSince).toEqual(expect.any(String));
+    });
+
+    it('a project readable again clears the pending 404 observation', async () => {
       const record = row({
         state: 'mr-open',
         mr_ref: 'mr-url',
-        detail: JSON.stringify(repo),
+        detail: JSON.stringify({ ...repo, iid: 10, projectGoneSince: new Date(Date.now() - 60_000).toISOString() }),
+      });
+      const store = fakeStore([record]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        fileExistsOnRef: jest.fn().mockResolvedValue(true),
+        getMergeRequest: jest.fn().mockResolvedValue({ state: 'opened', mergedAt: null }),
+      };
+
+      await reconcilePromotions({ logger, gitlab, kong: {} as any, store, config });
+
+      expect(store.transitionCalls).toHaveLength(1);
+      expect(JSON.parse(store.transitionCalls[0][2].detail).projectGoneSince).toBeUndefined();
+    });
+
+    it('aborts the promotion when the project has been gone (404) for longer than the confirmation window', async () => {
+      const record = row({
+        state: 'mr-open',
+        mr_ref: 'mr-url',
+        detail: JSON.stringify({ ...repo, projectGoneSince: new Date(Date.now() - 3 * 60_000).toISOString() }),
       });
       const store = fakeStore([record]);
       const gitlab: any = { getProject: jest.fn().mockRejectedValue(Object.assign(new Error('gone'), { status: 404 })) };
