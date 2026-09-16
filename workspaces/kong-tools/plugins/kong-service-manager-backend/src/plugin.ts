@@ -68,6 +68,8 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
           });
         }
 
+        const editInCodeEnabled = config.getOptionalBoolean('kong.promotion.editInCode') ?? false;
+
         const router = await createRouter({
           httpAuth,
           permissions,
@@ -78,6 +80,7 @@ export const kongServiceManagerBackendPlugin = createBackendPlugin({
           helmGate,
           helmPath,
           helmTimeoutSeconds,
+          editInCodeEnabled,
         });
 
         httpRouter.use(router);
