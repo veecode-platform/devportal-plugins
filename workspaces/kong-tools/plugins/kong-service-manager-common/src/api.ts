@@ -127,22 +127,33 @@ export interface KongServiceManagerApi {
   /** Runtime prerequisites for promote-to-code (currently: helm) — fetch once and use it to disable the Promote action when unavailable. */
   getPromotionCapabilities(instance: string): Promise<PromotionCapabilities>;
 
-  /** Dry-run of a promotion — no side effects. Same permission/adapter gate as promote; surfaces a renderCheck mismatch as a 400. */
+  /**
+   * Dry-run of a promotion — no side effects. Same permission/adapter gate as
+   * promote; surfaces a renderCheck mismatch as a 400. `config` (issue #135,
+   * "edit in code") previews an edit of an already code-owned plugin instead
+   * of the live one — only accepted when the backend has `editInCode` on.
+   */
   previewPromotion(
     instance: string,
     serviceName: string,
     routeId: string,
     pluginId: string,
     entityRef: string,
+    config?: Record<string, unknown>,
   ): Promise<PromotionPreview>;
 
-  /** Promote an experimental route plugin to code (design 02) — opens an MR in the owning repo. */
+  /**
+   * Promote an experimental route plugin to code (design 02) — opens an MR
+   * in the owning repo. `config` (issue #135) edits an already code-owned
+   * plugin directly instead — mode `code-only`, no experiment created.
+   */
   promotePlugin(
     instance: string,
     serviceName: string,
     routeId: string,
     pluginId: string,
     entityRef: string,
+    config?: Record<string, unknown>,
   ): Promise<PromotionRecord>;
 
   /** Discard an open promotion — closes its MR, untags the experiment, returns it to draft-free state. */

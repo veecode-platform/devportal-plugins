@@ -252,6 +252,46 @@ describe('KongServiceManagerClient', () => {
     expect(result).toEqual(mockPromotion);
   });
 
+  it('includes config in the body for previewPromotion/promotePlugin (issue #135, edit in code)', async () => {
+    const { client, mockFetch } = createMocks();
+    mockFetch.mockResolvedValue(jsonResponse({ files: [], normalizedConfig: {} }));
+
+    await client.previewPromotion(
+      'default',
+      'my-service',
+      'route-abc',
+      'plugin-xyz',
+      'component:default/my-service',
+      { minute: 30 },
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/services/my-service/routes/route-abc/plugins/plugin-xyz/promote/preview`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ entityRef: 'component:default/my-service', config: { minute: 30 } }),
+      }),
+    );
+
+    mockFetch.mockResolvedValue(jsonResponse({ id: 1, state: 'mr-open', mode: 'code-only' }, 201));
+    await client.promotePlugin(
+      'default',
+      'my-service',
+      'route-abc',
+      'plugin-xyz',
+      'component:default/my-service',
+      { minute: 30 },
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/services/my-service/routes/route-abc/plugins/plugin-xyz/promote`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ entityRef: 'component:default/my-service', config: { minute: 30 } }),
+      }),
+    );
+  });
+
   it('constructs correct URL for discardPromotion and handles 204', async () => {
     const { client, mockFetch } = createMocks();
     mockFetch.mockResolvedValue(
