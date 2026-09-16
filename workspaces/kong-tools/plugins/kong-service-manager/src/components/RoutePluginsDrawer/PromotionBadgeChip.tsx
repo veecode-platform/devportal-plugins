@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, Chip, Link, Tooltip } from '@mui/material';
 import type { PromotionBadge } from './promotionBadge';
+import { useTranslation } from '../../hooks/useTranslation';
 
 /** Formats an age in milliseconds as a short, human-scale duration (design 02: every badge shows age). */
 function formatAge(ageMs: number): string {
@@ -12,24 +13,7 @@ function formatAge(ageMs: number): string {
   return `${days}d`;
 }
 
-const KIND_META: Record<
-  PromotionBadge['kind'],
-  { emoji: string; label: string; color: 'default' | 'primary' | 'warning' | 'success' | 'info'; tooltip?: string }
-> = {
-  experimental: { emoji: '🧪', label: 'Experimental', color: 'default' },
-  'code-owned': {
-    emoji: '✅',
-    label: 'Code-owned',
-    color: 'default',
-    tooltip: "Defined in the service's chart; edit it there",
-  },
-  'mr-open': { emoji: '🔀', label: 'Promoção aberta', color: 'info' },
-  'pending-deploy': { emoji: '⏳', label: 'Aplicando', color: 'primary' },
-  codified: { emoji: '✅', label: 'Codificado', color: 'success' },
-  // Both backend failure states land here — `failed` (ADR-020) and the
-  // legacy `failed-restored`.
-  'failed-restored': { emoji: '⚠️', label: 'Aplicação falhou', color: 'warning' },
-};
+type KindMeta = { emoji: string; label: string; color: 'default' | 'primary' | 'warning' | 'success' | 'info'; tooltip?: string };
 
 type PromotionBadgeChipProps = {
   badge: PromotionBadge;
@@ -38,8 +22,51 @@ type PromotionBadgeChipProps = {
 };
 
 export function PromotionBadgeChip({ badge, onRetry }: PromotionBadgeChipProps) {
+  const { t } = useTranslation();
   const [diffOpen, setDiffOpen] = useState(false);
-  const meta = KIND_META[badge.kind];
+
+  const kindMeta: Record<PromotionBadge['kind'], KindMeta> = {
+    experimental: {
+      emoji: '🧪',
+      label: t('promotionBadgeChip.kinds.experimental'),
+      color: 'default',
+      tooltip: t('promotionBadgeChip.kindTooltips.experimental'),
+    },
+    'code-owned': {
+      emoji: '✅',
+      label: t('promotionBadgeChip.kinds.codeOwned'),
+      color: 'default',
+      tooltip: t('promotionBadgeChip.codeOwnedTooltip'),
+    },
+    'mr-open': {
+      emoji: '🔀',
+      label: t('promotionBadgeChip.kinds.mrOpen'),
+      color: 'info',
+      tooltip: t('promotionBadgeChip.kindTooltips.mrOpen'),
+    },
+    'pending-deploy': {
+      emoji: '⏳',
+      label: t('promotionBadgeChip.kinds.pendingDeploy'),
+      color: 'primary',
+      tooltip: t('promotionBadgeChip.kindTooltips.pendingDeploy'),
+    },
+    codified: {
+      emoji: '✅',
+      label: t('promotionBadgeChip.kinds.codified'),
+      color: 'success',
+      tooltip: t('promotionBadgeChip.kindTooltips.codified'),
+    },
+    // Both backend failure states land here — `failed` (ADR-020) and the
+    // legacy `failed-restored`.
+    'failed-restored': {
+      emoji: '⚠️',
+      label: t('promotionBadgeChip.kinds.failedRestored'),
+      color: 'warning',
+      tooltip: t('promotionBadgeChip.kindTooltips.failedRestored'),
+    },
+  };
+
+  const meta = kindMeta[badge.kind];
   const label = `${meta.emoji} ${meta.label} · ${formatAge(badge.ageMs)}`;
 
   // 🔀 links to the MR; ✅ links to the code — same field (mrRef) is the
@@ -53,7 +80,8 @@ export function PromotionBadgeChip({ badge, onRetry }: PromotionBadgeChipProps) 
   // for any other state): the finalizer's config diff for the legacy
   // `failed-restored`, or its actionable message for `failed` (ADR-020).
   const diff = badge.kind === 'failed-restored' ? badge.record?.detail : undefined;
-  const tooltip = meta.tooltip ?? diff;
+  // The backend's specific failure detail wins over the static explanation.
+  const tooltip = diff ?? meta.tooltip;
 
   return (
     <Box display="flex" flexDirection="column" gap={0.5}>
@@ -76,12 +104,12 @@ export function PromotionBadgeChip({ badge, onRetry }: PromotionBadgeChipProps) 
             the detail describes: fix the chart or revert the merge request. */}
         {badge.kind === 'failed-restored' && badge.record?.state !== 'failed' && onRetry && (
           <Button size="small" variant="outlined" color="warning" onClick={onRetry}>
-            Retry
+            {t('promotionBadgeChip.retry')}
           </Button>
         )}
         {diff && (
           <Button size="small" onClick={() => setDiffOpen(o => !o)}>
-            {diffOpen ? 'Hide details' : 'Show details'}
+            {diffOpen ? t('promotionBadgeChip.hideDetails') : t('promotionBadgeChip.showDetails')}
           </Button>
         )}
       </Box>

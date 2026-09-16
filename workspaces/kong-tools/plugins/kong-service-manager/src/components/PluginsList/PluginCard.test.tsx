@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mockUseTranslation } from '../../test-utils/mockTranslations';
 import { PluginCard } from './PluginCard';
 import type { PluginCard as PluginCardType } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import type { PromotionBadge } from '../RoutePluginsDrawer/promotionBadge';
+
+jest.mock('../../hooks/useTranslation', () => ({
+  useTranslation: mockUseTranslation,
+}));
 
 const basePlugin: PluginCardType = {
   name: 'rate-limiting',
@@ -180,7 +185,7 @@ describe('PluginCard', () => {
     expect(screen.getByText(/No owning repo/)).toBeInTheDocument();
   });
 
-  it('shows Descartar promoção instead of Disable while a promotion is open, and calls onDiscardPromotion', async () => {
+  it('shows Discard promotion instead of Disable while a promotion is open, and calls onDiscardPromotion', async () => {
     const onDiscardPromotion = jest.fn();
     const badge: PromotionBadge = { kind: 'mr-open', ageMs: 60_000 };
     render(
@@ -197,7 +202,7 @@ describe('PluginCard', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Descartar promoção' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard promotion' }));
     expect(onDiscardPromotion).toHaveBeenCalledWith('plugin-id-123', 'rate-limiting');
   });
 
@@ -270,7 +275,7 @@ describe('PluginCard', () => {
     );
 
     expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Descartar promoção' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Discard promotion' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit plugin configuration/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Managed from the repository/)).toBeInTheDocument();

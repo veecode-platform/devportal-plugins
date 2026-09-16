@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import type { PromotionPreview } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 type PromotionReviewDialogProps = {
@@ -84,6 +85,7 @@ export function PromotionReviewDialog({
   submitting = false,
   error,
 }: PromotionReviewDialogProps) {
+  const { t } = useTranslation();
   const { previewPromotion } = useKongServiceManager();
   const [preview, setPreview] = useState<PromotionPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -118,16 +120,20 @@ export function PromotionReviewDialog({
 
   return (
     <Dialog open={open} onClose={submitting ? undefined : onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{editedConfig ? `Edit ${pluginName} in code` : `Promote ${pluginName} to code`}</DialogTitle>
+      <DialogTitle>
+        {editedConfig
+          ? t('promotionReviewDialog.editTitle', { pluginName })
+          : t('promotionReviewDialog.promoteTitle', { pluginName })}
+      </DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           {editedConfig
-            ? "This opens a merge request in the service's repository with the edited configuration. This plugin is already managed by the Kong Ingress Controller from the chart — no experiment is created, tagged, or removed."
-            : "This opens a merge request in the service's repository with the equivalent chart configuration. Once it merges and deploys, the portal verifies the code-owned plugin and removes this experiment."}
+            ? t('promotionReviewDialog.editDescription')
+            : t('promotionReviewDialog.promoteDescription')}
         </Typography>
 
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          {editedConfig ? 'Live config (current)' : 'Live config'}
+          {editedConfig ? t('promotionReviewDialog.liveConfigCurrent') : t('promotionReviewDialog.liveConfig')}
         </Typography>
         <Box
           component="pre"
@@ -147,7 +153,7 @@ export function PromotionReviewDialog({
         {editedConfig && (
           <>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Edited config
+              {t('promotionReviewDialog.editedConfig')}
             </Typography>
             <Box
               component="pre"
@@ -167,13 +173,13 @@ export function PromotionReviewDialog({
         )}
 
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          Generated chart
+          {t('promotionReviewDialog.generatedChart')}
         </Typography>
         {previewLoading && (
           <Box display="flex" alignItems="center" gap={1} py={1}>
             <CircularProgress size={18} />
             <Typography variant="body2" color="text.secondary">
-              Generating preview...
+              {t('promotionReviewDialog.generatingPreview')}
             </Typography>
           </Box>
         )}
@@ -192,15 +198,15 @@ export function PromotionReviewDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={submitting}>
-          Cancel
+          {t('promotionReviewDialog.cancel')}
         </Button>
         <Button
           variant="contained"
           onClick={onConfirm}
           disabled={confirmDisabled}
-          aria-label="Promote to code"
+          aria-label={t('promotionReviewDialog.promoteToCode')}
         >
-          {submitting ? <CircularProgress size={18} /> : 'Promote to code'}
+          {submitting ? <CircularProgress size={18} /> : t('promotionReviewDialog.promoteToCode')}
         </Button>
       </DialogActions>
     </Dialog>

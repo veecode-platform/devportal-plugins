@@ -15,6 +15,7 @@ import type { PluginCard as PluginCardType } from '@veecode-platform/backstage-p
 import { getPluginImage } from '../../assets/pluginImages';
 import { PromotionBadgeChip } from '../RoutePluginsDrawer/PromotionBadgeChip';
 import type { PromotionBadge } from '../RoutePluginsDrawer/promotionBadge';
+import { useTranslation } from '../../hooks/useTranslation';
 
 type PluginCardProps = {
   plugin: PluginCardType;
@@ -59,6 +60,7 @@ export function PluginCard({
   editInCodeEnabled,
   onEditInCode,
 }: PluginCardProps) {
+  const { t } = useTranslation();
   const isAssociated = !!associatedId;
   // Frozen (open MR / applying) blocks portal edits server-side (409); codified is terminal and read-only.
   const isFrozen = promotionBadge?.kind === 'mr-open' || promotionBadge?.kind === 'pending-deploy';
@@ -100,7 +102,7 @@ export function PluginCard({
         }
         action={
           isAssociated && canEdit && !isReadOnly && !isFrozen ? (
-            <Tooltip title="Edit plugin configuration">
+            <Tooltip title={t('pluginCard.editTooltip')}>
               <IconButton
                 size="small"
                 onClick={() => onEdit(associatedId, plugin.slug)}
@@ -154,7 +156,7 @@ export function PluginCard({
                 disabled={discardingPromotion}
                 onClick={() => onDiscardPromotion?.(associatedId, plugin.slug)}
               >
-                {discardingPromotion ? <CircularProgress size={18} /> : 'Descartar promoção'}
+                {discardingPromotion ? <CircularProgress size={18} /> : t('pluginCard.discardPromotion')}
               </Button>
             ) : (
               canDisable &&
@@ -166,7 +168,7 @@ export function PluginCard({
                   disabled={disabling}
                   onClick={() => onDisable(associatedId, plugin.slug)}
                 >
-                  {disabling ? <CircularProgress size={18} /> : 'Disable'}
+                  {disabling ? <CircularProgress size={18} /> : t('pluginCard.disable')}
                 </Button>
               )
             )}
@@ -180,7 +182,7 @@ export function PluginCard({
                     disabled={!canPromote || !!promoteDisabledReason}
                     onClick={() => onPromote?.(associatedId, plugin.slug)}
                   >
-                    Promote to code
+                    {t('pluginCard.promoteToCode')}
                   </Button>
                 </span>
               </Tooltip>
@@ -195,7 +197,7 @@ export function PluginCard({
                     disabled={!canPromote || !!promoteDisabledReason}
                     onClick={() => onEditInCode?.(associatedId, plugin.slug)}
                   >
-                    Edit in code
+                    {t('pluginCard.editInCode')}
                   </Button>
                 </span>
               </Tooltip>
@@ -209,7 +211,7 @@ export function PluginCard({
               size="small"
               onClick={() => onEnable(plugin.slug)}
             >
-              Enable
+              {t('pluginCard.enable')}
             </Button>
           )
         )}
@@ -217,7 +219,7 @@ export function PluginCard({
       {isReadOnly && !showEditInCode && (
         <Box px={1.5} pb={1.5} textAlign="center">
           <Typography variant="caption" color="text.secondary">
-            Managed from the repository — change it in code.
+            {t('pluginCard.managedFromRepository')}
           </Typography>
         </Box>
       )}

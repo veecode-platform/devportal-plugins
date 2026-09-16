@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Box, Snackbar, Tab, Tabs, Button } from '@mui/material';
+import { Alert, Box, Snackbar, Tab, Tabs, Button, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useEntityAnnotations, useKongPermissions } from '../../hooks';
+import { useTranslation } from '../../hooks/useTranslation';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
 import { SelectInstance } from '../SelectInstance/SelectInstance';
 import { ServicePage } from '../ServicePage/ServicePage';
@@ -13,6 +14,7 @@ import { RoutePluginsDrawer } from '../RoutePluginsDrawer';
 import type { RouteResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 export function KongServiceManagerHomepage() {
+  const { t } = useTranslation();
   const { serviceName } = useEntityAnnotations();
   const { state, setServiceName } = useKongServiceManager();
   const permissions = useKongPermissions();
@@ -96,30 +98,42 @@ export function KongServiceManagerHomepage() {
     <Box>
       <SelectInstance />
 
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {t('homepage.intro')}
+      </Typography>
+
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         {/* textTransform none = same casing as the RHDH entity tabs above */}
         <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)}>
-          <Tab label="Service" sx={{ textTransform: 'none' }} />
-          <Tab label="Plugins" sx={{ textTransform: 'none' }} />
-          <Tab label="Routes" sx={{ textTransform: 'none' }} />
+          <Tab label={t('homepage.tabs.service')} sx={{ textTransform: 'none' }} />
+          <Tab label={t('homepage.tabs.plugins')} sx={{ textTransform: 'none' }} />
+          <Tab label={t('homepage.tabs.routes')} sx={{ textTransform: 'none' }} />
         </Tabs>
       </Box>
 
       {tabIndex === 0 && <ServicePage />}
 
       {tabIndex === 1 && (
-        <PluginsList
-          onEnablePlugin={handleEnablePlugin}
-          onEditPlugin={handleEditPlugin}
-          onPluginDisabled={name => setSuccessMessage(`Plugin "${name}" disabled`)}
-          canEnable={permissions.canAddServicePlugin}
-          canDisable={permissions.canDisableServicePlugin}
-          canEdit={permissions.canUpdateServicePlugin}
-        />
+        <Box>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t('homepage.pluginsScope')}
+          </Alert>
+          <PluginsList
+            onEnablePlugin={handleEnablePlugin}
+            onEditPlugin={handleEditPlugin}
+            onPluginDisabled={name => setSuccessMessage(t('homepage.pluginDisabled', { name }))}
+            canEnable={permissions.canAddServicePlugin}
+            canDisable={permissions.canDisableServicePlugin}
+            canEdit={permissions.canUpdateServicePlugin}
+          />
+        </Box>
       )}
 
       {tabIndex === 2 && (
         <Box>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {t('homepage.routesScope')}
+          </Alert>
           {permissions.canCreateRoute && (
             <Box display="flex" justifyContent="flex-end" mb={1}>
               <Button
@@ -128,14 +142,14 @@ export function KongServiceManagerHomepage() {
                 onClick={handleCreateRoute}
                 size="small"
               >
-                Create Route
+                {t('homepage.createRoute')}
               </Button>
             </Box>
           )}
           <RoutesList
             onEditRoute={handleEditRoute}
             onManagePlugins={handleManageRoutePlugins}
-            onRouteDeleted={() => setSuccessMessage('Route deleted')}
+            onRouteDeleted={() => setSuccessMessage(t('homepage.routeDeleted'))}
             canEdit={permissions.canUpdateRoute}
             canDelete={permissions.canDeleteRoute}
           />
@@ -152,8 +166,8 @@ export function KongServiceManagerHomepage() {
         canDisable={permissions.canDisableRoutePlugin}
         canEdit={permissions.canUpdateRoutePlugin}
         canPromote={permissions.canPromotePlugin}
-        onPromoted={name => setSuccessMessage(`Plugin "${name}" promotion opened — see the MR link on its badge`)}
-        onPromotionDiscarded={name => setSuccessMessage(`Promotion for plugin "${name}" discarded`)}
+        onPromoted={name => setSuccessMessage(t('homepage.pluginPromotionOpened', { name }))}
+        onPromotionDiscarded={name => setSuccessMessage(t('homepage.promotionDiscarded', { name }))}
       />
 
       <PluginConfigDrawer
@@ -167,8 +181,8 @@ export function KongServiceManagerHomepage() {
         onSaved={() =>
           setSuccessMessage(
             drawerPluginId
-              ? `Plugin "${drawerPluginName}" updated`
-              : `Plugin "${drawerPluginName}" enabled`,
+              ? t('homepage.pluginUpdated', { name: drawerPluginName })
+              : t('homepage.pluginEnabled', { name: drawerPluginName }),
           )
         }
       />
@@ -179,7 +193,7 @@ export function KongServiceManagerHomepage() {
         onClose={() => setRouteFormOpen(false)}
         onSaved={() =>
           setSuccessMessage(
-            editingRoute ? 'Route updated' : 'Route created',
+            editingRoute ? t('homepage.routeUpdated') : t('homepage.routeCreated'),
           )
         }
         editingRoute={editingRoute}

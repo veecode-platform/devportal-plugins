@@ -1,6 +1,7 @@
 import { Box, Button, FormLabel, IconButton, TextField } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 type IncrementalFieldsProps = {
   name: string;
@@ -15,6 +16,7 @@ export function IncrementalFields({
   items,
   onChange,
 }: IncrementalFieldsProps) {
+  const { t } = useTranslation();
   const handleChange = (index: number, value: string) => {
     const updated = [...items];
     updated[index] = value;
@@ -63,7 +65,7 @@ export function IncrementalFields({
         onClick={handleAdd}
         sx={{ mt: 0.5 }}
       >
-        Add
+        {t('incrementalFields.add')}
       </Button>
     </Box>
   );

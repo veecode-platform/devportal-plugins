@@ -19,6 +19,7 @@ import {
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { stringifyEntityRef } from '@backstage/catalog-model';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import { PluginCard } from '../PluginsList/PluginCard';
 import { PluginConfigDrawer } from '../PluginConfigDrawer/PluginConfigDrawer';
 import { derivePromotionBadge } from './promotionBadge';
@@ -28,28 +29,28 @@ import type {
   PluginPerCategory,
   RouteResponse,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+import type { TranslationFunction } from '@backstage/core-plugin-api/alpha';
+import type { kongServiceManagerTranslationRef } from '../../translations';
 
 /** Mirrors GitlabClient's annotation key (backend, not exported to common) — the same key resolves the owning repo for promotion. */
 const GITLAB_PROJECT_SLUG_ANNOTATION = 'gitlab.com/project-slug';
 
-/** Spec 02's exact wording for the pure-route guardrail — a signposted dead end, not a silent one. */
-const PURE_ROUTE_REASON =
-  'No owning repo — exposure of repo-less APIs is a future milestone';
-
-const CATEGORY_LABELS: Record<string, string> = {
-  ai: 'AI',
-  authentication: 'Authentication',
-  security: 'Security',
-  'traffic-control': 'Traffic Control',
-  serverless: 'Serverless',
-  transformation: 'Transformations',
-  logging: 'Logging',
-  analytics: 'Analytics & Monitoring',
-};
-
-function formatCategory(slug: string): string {
+function formatCategory(
+  slug: string,
+  t: TranslationFunction<typeof kongServiceManagerTranslationRef.T>,
+): string {
+  const categoryLabels: Record<string, string> = {
+    ai: t('routePluginsDrawer.categories.ai'),
+    authentication: t('routePluginsDrawer.categories.authentication'),
+    security: t('routePluginsDrawer.categories.security'),
+    'traffic-control': t('routePluginsDrawer.categories.trafficControl'),
+    serverless: t('routePluginsDrawer.categories.serverless'),
+    transformation: t('routePluginsDrawer.categories.transformation'),
+    logging: t('routePluginsDrawer.categories.logging'),
+    analytics: t('routePluginsDrawer.categories.analytics'),
+  };
   return (
-    CATEGORY_LABELS[slug] ??
+    categoryLabels[slug] ??
     slug
       .replace(/-/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase())
@@ -83,6 +84,7 @@ export function RoutePluginsDrawer({
   onPromoted,
   onPromotionDiscarded,
 }: RoutePluginsDrawerProps) {
+  const { t } = useTranslation();
   const {
     state,
     fetchRouteAssociatedPlugins,
@@ -129,7 +131,7 @@ export function RoutePluginsDrawer({
   // when there's nowhere to promote to. Otherwise, an unavailable helm
   // prerequisite reuses the backend's own actionable message verbatim.
   const promoteDisabledReason = !entity.metadata.annotations?.[GITLAB_PROJECT_SLUG_ANNOTATION]
-    ? PURE_ROUTE_REASON
+    ? t('routePluginsDrawer.noOwningRepoReason')
     : promotionCapabilities && !promotionCapabilities.helm.available
       ? promotionCapabilities.helm.error
       : undefined;
@@ -354,7 +356,11 @@ export function RoutePluginsDrawer({
     if (categories.length === 0) {
       return (
         <Box p={4} textAlign="center">
-          <Typography color="text.secondary">No plugins to display</Typography>
+          <Typography color="text.secondary">
+            {search
+              ? t('routePluginsDrawer.noPluginsFiltered', { search })
+              : t('routePluginsDrawer.noPluginsEmpty')}
+          </Typography>
         </Box>
       );
     }
@@ -362,7 +368,7 @@ export function RoutePluginsDrawer({
     return categories.map(cat => (
       <Box key={cat.category} mb={3}>
         <Typography variant="h6" sx={{ mb: 1.5 }}>
-          {formatCategory(cat.category)}
+          {formatCategory(cat.category, t)}
         </Typography>
         <ItemCardGrid>
           {cat.plugins.map(plugin => {
@@ -383,7 +389,7 @@ export function RoutePluginsDrawer({
             const adapters = promotionCapabilities?.adapters;
             const noAdapterReason =
               adapters && !adapters.includes(plugin.slug)
-                ? `'${plugin.slug}' has no promotion adapter; only ${adapters.join(', ')} can be promoted to code`
+                ? t('routePluginsDrawer.noAdapterReason')
                 : undefined;
             return (
               <PluginCard
@@ -424,7 +430,7 @@ export function RoutePluginsDrawer({
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', p: 2.5 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h5">Plugins for route: {routeLabel}</Typography>
+          <Typography variant="h5">{t('routePluginsDrawer.title', { routeLabel })}</Typography>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -434,7 +440,7 @@ export function RoutePluginsDrawer({
           {loading && <CircularProgress size={20} />}
           <TextField
             size="small"
-            placeholder="Search plugins..."
+            placeholder={t('routePluginsDrawer.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             InputProps={{
@@ -450,10 +456,10 @@ export function RoutePluginsDrawer({
 
         <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
           <TabbedCard title="">
-            <CardTab label="All Plugins">
+            <CardTab label={t('routePluginsDrawer.allPlugins')}>
               <Box p={2}>{renderCategories(allFiltered)}</Box>
             </CardTab>
-            <CardTab label="Associated Plugins">
+            <CardTab label={t('routePluginsDrawer.associatedPlugins')}>
               <Box p={2}>{renderCategories(associatedFiltered)}</Box>
             </CardTab>
           </TabbedCard>

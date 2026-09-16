@@ -9,8 +9,10 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export function ServicePage() {
+  const { t } = useTranslation();
   const { state, fetchServiceInfo } = useKongServiceManager();
   const { serviceInfo, loading, instance, serviceName } = state;
 
@@ -31,7 +33,7 @@ export function ServicePage() {
   if (!serviceInfo) {
     return (
       <Box p={2}>
-        <Typography>No service information available.</Typography>
+        <Typography>{t('servicePage.noServiceInfo')}</Typography>
       </Box>
     );
   }
@@ -40,10 +42,10 @@ export function ServicePage() {
     <Card variant="outlined">
       <CardHeader
         title={serviceInfo.name}
-        subheader={`ID: ${serviceInfo.id}`}
+        subheader={t('servicePage.idLabel', { id: serviceInfo.id })}
         action={
           <Chip
-            label={serviceInfo.enabled ? 'Enabled' : 'Disabled'}
+            label={serviceInfo.enabled ? t('servicePage.enabled') : t('servicePage.disabled')}
             color={serviceInfo.enabled ? 'success' : 'default'}
             size="small"
           />
@@ -55,21 +57,21 @@ export function ServicePage() {
           gridTemplateColumns="repeat(auto-fill, minmax(200px, 1fr))"
           gap={2}
         >
-          <InfoItem label="Protocol" value={serviceInfo.protocol} />
-          <InfoItem label="Host" value={serviceInfo.host} />
-          <InfoItem label="Port" value={String(serviceInfo.port)} />
-          <InfoItem label="Path" value={serviceInfo.path ?? '/'} />
-          <InfoItem label="Retries" value={String(serviceInfo.retries)} />
+          <InfoItem label={t('servicePage.fields.protocol')} value={serviceInfo.protocol} />
+          <InfoItem label={t('servicePage.fields.host')} value={serviceInfo.host} />
+          <InfoItem label={t('servicePage.fields.port')} value={String(serviceInfo.port)} />
+          <InfoItem label={t('servicePage.fields.path')} value={serviceInfo.path ?? '/'} />
+          <InfoItem label={t('servicePage.fields.retries')} value={String(serviceInfo.retries)} />
           <InfoItem
-            label="Connect Timeout"
+            label={t('servicePage.fields.connectTimeout')}
             value={`${serviceInfo.connect_timeout}ms`}
           />
           <InfoItem
-            label="Write Timeout"
+            label={t('servicePage.fields.writeTimeout')}
             value={`${serviceInfo.write_timeout}ms`}
           />
           <InfoItem
-            label="Read Timeout"
+            label={t('servicePage.fields.readTimeout')}
             value={`${serviceInfo.read_timeout}ms`}
           />
         </Box>

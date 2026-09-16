@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mockUseTranslation } from '../../test-utils/mockTranslations';
 import { PromotionReviewDialog } from './PromotionReviewDialog';
 
 const mockPreviewPromotion = jest.fn();
@@ -8,6 +9,10 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
   useKongServiceManager: () => ({
     previewPromotion: mockPreviewPromotion,
   }),
+}));
+
+jest.mock('../../hooks/useTranslation', () => ({
+  useTranslation: mockUseTranslation,
 }));
 
 const defaultProps = {

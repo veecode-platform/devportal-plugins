@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import { getPluginImage } from '../../assets/pluginImages';
 import type { CreatePlugin } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
@@ -56,6 +57,7 @@ export function PluginConfigDrawer({
   mode = 'kong',
   onSubmitCode,
 }: PluginConfigDrawerProps) {
+  const { t } = useTranslation();
   const {
     state,
     clearError,
@@ -204,7 +206,7 @@ export function PluginConfigDrawer({
               alt={pluginName}
               sx={{ width: 50, height: 50, borderRadius: '4px', objectFit: 'contain' }}
             />
-            <Typography variant="h5">{pluginName} Plugin</Typography>
+            <Typography variant="h5">{t('pluginConfigDrawer.title', { pluginName })}</Typography>
           </Box>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
@@ -231,7 +233,7 @@ export function PluginConfigDrawer({
             </Box>
           ) : configFields.length === 0 ? (
             <Typography color="text.secondary" textAlign="center" py={4}>
-              No configurable fields for this plugin.
+              {t('pluginConfigDrawer.noConfigurableFields')}
             </Typography>
           ) : (
             <FormControl
@@ -250,7 +252,7 @@ export function PluginConfigDrawer({
                     color="primary"
                   />
                 }
-                label="Enabled"
+                label={t('pluginConfigDrawer.enabled')}
                 sx={{ mb: 2 }}
               />
 
@@ -375,7 +377,7 @@ export function PluginConfigDrawer({
         {/* Footer actions */}
         <Box display="flex" gap={1.5} justifyContent="flex-end" mt={2}>
           <Button variant="outlined" onClick={onClose}>
-            Cancel
+            {t('pluginConfigDrawer.cancel')}
           </Button>
           <Button
             variant="contained"
@@ -384,15 +386,15 @@ export function PluginConfigDrawer({
           >
             {saving ? (
               <>
-                {isEdit ? 'Saving...' : 'Installing...'}
+                {isEdit ? t('pluginConfigDrawer.saving') : t('pluginConfigDrawer.installing')}
                 <CircularProgress size={18} sx={{ ml: 1 }} />
               </>
             ) : mode === 'code' ? (
-              'Review promotion'
+              t('pluginConfigDrawer.reviewPromotion')
             ) : isEdit ? (
-              'Save Changes'
+              t('pluginConfigDrawer.saveChanges')
             ) : (
-              'Install Plugin'
+              t('pluginConfigDrawer.installPlugin')
             )}
           </Button>
         </Box>

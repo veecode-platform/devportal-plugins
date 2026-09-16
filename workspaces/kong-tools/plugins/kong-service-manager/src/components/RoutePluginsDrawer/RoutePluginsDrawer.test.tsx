@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mockUseTranslation } from '../../test-utils/mockTranslations';
 import { RoutePluginsDrawer } from './RoutePluginsDrawer';
 import type {
   AssociatedPluginsResponse,
@@ -74,6 +75,10 @@ let mockPluginFields: unknown = null;
 
 jest.mock('@backstage/plugin-catalog-react', () => ({
   useEntity: () => ({ entity: mockEntity }),
+}));
+
+jest.mock('../../hooks/useTranslation', () => ({
+  useTranslation: mockUseTranslation,
 }));
 
 jest.mock('../../context/KongServiceManagerContext', () => ({
@@ -179,7 +184,7 @@ describe('RoutePluginsDrawer', () => {
     );
 
     expect(screen.getByRole('button', { name: /Promote to code/i })).toBeDisabled();
-    expect(screen.getByText(/No owning repo/)).toBeInTheDocument();
+    expect(screen.getByText(/no linked repository/)).toBeInTheDocument();
   });
 
   it('fetches promotion capabilities once when opened', () => {
@@ -251,7 +256,7 @@ describe('RoutePluginsDrawer', () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Descartar promoção' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard promotion' }));
     expect(mockDiscardPromotion).toHaveBeenCalledWith('route-1', 'plugin-1');
   });
 

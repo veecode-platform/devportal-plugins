@@ -26,6 +26,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import type { RouteResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 type RoutesListProps = {
@@ -37,6 +38,7 @@ type RoutesListProps = {
 };
 
 export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEdit = true, canDelete = true }: RoutesListProps) {
+  const { t } = useTranslation();
   const { state, fetchRoutes, removeRoute } = useKongServiceManager();
   const { routes, loading, instance, serviceName } = state;
   const [deleteTarget, setDeleteTarget] = useState<RouteResponse | null>(null);
@@ -62,17 +64,17 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEd
   if (loading && !routes) {
     return (
       <Card variant="outlined">
-        <CardHeader title="Routes" />
+        <CardHeader title={t('routesList.title')} />
         <CardContent>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Protocols</TableCell>
-                <TableCell>Methods</TableCell>
-                <TableCell>Paths</TableCell>
-                <TableCell>Hosts</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell>{t('routesList.columns.name')}</TableCell>
+                <TableCell>{t('routesList.columns.protocols')}</TableCell>
+                <TableCell>{t('routesList.columns.methods')}</TableCell>
+                <TableCell>{t('routesList.columns.paths')}</TableCell>
+                <TableCell>{t('routesList.columns.hosts')}</TableCell>
+                <TableCell align="right">{t('routesList.columns.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -98,25 +100,25 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEd
     <>
       <Card variant="outlined">
         <CardHeader
-          title="Routes"
-          subheader={`${routeData.length} route(s)`}
+          title={t('routesList.title')}
+          subheader={t('routesList.routeCount', { total: String(routeData.length) })}
         />
         <CardContent>
           {routeData.length === 0 ? (
             <Typography color="text.secondary">
-              No routes configured for this service.
+              {t('routesList.noRoutes')}
             </Typography>
           ) : (
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Protocols</TableCell>
-                    <TableCell>Methods</TableCell>
-                    <TableCell>Paths</TableCell>
-                    <TableCell>Hosts</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    <TableCell>{t('routesList.columns.name')}</TableCell>
+                    <TableCell>{t('routesList.columns.protocols')}</TableCell>
+                    <TableCell>{t('routesList.columns.methods')}</TableCell>
+                    <TableCell>{t('routesList.columns.paths')}</TableCell>
+                    <TableCell>{t('routesList.columns.hosts')}</TableCell>
+                    <TableCell align="right">{t('routesList.columns.actions')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -150,7 +152,7 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEd
                       <TableCell align="right">
                         <Box display="flex" justifyContent="flex-end" gap={0.5}>
                           {onManagePlugins && (
-                            <Tooltip title="Manage plugins">
+                            <Tooltip title={t('routesList.managePlugins')}>
                               <IconButton
                                 size="small"
                                 onClick={() => onManagePlugins(route)}
@@ -160,7 +162,7 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEd
                             </Tooltip>
                           )}
                           {onEditRoute && canEdit && (
-                            <Tooltip title="Edit route">
+                            <Tooltip title={t('routesList.editRoute')}>
                               <IconButton
                                 size="small"
                                 onClick={() => onEditRoute(route)}
@@ -170,7 +172,7 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEd
                             </Tooltip>
                           )}
                           {canDelete && (
-                            <Tooltip title="Delete route">
+                            <Tooltip title={t('routesList.deleteRoute')}>
                               <IconButton
                                 size="small"
                                 color="error"
@@ -192,18 +194,18 @@ export function RoutesList({ onEditRoute, onManagePlugins, onRouteDeleted, canEd
       </Card>
 
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete Route</DialogTitle>
+        <DialogTitle>{t('routesList.deleteDialog.title')}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete route{' '}
-            <strong>{deleteTarget?.name ?? deleteTarget?.id}</strong>? This
-            action cannot be undone.
+            {t('routesList.deleteDialog.confirmBefore')}{' '}
+            <strong>{deleteTarget?.name ?? deleteTarget?.id}</strong>
+            {t('routesList.deleteDialog.confirmAfter')}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button onClick={() => setDeleteTarget(null)}>{t('routesList.deleteDialog.cancel')}</Button>
           <Button onClick={handleDelete} color="error" variant="contained">
-            Delete
+            {t('routesList.deleteDialog.confirm')}
           </Button>
         </DialogActions>
       </Dialog>
