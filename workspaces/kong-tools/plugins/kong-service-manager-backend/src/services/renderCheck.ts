@@ -5,6 +5,7 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import { Document, isMap, parseDocument } from 'yaml';
 import { FileEdit, KongPluginAdapter, NormalizedConfig } from './adapters/types';
 
 const execFileAsync = promisify(execFile);
@@ -29,18 +30,47 @@ export async function applyFileEdits(repoDir: string, edits: FileEdit[]): Promis
       continue;
     }
 
-    let current: Record<string, unknown> = {};
+    // Comment-preserving merge (#126): edit the YAML document in place with
+    // the `yaml` Document API instead of a load/dump round-trip, so every
+    // comment, quoting style and key order the adapter does not touch
+    // survives — the golden chart documents its `kongPlugins` idiom inline,
+    // and the promote MR must read as a minimal diff.
+    let doc: Document.Parsed | Document;
     try {
-      const raw = await fs.readFile(targetPath, 'utf8');
-      current = (yaml.load(raw) as Record<string, unknown>) ?? {};
+      doc = parseDocument(await fs.readFile(targetPath, 'utf8'));
+      if (doc.errors.length > 0) {
+        throw new Error(`${edit.path}: ${doc.errors.map(e => e.message).join('; ')}`);
+      }
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw err;
       }
+      doc = new Document({});
     }
+    if (!isMap(doc.contents)) {
+      // Empty file or a scalar/sequence at the root: start a fresh mapping.
+      doc.contents = doc.createNode({}) as any;
+    }
+    applyPatch(doc, edit.values, []);
+    await fs.writeFile(targetPath, doc.toString(), 'utf8');
+  }
+}
 
-    const merged = deepMerge(current, edit.values);
-    await fs.writeFile(targetPath, yaml.dump(merged), 'utf8');
+/**
+ * Deep-merges `patch` into `doc` at `basePath`: plain objects recurse (so
+ * sibling keys and their comments stay untouched), everything else replaces
+ * the node at that path. An `{}` placeholder (the fixture's `kongPlugins: {}`)
+ * is a map too, so keys are added inside it rather than replacing it.
+ */
+function applyPatch(doc: Document, patch: Record<string, unknown>, basePath: string[]): void {
+  for (const [key, value] of Object.entries(patch)) {
+    const path = [...basePath, key];
+    const existing = doc.getIn(path, true);
+    if (isPlainObject(value) && isMap(existing)) {
+      applyPatch(doc, value, path);
+    } else {
+      doc.setIn(path, value);
+    }
   }
 }
 
@@ -48,20 +78,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function deepMerge(
-  base: Record<string, unknown>,
-  patch: Record<string, unknown>,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(patch)) {
-    const existing = result[key];
-    result[key] =
-      isPlainObject(existing) && isPlainObject(value)
-        ? deepMerge(existing, value)
-        : value;
-  }
-  return result;
-}
 
 export interface EquivalenceResult {
   equal: boolean;

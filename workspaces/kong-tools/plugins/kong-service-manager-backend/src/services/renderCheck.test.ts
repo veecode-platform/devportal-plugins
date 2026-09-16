@@ -62,7 +62,7 @@ describe('renderCheck', () => {
   });
 
   it('correlation-id: creates the KongPlugin manifest and confirms it equals the live config', async () => {
-    const liveConfig = { header_name: 'X-Correlation-Id' };
+    const liveConfig = { header_name: 'X-Correlation-Id', generator: 'uuid', echo_downstream: true };
     const result = await renderCheck({
       repoDir,
       adapter: correlationIdAdapter,
@@ -77,11 +77,11 @@ describe('renderCheck', () => {
     await renderCheck({
       repoDir,
       adapter: correlationIdAdapter,
-      edits: correlationIdAdapter.toChartEdits({ header_name: 'X-Correlation-Id' }),
-      liveConfig: { header_name: 'X-Correlation-Id' },
+      edits: correlationIdAdapter.toChartEdits({ header_name: 'X-Correlation-Id', generator: 'uuid', echo_downstream: true }),
+      liveConfig: { header_name: 'X-Correlation-Id', generator: 'uuid', echo_downstream: true },
     });
 
-    const updatedLiveConfig = { header_name: 'X-Request-Trace' };
+    const updatedLiveConfig = { header_name: 'X-Request-Trace', generator: 'uuid#counter', echo_downstream: false };
     const result = await renderCheck({
       repoDir,
       adapter: correlationIdAdapter,
