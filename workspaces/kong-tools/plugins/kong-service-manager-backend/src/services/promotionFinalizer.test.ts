@@ -138,6 +138,7 @@ describe('reconcilePromotions', () => {
       const gitlab: any = {
         getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
         getMergeRequest: jest.fn().mockResolvedValue({ state: 'closed', mergedAt: null }),
+        deleteBranch: jest.fn().mockResolvedValue(undefined),
       };
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockResolvedValue([plugin()]),
@@ -147,6 +148,29 @@ describe('reconcilePromotions', () => {
       await reconcilePromotions({ logger, gitlab, kong, store, config });
 
       expect(kong.editRoutePlugin).toHaveBeenCalledWith('default', 'route-1', 'plugin-1', { tags: [] });
+      // The promotion branch goes with the MR, so the next promote of this type starts fresh (ADR-022).
+      expect(gitlab.deleteBranch).toHaveBeenCalledWith(
+        expect.objectContaining({ host: repo.host, projectSlug: repo.projectSlug }),
+        'kong-promote/rate-limiting',
+      );
+      expect(store.transitionCalls).toEqual([[1, 'discarded', undefined]]);
+    });
+
+    it('closed MR: still discards when the branch delete fails (best-effort, ADR-022)', async () => {
+      const record = row({ state: 'mr-open', mr_ref: 'mr-url', detail });
+      const store = fakeStore([record]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        getMergeRequest: jest.fn().mockResolvedValue({ state: 'closed', mergedAt: null }),
+        deleteBranch: jest.fn().mockRejectedValue(new Error('403 forbidden')),
+      };
+      const kong: any = {
+        getRouteAssociatedPlugins: jest.fn().mockResolvedValue([plugin()]),
+        editRoutePlugin: jest.fn().mockResolvedValue(undefined),
+      };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
       expect(store.transitionCalls).toEqual([[1, 'discarded', undefined]]);
     });
 

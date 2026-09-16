@@ -171,8 +171,22 @@ export class GitlabClient {
     } catch (err) {
       const e = err as GitlabRequestError;
       if (e.status === 400 && /already exists/i.test(e.upstreamBody ?? '')) {
-        return; // crash-retry: branch survived from a prior attempt — reuse it
+        return; // reuse: the caller has verified an MR is still open for it (ADR-022)
       }
+      throw err;
+    }
+  }
+
+  /** Idempotent: deleting a branch that is already gone is a no-op success. */
+  async deleteBranch(repo: { host: string; projectSlug: string }, branch: string): Promise<void> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    try {
+      await this.call(token, `${base}/repository/branches/${encodeURIComponent(branch)}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      const e = err as GitlabRequestError;
+      if (e.status === 404) return;
       throw err;
     }
   }

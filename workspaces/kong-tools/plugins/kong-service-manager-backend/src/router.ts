@@ -37,7 +37,7 @@ import type { HelmCapabilityGate } from './services/helmCapability';
 import { GitlabClient, type ResolvedRepo } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
-import { EXPERIMENTAL_TAG_PREFIX } from './services/promotionTags';
+import { EXPERIMENTAL_TAG_PREFIX, promotionBranch } from './services/promotionTags';
 
 /**
  * States whose `detail` column carries a human-readable failure message
@@ -726,12 +726,21 @@ export async function createRouter({
         }
 
         // Step 3: branch/commit/MR (idempotent — reuses a branch/MR left by a crashed prior attempt).
+        // The branch is reused ONLY while an MR is open for it (crash-retry
+        // between "MR opened" and "record transitioned"). Otherwise it is a
+        // leftover — GitLab does not always honour remove_source_branch on
+        // merge, and a discard closes the MR without touching the branch — and
+        // committing on top of it produced an MR 12 commits behind main with
+        // conflicts (ADR-022). Recreate it from the default branch instead.
         // create-vs-update is decided against the PROMOTION branch, not the
-        // default-branch copy `dir` was materialized from: a crash-retry (or
-        // a promote right after a discard, which doesn't delete the branch)
-        // can find the branch already carrying a prior commit, and sending
+        // default-branch copy `dir` was materialized from: a crash-retry can
+        // find the branch already carrying a prior commit, and sending
         // `create` for a file that already exists there is a GitLab 400.
-        const branch = `kong-promote/${adapter.pluginType}`;
+        const branch = promotionBranch(adapter.pluginType);
+        let mr = await gitlabClient.findOpenMergeRequest(repo, branch);
+        if (!mr) {
+          await gitlabClient.deleteBranch(repo, branch);
+        }
         await gitlabClient.ensureBranch(repo, branch);
         const existing = await gitlabClient.pathsExistingOnRef(repo, branch, edits.map(e => e.path));
         await gitlabClient.commitEdits(
@@ -743,7 +752,6 @@ export async function createRouter({
           `kong: promote ${adapter.pluginType} on route ${routeId} to code`,
         );
 
-        let mr = await gitlabClient.findOpenMergeRequest(repo, branch);
         if (!mr) {
           mr = await gitlabClient.openMergeRequest(
             repo,

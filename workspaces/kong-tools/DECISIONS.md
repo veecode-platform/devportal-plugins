@@ -442,3 +442,29 @@ Rejected: storing the plugin id on the record (Kong ids change when an
 experiment is recreated; the type/route key is what the finalizer needs);
 reaping terminal records server-side when the plugin disappears (a
 finalizer tick per codified record forever, for a purely visual problem).
+
+## ADR-022: The Promotion Branch Is Reused Only While Its MR Is Open; Otherwise It Is Recreated From the Default Branch
+
+**Date:** 2026-09
+**Status:** Accepted
+
+`ensureBranch` treated "branch already exists" as success so a promote retried
+after a crash would find its own commit and MR again (ADR-015 idiom). That
+rule also reused a branch **nobody was using**: GitLab did not honour
+`remove_source_branch` on a merge performed from its UI (2026-09-15), and a
+discard closes the MR without touching the branch. The next promotion of the
+same type on the same repo committed on top of the stale branch and opened an
+MR 12 commits behind the default branch, in conflict (2026-09-16).
+
+Decision: the branch (`kong-promote/<type>`, one per plugin type) is reused
+**only when an open MR exists for it** — that is the crash-retry case. In every
+other case the promote endpoint deletes it (404 = already gone) and recreates
+it from the default branch head before committing. The finalizer deletes the
+branch when it discards a closed MR, best-effort, so leftovers are rare rather
+than merely harmless. Create-vs-update detection keeps running against the
+promotion branch (ADR-015).
+
+Rejected: unique branch names per promotion (`kong-promote/<type>-<ts>`) — the
+crash-retry would then have to find its branch through the record, and the
+"one open promotion per type" rule would need a second index; rebasing the
+stale branch server-side — GitLab has no rebase-branch API outside an MR.

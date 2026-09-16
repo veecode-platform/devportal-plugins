@@ -90,6 +90,7 @@ function gitlabClientMock(): jest.Mocked<GitlabClient> {
     materializeChart: jest.fn(),
     pathsExistingOnRef: jest.fn(),
     ensureBranch: jest.fn(),
+    deleteBranch: jest.fn(),
     commitEdits: jest.fn(),
     findOpenMergeRequest: jest.fn(),
     openMergeRequest: jest.fn(),
@@ -165,6 +166,12 @@ describe('promote to code (Task P3)', () => {
         expect(res.status).toBe(201);
         expect(res.body).toMatchObject({ state: 'mr-open', mrRef: mr.webUrl, pluginType: 'rate-limiting' });
         expect(gitlabClient.ensureBranch).toHaveBeenCalledWith(repo, 'kong-promote/rate-limiting');
+        // No MR open for the branch → any leftover branch is stale and is
+        // recreated from the default branch, never committed onto (ADR-022).
+        expect(gitlabClient.deleteBranch).toHaveBeenCalledWith(repo, 'kong-promote/rate-limiting');
+        expect(gitlabClient.deleteBranch.mock.invocationCallOrder[0]).toBeLessThan(
+          gitlabClient.ensureBranch.mock.invocationCallOrder[0],
+        );
         // create-vs-update must be decided against the promotion branch, not the
         // default-branch copy `renderCheck` runs against.
         expect(gitlabClient.pathsExistingOnRef).toHaveBeenCalledWith(
@@ -290,6 +297,8 @@ describe('promote to code (Task P3)', () => {
         expect(promotionStore.upsertDraft).toHaveBeenCalledTimes(1);
         expect(gitlabClient.openMergeRequest).toHaveBeenCalledTimes(1); // never a second MR
         expect(gitlabClient.findOpenMergeRequest).toHaveBeenCalledTimes(2);
+        // The retry found the MR still open, so the branch carrying its commit is kept (ADR-022).
+        expect(gitlabClient.deleteBranch).toHaveBeenCalledTimes(1);
       } finally {
         await chart.cleanup();
       }

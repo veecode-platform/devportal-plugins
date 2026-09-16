@@ -6,7 +6,7 @@ import { KongServiceManagerService } from './KongServiceManagerService';
 import { PromotionRecordRow, PromotionStore } from './promotionStore';
 import { MrDetail, decodeMrDetail, encodeMrDetail } from './mrDetail';
 import { getAdapter } from './adapters';
-import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG } from './promotionTags';
+import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG, promotionBranch } from './promotionTags';
 
 export interface PromotionFinalizerConfig {
   /** Minutes a record may sit in `applying` before the finalizer gives up and marks it `failed` (ADR-020: nothing is restored). */
@@ -84,7 +84,7 @@ async function reconcileOne(deps: {
     case 'draft':
       return handleDraft({ gitlab, store, record, detail });
     case 'mr-open':
-      return handleMrOpen({ gitlab, kong, store, record, detail });
+      return handleMrOpen({ logger, gitlab, kong, store, record, detail });
     case 'awaiting-deploy':
       return handleAwaitingDeploy({ gitlab, store, record, detail, project });
     case 'applying':
@@ -156,6 +156,7 @@ async function handleDraft(deps: {
 }
 
 async function handleMrOpen(deps: {
+  logger: LoggerService;
   gitlab: GitlabClient;
   kong: KongServiceManagerService;
   store: PromotionStore;
@@ -168,6 +169,17 @@ async function handleMrOpen(deps: {
   const mr = await gitlab.getMergeRequest(detail, detail.iid);
   if (mr.state === 'closed') {
     await untagExperimental(kong, record);
+    // The branch would otherwise outlive the MR and be found stale by the
+    // next promote of this type (ADR-022). Best-effort: a failure here must
+    // not keep the record out of `discarded`.
+    try {
+      await gitlab.deleteBranch(detail, promotionBranch(record.plugin_type));
+    } catch (err) {
+      deps.logger.warn('kong-service-manager promotion: could not delete the promotion branch after discard', {
+        promotionId: record.id,
+        error: String(err),
+      });
+    }
     await store.transition(record.id, 'discarded');
     return;
   }
