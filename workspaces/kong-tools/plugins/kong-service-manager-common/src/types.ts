@@ -230,6 +230,12 @@ export type PromotionCapabilities = {
     version?: string;
     error?: string;
   };
+  /**
+   * Plugin types that have a promotion adapter — the promotion allowlist. The
+   * UI disables "Promote to code" up front for any other type instead of
+   * letting the request fail with a 400 (#136). Absent on backends < 1.5.0.
+   */
+  adapters?: string[];
 };
 
 /** Plugin categories enum */

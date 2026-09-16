@@ -254,7 +254,7 @@ describe('PluginCard', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
-  it('hides Promote and Discard for a code-owned plugin, but keeps Disable (ADR-017)', () => {
+  it('renders a code-owned plugin read-only: no Promote, Discard, Disable or Edit (ADR-017, #136)', () => {
     const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
     render(
       <PluginCard
@@ -271,6 +271,28 @@ describe('PluginCard', () => {
 
     expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Descartar promoção' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit plugin configuration/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Managed from the repository/)).toBeInTheDocument();
+  });
+
+  it('disables Promote with the no-adapter reason coming from the capabilities (#136)', () => {
+    const badge: PromotionBadge = { kind: 'experimental', ageMs: 60_000 };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        promoteDisabledReason="'request-size-limiting' has no promotion adapter; only correlation-id, rate-limiting can be promoted to code"
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onPromote={noop}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Promote to code/i })).toBeDisabled();
+    expect(screen.getByText(/has no promotion adapter/)).toBeInTheDocument();
   });
 });

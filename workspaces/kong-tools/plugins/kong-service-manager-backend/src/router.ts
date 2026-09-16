@@ -30,7 +30,7 @@ import {
   kongPluginPromotePermission,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { KongServiceManagerService } from './services/KongServiceManagerService';
-import { getAdapter } from './services/adapters';
+import { adapterRegistry, getAdapter } from './services/adapters';
 import type { FileEdit, KongPluginAdapter, NormalizedConfig } from './services/adapters/types';
 import { renderCheck, type EquivalenceResult } from './services/renderCheck';
 import type { HelmCapabilityGate } from './services/helmCapability';
@@ -646,6 +646,7 @@ export async function createRouter({
     const parsed = z.object({ instance: z.string() }).safeParse(req.params);
     if (!parsed.success) throw new InputError(parsed.error.toString());
 
+    const adapters = Object.keys(adapterRegistry).sort();
     if (!helmGate) {
       const capabilities: PromotionCapabilities = {
         helm: {
@@ -653,12 +654,13 @@ export async function createRouter({
           path: helmPath,
           error: 'Kong plugin promotion is not enabled on this instance',
         },
+        adapters,
       };
       res.json(capabilities);
       return;
     }
 
-    const capabilities: PromotionCapabilities = { helm: await helmGate.getCapability() };
+    const capabilities: PromotionCapabilities = { helm: await helmGate.getCapability(), adapters };
     res.json(capabilities);
   });
 

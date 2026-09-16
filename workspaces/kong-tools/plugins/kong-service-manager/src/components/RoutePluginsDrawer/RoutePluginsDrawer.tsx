@@ -337,6 +337,15 @@ export function RoutePluginsDrawer({
                   { pluginTags: assocPlugin?.tags, instanceDefaultTags },
                 )
               : undefined;
+            // Per-type gate (#136): the backend refuses types without a
+            // promotion adapter with a 400; say so before the click instead.
+            // A backend that does not report `adapters` (< 1.5.0) leaves the
+            // button enabled — the server-side gate still holds.
+            const adapters = promotionCapabilities?.adapters;
+            const noAdapterReason =
+              adapters && !adapters.includes(plugin.slug)
+                ? `'${plugin.slug}' has no promotion adapter; only ${adapters.join(', ')} can be promoted to code`
+                : undefined;
             return (
               <PluginCard
                 key={plugin.slug}
@@ -351,7 +360,7 @@ export function RoutePluginsDrawer({
                 onDisable={handleDisable}
                 promotionBadge={promotionBadge}
                 canPromote={canPromote}
-                promoteDisabledReason={promoteDisabledReason}
+                promoteDisabledReason={promoteDisabledReason ?? noAdapterReason}
                 discardingPromotion={discardingId === pluginId}
                 onPromote={handleOpenReview}
                 onDiscardPromotion={handleDiscard}
