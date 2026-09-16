@@ -273,4 +273,86 @@ describe('PluginCard', () => {
     expect(screen.queryByRole('button', { name: 'Descartar promoção' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
   });
+
+  it('shows Edit in code for a code-owned plugin only when the capability is on (issue #135)', () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
+    const onEditInCode = jest.fn();
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        editInCodeEnabled
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onDiscardPromotion={noop}
+        onEditInCode={onEditInCode}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Edit in code' })).toBeInTheDocument();
+  });
+
+  it('hides Edit in code for a code-owned plugin when the capability is off', () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onDiscardPromotion={noop}
+        onEditInCode={noop}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Edit in code' })).not.toBeInTheDocument();
+  });
+
+  it('calls onEditInCode with plugin id and name when Edit in code is clicked', async () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
+    const onEditInCode = jest.fn();
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        editInCodeEnabled
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onDiscardPromotion={noop}
+        onEditInCode={onEditInCode}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit in code' }));
+    expect(onEditInCode).toHaveBeenCalledWith('plugin-id-123', basePlugin.slug);
+  });
+
+  it('hides Edit in code once a code-only promotion is active (badge no longer code-owned)', () => {
+    const badge: PromotionBadge = { kind: 'mr-open', ageMs: 60_000 };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        editInCodeEnabled
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onDiscardPromotion={noop}
+        onEditInCode={noop}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Edit in code' })).not.toBeInTheDocument();
+  });
 });

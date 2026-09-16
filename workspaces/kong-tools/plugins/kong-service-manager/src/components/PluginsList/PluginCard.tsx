@@ -35,6 +35,9 @@ type PluginCardProps = {
   discardingPromotion?: boolean;
   onPromote?: (pluginId: string, pluginName: string) => void;
   onDiscardPromotion?: (pluginId: string, pluginName: string) => void;
+  /** `kong.promotion.editInCode` capability (issue #135) — gates the "Edit in code" action for a code-owned plugin. */
+  editInCodeEnabled?: boolean;
+  onEditInCode?: (pluginId: string, pluginName: string) => void;
 };
 
 export function PluginCard({
@@ -53,6 +56,8 @@ export function PluginCard({
   discardingPromotion,
   onPromote,
   onDiscardPromotion,
+  editInCodeEnabled,
+  onEditInCode,
 }: PluginCardProps) {
   const isAssociated = !!associatedId;
   // Frozen (open MR / applying) blocks portal edits server-side (409); codified is terminal and read-only.
@@ -60,6 +65,9 @@ export function PluginCard({
   const isCodified = promotionBadge?.kind === 'codified';
   // Code-owned (ADR-017): the plugin was never portal-created, so it never
   // has a promotion to start or discard — read-only, same as codified.
+  // While a code-only promotion (issue #135) is active, the badge reads
+  // mr-open/pending-deploy instead (active records win over ownership), so
+  // this only matches a code-owned plugin with no open edit.
   const isCodeOwned = promotionBadge?.kind === 'code-owned';
   // Failed handover (ADR-020): the experiment was removed at merge and the
   // chart already carries the plugin — there is nothing left to promote.
@@ -67,6 +75,7 @@ export function PluginCard({
   const showPromote =
     isAssociated && !!promotionBadge && !isFrozen && !isCodified && !isCodeOwned && !isFailedHandover;
   const showDiscard = isAssociated && isFrozen && !isCodeOwned;
+  const showEditInCode = isAssociated && isCodeOwned && !!editInCodeEnabled && !!onEditInCode;
 
   return (
     <Card
@@ -172,6 +181,21 @@ export function PluginCard({
                 </span>
               </Tooltip>
             )}
+            {showEditInCode && (
+              <Tooltip title={promoteDisabledReason ?? ''}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    size="small"
+                    disabled={!canPromote || !!promoteDisabledReason}
+                    onClick={() => onEditInCode?.(associatedId, plugin.slug)}
+                  >
+                    Edit in code
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
           </>
         ) : (
           canEnable && (
@@ -186,7 +210,7 @@ export function PluginCard({
           )
         )}
       </CardActions>
-      {showPromote && promoteDisabledReason && (
+      {(showPromote || showEditInCode) && promoteDisabledReason && (
         <Box px={1.5} pb={1.5} textAlign="center">
           <Typography variant="caption" color="text.secondary">
             {promoteDisabledReason}
