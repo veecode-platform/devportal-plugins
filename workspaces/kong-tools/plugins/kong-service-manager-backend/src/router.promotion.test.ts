@@ -1,4 +1,5 @@
 import * as fs from 'fs/promises';
+import * as path from 'path';
 import { mockErrorHandler, mockServices } from '@backstage/backend-test-utils';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import express from 'express';
@@ -140,6 +141,60 @@ function withRealChart(gitlabClient: jest.Mocked<GitlabClient>): { cleanup: () =
   gitlabClient.resolveRepo.mockResolvedValue(repo);
   gitlabClient.materializeChart.mockImplementation(async () => {
     dir = await copyGoldenPathRepo();
+    return { dir, cleanup: jest.fn().mockResolvedValue(undefined) };
+  });
+  gitlabClient.pathsExistingOnRef.mockResolvedValue(new Set(['chart/values.yaml']));
+  gitlabClient.ensureBranch.mockResolvedValue(undefined);
+  gitlabClient.commitEdits.mockResolvedValue({ sha: 'sha-abc' });
+  return {
+    cleanup: async () => {
+      if (dir) await fs.rm(dir, { recursive: true, force: true });
+    },
+  };
+}
+
+/** A rate-limiting KongPlugin template that routes `minute` through chart values (the golden-path scaffolder shape) — editing the value in `values.yaml` changes the rendered config. */
+const VALUES_ROUTED_RL_TEMPLATE = `apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ .Release.Name }}-rate-limiting
+plugin: rate-limiting
+config:
+  minute: {{ .Values.kongPlugins.rateLimiting.minute }}
+  policy: local
+`;
+
+/** A rate-limiting template that hardcodes `minute` — editing `values.yaml` can never change the rendered config, so edit-in-code must refuse. */
+const HARDCODED_RL_TEMPLATE = `apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: {{ .Release.Name }}-rate-limiting
+plugin: rate-limiting
+config:
+  minute: 10
+  policy: local
+`;
+
+/**
+ * Like `withRealChart`, but the materialized chart ALREADY declares a
+ * code-owned rate-limiting KongPlugin (authored by the service team, not the
+ * portal) — the realistic edit-in-code target. `template` is written to
+ * `chart/templates/kongplugin-rate-limiting.yaml`; `extraTemplate`, when
+ * given, adds a second manifest of the same type.
+ */
+function withCodeOwnedChart(
+  gitlabClient: jest.Mocked<GitlabClient>,
+  template: string,
+  extraTemplate?: string,
+): { cleanup: () => Promise<void> } {
+  let dir: string;
+  gitlabClient.resolveRepo.mockResolvedValue(repo);
+  gitlabClient.materializeChart.mockImplementation(async () => {
+    dir = await copyGoldenPathRepo();
+    await fs.writeFile(path.join(dir, 'chart/templates/kongplugin-rate-limiting.yaml'), template, 'utf8');
+    if (extraTemplate) {
+      await fs.writeFile(path.join(dir, 'chart/templates/kongplugin-rate-limiting-2.yaml'), extraTemplate, 'utf8');
+    }
     return { dir, cleanup: jest.fn().mockResolvedValue(undefined) };
   });
   gitlabClient.pathsExistingOnRef.mockResolvedValue(new Set(['chart/values.yaml']));
@@ -596,7 +651,9 @@ describe('promote to code (Task P3)', () => {
       promotionStore.transition.mockResolvedValue(undefined);
 
       const gitlabClient = gitlabClientMock();
-      const chart = withRealChart(gitlabClient);
+      // The chart already declares the code-owned plugin, routing `minute`
+      // through values — the realistic edit-in-code target (B1).
+      const chart = withCodeOwnedChart(gitlabClient, VALUES_ROUTED_RL_TEMPLATE);
       gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
       gitlabClient.openMergeRequest.mockResolvedValue(mr);
 
@@ -613,6 +670,71 @@ describe('promote to code (Task P3)', () => {
         );
         // No experiment ever existed for a code-only edit — nothing to tag.
         expect(kongService.editRoutePlugin).not.toHaveBeenCalled();
+        // B1: the MR only touches values.yaml — the team's template is never
+        // rewritten (no op:'create' edit reaches the commit).
+        const committedEdits = gitlabClient.commitEdits.mock.calls[0][3];
+        expect(committedEdits.every((e: { op: string }) => e.op !== 'create')).toBe(true);
+        expect(committedEdits.map((e: { path: string }) => e.path)).toEqual(['chart/values.yaml']);
+        // ...and the written values.yaml is a surgical change: the edited
+        // value lands and the team's existing comment survives (a load/dump
+        // round-trip would have dropped it — the whole point of #138).
+        const materialized = await gitlabClient.materializeChart.mock.results[0].value;
+        const writtenValues = await fs.readFile(path.join(materialized.dir, 'chart/values.yaml'), 'utf8');
+        expect(writtenValues).toMatch(/minute: 30/);
+        expect(writtenValues).toMatch(/kongPlugins is intentionally empty/);
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('promote 409s a code-owned plugin whose chart hardcodes the field — editing values can\'t reproduce it (B1)', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(draftRow({ mode: 'code-only', config_snapshot: { minute: 30 } }));
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withCodeOwnedChart(gitlabClient, HARDCODED_RL_TEMPLATE);
+      gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+      try {
+        const res = await request(app)
+          .post(PROMOTE_URL)
+          .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.message).toMatch(/does not expose 'rate-limiting' as an editable value/);
+        // Nothing was committed — the write is refused before the MR.
+        expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('promote 409s when the chart declares the plugin type more than once — can\'t tell which one to edit (B1)', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(draftRow({ mode: 'code-only', config_snapshot: { minute: 30 } }));
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withCodeOwnedChart(gitlabClient, VALUES_ROUTED_RL_TEMPLATE, VALUES_ROUTED_RL_TEMPLATE);
+      gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+      try {
+        const res = await request(app)
+          .post(PROMOTE_URL)
+          .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+        expect(res.status).toBe(409);
+        expect(res.body.error.message).toMatch(/2 KongPlugin manifests/);
+        expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
       } finally {
         await chart.cleanup();
       }
@@ -717,7 +839,7 @@ describe('promote to code (Task P3)', () => {
     it('preview stays permissive on an edited config that equals the live config (unlike promote)', async () => {
       const kongService = kongServiceForCodeOwned();
       const gitlabClient = gitlabClientMock();
-      const chart = withRealChart(gitlabClient);
+      const chart = withCodeOwnedChart(gitlabClient, VALUES_ROUTED_RL_TEMPLATE);
 
       const app = await buildApp({
         kongService,

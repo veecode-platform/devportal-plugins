@@ -838,13 +838,25 @@ export async function createRouter({
         detail: encodeMrDetail({ host: repo.host, projectSlug: repo.projectSlug, projectId: repo.projectId }),
       });
 
-      const edits = adapter.toChartEdits(snapshot);
+      // Edit-in-code (B1): a code-only promotion targets a plugin whose chart
+      // file was authored by the service team, not the portal. Only touch
+      // `values.yaml` (the `op:'merge'` edits) and never rewrite the template
+      // (`op:'create'`), which would clobber the team's file — guard, labels,
+      // hardcoded keys — or add a duplicate manifest. If the existing template
+      // doesn't route the edited field through values, the render check below
+      // won't reproduce the edited config and the promote is refused.
+      const edits =
+        mode === 'code-only'
+          ? adapter.toChartEdits(snapshot).filter(e => e.op !== 'create')
+          : adapter.toChartEdits(snapshot);
       const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, snapshot);
 
       try {
         if (!check.equal) {
           throw new ConflictError(
-            `Generated chart does not reproduce the live config for '${adapter.pluginType}': ${check.diff}`,
+            mode === 'code-only'
+              ? `The chart does not expose '${adapter.pluginType}' as an editable value on this route, so editing in code can't reproduce the requested config — edit the plugin directly in the service's chart. Detail: ${check.diff}`
+              : `Generated chart does not reproduce the live config for '${adapter.pluginType}': ${check.diff}`,
           );
         }
 
@@ -963,7 +975,7 @@ export async function createRouter({
       // Preview stays permissive on the equality check (unlike promote): it
       // shows the generated YAML for an edited config even when that config
       // happens to match the live one.
-      resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId, plugin.tags ?? []);
+      const mode = resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId, plugin.tags ?? []);
       const previewConfig =
         editedConfigInput !== undefined
           ? adapter.fromRendered({ config: editedConfigInput })
@@ -972,7 +984,12 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req, { allow: ['user'] });
       const repo = await gitlabClient.resolveRepo(entityRef, credentials);
 
-      const edits = adapter.toChartEdits(previewConfig);
+      // Same edit-in-code rule as promote (B1): code-only never rewrites the
+      // team's template, only the values it exposes.
+      const edits =
+        mode === 'code-only'
+          ? adapter.toChartEdits(previewConfig).filter(e => e.op !== 'create')
+          : adapter.toChartEdits(previewConfig);
       const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, previewConfig);
 
       try {

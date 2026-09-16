@@ -207,6 +207,14 @@ it too — and the finalizer only ever recognizes convergence on a
 controller-managed plugin, so a merge request for any other plugin could
 never finish. Those are refused with `400`.
 
+Only the plugin's chart **values** are edited, never the template that reads
+them. If the service's chart routes the field through `values.yaml` (the
+golden-path shape), the merge request is a one-line values change; if the
+chart hardcodes the field, the edit cannot be reproduced and the request is
+refused (409) — edit that plugin directly in the chart instead. A chart that
+declares the same plugin type more than once is refused the same way, since
+the backend cannot tell which manifest an edit would change.
+
 The record this writes carries `mode: 'code-only'` (as opposed to the
 default `experiment`) and is otherwise reconciled by the same finalizer
 states — `mr-open`, `awaiting-deploy`, `applying`, `codified`/`failed` — but

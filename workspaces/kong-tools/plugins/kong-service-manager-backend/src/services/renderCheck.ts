@@ -148,17 +148,29 @@ export async function renderCheck(params: {
     await fs.rm(scratchDir, { recursive: true, force: true });
   }
 
-  const manifest = yaml
+  const manifests = yaml
     .loadAll(stdout)
     .filter((doc): doc is Record<string, unknown> => isPlainObject(doc))
-    .find(doc => doc.kind === 'KongPlugin' && doc.plugin === adapter.pluginType);
+    .filter(doc => doc.kind === 'KongPlugin' && doc.plugin === adapter.pluginType);
 
-  if (!manifest) {
+  if (manifests.length === 0) {
     return {
       equal: false,
       diff: `rendered chart has no KongPlugin manifest for plugin type '${adapter.pluginType}'`,
     };
   }
+  if (manifests.length > 1) {
+    // The chart declares the plugin type more than once (e.g. per-route
+    // manifests reading the same value). `fromRendered` on the first one
+    // can't tell which resource an edit would change, and committing the
+    // shared value would silently change the others too — refuse rather
+    // than pick one by render order.
+    return {
+      equal: false,
+      diff: `rendered chart declares ${manifests.length} KongPlugin manifests of type '${adapter.pluginType}'; cannot determine which one an edit would change — edit the chart in the repository`,
+    };
+  }
+  const manifest = manifests[0];
 
   const rendered = adapter.fromRendered(manifest);
   if (isDeepStrictEqual(rendered, liveConfig)) {

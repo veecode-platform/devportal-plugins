@@ -538,16 +538,40 @@ experiment was ever created. The finalizer's `isCodeOnly()` guards exactly
 those three write sites; `handleApplying`'s convergence check only reads
 Kong and needed no change.
 
-**Ownership check reused as-is (ADR-017), not the KIC tag.** The gate is
-`resolvePromotableRoutePlugin`'s existing `defaultTags` derivation — the
-same one the frontend's `derivePromotionBadge` already keys its `code-owned`
-badge on — not the Kong Ingress Controller's `managed-by-ingress-controller`
-tag. The two signals usually agree, but only the `defaultTags` derivation is
-visible to the frontend; gating the backend on the KIC tag instead would let
-a card show "Edit in code" for a plugin the backend then rejects. Corollary:
-an instance with no `defaultTags` configured has no ownership signal at all
-(ADR-017), so `editInCode` can never fire there — every plugin reads as
-portal-managed.
+**Ownership by `defaultTags`, plus the KIC tag as a second gate.** A plugin
+is classified `code-owned` by `resolvePromotableRoutePlugin`'s existing
+`defaultTags` derivation (ADR-017) — the same one the frontend's
+`derivePromotionBadge` keys its badge on. But a `code-only` promotion is
+additionally refused (400) unless the live plugin also carries the Kong
+Ingress Controller's `managed-by-ingress-controller` tag (review finding W1,
+2026-09-16). The reason is convergence: `handleApplying` only ever recognizes
+the merged chart as applied on a plugin carrying that tag, so "not
+portal-managed" — which also matches a plugin created straight through the
+Admin API — is too wide a gate; accepting one of those would open a merge
+request the finalizer could never close, stranding the record in `failed`.
+Corollary: an instance with no `defaultTags` configured has no ownership
+signal at all (ADR-017), so `editInCode` can never fire there. Accepted
+edge (v1): the frontend still offers "Edit in code" from the `defaultTags`
+signal alone, so a plugin that is code-owned but *not* KIC-managed shows the
+button and is then refused with an actionable 400 — a guard rail, not a
+silent failure; plumbing the KIC signal to the card is deferred.
+
+**How the edit reaches the chart (review finding B1, 2026-09-16).** The
+`experiment` mode authors the plugin's chart file itself, so it emits both a
+`values.yaml` merge and a whole-file `create` of the template. In `code-only`
+mode that template already exists and belongs to the service team — richer
+than the adapter's (guard blocks, labels, a different `metadata.name`,
+hardcoded keys the adapter doesn't model). Rewriting it would silently drop
+all of that, and if the chart declared the plugin under another filename the
+`create` would add a *second* manifest of the type. So `code-only` drops
+every `op:'create'` edit and touches only `values.yaml`, then lets the
+existing render-check decide: if the team's template routes the edited field
+through values, the render reproduces the edited config and the MR is a
+values-only diff; if it hardcodes the field, the render can't reproduce it
+and the promote is refused (409, "the chart does not expose … as an editable
+value"). `renderCheck` also refuses (409) when the rendered chart declares
+more than one manifest of the type, since it cannot tell which one an edit
+would change.
 
 **A `code-only` request never resumes an active record.** The `experiment`
 flow resumes an in-flight draft by (instance, route, plugin type) so a
