@@ -131,7 +131,7 @@ finalizer therefore removes the experiment at merge and never recreates it:
 |---|---|
 | `awaiting-deploy` | Merged, experiment removed, waiting for the deploy. No timeout: the route runs without the plugin until the chart lands. |
 | `applying` | Deployed; waiting for the code-owned plugin to match the promoted config. |
-| `codified` | The code-owned plugin converged. Terminal. |
+| `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (ADR-021). |
 | `failed` | `applyTimeoutMinutes` elapsed without convergence. Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, or revert the merge request. |
 
 Where pipelines are fast, lower `kong.promotion.reconcileIntervalSeconds`
