@@ -81,7 +81,12 @@ export function PluginCard({
   const showPromote =
     isAssociated && !!promotionBadge && !isFrozen && !isCodified && !isCodeOwned && !isFailedHandover;
   const showDiscard = isAssociated && isFrozen && !isCodeOwned;
-  const showEditInCode = isAssociated && isCodeOwned && !!editInCodeEnabled && !!onEditInCode;
+  // Edit-in-code only reaches a KIC-managed plugin (the badge carries this from
+  // the plugin's tags): a code-owned plugin the ingress controller does not
+  // manage would 400 on the backend's W1 gate, so hide the button rather than
+  // offer a dead click (issue #135, edit-in-code ships on by default).
+  const showEditInCode =
+    isAssociated && isCodeOwned && !!promotionBadge?.editableInCode && !!editInCodeEnabled && !!onEditInCode;
 
   return (
     <Card

@@ -19,7 +19,26 @@ export type PromotionBadge = {
   record?: PromotionRecord;
   /** Age of the current badge state, in milliseconds. */
   ageMs: number;
+  /**
+   * Only meaningful for a `code-owned` badge: whether the plugin is managed by
+   * the Kong Ingress Controller, and so can be edited in code (issue #135). The
+   * backend refuses edit-in-code for a code-owned plugin that lacks the KIC tag
+   * (W1 gate), because the finalizer only converges on KIC-managed plugins — so
+   * the "Edit in code" button hides here rather than offering a click that 400s.
+   */
+  editableInCode?: boolean;
 };
+
+/**
+ * Tag the Kong Ingress Controller stamps on every entity it manages. Mirrors
+ * the backend's `KIC_OWNERSHIP_TAG` (services/promotionTags.ts); a code-owned
+ * plugin carries it exactly when edit-in-code applies.
+ */
+const KIC_OWNERSHIP_TAG = 'managed-by-ingress-controller';
+
+function isKicManaged(pluginTags?: string[] | null): boolean {
+  return (pluginTags ?? []).includes(KIC_OWNERSHIP_TAG);
+}
 
 /** States that no longer represent a live promotion — the plugin reads as a plain experiment again. */
 const RESET_STATES = new Set(['discarded', 'aborted-teardown']);
@@ -94,6 +113,7 @@ export function derivePromotionBadge(
     return {
       kind: isPortalManaged(ownership) ? 'experimental' : 'code-owned',
       ageMs: now - pluginCreatedAtSeconds * 1000,
+      editableInCode: isKicManaged(ownership.pluginTags),
     };
   }
 
@@ -125,6 +145,7 @@ export function derivePromotionBadge(
       kind: 'code-owned',
       record: latest,
       ageMs: now - pluginCreatedAtSeconds * 1000,
+      editableInCode: isKicManaged(ownership.pluginTags),
     };
   }
 

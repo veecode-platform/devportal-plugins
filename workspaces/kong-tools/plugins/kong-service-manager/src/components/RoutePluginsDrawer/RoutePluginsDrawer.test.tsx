@@ -263,9 +263,16 @@ describe('RoutePluginsDrawer', () => {
   describe('edit in code (issue #135)', () => {
     beforeEach(() => {
       mockPromotionCapabilities = { helm: { available: true, path: 'helm' }, editInCode: true };
-      // No defaultTags on the plugin's own tags (null) but the instance
-      // carries one => ADR-017 code-owned.
+      // Code-owned via ADR-017 (the instance carries a defaultTag the plugin
+      // does not), and KIC-managed — a real code-owned plugin comes from a
+      // KongPlugin CRD, so it carries the ingress-controller tag. Only then is
+      // the "Edit in code" button offered (the backend W1 gate needs it).
+      routePlugin.tags = ['managed-by-ingress-controller'];
       mockKongInstances = [{ id: 'default', apiBaseUrl: 'https://kong.example.com', defaultTags: ['portal-managed'] }];
+    });
+
+    afterEach(() => {
+      routePlugin.tags = null;
     });
 
     it('opens the code form, then the review dialog, and promotes with the edited config', async () => {

@@ -90,6 +90,17 @@ describe('derivePromotionBadge', () => {
         instanceDefaultTags: ['portal-managed'],
       });
       expect(badge.kind).toBe('code-owned');
+      // Not KIC-managed → not editable in code (the button hides; issue #135).
+      expect(badge.editableInCode).toBe(false);
+    });
+
+    it('marks a code-owned plugin editable in code only when it carries the KIC tag (issue #135)', () => {
+      const badge = derivePromotionBadge([], 1757764800, NOW, {
+        pluginTags: ['managed-by-ingress-controller'],
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('code-owned');
+      expect(badge.editableInCode).toBe(true);
     });
 
     it('returns experimental when the plugin carries all of the instance defaultTags', () => {
@@ -144,6 +155,7 @@ describe('derivePromotionBadge', () => {
         { pluginTags: ['managed-by-ingress-controller'], instanceDefaultTags: ['portal-managed'] },
       );
       expect(badge.kind).toBe('code-owned');
+      expect(badge.editableInCode).toBe(true);
     });
 
     it('falls back to code-owned for a failed code-only promotion too — nothing to promote or discard', () => {

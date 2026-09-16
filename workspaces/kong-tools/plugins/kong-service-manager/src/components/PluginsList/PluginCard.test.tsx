@@ -302,7 +302,7 @@ describe('PluginCard', () => {
   });
 
   it('shows Edit in code for a code-owned plugin only when the capability is on (issue #135)', () => {
-    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000, editableInCode: true };
     const onEditInCode = jest.fn();
     render(
       <PluginCard
@@ -341,8 +341,31 @@ describe('PluginCard', () => {
     expect(screen.queryByRole('button', { name: 'Edit in code' })).not.toBeInTheDocument();
   });
 
+  it('hides Edit in code for a code-owned plugin the ingress controller does not manage (would 400)', () => {
+    // Code-owned by ownership (no portal tags) but not KIC-tagged: the backend
+    // W1 gate refuses edit-in-code, so the button must not appear even with the
+    // capability on (issue #135).
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000, editableInCode: false };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        editInCodeEnabled
+        onEnable={noop}
+        onEdit={noop}
+        onDisable={noop}
+        onDiscardPromotion={noop}
+        onEditInCode={noop}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Edit in code' })).not.toBeInTheDocument();
+  });
+
   it('calls onEditInCode with plugin id and name when Edit in code is clicked', async () => {
-    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000, editableInCode: true };
     const onEditInCode = jest.fn();
     render(
       <PluginCard
