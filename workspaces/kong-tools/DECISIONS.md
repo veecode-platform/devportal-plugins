@@ -416,3 +416,29 @@ for the entire review window, and every closed MR would have to recreate it);
 keeping the restore but gating it on the code-owned plugin being absent
 (a check that is racy by construction — the controller can create it a
 millisecond later).
+
+## ADR-021: A Terminal Promotion Record Describes a Plugin That No Longer Exists; the Badge Must Not Outlive It
+
+**Date:** 2026-09
+**Status:** Accepted
+
+Promotion records are keyed by (instance, route, plugin type), not by Kong
+plugin id (ADR-012). A terminal record (`codified`, `failed`) therefore stays
+attached to the *type* after the plugin it describes is gone: the code-owned
+plugin removed from the chart, or the experiment deleted at merge (ADR-020).
+Observed 2026-09-16: after the promoted `rate-limiting` was dropped from a
+service's chart, a fresh `rate-limiting` experiment on the same route rendered
+as "Codificado · 16h" and lost its Promote button.
+
+Decision: the frontend derives the badge from the record **and** the live
+plugin's ownership (ADR-017). When the latest record is terminal and the live
+plugin carries the instance `defaultTags`, the record is stale and the plugin
+is a plain experiment. Active records (`draft`, `mr-open`, `awaiting-deploy`,
+`applying`) still win — a frozen experiment is the plugin itself. Instances
+with no `defaultTags` have no way to tell the cases apart and keep the old
+behaviour.
+
+Rejected: storing the plugin id on the record (Kong ids change when an
+experiment is recreated; the type/route key is what the finalizer needs);
+reaping terminal records server-side when the plugin disappears (a
+finalizer tick per codified record forever, for a purely visual problem).

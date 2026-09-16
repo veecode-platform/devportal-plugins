@@ -24,6 +24,13 @@ export type PromotionBadge = {
 /** States that no longer represent a live promotion — the plugin reads as a plain experiment again. */
 const RESET_STATES = new Set(['discarded', 'aborted-teardown']);
 
+/**
+ * Terminal states whose experiment no longer exists (ADR-020: deleted at
+ * merge). A portal-managed plugin found on the route afterwards cannot be the
+ * one this record describes.
+ */
+const STALE_WHEN_PORTAL_MANAGED = new Set(['codified', 'failed']);
+
 function badgeKind(state: PromotionRecord['state']): PromotionBadgeKind {
   switch (state) {
     case 'draft':
@@ -50,6 +57,10 @@ export type PromotionOwnership = {
   pluginTags?: string[] | null;
   instanceDefaultTags?: string[];
 };
+
+function hasOwnershipSignal({ instanceDefaultTags }: PromotionOwnership): boolean {
+  return !!instanceDefaultTags && instanceDefaultTags.length > 0;
+}
 
 function isPortalManaged(
   { pluginTags, instanceDefaultTags }: PromotionOwnership,
@@ -86,6 +97,20 @@ export function derivePromotionBadge(
   const latest = relevant.reduce((a, b) =>
     new Date(a.updatedAt).getTime() >= new Date(b.updatedAt).getTime() ? a : b,
   );
+
+  // Records are keyed by (route, plugin type), not by plugin id, so a terminal
+  // record from an earlier promotion outlives the plugin it describes. Once the
+  // code-owned plugin is gone from the route (removed from the chart) a plugin
+  // of the same type that carries the portal's ownership tags is a NEW
+  // experiment: the stale `codified`/`failed` badge would hide its Promote
+  // button. Only decidable when the instance has an ownership signal.
+  if (
+    STALE_WHEN_PORTAL_MANAGED.has(latest.state) &&
+    hasOwnershipSignal(ownership) &&
+    isPortalManaged(ownership)
+  ) {
+    return { kind: 'experimental', ageMs: now - pluginCreatedAtSeconds * 1000 };
+  }
 
   return {
     kind: badgeKind(latest.state),

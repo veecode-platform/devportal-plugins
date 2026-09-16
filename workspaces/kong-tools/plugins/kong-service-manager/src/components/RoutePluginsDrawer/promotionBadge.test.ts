@@ -107,6 +107,50 @@ describe('derivePromotionBadge', () => {
       expect(badge.kind).toBe('experimental');
     });
 
+    it('treats a codified record as stale when the live plugin is portal-managed — the code-owned plugin left the route and this is a new experiment', () => {
+      const badge = derivePromotionBadge(
+        [record({ state: 'codified', updatedAt: '2026-09-13T20:00:00.000Z' })],
+        1757764800,
+        NOW,
+        { pluginTags: ['portal-managed'], instanceDefaultTags: ['portal-managed'] },
+      );
+      expect(badge.kind).toBe('experimental');
+      expect(badge.record).toBeUndefined();
+      expect(badge.ageMs).toBe(NOW - 1757764800 * 1000);
+    });
+
+    it('treats a failed record as stale for a portal-managed plugin (ADR-020 deleted the experiment at merge)', () => {
+      const badge = derivePromotionBadge([record({ state: 'failed' })], 1757764800, NOW, {
+        pluginTags: ['portal-managed'],
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('experimental');
+    });
+
+    it('keeps the codified badge when the live plugin is code-owned', () => {
+      const badge = derivePromotionBadge([record({ state: 'codified' })], 1757764800, NOW, {
+        pluginTags: ['managed-by-ingress-controller'],
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('codified');
+    });
+
+    it('keeps the codified badge when the instance has no ownership signal (cannot tell a stale record apart)', () => {
+      const badge = derivePromotionBadge([record({ state: 'codified' })], 1757764800, NOW, {
+        pluginTags: ['portal-managed'],
+        instanceDefaultTags: undefined,
+      });
+      expect(badge.kind).toBe('codified');
+    });
+
+    it('keeps an active record (mr-open) on a portal-managed plugin — the frozen experiment is the plugin itself', () => {
+      const badge = derivePromotionBadge([record({ state: 'mr-open' })], 1757764800, NOW, {
+        pluginTags: ['portal-managed'],
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('mr-open');
+    });
+
     it('ignores ownership once a promotion record exists — records only ever belong to portal-managed plugins', () => {
       const badge = derivePromotionBadge([record({ state: 'mr-open' })], 1757764800, NOW, {
         pluginTags: null,
