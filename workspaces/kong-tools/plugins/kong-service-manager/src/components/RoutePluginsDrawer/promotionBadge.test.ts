@@ -11,6 +11,7 @@ function record(overrides: Partial<PromotionRecord> = {}): PromotionRecord {
     routeId: 'route-1',
     pluginType: 'rate-limiting',
     state: 'mr-open',
+    mode: 'experiment',
     mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
     requesterRef: 'user:default/alice',
     createdAt: '2026-09-13T12:00:00.000Z',
