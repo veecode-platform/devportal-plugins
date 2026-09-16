@@ -20,6 +20,7 @@ import { useEntity } from '@backstage/plugin-catalog-react';
 import { stringifyEntityRef } from '@backstage/catalog-model';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
 import { PluginCard } from '../PluginsList/PluginCard';
+import { PluginConfigDrawer } from '../PluginConfigDrawer/PluginConfigDrawer';
 import { derivePromotionBadge } from './promotionBadge';
 import { PromotionReviewDialog } from './PromotionReviewDialog';
 import type {
@@ -109,9 +110,19 @@ export function RoutePluginsDrawer({
   const [search, setSearch] = useState('');
   const [disablingId, setDisablingId] = useState<string | null>(null);
   const [discardingId, setDiscardingId] = useState<string | null>(null);
-  const [reviewPlugin, setReviewPlugin] = useState<{ id: string; name: string; config: Record<string, unknown> } | null>(null);
+  const [reviewPlugin, setReviewPlugin] = useState<{
+    id: string;
+    name: string;
+    config: Record<string, unknown>;
+    /** Set only for an edit-in-code review (issue #135) — the config the user just edited for an already code-owned plugin. */
+    editedConfig?: Record<string, unknown>;
+  } | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  // Edit-in-code (issue #135): a second PluginConfigDrawer instance, in
+  // 'code' mode, mounted here (not in the parent homepage) so its submit
+  // can hand the edited config straight to the review dialog below.
+  const [codeEditTarget, setCodeEditTarget] = useState<{ id: string; name: string; config: Record<string, unknown> } | null>(null);
 
   const entityRef = useMemo(() => stringifyEntityRef(entity), [entity]);
   // Pure-route (no owning repo) takes priority — helm availability is moot
@@ -231,6 +242,34 @@ export function RoutePluginsDrawer({
     [associatedPluginById],
   );
 
+  // Edit-in-code (issue #135): opens the config form prefilled from the
+  // live config of an already code-owned plugin.
+  const handleOpenCodeEdit = useCallback(
+    (pluginId: string, pluginName: string) => {
+      const plugin = associatedPluginById.get(pluginId);
+      setCodeEditTarget({ id: pluginId, name: pluginName, config: plugin?.config ?? {} });
+    },
+    [associatedPluginById],
+  );
+
+  const handleCloseCodeEdit = useCallback(() => {
+    setCodeEditTarget(null);
+  }, []);
+
+  // The code form's submit hands us the edited config — open the same
+  // review dialog the experiment flow uses, carrying both the live config
+  // (for comparison) and the edited one (what actually gets previewed and
+  // promoted).
+  const handleSubmitCodeEdit = useCallback(
+    (config: Record<string, unknown>) => {
+      if (!codeEditTarget) return;
+      setReviewError(null);
+      setReviewPlugin({ id: codeEditTarget.id, name: codeEditTarget.name, config: codeEditTarget.config, editedConfig: config });
+      setCodeEditTarget(null);
+    },
+    [codeEditTarget],
+  );
+
   const handleCloseReview = useCallback(() => {
     if (reviewSubmitting) return;
     setReviewPlugin(null);
@@ -242,7 +281,7 @@ export function RoutePluginsDrawer({
     setReviewSubmitting(true);
     setReviewError(null);
     try {
-      await promotePlugin(route.id, reviewPlugin.id, entityRef);
+      await promotePlugin(route.id, reviewPlugin.id, entityRef, reviewPlugin.editedConfig);
       const promotedName = reviewPlugin.name;
       setReviewPlugin(null);
       onPromoted?.(promotedName);
@@ -355,6 +394,8 @@ export function RoutePluginsDrawer({
                 discardingPromotion={discardingId === pluginId}
                 onPromote={handleOpenReview}
                 onDiscardPromotion={handleDiscard}
+                editInCodeEnabled={promotionCapabilities?.editInCode}
+                onEditInCode={handleOpenCodeEdit}
               />
             );
           })}
@@ -410,10 +451,23 @@ export function RoutePluginsDrawer({
         </Box>
       </Box>
 
+      <PluginConfigDrawer
+        open={!!codeEditTarget}
+        pluginName={codeEditTarget?.name ?? ''}
+        pluginId={codeEditTarget?.id}
+        existingConfig={codeEditTarget?.config}
+        scope="route"
+        routeId={route?.id}
+        mode="code"
+        onClose={handleCloseCodeEdit}
+        onSubmitCode={handleSubmitCodeEdit}
+      />
+
       <PromotionReviewDialog
         open={!!reviewPlugin}
         pluginName={reviewPlugin?.name ?? ''}
         liveConfig={reviewPlugin?.config ?? {}}
+        editedConfig={reviewPlugin?.editedConfig}
         routeId={route?.id ?? null}
         pluginId={reviewPlugin?.id ?? null}
         entityRef={entityRef}
