@@ -66,15 +66,18 @@ async function reconcileOne(deps: {
   const { logger, gitlab, kong, store, config, record } = deps;
   const detail = decodeMrDetail(record.detail);
 
-  // Teardown interaction (design 02): if the project the record's repo
-  // coordinates point at is archived or gone, abort the promotion before
-  // any state-specific handling — a record with no coordinates yet (a
-  // draft from before the repo was even resolved) has nothing to check.
+  // Teardown interaction (design 02 + design 01): the portal teardown does
+  // NOT archive the project — it removes `catalog-info.yaml` from the default
+  // branch and lets discovery drop the entity (spec 01, ADR-0028). So a
+  // promotion is orphaned when the project is archived, gone, OR unregistered
+  // (ADR-023). Checked before any state-specific handling — a record with no
+  // coordinates yet (a draft from before the repo was resolved) has nothing
+  // to check.
   let project: { archived: boolean; defaultBranch: string } | undefined;
   if (detail?.host && detail?.projectSlug) {
     const status = await getProjectStatus(gitlab, detail);
-    if (status === 'gone' || status.archived) {
-      await abortForTeardown({ logger, kong, store, record });
+    if (status === 'gone' || status === 'unregistered' || status.archived) {
+      await abortForTeardown({ logger, gitlab, kong, store, record, detail, reason: status === 'gone' ? 'gone' : status === 'unregistered' ? 'unregistered' : 'archived' });
       return;
     }
     project = status;
@@ -95,37 +98,62 @@ async function reconcileOne(deps: {
   }
 }
 
+/** The file whose presence on the default branch means "this service is registered" (spec 01). */
+export const CATALOG_INFO_PATH = 'catalog-info.yaml';
+
 async function getProjectStatus(
   gitlab: GitlabClient,
   detail: MrDetail,
-): Promise<{ archived: boolean; defaultBranch: string } | 'gone'> {
+): Promise<{ archived: boolean; defaultBranch: string } | 'gone' | 'unregistered'> {
+  let project: { archived: boolean; defaultBranch: string };
   try {
-    return await gitlab.getProject(detail);
+    project = await gitlab.getProject(detail);
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status === 404) return 'gone';
     throw err;
   }
+  if (project.archived) return project;
+  const registered = await gitlab.fileExistsOnRef(detail, project.defaultBranch, CATALOG_INFO_PATH);
+  return registered ? project : 'unregistered';
 }
 
 async function abortForTeardown(deps: {
   logger: LoggerService;
+  gitlab: GitlabClient;
   kong: KongServiceManagerService;
   store: PromotionStore;
   record: PromotionRecordRow;
+  detail: MrDetail;
+  reason: 'archived' | 'gone' | 'unregistered';
 }): Promise<void> {
-  const { logger, kong, store, record } = deps;
+  const { logger, gitlab, kong, store, record, detail, reason } = deps;
   const experimental = await findExperimentalPlugin(kong, record);
   if (experimental) {
     await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
   }
+  // Close the promotion MR so the repo does not keep an orphan (ADR-023).
+  // Best-effort: a gone project has no MR to close, and a failure here must
+  // not keep the record out of its terminal state.
+  if (reason !== 'gone' && detail.iid !== undefined) {
+    try {
+      await gitlab.closeMergeRequest(detail, detail.iid);
+      await gitlab.deleteBranch(detail, promotionBranch(record.plugin_type));
+    } catch (err) {
+      logger.warn('kong-service-manager promotion: could not close the MR after teardown', {
+        promotionId: record.id,
+        error: String(err),
+      });
+    }
+  }
   await store.transition(record.id, 'aborted-teardown', {
-    detail: 'project archived or removed during an open promotion; leftover experimental plugin removed',
+    detail: `project ${reason} during an open promotion; leftover experimental plugin removed, merge request closed`,
   });
   logger.info('kong-service-manager promotion aborted by teardown', {
     promotionId: record.id,
     routeId: record.route_id,
     pluginType: record.plugin_type,
+    reason,
   });
 }
 

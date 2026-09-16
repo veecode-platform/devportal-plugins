@@ -468,3 +468,28 @@ Rejected: unique branch names per promotion (`kong-promote/<type>-<ts>`) — the
 crash-retry would then have to find its branch through the record, and the
 "one open promotion per type" rule would need a second index; rebasing the
 stale branch server-side — GitLab has no rebase-branch API outside an MR.
+
+## ADR-023: An Unregistered Service Is a Teardown; the Finalizer Aborts and Closes the MR
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The finalizer aborted an open promotion only when the GitLab project was
+archived or deleted. M20 design 01 later re-based the portal teardown on the
+lifecycle reconciler: it removes `catalog-info.yaml` from the default branch
+and lets discovery drop the entity — the project stays active and unarchived.
+Live on 2026-09-16 (acceptance item 6): destroy + unregister with an MR open
+left the record in `mr-open` and the MR open forever; the experiment was gone
+only because the route went with the helm release.
+
+Decision: `getProjectStatus` also reports `unregistered` when
+`catalog-info.yaml` is absent from the default branch (the same signal the
+reconciler and the template's deploy guard use). Any of archived / gone /
+unregistered aborts the promotion: leftover experiment removed, **MR closed
+and promotion branch deleted** (best-effort), record `aborted-teardown` with
+the reason in `detail`. One extra GitLab read per active record per tick.
+
+Rejected: asking the catalog whether the entity still exists — discovery lags
+the file by up to a cycle and the finalizer would abort a promotion whose
+service was merely re-scaffolded; the file on the default branch is the
+source of truth the whole lifecycle is built on.

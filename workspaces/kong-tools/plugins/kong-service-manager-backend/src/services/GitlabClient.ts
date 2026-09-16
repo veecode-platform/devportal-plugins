@@ -177,6 +177,19 @@ export class GitlabClient {
     }
   }
 
+  /** True when `path` exists on `ref` (raw-file HEAD-equivalent; 404 = absent). */
+  async fileExistsOnRef(repo: { host: string; projectSlug: string }, ref: string, path: string): Promise<boolean> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    try {
+      await this.callRaw(token, `${base}/repository/files/${encodeURIComponent(path)}/raw?ref=${encodeURIComponent(ref)}`);
+      return true;
+    } catch (err) {
+      const e = err as GitlabRequestError;
+      if (e.status === 404) return false;
+      throw err;
+    }
+  }
+
   /** Idempotent: deleting a branch that is already gone is a no-op success. */
   async deleteBranch(repo: { host: string; projectSlug: string }, branch: string): Promise<void> {
     const { token, base } = this.target(repo.host, repo.projectSlug);
