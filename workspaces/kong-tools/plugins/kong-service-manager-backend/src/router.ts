@@ -273,6 +273,40 @@ export async function createRouter({
   }
 
   /**
+   * Edit-in-code (issue #135): the adapter only carries the fields its
+   * `fromRendered` normalizes into the chart — a change to any other live
+   * field would be dropped from the generated `values.yaml` silently, and for
+   * an adapter like rate-limiting (which routes only `minute`) the render
+   * check compares only that normalized view, so the promotion could still
+   * finish `codified` without the user's edit. Reject such an edit loudly.
+   * `fromRendered`'s own output keys are the single source of truth for what
+   * the adapter can carry, so this never drifts from `toChartEdits`. Only
+   * fields present in the live Kong config count as edits — the portal form
+   * seeds schema defaults Kong may omit, and those are not user changes.
+   */
+  function assertEditableInCode(
+    adapter: KongPluginAdapter,
+    editedConfig: Record<string, unknown>,
+    liveConfig: Record<string, unknown>,
+  ): void {
+    const editable = new Set(Object.keys(adapter.fromRendered({ config: editedConfig })));
+    const changedUneditable = Object.keys(editedConfig).filter(
+      key =>
+        !editable.has(key) &&
+        key in liveConfig &&
+        !isDeepStrictEqual(editedConfig[key], liveConfig[key]),
+    );
+    if (changedUneditable.length > 0) {
+      throw new InputError(
+        `Editing ${changedUneditable.map(k => `'${k}'`).join(', ')} is not supported for ` +
+          `'${adapter.pluginType}' in code — only ${[...editable].map(k => `'${k}'`).join(', ')} ` +
+          `${editable.size === 1 ? 'is' : 'are'} carried into the chart from this plugin. ` +
+          `Change the rest directly in the service's chart.`,
+      );
+    }
+  }
+
+  /**
    * Materializes the chart at the repo's default branch and runs the
    * generation-time equivalence check against it (design 02, promotion
    * mechanics step 3) — shared by promote (which aborts the write on a
@@ -788,6 +822,8 @@ export async function createRouter({
           );
         }
 
+        assertEditableInCode(adapter, editedConfigInput!, plugin.config);
+
         const editedSnapshot = adapter.fromRendered({ config: editedConfigInput! });
         const liveSnapshot = adapter.fromRendered({ config: plugin.config });
         if (isDeepStrictEqual(editedSnapshot, liveSnapshot)) {
@@ -976,6 +1012,12 @@ export async function createRouter({
       // shows the generated YAML for an edited config even when that config
       // happens to match the live one.
       const mode = resolvePromotionMode(ownership, editedConfigInput, plugin.name, routeId, plugin.tags ?? []);
+      if (mode === 'code-only' && editedConfigInput !== undefined) {
+        // Same guard as promote: refuse a preview of an edit that changes a
+        // field the adapter can't carry, so the review dialog shows why the
+        // config is unsupported instead of a diff that silently omits it.
+        assertEditableInCode(adapter, editedConfigInput, plugin.config);
+      }
       const previewConfig =
         editedConfigInput !== undefined
           ? adapter.fromRendered({ config: editedConfigInput })

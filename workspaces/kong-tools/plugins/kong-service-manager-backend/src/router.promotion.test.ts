@@ -687,6 +687,49 @@ describe('promote to code (Task P3)', () => {
       }
     });
 
+    it('promote 400s a code-owned edit that changes a field the adapter cannot carry — no silent drop (F2)', async () => {
+      const kongService = kongServiceForCodeOwned();
+      const promotionStore = promotionStoreMock();
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      const gitlabClient = gitlabClientMock();
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+
+      // rate-limiting routes only `minute` through values (`policy` is fixed in
+      // the template). Changing `policy` too would vanish from the MR silently
+      // and the promotion could still finish codified without it.
+      const res = await request(app)
+        .post(PROMOTE_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 30, policy: 'redis' } });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/'policy'/);
+      expect(res.body.error.message).toMatch(/not supported/);
+      // Rejected before any draft or GitLab write — nothing stranded.
+      expect(promotionStore.upsertDraft).not.toHaveBeenCalled();
+      expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
+    });
+
+    it('preview 400s the same unsupported-field edit, so the review dialog blocks promote (F2)', async () => {
+      const kongService = kongServiceForCodeOwned();
+      const gitlabClient = gitlabClientMock();
+
+      const app = await buildApp({
+        kongService,
+        promotionStore: promotionStoreMock(),
+        gitlabClient,
+        editInCodeEnabled: true,
+      });
+
+      const res = await request(app)
+        .post(PREVIEW_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 30, policy: 'redis' } });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/'policy'/);
+      expect(gitlabClient.materializeChart).not.toHaveBeenCalled();
+    });
+
     it('promote 409s a code-owned plugin whose chart hardcodes the field — editing values can\'t reproduce it (B1)', async () => {
       const kongService = kongServiceForCodeOwned();
 

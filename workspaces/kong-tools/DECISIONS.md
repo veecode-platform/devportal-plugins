@@ -573,6 +573,20 @@ value"). `renderCheck` also refuses (409) when the rendered chart declares
 more than one manifest of the type, since it cannot tell which one an edit
 would change.
 
+**Editing a field the adapter can't carry is refused up front (review
+finding F2, 2026-09-16).** An adapter only reproduces the fields its
+`fromRendered` normalizes — rate-limiting routes only `minute`, so a change
+to `policy` (fixed in the template) would be dropped from the generated
+`values.yaml`, and because the render-check compares that same normalized
+view it would not notice, letting the promotion finish `codified` without the
+user's edit. This is caught only for a field the adapter models but the chart
+hardcodes (correlation-id's `generator`); a field the adapter doesn't model
+at all slips through. So both promote and preview now reject a `code-only`
+edit that changes any live field outside `fromRendered`'s own output keys —
+those keys are the single source of truth for what the adapter can carry, so
+the check never drifts from `toChartEdits`. Only fields present in the live
+Kong config count, since the portal form seeds schema defaults Kong may omit.
+
 **A `code-only` request never resumes an active record.** The `experiment`
 flow resumes an in-flight draft by (instance, route, plugin type) so a
 retried promote doesn't open a second MR (ADR-012). Resuming for
