@@ -14,7 +14,8 @@
     "test:all": "backstage-cli repo test --coverage",
     "update-backstage": "backstage-cli versions:bump",
     "lint": "backstage-cli repo lint --since origin/main",
-    "lint:all": "backstage-cli repo lint"
+    "lint:all": "backstage-cli repo lint",
+    "prettier:check": "prettier --check ."
   },
   "workspaces": {
     "packages": [
