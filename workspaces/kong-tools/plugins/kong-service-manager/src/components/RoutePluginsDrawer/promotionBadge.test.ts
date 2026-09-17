@@ -11,6 +11,7 @@ function record(overrides: Partial<PromotionRecord> = {}): PromotionRecord {
     routeId: 'route-1',
     pluginType: 'rate-limiting',
     state: 'mr-open',
+    mode: 'experiment',
     mrRef: 'https://gitlab.example.com/team/svc/-/merge_requests/1',
     requesterRef: 'user:default/alice',
     createdAt: '2026-09-13T12:00:00.000Z',
@@ -89,6 +90,17 @@ describe('derivePromotionBadge', () => {
         instanceDefaultTags: ['portal-managed'],
       });
       expect(badge.kind).toBe('code-owned');
+      // Not KIC-managed → not editable in code (the button hides; issue #135).
+      expect(badge.editableInCode).toBe(false);
+    });
+
+    it('marks a code-owned plugin editable in code only when it carries the KIC tag (issue #135)', () => {
+      const badge = derivePromotionBadge([], 1757764800, NOW, {
+        pluginTags: ['managed-by-ingress-controller'],
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('code-owned');
+      expect(badge.editableInCode).toBe(true);
     });
 
     it('returns experimental when the plugin carries all of the instance defaultTags', () => {
@@ -127,12 +139,53 @@ describe('derivePromotionBadge', () => {
       expect(badge.kind).toBe('experimental');
     });
 
-    it('keeps the codified badge when the live plugin is code-owned', () => {
+    it('falls back to code-owned when a promote-to-code finished on a KIC-managed plugin — editable in code again, same as one born code-owned (issue #135)', () => {
       const badge = derivePromotionBadge([record({ state: 'codified' })], 1757764800, NOW, {
         pluginTags: ['managed-by-ingress-controller'],
         instanceDefaultTags: ['portal-managed'],
       });
+      expect(badge.kind).toBe('code-owned');
+      expect(badge.editableInCode).toBe(true);
+      // The codified record is kept as history — the badge just no longer reads terminal.
+      expect(badge.record?.state).toBe('codified');
+    });
+
+    it('converts a legacy (undefined-mode) codified record on a KIC plugin too — mode is optional on 1.4.x records', () => {
+      const badge = derivePromotionBadge([record({ state: 'codified', mode: undefined })], 1757764800, NOW, {
+        pluginTags: ['managed-by-ingress-controller'],
+        instanceDefaultTags: ['portal-managed'],
+      });
+      expect(badge.kind).toBe('code-owned');
+      expect(badge.editableInCode).toBe(true);
+    });
+
+    it('keeps the codified badge when the live plugin is neither portal-managed nor KIC-managed (a foreign writer) — no second edit to offer', () => {
+      const badge = derivePromotionBadge([record({ state: 'codified' })], 1757764800, NOW, {
+        pluginTags: ['some-other-writer'],
+        instanceDefaultTags: ['portal-managed'],
+      });
       expect(badge.kind).toBe('codified');
+    });
+
+    it('falls back to code-owned when a finished code-only promotion ends — the plugin is editable in code again (issue #135)', () => {
+      const badge = derivePromotionBadge(
+        [record({ state: 'codified', mode: 'code-only' })],
+        1757764800,
+        NOW,
+        { pluginTags: ['managed-by-ingress-controller'], instanceDefaultTags: ['portal-managed'] },
+      );
+      expect(badge.kind).toBe('code-owned');
+      expect(badge.editableInCode).toBe(true);
+    });
+
+    it('falls back to code-owned for a failed code-only promotion too — nothing to promote or discard', () => {
+      const badge = derivePromotionBadge(
+        [record({ state: 'failed', mode: 'code-only' })],
+        1757764800,
+        NOW,
+        { pluginTags: ['managed-by-ingress-controller'], instanceDefaultTags: ['portal-managed'] },
+      );
+      expect(badge.kind).toBe('code-owned');
     });
 
     it('keeps the codified badge when the instance has no ownership signal (cannot tell a stale record apart)', () => {

@@ -25,6 +25,7 @@ import type {
   RouteProtocol,
 } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 
 const METHODS: HttpMethod[] = [
   'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS',
@@ -42,6 +43,7 @@ type RouteFormProps = {
 };
 
 export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormProps) {
+  const { t } = useTranslation();
   const { createRoute, editRoute, clearError } = useKongServiceManager();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -103,12 +105,12 @@ export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormPro
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        {editingRoute ? 'Edit Route' : 'Create Route'}
+        {editingRoute ? t('routeForm.editTitle') : t('routeForm.createTitle')}
       </DialogTitle>
       <DialogContent>
         <Box display="flex" flexDirection="column" gap={2} mt={1}>
           <TextField
-            label="Name"
+            label={t('routeForm.nameLabel')}
             value={name}
             onChange={e => setName(e.target.value)}
             fullWidth
@@ -116,12 +118,12 @@ export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormPro
           />
 
           <FormControl fullWidth size="small">
-            <InputLabel>Protocols</InputLabel>
+            <InputLabel>{t('routeForm.protocolsLabel')}</InputLabel>
             <Select
               multiple
               value={protocols}
               onChange={handleMultiSelect(setProtocols)}
-              input={<OutlinedInput label="Protocols" />}
+              input={<OutlinedInput label={t('routeForm.protocolsLabel')} />}
               renderValue={selected => (
                 <Box display="flex" gap={0.5} flexWrap="wrap">
                   {(selected as string[]).map(v => (
@@ -137,12 +139,12 @@ export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormPro
           </FormControl>
 
           <FormControl fullWidth size="small">
-            <InputLabel>Methods</InputLabel>
+            <InputLabel>{t('routeForm.methodsLabel')}</InputLabel>
             <Select
               multiple
               value={methods}
               onChange={handleMultiSelect(setMethods)}
-              input={<OutlinedInput label="Methods" />}
+              input={<OutlinedInput label={t('routeForm.methodsLabel')} />}
               renderValue={selected => (
                 <Box display="flex" gap={0.5} flexWrap="wrap">
                   {(selected as string[]).map(v => (
@@ -158,21 +160,21 @@ export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormPro
           </FormControl>
 
           <TextField
-            label="Paths (comma-separated)"
+            label={t('routeForm.pathsLabel')}
             value={paths}
             onChange={e => setPaths(e.target.value)}
             fullWidth
             size="small"
-            helperText="e.g. /api/v1, /health"
+            helperText={t('routeForm.pathsHelper')}
           />
 
           <TextField
-            label="Hosts (comma-separated)"
+            label={t('routeForm.hostsLabel')}
             value={hosts}
             onChange={e => setHosts(e.target.value)}
             fullWidth
             size="small"
-            helperText="Optional, e.g. example.com"
+            helperText={t('routeForm.hostsHelper')}
           />
 
           <FormControlLabel
@@ -182,7 +184,7 @@ export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormPro
                 onChange={e => setStripPath(e.target.checked)}
               />
             }
-            label="Strip Path"
+            label={t('routeForm.stripPath')}
           />
 
           <FormControlLabel
@@ -192,7 +194,7 @@ export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormPro
                 onChange={e => setPreserveHost(e.target.checked)}
               />
             }
-            label="Preserve Host"
+            label={t('routeForm.preserveHost')}
           />
         </Box>
         {saveError && (
@@ -202,9 +204,9 @@ export function RouteForm({ open, onClose, onSaved, editingRoute }: RouteFormPro
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose}>{t('routeForm.cancel')}</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save'}
+          {saving ? t('routeForm.saving') : t('routeForm.save')}
         </Button>
       </DialogActions>
     </Dialog>

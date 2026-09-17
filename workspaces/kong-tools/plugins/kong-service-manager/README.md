@@ -12,9 +12,16 @@ and plugins directly from the catalog.
 - List and manage plugins on a service (add, edit, remove)
 - List and manage routes on a service (create, edit, delete)
 - Manage plugins scoped to individual routes
+- Move a route plugin into Git: **promote to code** (from a live experiment) or
+  **edit in code** (for a plugin already owned by the chart) — each opens a merge
+  request against the service's chart instead of writing to the gateway. See
+  [Applying changes to Kong](../../docs/applying-changes-to-kong.md).
+- Promotion state shown per route plugin (experimental, code-owned, promotion
+  open, applying, codified, failed) with the merge-request link
 - Dynamic plugin configuration based on Kong schema introspection
 - Multi-instance support with an instance selector dropdown
 - Plugin categorization (AI, Authentication, Security, Traffic Control, etc.)
+- Bilingual UI (English default, Brazilian Portuguese) via Backstage i18n
 
 ## Screenshots
 
@@ -121,7 +128,16 @@ The plugin renders a tabbed interface on the entity page:
 - **Plugins** - Browse and manage service-level plugins. Add new plugins from
   the list of available Kong plugins, or edit/remove existing ones.
 - **Routes** - View, create, edit, and delete routes. Each route shows its
-  protocols, methods, paths, hosts, and configuration flags.
+  protocols, methods, paths, hosts, and configuration flags. Open **Manage
+  plugins** on a route to attach plugins scoped to that single route.
+
+A service plugin (Plugins tab) takes effect in the gateway immediately. A route
+plugin (Manage plugins) does too, but can additionally be **moved into Git**: its
+card shows a promotion badge and, depending on ownership, a **Promote to code** or
+**Edit in code** action that opens a merge request against the service's chart.
+Plugins the chart already owns are read-only in the gateway and edited only in
+code. See [Applying changes to Kong](../../docs/applying-changes-to-kong.md) for
+when each path applies.
 
 ## Exports
 

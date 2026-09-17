@@ -313,10 +313,11 @@ export class KongServiceManagerClient implements KongServiceManagerApi {
     routeId: string,
     pluginId: string,
     entityRef: string,
+    config?: Record<string, unknown>,
   ): Promise<PromotionPreview> {
     return this.request(
       `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promote/preview`,
-      { method: 'POST', body: JSON.stringify({ entityRef }) },
+      { method: 'POST', body: JSON.stringify({ entityRef, ...(config !== undefined ? { config } : {}) }) },
     );
   }
 
@@ -326,10 +327,11 @@ export class KongServiceManagerClient implements KongServiceManagerApi {
     routeId: string,
     pluginId: string,
     entityRef: string,
+    config?: Record<string, unknown>,
   ): Promise<PromotionRecord> {
     return this.request(
       `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promote`,
-      { method: 'POST', body: JSON.stringify({ entityRef }) },
+      { method: 'POST', body: JSON.stringify({ entityRef, ...(config !== undefined ? { config } : {}) }) },
     );
   }
 

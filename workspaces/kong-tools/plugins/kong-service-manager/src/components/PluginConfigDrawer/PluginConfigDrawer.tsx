@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import { getPluginImage } from '../../assets/pluginImages';
 import type { CreatePlugin } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import {
@@ -34,6 +35,14 @@ type PluginConfigDrawerProps = {
   routeId?: string;
   onClose: () => void;
   onSaved?: () => void;
+  /**
+   * `'code'` (issue #135, "edit in code") replaces the Kong mutation on
+   * submit with `onSubmitCode` — used to edit an already code-owned plugin
+   * by opening a merge request, never by calling Kong. @default 'kong'
+   */
+  mode?: 'kong' | 'code';
+  /** Required when `mode: 'code'` — receives the edited `config` (the `enabled` flag is not part of a code-mode submit; the adapter only consumes `config`). */
+  onSubmitCode?: (config: Record<string, unknown>) => void;
 };
 
 export function PluginConfigDrawer({
@@ -45,7 +54,10 @@ export function PluginConfigDrawer({
   routeId,
   onClose,
   onSaved,
+  mode = 'kong',
+  onSubmitCode,
 }: PluginConfigDrawerProps) {
+  const { t } = useTranslation();
   const {
     state,
     clearError,
@@ -107,6 +119,14 @@ export function PluginConfigDrawer({
   );
 
   const handleSave = useCallback(async () => {
+    if (mode === 'code') {
+      // Edit-in-code (issue #135) never calls Kong — the config goes to the
+      // review dialog, which previews and promotes it as a merge request.
+      onSubmitCode?.(configState);
+      onClose();
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
     try {
@@ -138,6 +158,8 @@ export function PluginConfigDrawer({
       setSaving(false);
     }
   }, [
+    mode,
+    onSubmitCode,
     configState,
     enabled,
     pluginName,
@@ -184,7 +206,7 @@ export function PluginConfigDrawer({
               alt={pluginName}
               sx={{ width: 50, height: 50, borderRadius: '4px', objectFit: 'contain' }}
             />
-            <Typography variant="h5">{pluginName} Plugin</Typography>
+            <Typography variant="h5">{t('pluginConfigDrawer.title', { pluginName })}</Typography>
           </Box>
           <IconButton onClick={onClose} size="small">
             <CloseIcon />
@@ -211,7 +233,7 @@ export function PluginConfigDrawer({
             </Box>
           ) : configFields.length === 0 ? (
             <Typography color="text.secondary" textAlign="center" py={4}>
-              No configurable fields for this plugin.
+              {t('pluginConfigDrawer.noConfigurableFields')}
             </Typography>
           ) : (
             <FormControl
@@ -230,7 +252,7 @@ export function PluginConfigDrawer({
                     color="primary"
                   />
                 }
-                label="Enabled"
+                label={t('pluginConfigDrawer.enabled')}
                 sx={{ mb: 2 }}
               />
 
@@ -355,7 +377,7 @@ export function PluginConfigDrawer({
         {/* Footer actions */}
         <Box display="flex" gap={1.5} justifyContent="flex-end" mt={2}>
           <Button variant="outlined" onClick={onClose}>
-            Cancel
+            {t('pluginConfigDrawer.cancel')}
           </Button>
           <Button
             variant="contained"
@@ -364,13 +386,15 @@ export function PluginConfigDrawer({
           >
             {saving ? (
               <>
-                {isEdit ? 'Saving...' : 'Installing...'}
+                {isEdit ? t('pluginConfigDrawer.saving') : t('pluginConfigDrawer.installing')}
                 <CircularProgress size={18} sx={{ ml: 1 }} />
               </>
+            ) : mode === 'code' ? (
+              t('pluginConfigDrawer.reviewPromotion')
             ) : isEdit ? (
-              'Save Changes'
+              t('pluginConfigDrawer.saveChanges')
             ) : (
-              'Install Plugin'
+              t('pluginConfigDrawer.installPlugin')
             )}
           </Button>
         </Box>

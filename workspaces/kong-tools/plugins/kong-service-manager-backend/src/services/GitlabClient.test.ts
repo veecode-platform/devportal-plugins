@@ -229,6 +229,37 @@ describe('GitlabClient', () => {
     });
   });
 
+  describe('deleteBranch (ADR-022)', () => {
+    const repo = { host: 'gitlab.example.com', projectSlug: 'group/box' };
+
+    it('deletes the branch', async () => {
+      let hit = false;
+      server.use(
+        rest.delete(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/branches/kong-promote%2Frate-limiting',
+          (_req, res, ctx) => {
+            hit = true;
+            return res(ctx.status(204));
+          },
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await client.deleteBranch(repo, 'kong-promote/rate-limiting');
+      expect(hit).toBe(true);
+    });
+
+    it('treats an already-gone branch as success', async () => {
+      server.use(
+        rest.delete(
+          'https://gitlab.example.com/api/v4/projects/group%2Fbox/repository/branches/kong-promote%2Frate-limiting',
+          (_req, res, ctx) => res(ctx.status(404), ctx.json({ message: '404 Branch Not Found' })),
+        ),
+      );
+      const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
+      await expect(client.deleteBranch(repo, 'kong-promote/rate-limiting')).resolves.toBeUndefined();
+    });
+  });
+
   describe('findOpenMergeRequest / openMergeRequest / closeMergeRequest', () => {
     const repo = { host: 'gitlab.example.com', projectSlug: 'group/box', projectId: 42, defaultBranch: 'main' };
 
@@ -245,7 +276,7 @@ describe('GitlabClient', () => {
       );
       const client = GitlabClient.fromConfig(config, catalogServiceMock({ entities: [] }));
       const mr = await client.findOpenMergeRequest(repo, 'kong-promote/rate-limiting');
-      expect(mr).toEqual({ projectId: 42, iid: 7, webUrl: 'https://gitlab.example.com/group/box/-/merge_requests/7' });
+      expect(mr).toEqual({ projectId: 42, iid: 7, webUrl: 'https://gitlab.example.com/group/box/-/merge_requests/7', description: expect.any(String) });
     });
 
     it('returns undefined when no MR is open for the branch', async () => {

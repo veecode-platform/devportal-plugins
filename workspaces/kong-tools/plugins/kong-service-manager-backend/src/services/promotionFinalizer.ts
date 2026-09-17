@@ -6,7 +6,7 @@ import { KongServiceManagerService } from './KongServiceManagerService';
 import { PromotionRecordRow, PromotionStore } from './promotionStore';
 import { MrDetail, decodeMrDetail, encodeMrDetail } from './mrDetail';
 import { getAdapter } from './adapters';
-import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG } from './promotionTags';
+import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG, promotionBranch } from './promotionTags';
 
 export interface PromotionFinalizerConfig {
   /** Minutes a record may sit in `applying` before the finalizer gives up and marks it `failed` (ADR-020: nothing is restored). */
@@ -66,15 +66,41 @@ async function reconcileOne(deps: {
   const { logger, gitlab, kong, store, config, record } = deps;
   const detail = decodeMrDetail(record.detail);
 
-  // Teardown interaction (design 02): if the project the record's repo
-  // coordinates point at is archived or gone, abort the promotion before
-  // any state-specific handling — a record with no coordinates yet (a
-  // draft from before the repo was even resolved) has nothing to check.
+  // Teardown interaction (design 02 + design 01): the portal teardown does
+  // NOT archive the project — it removes `catalog-info.yaml` from the default
+  // branch and lets discovery drop the entity (spec 01, ADR-0028). So a
+  // promotion is orphaned when the project is archived, gone, OR unregistered
+  // (ADR-023). Checked before any state-specific handling — a record with no
+  // coordinates yet (a draft from before the repo was resolved) has nothing
+  // to check.
   let project: { archived: boolean; defaultBranch: string } | undefined;
   if (detail?.host && detail?.projectSlug) {
     const status = await getProjectStatus(gitlab, detail);
-    if (status === 'gone' || status.archived) {
-      await abortForTeardown({ logger, kong, store, record });
+    if (status === 'gone') {
+      // GitLab masks "not authorised" as 404, so a project that was readable
+      // at promote time answering 404 may be a token/permission problem, not
+      // a deletion. Destructive cleanup needs the observation to persist for
+      // at least GONE_CONFIRMATION_MS across ticks (ADR-023 hardening).
+      const firstSeen = detail.projectGoneSince ?? new Date().toISOString();
+      if (Date.now() - Date.parse(firstSeen) < GONE_CONFIRMATION_MS) {
+        if (!detail.projectGoneSince) {
+          await store.transition(record.id, record.state, { detail: encodeMrDetail({ ...detail, projectGoneSince: firstSeen }) });
+        }
+        logger.warn('kong-service-manager promotion: project answers 404; waiting for confirmation before aborting', {
+          promotionId: record.id,
+          since: firstSeen,
+        });
+        return;
+      }
+      await abortForTeardown({ logger, gitlab, kong, store, record, detail, reason: 'gone' });
+      return;
+    }
+    if (detail.projectGoneSince) {
+      // Readable again: the 404 was transient — forget it.
+      await store.transition(record.id, record.state, { detail: encodeMrDetail({ ...detail, projectGoneSince: undefined }) });
+    }
+    if (status === 'unregistered' || status.archived) {
+      await abortForTeardown({ logger, gitlab, kong, store, record, detail, reason: status === 'unregistered' ? 'unregistered' : 'archived' });
       return;
     }
     project = status;
@@ -84,7 +110,7 @@ async function reconcileOne(deps: {
     case 'draft':
       return handleDraft({ gitlab, store, record, detail });
     case 'mr-open':
-      return handleMrOpen({ gitlab, kong, store, record, detail });
+      return handleMrOpen({ logger, gitlab, kong, store, record, detail });
     case 'awaiting-deploy':
       return handleAwaitingDeploy({ gitlab, store, record, detail, project });
     case 'applying':
@@ -95,37 +121,98 @@ async function reconcileOne(deps: {
   }
 }
 
+/** A project 404 must persist this long before it counts as "gone" (ADR-023 hardening). */
+export const GONE_CONFIRMATION_MS = 2 * 60 * 1000;
+
+/** The file whose presence on the default branch means "this service is registered" (spec 01). */
+export const CATALOG_INFO_PATH = 'catalog-info.yaml';
+
 async function getProjectStatus(
   gitlab: GitlabClient,
   detail: MrDetail,
-): Promise<{ archived: boolean; defaultBranch: string } | 'gone'> {
+): Promise<{ archived: boolean; defaultBranch: string } | 'gone' | 'unregistered'> {
+  let project: { archived: boolean; defaultBranch: string };
   try {
-    return await gitlab.getProject(detail);
+    project = await gitlab.getProject(detail);
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status === 404) return 'gone';
     throw err;
   }
+  if (project.archived) return project;
+  const registered = await gitlab.fileExistsOnRef(detail, project.defaultBranch, CATALOG_INFO_PATH);
+  return registered ? project : 'unregistered';
+}
+
+/**
+ * Deletes the per-type promotion branch unless an MR is still open on it —
+ * that MR belongs to a newer promotion (another route, or a promote that
+ * raced this tick) and its branch must survive (ADR-022 hardening).
+ */
+async function deletePromotionBranchIfUnused(
+  gitlab: GitlabClient,
+  repo: { host: string; projectSlug: string },
+  pluginType: string,
+): Promise<void> {
+  const branch = promotionBranch(pluginType);
+  const open = await gitlab.findOpenMergeRequest(repo, branch);
+  if (open) return;
+  await gitlab.deleteBranch(repo, branch);
+}
+
+/**
+ * `mode === 'code-only'` (issue #135) means this record never created,
+ * tagged, or froze anything in Kong — it edits an already code-owned plugin
+ * directly. Every Kong-write site in the finalizer must skip its write for
+ * such a record; reads (e.g. `handleApplying`'s convergence check) are
+ * unaffected and need no guard.
+ */
+function isCodeOnly(record: PromotionRecordRow): boolean {
+  return record.mode === 'code-only';
 }
 
 async function abortForTeardown(deps: {
   logger: LoggerService;
+  gitlab: GitlabClient;
   kong: KongServiceManagerService;
   store: PromotionStore;
   record: PromotionRecordRow;
+  detail: MrDetail;
+  reason: 'archived' | 'gone' | 'unregistered';
 }): Promise<void> {
-  const { logger, kong, store, record } = deps;
-  const experimental = await findExperimentalPlugin(kong, record);
-  if (experimental) {
-    await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+  const { logger, gitlab, kong, store, record, detail, reason } = deps;
+  // A code-only record (issue #135) never created an experiment in Kong, so
+  // there is nothing to remove — only the MR/branch cleanup below applies.
+  if (!isCodeOnly(record)) {
+    const experimental = await findExperimentalPlugin(kong, record);
+    if (experimental) {
+      await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+    }
+  }
+  // Close the promotion MR so the repo does not keep an orphan (ADR-023).
+  // Best-effort: a gone project has no MR to close, and a failure here must
+  // not keep the record out of its terminal state.
+  if (reason !== 'gone' && detail.iid !== undefined) {
+    try {
+      await gitlab.closeMergeRequest(detail, detail.iid);
+      await deletePromotionBranchIfUnused(gitlab, detail, record.plugin_type);
+    } catch (err) {
+      logger.warn('kong-service-manager promotion: could not close the MR after teardown', {
+        promotionId: record.id,
+        error: String(err),
+      });
+    }
   }
   await store.transition(record.id, 'aborted-teardown', {
-    detail: 'project archived or removed during an open promotion; leftover experimental plugin removed',
+    detail: isCodeOnly(record)
+      ? `project ${reason} during an open code-only edit; merge request closed (no experiment in Kong)`
+      : `project ${reason} during an open promotion; leftover experimental plugin removed, merge request closed`,
   });
   logger.info('kong-service-manager promotion aborted by teardown', {
     promotionId: record.id,
     routeId: record.route_id,
     pluginType: record.plugin_type,
+    reason,
   });
 }
 
@@ -156,6 +243,7 @@ async function handleDraft(deps: {
 }
 
 async function handleMrOpen(deps: {
+  logger: LoggerService;
   gitlab: GitlabClient;
   kong: KongServiceManagerService;
   store: PromotionStore;
@@ -167,7 +255,22 @@ async function handleMrOpen(deps: {
 
   const mr = await gitlab.getMergeRequest(detail, detail.iid);
   if (mr.state === 'closed') {
-    await untagExperimental(kong, record);
+    // A code-only record (issue #135) never tagged an experiment — nothing
+    // to untag; the branch cleanup below applies to both modes.
+    if (!isCodeOnly(record)) {
+      await untagExperimental(kong, record);
+    }
+    // The branch would otherwise outlive the MR and be found stale by the
+    // next promote of this type (ADR-022). Best-effort: a failure here must
+    // not keep the record out of `discarded`.
+    try {
+      await deletePromotionBranchIfUnused(gitlab, detail, record.plugin_type);
+    } catch (err) {
+      deps.logger.warn('kong-service-manager promotion: could not delete the promotion branch after discard', {
+        promotionId: record.id,
+        error: String(err),
+      });
+    }
     await store.transition(record.id, 'discarded');
     return;
   }
@@ -179,9 +282,13 @@ async function handleMrOpen(deps: {
   // Idempotent: if the process crashed between this delete and the
   // transition below, the record is still `mr-open`, the next tick finds no
   // experiment and just transitions.
-  const experimental = await findExperimentalPlugin(kong, record);
-  if (experimental) {
-    await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+  // A `code-only` record (issue #135) never created an experiment — the
+  // plugin it edited was already code-owned — so there is nothing to remove.
+  if (!isCodeOnly(record)) {
+    const experimental = await findExperimentalPlugin(kong, record);
+    if (experimental) {
+      await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+    }
   }
 
   await store.transition(record.id, 'awaiting-deploy', {

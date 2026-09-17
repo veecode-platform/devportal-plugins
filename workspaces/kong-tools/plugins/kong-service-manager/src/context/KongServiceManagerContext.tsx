@@ -141,8 +141,8 @@ type KongServiceManagerContextValue = {
   /** Fetches the configured Kong instances (for ownership-marker defaultTags). Best-effort: a denied/failed call leaves `kongInstances` empty rather than surfacing the global error, since only the promotion badge depends on it and an empty list degrades safely to "no ownership gate". */
   fetchInstances: () => Promise<void>;
   fetchPromotionCapabilities: () => Promise<void>;
-  previewPromotion: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionPreview>;
-  promotePlugin: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionRecord>;
+  previewPromotion: (routeId: string, pluginId: string, entityRef: string, config?: Record<string, unknown>) => Promise<PromotionPreview>;
+  promotePlugin: (routeId: string, pluginId: string, entityRef: string, config?: Record<string, unknown>) => Promise<PromotionRecord>;
   discardPromotion: (routeId: string, pluginId: string) => Promise<void>;
 };
 
@@ -429,16 +429,16 @@ export function KongServiceManagerProvider({
   // never toggles the page-wide loading spinner or surfaces its error in the
   // global error snackbar; the caller (the review dialog) owns that state.
   const previewPromotion = useCallback(
-    async (routeId: string, pluginId: string, entityRef: string) =>
-      api.previewPromotion(state.instance, state.serviceName, routeId, pluginId, entityRef),
+    async (routeId: string, pluginId: string, entityRef: string, config?: Record<string, unknown>) =>
+      api.previewPromotion(state.instance, state.serviceName, routeId, pluginId, entityRef, config),
     [api, state.instance, state.serviceName],
   );
 
   const promotePluginAction = useCallback(
-    async (routeId: string, pluginId: string, entityRef: string) => {
+    async (routeId: string, pluginId: string, entityRef: string, config?: Record<string, unknown>) => {
       let result!: PromotionRecord;
       await withLoading(async () => {
-        result = await api.promotePlugin(state.instance, state.serviceName, routeId, pluginId, entityRef);
+        result = await api.promotePlugin(state.instance, state.serviceName, routeId, pluginId, entityRef, config);
         const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId);
         dispatch({ type: 'SET_PROMOTIONS_FOR_PLUGIN', pluginId, data });
       });

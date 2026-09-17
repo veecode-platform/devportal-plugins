@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mockUseTranslation } from '../../test-utils/mockTranslations';
 import { PromotionReviewDialog } from './PromotionReviewDialog';
 
 const mockPreviewPromotion = jest.fn();
@@ -8,6 +9,10 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
   useKongServiceManager: () => ({
     previewPromotion: mockPreviewPromotion,
   }),
+}));
+
+jest.mock('../../hooks/useTranslation', () => ({
+  useTranslation: mockUseTranslation,
 }));
 
 const defaultProps = {
@@ -49,6 +54,7 @@ describe('PromotionReviewDialog', () => {
       'route-1',
       'plugin-1',
       'component:default/my-service',
+      undefined,
     );
     await waitFor(() =>
       expect(screen.getByText(/chart\/values\.yaml/)).toBeInTheDocument(),
@@ -109,5 +115,26 @@ describe('PromotionReviewDialog', () => {
 
     expect(screen.getByText(/has no promotion adapter/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText(/chart\/values\.yaml/)).toBeInTheDocument());
+  });
+
+  describe('edit in code (issue #135)', () => {
+    const editedConfig = { minute: 30, policy: 'local' };
+
+    it('previews with the edited config, titles as an edit, and shows both configs', async () => {
+      render(<PromotionReviewDialog open {...defaultProps} editedConfig={editedConfig} />);
+
+      expect(mockPreviewPromotion).toHaveBeenCalledWith(
+        'route-1',
+        'plugin-1',
+        'component:default/my-service',
+        editedConfig,
+      );
+      expect(screen.getByText(/Edit rate-limiting in code/)).toBeInTheDocument();
+      expect(screen.getByText(/no experiment is created, tagged, or removed/i)).toBeInTheDocument();
+      expect(screen.getByText(/"minute": 30/)).toBeInTheDocument();
+      expect(screen.getByText(/"minute": 60/)).toBeInTheDocument();
+
+      await waitFor(() => expect(screen.getByText(/chart\/values\.yaml/)).toBeInTheDocument());
+    });
   });
 });

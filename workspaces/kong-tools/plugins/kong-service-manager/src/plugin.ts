@@ -40,3 +40,12 @@ export const KongServiceManagerContent = kongServiceManagerPlugin.provide(
     mountPoint: rootRouteRef,
   }),
 );
+
+/**
+ * Translation resource for the kong-service-manager plugin (English default,
+ * pt-BR lazily loaded). The hosting app registers this via its own
+ * `__experimentalTranslations.resources` to activate pt-BR.
+ *
+ * @public
+ */
+export { kongServiceManagerTranslations } from './translations';

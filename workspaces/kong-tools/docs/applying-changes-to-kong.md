@@ -55,6 +55,38 @@ CLI as a deployment prerequisite for the backend (see the `kong-service-manager-
 README, "Prerequisites"). Exporting full Kubernetes resources for an Ingress Controller, or
 decK-format files, remains on the roadmap.
 
+### Editing a plugin that already lives in code
+
+Promote-to-code above starts from an *experiment* — a plugin created live on a db-backed Kong
+and then moved into Git. **Edit-in-code** covers the other case: a plugin that is *already*
+defined in the service's chart and applied to the gateway by the Kong Ingress Controller (a
+db-less setup). There is no experiment to move; the plugin is already code-owned.
+
+For such a plugin the portal shows a **Code-owned** badge and, instead of the usual edit form
+(which would write to Kong and be reverted on the controller's next sync), an **Edit in code**
+action. It opens a merge request that changes only the plugin's values in the chart — the
+portal never writes to the gateway. Once the change merges and deploys, the controller applies
+it. The same guarantees as promote-to-code hold, plus two that matter here:
+
+- **Only what the chart can reproduce is editable.** The action renders the chart with your
+  edit and checks it reproduces the exact config you asked for. A field the chart routes
+  through its values (say a header name) produces a one-line MR; a field the template hardcodes,
+  or one the plugin's adapter doesn't carry into the chart, is **refused with an explanation**,
+  never silently dropped — so the merge request always matches what you asked for.
+- **The controller's own file is left intact.** The MR touches the values file only; it never
+  rewrites the plugin template the service team authored (its guards, labels, and hardcoded
+  keys stay exactly as they were).
+
+Edit-in-code is only offered for a plugin the Ingress Controller manages (it carries the
+controller's ownership tag), because only then can the merged chart change actually reach the
+gateway. It is gated by `kong.promotion.editInCode` on the Kong instance and, like
+promote-to-code, needs the `helm` CLI on the backend.
+
+A plugin you *promoted* from an experiment (path 2 above) becomes editable in code once the
+merge deploys and the Ingress Controller applies it: it is now code-owned, so the portal shows
+it as **Code-owned** with the same **Edit in code** action — adjust its values later without
+hand-editing the chart.
+
 ## Using both: experiment first, make it permanent after
 
 The two paths combine into a workflow rather than a fork:

@@ -108,7 +108,11 @@ describe('helm capability gate (ADR-018)', () => {
 
       const res = await request(app).get(CAPABILITIES_URL);
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ helm: { available: true, path: '/opt/helm/helm', version: 'v3.15.0' } });
+      expect(res.body).toEqual({
+        helm: { available: true, path: '/opt/helm/helm', version: 'v3.15.0' },
+        editInCode: false,
+        adapters: ['correlation-id', 'rate-limiting'],
+      });
     });
 
     it('recovers on the next request after the gate re-probes successfully', async () => {
@@ -136,6 +140,8 @@ describe('helm capability gate (ADR-018)', () => {
           path: 'helm',
           error: 'Kong plugin promotion is not enabled on this instance',
         },
+        editInCode: false,
+        adapters: ['correlation-id', 'rate-limiting'],
       });
     });
 

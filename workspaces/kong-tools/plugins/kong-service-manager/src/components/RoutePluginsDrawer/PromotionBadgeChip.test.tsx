@@ -1,7 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mockUseTranslation } from '../../test-utils/mockTranslations';
 import { PromotionBadgeChip } from './PromotionBadgeChip';
 import type { PromotionBadge } from './promotionBadge';
+
+jest.mock('../../hooks/useTranslation', () => ({
+  useTranslation: mockUseTranslation,
+}));
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -43,14 +48,14 @@ describe('PromotionBadgeChip', () => {
       },
     };
     render(<PromotionBadgeChip badge={badge} />);
-    const link = screen.getByRole('link', { name: /Promoção aberta/ });
+    const link = screen.getByRole('link', { name: /Promotion open/ });
     expect(link).toHaveAttribute('href', badge.record!.mrRef);
   });
 
   it('renders the pending-deploy badge', () => {
     const badge: PromotionBadge = { kind: 'pending-deploy', ageMs: ONE_DAY_MS };
     render(<PromotionBadgeChip badge={badge} />);
-    expect(screen.getByText(/Aplicando/)).toBeInTheDocument();
+    expect(screen.getByText(/Applying/)).toBeInTheDocument();
   });
 
   it('renders the codified badge as a link to the code when an MR ref is available', () => {
@@ -71,7 +76,7 @@ describe('PromotionBadgeChip', () => {
       },
     };
     render(<PromotionBadgeChip badge={badge} />);
-    const link = screen.getByRole('link', { name: /Codificado/ });
+    const link = screen.getByRole('link', { name: /Codified/ });
     expect(link).toHaveAttribute('href', badge.record!.mrRef);
   });
 
@@ -79,7 +84,7 @@ describe('PromotionBadgeChip', () => {
     const onRetry = jest.fn();
     const badge: PromotionBadge = { kind: 'failed-restored', ageMs: ONE_DAY_MS };
     render(<PromotionBadgeChip badge={badge} onRetry={onRetry} />);
-    expect(screen.getByText(/Aplicação falhou/)).toBeInTheDocument();
+    expect(screen.getByText(/Application failed/)).toBeInTheDocument();
     screen.getByRole('button', { name: 'Retry' }).click();
     expect(onRetry).toHaveBeenCalled();
   });
@@ -112,7 +117,7 @@ describe('PromotionBadgeChip', () => {
     };
     render(<PromotionBadgeChip badge={badge} />);
 
-    await userEvent.hover(screen.getByText(/Aplicação falhou/));
+    await userEvent.hover(screen.getByText(/Application failed/));
     expect(await screen.findByText(detail)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Show details/i }));

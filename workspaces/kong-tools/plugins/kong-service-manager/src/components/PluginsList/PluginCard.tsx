@@ -15,6 +15,7 @@ import type { PluginCard as PluginCardType } from '@veecode-platform/backstage-p
 import { getPluginImage } from '../../assets/pluginImages';
 import { PromotionBadgeChip } from '../RoutePluginsDrawer/PromotionBadgeChip';
 import type { PromotionBadge } from '../RoutePluginsDrawer/promotionBadge';
+import { useTranslation } from '../../hooks/useTranslation';
 
 type PluginCardProps = {
   plugin: PluginCardType;
@@ -35,6 +36,9 @@ type PluginCardProps = {
   discardingPromotion?: boolean;
   onPromote?: (pluginId: string, pluginName: string) => void;
   onDiscardPromotion?: (pluginId: string, pluginName: string) => void;
+  /** `kong.promotion.editInCode` capability (issue #135) — gates the "Edit in code" action for a code-owned plugin. */
+  editInCodeEnabled?: boolean;
+  onEditInCode?: (pluginId: string, pluginName: string) => void;
 };
 
 export function PluginCard({
@@ -53,20 +57,36 @@ export function PluginCard({
   discardingPromotion,
   onPromote,
   onDiscardPromotion,
+  editInCodeEnabled,
+  onEditInCode,
 }: PluginCardProps) {
+  const { t } = useTranslation();
   const isAssociated = !!associatedId;
   // Frozen (open MR / applying) blocks portal edits server-side (409); codified is terminal and read-only.
   const isFrozen = promotionBadge?.kind === 'mr-open' || promotionBadge?.kind === 'pending-deploy';
   const isCodified = promotionBadge?.kind === 'codified';
   // Code-owned (ADR-017): the plugin was never portal-created, so it never
-  // has a promotion to start or discard — read-only, same as codified.
+  // has a promotion to start or discard. Read-only like codified (#136):
+  // editing or disabling it through the Admin API is drift the ingress
+  // controller reverts on its next push — change it in the repository, or,
+  // when kong.promotion.editInCode is on, through the Edit-in-code action
+  // (issue #135). While a code-only promotion is active the badge reads
+  // mr-open/pending-deploy instead (active records win over ownership), so
+  // this only matches a code-owned plugin with no open edit.
   const isCodeOwned = promotionBadge?.kind === 'code-owned';
+  const isReadOnly = isCodified || isCodeOwned;
   // Failed handover (ADR-020): the experiment was removed at merge and the
   // chart already carries the plugin — there is nothing left to promote.
   const isFailedHandover = promotionBadge?.record?.state === 'failed';
   const showPromote =
     isAssociated && !!promotionBadge && !isFrozen && !isCodified && !isCodeOwned && !isFailedHandover;
   const showDiscard = isAssociated && isFrozen && !isCodeOwned;
+  // Edit-in-code only reaches a KIC-managed plugin (the badge carries this from
+  // the plugin's tags): a code-owned plugin the ingress controller does not
+  // manage would 400 on the backend's W1 gate, so hide the button rather than
+  // offer a dead click (issue #135, edit-in-code ships on by default).
+  const showEditInCode =
+    isAssociated && isCodeOwned && !!promotionBadge?.editableInCode && !!editInCodeEnabled && !!onEditInCode;
 
   return (
     <Card
@@ -86,8 +106,8 @@ export function PluginCard({
           </Typography>
         }
         action={
-          isAssociated && canEdit && !isCodified && !isFrozen ? (
-            <Tooltip title="Edit plugin configuration">
+          isAssociated && canEdit && !isReadOnly && !isFrozen ? (
+            <Tooltip title={t('pluginCard.editTooltip')}>
               <IconButton
                 size="small"
                 onClick={() => onEdit(associatedId, plugin.slug)}
@@ -141,11 +161,11 @@ export function PluginCard({
                 disabled={discardingPromotion}
                 onClick={() => onDiscardPromotion?.(associatedId, plugin.slug)}
               >
-                {discardingPromotion ? <CircularProgress size={18} /> : 'Descartar promoção'}
+                {discardingPromotion ? <CircularProgress size={18} /> : t('pluginCard.discardPromotion')}
               </Button>
             ) : (
               canDisable &&
-              !isCodified && (
+              !isReadOnly && (
                 <Button
                   variant="contained"
                   color="primary"
@@ -153,7 +173,7 @@ export function PluginCard({
                   disabled={disabling}
                   onClick={() => onDisable(associatedId, plugin.slug)}
                 >
-                  {disabling ? <CircularProgress size={18} /> : 'Disable'}
+                  {disabling ? <CircularProgress size={18} /> : t('pluginCard.disable')}
                 </Button>
               )
             )}
@@ -167,7 +187,22 @@ export function PluginCard({
                     disabled={!canPromote || !!promoteDisabledReason}
                     onClick={() => onPromote?.(associatedId, plugin.slug)}
                   >
-                    Promote to code
+                    {t('pluginCard.promoteToCode')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {showEditInCode && (
+              <Tooltip title={promoteDisabledReason ?? ''}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    size="small"
+                    disabled={!canPromote || !!promoteDisabledReason}
+                    onClick={() => onEditInCode?.(associatedId, plugin.slug)}
+                  >
+                    {t('pluginCard.editInCode')}
                   </Button>
                 </span>
               </Tooltip>
@@ -181,12 +216,19 @@ export function PluginCard({
               size="small"
               onClick={() => onEnable(plugin.slug)}
             >
-              Enable
+              {t('pluginCard.enable')}
             </Button>
           )
         )}
       </CardActions>
-      {showPromote && promoteDisabledReason && (
+      {isReadOnly && !showEditInCode && (
+        <Box px={1.5} pb={1.5} textAlign="center">
+          <Typography variant="caption" color="text.secondary">
+            {t('pluginCard.managedFromRepository')}
+          </Typography>
+        </Box>
+      )}
+      {(showPromote || showEditInCode) && promoteDisabledReason && (
         <Box px={1.5} pb={1.5} textAlign="center">
           <Typography variant="caption" color="text.secondary">
             {promoteDisabledReason}

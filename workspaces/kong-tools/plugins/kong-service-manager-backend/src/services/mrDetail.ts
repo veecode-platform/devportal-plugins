@@ -32,6 +32,8 @@ export interface MrDetail {
   applyingSince?: string;
   /** ISO timestamp of the experimental plugin's removal, written on the `mr-open` → `awaiting-deploy` transition (ADR-020: the experiment goes at merge, never coexists with the code-owned plugin). Never rewritten after. */
   experimentRemovedAt?: string;
+  /** First tick on which the project answered 404 (ADR-023 hardening: gone needs confirmation). */
+  projectGoneSince?: string;
 }
 
 export function encodeMrDetail(detail: MrDetail): string {

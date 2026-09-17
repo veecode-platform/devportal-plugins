@@ -442,3 +442,194 @@ Rejected: storing the plugin id on the record (Kong ids change when an
 experiment is recreated; the type/route key is what the finalizer needs);
 reaping terminal records server-side when the plugin disappears (a
 finalizer tick per codified record forever, for a purely visual problem).
+
+Refinement (2026-09-17): the same "terminal record + live ownership"
+derivation also decides *editability*, not just staleness. A `codified` record
+whose live plugin carries the KIC ownership tag (`managed-by-ingress-controller`)
+reads as **code-owned** with `editableInCode`, exactly like a plugin that was
+born in the chart or edited via a `code-only` promotion (ADR-024) — the
+finalizer only reaches `codified` once such a KIC-owned plugin matches the
+snapshot (ADR-020 handover), and the backend's `resolvePromotionMode` accepts
+any not-portal-managed, KIC-tagged plugin for edit-in-code without excluding
+previously-promoted ones. Keeping the terminal `codified` badge here was the one
+code-owned case that offered no second edit and no way back (observed in prod on
+`apip-lifecycle-e2e`: a promoted `rate-limiting` showed "Codified" with no Edit
+in code, while a born-in-code `correlation-id` on the same service did). `mode`
+is not consulted (optional on 1.4.x records); `failed` stays terminal — a failed
+handover needs a human.
+
+## ADR-022: The Promotion Branch Is Reused Only While Its MR Is Open; Otherwise It Is Recreated From the Default Branch
+
+**Date:** 2026-09
+**Status:** Accepted
+
+`ensureBranch` treated "branch already exists" as success so a promote retried
+after a crash would find its own commit and MR again (ADR-015 idiom). That
+rule also reused a branch **nobody was using**: GitLab did not honour
+`remove_source_branch` on a merge performed from its UI (2026-09-15), and a
+discard closes the MR without touching the branch. The next promotion of the
+same type on the same repo committed on top of the stale branch and opened an
+MR 12 commits behind the default branch, in conflict (2026-09-16).
+
+Decision: the branch (`kong-promote/<type>`, one per plugin type) is reused
+**only when an open MR exists for it** — that is the crash-retry case. In every
+other case the promote endpoint deletes it (404 = already gone) and recreates
+it from the default branch head before committing. The finalizer deletes the
+branch when it discards a closed MR, best-effort, so leftovers are rare rather
+than merely harmless. Create-vs-update detection keeps running against the
+promotion branch (ADR-015).
+
+Rejected: unique branch names per promotion (`kong-promote/<type>-<ts>`) — the
+crash-retry would then have to find its branch through the record, and the
+"one open promotion per type" rule would need a second index; rebasing the
+stale branch server-side — GitLab has no rebase-branch API outside an MR.
+
+Hardening (cross-vendor review, 2026-09-16): the branch is per type per
+*repository*, so a second route of the same repo promoting the same type
+would find the other route's open MR and land its commit there. The promote
+endpoint therefore refuses (409) when the open MR on the branch does not name
+its route (the generated description carries the route id); and every branch
+deletion — discard, teardown abort — first checks that no MR is open on the
+branch, so a delayed finalizer never deletes a newer promotion's branch.
+
+## ADR-023: An Unregistered Service Is a Teardown; the Finalizer Aborts and Closes the MR
+
+**Date:** 2026-09
+**Status:** Accepted
+
+The finalizer aborted an open promotion only when the GitLab project was
+archived or deleted. M20 design 01 later re-based the portal teardown on the
+lifecycle reconciler: it removes `catalog-info.yaml` from the default branch
+and lets discovery drop the entity — the project stays active and unarchived.
+Live on 2026-09-16 (acceptance item 6): destroy + unregister with an MR open
+left the record in `mr-open` and the MR open forever; the experiment was gone
+only because the route went with the helm release.
+
+Decision: `getProjectStatus` also reports `unregistered` when
+`catalog-info.yaml` is absent from the default branch (the same signal the
+reconciler and the template's deploy guard use). Any of archived / gone /
+unregistered aborts the promotion: leftover experiment removed, **MR closed
+and promotion branch deleted** (best-effort), record `aborted-teardown` with
+the reason in `detail`. One extra GitLab read per active record per tick.
+
+Rejected: asking the catalog whether the entity still exists — discovery lags
+the file by up to a cycle and the finalizer would abort a promotion whose
+service was merely re-scaffolded; the file on the default branch is the
+source of truth the whole lifecycle is built on.
+
+Hardening (cross-vendor review, 2026-09-16): GitLab masks "not authorised" as
+404, so a project that was readable at promote time answering 404 may be a
+token or permission problem rather than a deletion. A 404 on the project only
+counts as `gone` after it has persisted for `GONE_CONFIRMATION_MS` (2 min)
+across ticks (`projectGoneSince` in the record detail, cleared when the
+project is readable again). The `unregistered` signal needs no grace: it is a
+confirmed 404 on one file of a project that answered 200 a moment earlier.
+Any other GitLab error skips the record for this tick and is logged; it never
+triggers cleanup.
+
+## ADR-024: Edit in Code — a `code-only` Promotion Mode With No Experiment in Kong
+
+**Date:** 2026-09
+**Status:** Accepted
+
+A code-owned plugin (ADR-017: reconciled onto Kong by an external
+controller from the service's chart, not created by the portal) was
+read-only — the only path to changing it was editing the chart by hand.
+Issue #135 adds "edit in code": the user edits the config in the existing
+plugin form, and the backend opens a merge request with the edited config
+directly, gated by `kong.promotion.editInCode`.
+
+The `promotions` table gains a nullable `mode` column
+(`'experiment' | 'code-only'`, migration `20260916010000_promotions_mode.js`,
+defaulting a null/missing value to `'experiment'` so a backend from before
+this change keeps reading its own rows unchanged). A `code-only` record's
+`config_snapshot` is the *edited* config (`adapter.fromRendered({ config })`
+on the client's `config` body field), not the live one — render-check runs
+against that snapshot instead of the live plugin's. Every Kong write the
+`experiment` mode makes — tagging the plugin (Step 4 of promote), untagging
+it on a closed MR, deleting it at merge, restoring it on teardown — is
+skipped for `code-only`: none of those things ever happened, because no
+experiment was ever created. The finalizer's `isCodeOnly()` guards exactly
+those three write sites; `handleApplying`'s convergence check only reads
+Kong and needed no change.
+
+**Ownership by `defaultTags`, plus the KIC tag as a second gate.** A plugin
+is classified `code-owned` by `resolvePromotableRoutePlugin`'s existing
+`defaultTags` derivation (ADR-017) — the same one the frontend's
+`derivePromotionBadge` keys its badge on. But a `code-only` promotion is
+additionally refused (400) unless the live plugin also carries the Kong
+Ingress Controller's `managed-by-ingress-controller` tag (review finding W1,
+2026-09-16). The reason is convergence: `handleApplying` only ever recognizes
+the merged chart as applied on a plugin carrying that tag, so "not
+portal-managed" — which also matches a plugin created straight through the
+Admin API — is too wide a gate; accepting one of those would open a merge
+request the finalizer could never close, stranding the record in `failed`.
+Corollary: an instance with no `defaultTags` configured has no ownership
+signal at all (ADR-017), so `editInCode` can never fire there. Accepted
+edge (v1): the frontend still offers "Edit in code" from the `defaultTags`
+signal alone, so a plugin that is code-owned but *not* KIC-managed shows the
+button and is then refused with an actionable 400 — a guard rail, not a
+silent failure; plumbing the KIC signal to the card is deferred.
+
+**How the edit reaches the chart (review finding B1, 2026-09-16).** The
+`experiment` mode authors the plugin's chart file itself, so it emits both a
+`values.yaml` merge and a whole-file `create` of the template. In `code-only`
+mode that template already exists and belongs to the service team — richer
+than the adapter's (guard blocks, labels, a different `metadata.name`,
+hardcoded keys the adapter doesn't model). Rewriting it would silently drop
+all of that, and if the chart declared the plugin under another filename the
+`create` would add a *second* manifest of the type. So `code-only` drops
+every `op:'create'` edit and touches only `values.yaml`, then lets the
+existing render-check decide: if the team's template routes the edited field
+through values, the render reproduces the edited config and the MR is a
+values-only diff; if it hardcodes the field, the render can't reproduce it
+and the promote is refused (409, "the chart does not expose … as an editable
+value"). `renderCheck` also refuses (409) when the rendered chart declares
+more than one manifest of the type, since it cannot tell which one an edit
+would change.
+
+**Editing a field the adapter can't carry is refused up front (review
+finding F2, 2026-09-16).** An adapter only reproduces the fields its
+`fromRendered` normalizes — rate-limiting routes only `minute`, so a change
+to `policy` (fixed in the template) would be dropped from the generated
+`values.yaml`, and because the render-check compares that same normalized
+view it would not notice, letting the promotion finish `codified` without the
+user's edit. This is caught only for a field the adapter models but the chart
+hardcodes (correlation-id's `generator`); a field the adapter doesn't model
+at all slips through. So both promote and preview now reject a `code-only`
+edit that changes any live field outside `fromRendered`'s own output keys —
+those keys are the single source of truth for what the adapter can carry, so
+the check never drifts from `toChartEdits`. Only fields present in the live
+Kong config count, since the portal form seeds schema defaults Kong may omit.
+
+**A `code-only` request never resumes an active record.** The `experiment`
+flow resumes an in-flight draft by (instance, route, plugin type) so a
+retried promote doesn't open a second MR (ADR-012). Resuming for
+`code-only` would either take the Step-4 branch of whatever mode the
+stale record was actually in, or silently promote a snapshot from a
+previous edit instead of the config the user just submitted. An active
+record of *either* mode for the same route/type is therefore always a 409
+for a `code-only` request, with the MR link when one exists — the same
+freeze wording `assertNotFrozen` already uses elsewhere. `experiment`
+promotes keep the pre-existing resume behaviour unchanged.
+
+**Promote refuses a no-op edit (409); preview stays permissive.** An edited
+config that normalizes identically to the live config has nothing to
+promote — promote 409s before writing a draft. Preview's job is to show
+the generated YAML for whatever the user typed, including a config that
+happens to match live, so it runs the equivalence render-check but skips
+the no-op comparison (ADR-016 precedent: promote and preview already differ
+on status for the same renderCheck mismatch, 409 vs. 400).
+
+**MR title/description/commit message name the mode.** A `code-only` MR
+says it edits an already code-owned plugin directly and that there is no
+experiment to remove — the reviewer reading the MR shouldn't have to infer
+that from the diff alone.
+
+Rejected: keying the mode off the KIC tag instead of `defaultTags` (drifts
+from what the frontend can see, per above); recreating a shadow experiment
+in Kong for `code-only` so the existing finalizer logic needs no `mode`
+branch (defeats the point — the plugin already exists and works, tagging
+and possibly clashing with it serves no purpose); letting `code-only`
+resume an active record like `experiment` does (silently promotes a stale
+edit, per above).

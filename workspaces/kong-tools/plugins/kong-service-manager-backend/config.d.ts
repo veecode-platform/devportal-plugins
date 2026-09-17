@@ -42,6 +42,16 @@ export interface Config {
        * @default 60
        */
       helmTimeoutSeconds?: number;
+      /**
+       * Enables "edit in code" (issue #135): editing an already code-owned
+       * (Kong Ingress Controller-managed) route plugin by opening a merge
+       * request directly against the edited config, with no experimental
+       * plugin ever created, tagged, or frozen in Kong for it. Off by
+       * default — a code-owned plugin stays read-only in the portal until
+       * this is set.
+       * @default false
+       */
+      editInCode?: boolean;
     };
   };
 }

@@ -6,21 +6,34 @@ describe('correlationIdAdapter', () => {
     expect(correlationIdAdapter.sensitive).toBe(false);
   });
 
-  it('produces a values.yaml merge and a KongPlugin template create for the golden-path chart idiom', () => {
-    const edits = correlationIdAdapter.toChartEdits({ header_name: 'X-Correlation-Id' });
+  it('promotes header name, generator and echo_downstream into the golden-path chart idiom (#127)', () => {
+    const edits = correlationIdAdapter.toChartEdits({
+      header_name: 'X-Correlation-Id',
+      generator: 'uuid',
+      echo_downstream: true,
+    });
 
     expect(edits).toEqual([
       {
         path: 'chart/values.yaml',
         op: 'merge',
-        values: { kongPlugins: { correlationId: { headerName: 'X-Correlation-Id' } } },
+        values: {
+          kongPlugins: { correlationId: { headerName: 'X-Correlation-Id', generator: 'uuid', echoDownstream: true } },
+        },
       },
       {
         path: 'chart/templates/kongplugin-correlation-id.yaml',
         op: 'create',
-        content: expect.stringContaining('.Values.kongPlugins.correlationId.headerName'),
+        content: expect.stringMatching(/headerName[\s\S]*generator[\s\S]*echoDownstream/),
       },
     ]);
+  });
+
+  it("falls back to Kong's defaults when the live config omits generator / echo_downstream", () => {
+    const [merge] = correlationIdAdapter.toChartEdits({ header_name: 'X-Correlation-Id' });
+    expect(merge).toMatchObject({
+      values: { kongPlugins: { correlationId: { generator: 'uuid#counter', echoDownstream: false } } },
+    });
   });
 
   it('rejects a live config with no non-empty header_name field', () => {
@@ -28,13 +41,19 @@ describe('correlationIdAdapter', () => {
     expect(() => correlationIdAdapter.toChartEdits({ header_name: '' })).toThrow(/header_name/);
   });
 
-  it('extracts only the promoted field from a rendered KongPlugin manifest', () => {
+  it('normalizes the three promoted fields from a rendered KongPlugin manifest, ignoring the rest', () => {
     const rendered = correlationIdAdapter.fromRendered({
       kind: 'KongPlugin',
       plugin: 'correlation-id',
-      config: { header_name: 'X-Correlation-Id', echo_downstream: false },
+      config: { header_name: 'X-Correlation-Id', echo_downstream: true, generator: 'uuid', tags: ['x'] },
     });
 
-    expect(rendered).toEqual({ header_name: 'X-Correlation-Id' });
+    expect(rendered).toEqual({ header_name: 'X-Correlation-Id', generator: 'uuid', echo_downstream: true });
+  });
+
+  it('a golden-path chart (echo_downstream true, generator uuid) and a live plugin with the same values are equal', () => {
+    const live = correlationIdAdapter.fromRendered({ config: { header_name: 'X-Request-Id', echo_downstream: true, generator: 'uuid' } });
+    const rendered = correlationIdAdapter.fromRendered({ config: { header_name: 'X-Request-Id', echo_downstream: true, generator: 'uuid' } });
+    expect(rendered).toEqual(live);
   });
 });

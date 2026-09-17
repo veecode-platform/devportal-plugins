@@ -3,9 +3,14 @@ import { FileEdit, KongPluginAdapter, NormalizedConfig } from './types';
 const PLUGIN_TYPE = 'correlation-id';
 const TEMPLATE_PATH = `chart/templates/kongplugin-${PLUGIN_TYPE}.yaml`;
 
+/** Kong's own defaults for the two fields we promote (Admin API always returns them). */
+const DEFAULT_GENERATOR = 'uuid#counter';
+const DEFAULT_ECHO_DOWNSTREAM = false;
+
 function manifestTemplate(): string {
-  // `echo_downstream: false` is the documented v1 behavior — a constant
-  // baked into the template, not a promoted field.
+  // All three behaviour-bearing fields are promoted (#127): the golden-path
+  // chart ships `echo_downstream: true` + `generator: uuid`, so a constant
+  // here would silently flip the edge behaviour on promotion.
   return `apiVersion: configuration.konghq.com/v1
 kind: KongPlugin
 metadata:
@@ -13,13 +18,15 @@ metadata:
 plugin: ${PLUGIN_TYPE}
 config:
   header_name: {{ .Values.kongPlugins.correlationId.headerName | quote }}
-  echo_downstream: false
+  generator: {{ .Values.kongPlugins.correlationId.generator | default "${DEFAULT_GENERATOR}" | quote }}
+  echo_downstream: {{ .Values.kongPlugins.correlationId.echoDownstream | default ${DEFAULT_ECHO_DOWNSTREAM} }}
 `;
 }
 
 /**
- * Adapter for Kong's `correlation-id` plugin, golden-path v1 scope: only the
- * header name (design 02: "correlation header" in the chart idiom).
+ * Adapter for Kong's `correlation-id` plugin: header name, id generator and
+ * whether the header is echoed to the caller (`kongPlugins.correlationId.*`
+ * in the chart idiom).
  */
 export const correlationIdAdapter: KongPluginAdapter = {
   pluginType: PLUGIN_TYPE,
@@ -32,12 +39,15 @@ export const correlationIdAdapter: KongPluginAdapter = {
         `correlation-id promotion requires a non-empty string 'header_name' field in the live config, got ${JSON.stringify(headerName)}`,
       );
     }
+    const generator = typeof liveConfig.generator === 'string' ? liveConfig.generator : DEFAULT_GENERATOR;
+    const echoDownstream =
+      typeof liveConfig.echo_downstream === 'boolean' ? liveConfig.echo_downstream : DEFAULT_ECHO_DOWNSTREAM;
 
     return [
       {
         path: 'chart/values.yaml',
         op: 'merge',
-        values: { kongPlugins: { correlationId: { headerName } } },
+        values: { kongPlugins: { correlationId: { headerName, generator, echoDownstream } } },
       },
       { path: TEMPLATE_PATH, op: 'create', content: manifestTemplate() },
     ];
@@ -45,6 +55,13 @@ export const correlationIdAdapter: KongPluginAdapter = {
 
   fromRendered(kongPluginManifest: Record<string, unknown>): NormalizedConfig {
     const config = (kongPluginManifest.config ?? {}) as Record<string, unknown>;
-    return { header_name: String(config.header_name) };
+    return {
+      header_name: String(config.header_name),
+      generator: typeof config.generator === 'string' ? config.generator : DEFAULT_GENERATOR,
+      echo_downstream:
+        typeof config.echo_downstream === 'boolean'
+          ? config.echo_downstream
+          : String(config.echo_downstream) === 'true',
+    };
   },
 };

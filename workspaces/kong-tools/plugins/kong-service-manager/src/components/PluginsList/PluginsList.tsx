@@ -14,23 +14,28 @@ import {
   TabbedCard,
 } from '@backstage/core-components';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 import { PluginCard } from './PluginCard';
 import type { PluginPerCategory } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+import type { TranslationFunction } from '@backstage/core-plugin-api/alpha';
+import type { kongServiceManagerTranslationRef } from '../../translations';
 
-const CATEGORY_LABELS: Record<string, string> = {
-  ai: 'AI',
-  authentication: 'Authentication',
-  security: 'Security',
-  'traffic-control': 'Traffic Control',
-  serverless: 'Serverless',
-  transformation: 'Transformations',
-  logging: 'Logging',
-  analytics: 'Analytics & Monitoring',
-};
-
-function formatCategory(slug: string): string {
+function formatCategory(
+  slug: string,
+  t: TranslationFunction<typeof kongServiceManagerTranslationRef.T>,
+): string {
+  const categoryLabels: Record<string, string> = {
+    ai: t('pluginsList.categories.ai'),
+    authentication: t('pluginsList.categories.authentication'),
+    security: t('pluginsList.categories.security'),
+    'traffic-control': t('pluginsList.categories.trafficControl'),
+    serverless: t('pluginsList.categories.serverless'),
+    transformation: t('pluginsList.categories.transformation'),
+    logging: t('pluginsList.categories.logging'),
+    analytics: t('pluginsList.categories.analytics'),
+  };
   return (
-    CATEGORY_LABELS[slug] ??
+    categoryLabels[slug] ??
     slug
       .replace(/-/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase())
@@ -62,6 +67,7 @@ type PluginsListProps = {
 };
 
 export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, canEnable, canDisable, canEdit }: PluginsListProps) {
+  const { t } = useTranslation();
   const {
     state,
     fetchAssociatedPlugins,
@@ -147,7 +153,11 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
     if (categories.length === 0) {
       return (
         <Box p={4} textAlign="center">
-          <Typography color="text.secondary">No plugins to display</Typography>
+          <Typography color="text.secondary">
+            {search
+              ? t('pluginsList.noPluginsFiltered', { search })
+              : t('pluginsList.noPluginsEmpty')}
+          </Typography>
         </Box>
       );
     }
@@ -155,7 +165,7 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
     return categories.map(cat => (
       <Box key={cat.category} mb={3}>
         <Typography variant="h6" sx={{ mb: 1.5 }}>
-          {formatCategory(cat.category)}
+          {formatCategory(cat.category, t)}
         </Typography>
         <ItemCardGrid>
           {cat.plugins.map(plugin => (
@@ -180,12 +190,12 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
   return (
     <Box>
       <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h5">Kong Plugins</Typography>
+        <Typography variant="h5">{t('pluginsList.title')}</Typography>
         <Box display="flex" alignItems="center" gap={1}>
           {loading && <CircularProgress size={20} />}
           <TextField
             size="small"
-            placeholder="Search plugins..."
+            placeholder={t('pluginsList.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             InputProps={{
@@ -201,10 +211,10 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
       </Box>
 
       <TabbedCard title="">
-        <CardTab label="All Plugins">
+        <CardTab label={t('pluginsList.allPlugins')}>
           <Box p={2}>{renderCategories(allFiltered)}</Box>
         </CardTab>
-        <CardTab label="Associated Plugins">
+        <CardTab label={t('pluginsList.associatedPlugins')}>
           <Box p={2}>{renderCategories(associatedFiltered)}</Box>
         </CardTab>
       </TabbedCard>

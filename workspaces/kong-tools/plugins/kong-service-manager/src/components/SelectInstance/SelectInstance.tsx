@@ -8,8 +8,10 @@ import {
 } from '@mui/material';
 import { useEntityAnnotations } from '../../hooks';
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export function SelectInstance() {
+  const { t } = useTranslation();
   const { instances } = useEntityAnnotations();
   const { state, setInstance } = useKongServiceManager();
 
@@ -29,11 +31,11 @@ export function SelectInstance() {
 
   return (
     <FormControl size="small" sx={{ minWidth: 200, mb: 2 }}>
-      <InputLabel id="kong-instance-label">Kong Instance</InputLabel>
+      <InputLabel id="kong-instance-label">{t('selectInstance.label')}</InputLabel>
       <Select
         labelId="kong-instance-label"
         value={state.instance}
-        label="Kong Instance"
+        label={t('selectInstance.label')}
         onChange={handleChange}
       >
         {instances.map(inst => (

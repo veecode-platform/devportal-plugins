@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mockUseTranslation } from '../../test-utils/mockTranslations';
 import { RoutesList } from './RoutesList';
 import type { RouteResponse, RoutesResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
@@ -45,6 +46,10 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
     fetchRoutes: mockFetchRoutes,
     removeRoute: mockRemoveRoute,
   }),
+}));
+
+jest.mock('../../hooks/useTranslation', () => ({
+  useTranslation: mockUseTranslation,
 }));
 
 describe('RoutesList', () => {

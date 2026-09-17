@@ -94,7 +94,16 @@ kong:
     enabled: true
     helmPath: /opt/helm/helm      # default: "helm" (resolved on PATH)
     helmTimeoutSeconds: 60         # default: 60
+    editInCode: true               # default: false — see below
 ```
+
+`kong.promotion.editInCode` (default `false`) additionally offers **edit in
+code** for a plugin already owned by the chart and managed by the Kong Ingress
+Controller: the portal opens a merge request that changes the plugin's values in
+the chart instead of writing to the gateway. It uses the same `helm` render
+check, and each edit is gated on the controller's ownership tag and refuses
+fields the chart can't reproduce. See
+[Applying changes to Kong](../../docs/applying-changes-to-kong.md).
 
 The backend probes `helm` once at startup (and again, lazily, on every
 gated request while it stays unavailable — no restart needed once fixed) and
@@ -133,6 +142,8 @@ finalizer therefore removes the experiment at merge and never recreates it:
 | `applying` | Deployed; waiting for the code-owned plugin to match the promoted config. |
 | `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (ADR-021). |
 | `failed` | `applyTimeoutMinutes` elapsed without convergence. Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, or revert the merge request. |
+| `aborted-teardown` | The service was torn down mid-promotion: project archived, deleted, or unregistered (`catalog-info.yaml` gone from the default branch, ADR-023). Leftover experiment removed, merge request closed, branch deleted. Terminal. |
+| `discarded` | The merge request was closed without merging (or the promotion discarded from the UI): the plugin is a plain experiment again and the promotion branch is deleted (ADR-022). Terminal. |
 
 Where pipelines are fast, lower `kong.promotion.reconcileIntervalSeconds`
 (e.g. `30`): a deploy that lands before the finalizer has seen the merge
@@ -176,6 +187,49 @@ kong:
   promotion:
     helmPath: /opt/helm/helm
 ```
+
+### Edit in code
+
+A plugin already reconciled onto Kong by an external controller (e.g. the
+Kong Ingress Controller, from the service's own chart) is **code-owned**
+(ADR-017) and read-only in the portal — there's no live experiment to
+promote. `kong.promotion.editInCode` lets the portal edit such a plugin
+directly instead: the user edits its config in the portal form, and the
+backend opens a merge request with the edited config, with **no experiment
+ever created, tagged, or frozen in Kong** for it.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `kong.promotion.editInCode` | `boolean` | No | Enables editing an already code-owned route plugin by opening a merge request against the edited config. `false` by default — a code-owned plugin stays read-only. |
+
+```yaml
+kong:
+  promotion:
+    enabled: true
+    editInCode: true
+```
+
+Edit in code is offered only for a plugin that carries the Kong Ingress
+Controller's `managed-by-ingress-controller` tag. "Not portal-managed" is a
+wider set than that — a plugin created straight through the Admin API matches
+it too — and the finalizer only ever recognizes convergence on a
+controller-managed plugin, so a merge request for any other plugin could
+never finish. Those are refused with `400`.
+
+Only the plugin's chart **values** are edited, never the template that reads
+them. If the service's chart routes the field through `values.yaml` (the
+golden-path shape), the merge request is a one-line values change; if the
+chart hardcodes the field, the edit cannot be reproduced and the request is
+refused (409) — edit that plugin directly in the chart instead. A chart that
+declares the same plugin type more than once is refused the same way, since
+the backend cannot tell which manifest an edit would change.
+
+The record this writes carries `mode: 'code-only'` (as opposed to the
+default `experiment`) and is otherwise reconciled by the same finalizer
+states — `mr-open`, `awaiting-deploy`, `applying`, `codified`/`failed` — but
+every Kong write the finalizer would normally make for an experiment (tag
+removal, deleting the experimental plugin) is skipped for it, since none of
+those ever happened.
 
 ### Annotate your catalog entities
 

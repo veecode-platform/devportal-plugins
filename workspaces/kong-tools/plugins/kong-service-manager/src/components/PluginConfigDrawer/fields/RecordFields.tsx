@@ -18,6 +18,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SaveIcon from '@mui/icons-material/Save';
 import type { ConfigField } from './parseSchemaFields';
 import { IncrementalFields } from './IncrementalFields';
+import { useTranslation } from '../../../hooks/useTranslation';
 
 type RecordFieldsProps = {
   name: string;
@@ -108,6 +109,7 @@ export function RecordFields({
   recordFields,
   onChange,
 }: RecordFieldsProps) {
+  const { t } = useTranslation();
   const [newItem, setNewItem] = useState<Record<string, unknown>>({});
 
   const handleEdit = useCallback(
@@ -183,7 +185,7 @@ export function RecordFields({
       <Accordion variant="outlined" sx={{ mt: 0.5 }}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="body2" color="primary">
-            New Item
+            {t('recordFields.newItem')}
           </Typography>
         </AccordionSummary>
         <AccordionDetails>
@@ -207,7 +209,7 @@ export function RecordFields({
             startIcon={<SaveIcon />}
             onClick={handleAddSave}
           >
-            Add
+            {t('recordFields.add')}
           </Button>
         </AccordionActions>
       </Accordion>
@@ -221,7 +223,7 @@ export function RecordFields({
         }
         sx={{ mt: 1 }}
       >
-        Add Empty
+        {t('recordFields.addEmpty')}
       </Button>
     </Box>
   );

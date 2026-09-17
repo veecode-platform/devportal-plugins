@@ -174,6 +174,15 @@ export type PromotionState =
   | 'discarded'
   | 'aborted-teardown';
 
+/**
+ * How a promotion reaches the chart (issue #135, "edit in code").
+ * `experiment` is the original flow: a portal-created experimental plugin is
+ * tagged and frozen in Kong until the MR merges and the finalizer removes it.
+ * `code-only` edits an already code-owned (KIC-managed) plugin directly — no
+ * experiment is ever created, tagged, frozen, or deleted in Kong for it.
+ */
+export type PromotionMode = 'experiment' | 'code-only';
+
 /** Promote-to-code record for a route plugin (design 02 / plan P3), as returned by the backend. */
 export type PromotionRecord = {
   id: number;
@@ -182,6 +191,8 @@ export type PromotionRecord = {
   routeId: string;
   pluginType: string;
   state: PromotionState;
+  /** @default 'experiment' — absent on records written before issue #135. */
+  mode?: PromotionMode;
   mrRef: string | null;
   requesterRef: string;
   createdAt: string;
@@ -230,6 +241,14 @@ export type PromotionCapabilities = {
     version?: string;
     error?: string;
   };
+  /** `kong.promotion.editInCode` (issue #135) — whether a code-owned (KIC-managed) plugin can be edited directly via a merge request, with no experiment ever created in Kong. */
+  editInCode: boolean;
+  /**
+   * Plugin types that have a promotion adapter — the promotion allowlist. The
+   * UI disables "Promote to code" up front for any other type instead of
+   * letting the request fail with a 400 (#136). Absent on backends < 1.5.0.
+   */
+  adapters?: string[];
 };
 
 /** Plugin categories enum */
