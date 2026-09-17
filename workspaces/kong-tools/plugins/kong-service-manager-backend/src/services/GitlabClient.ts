@@ -163,12 +163,29 @@ export class GitlabClient {
     return existing;
   }
 
-  async ensureBranch(repo: ResolvedRepo, branch: string): Promise<void> {
+  /**
+   * Resolves a ref (branch name or SHA) to its commit SHA. Lets a caller pin
+   * one commit and reuse it across reads and writes that would otherwise each
+   * re-resolve a moving branch name independently — the promote flow renders the
+   * chart at the default branch and then cuts the promotion branch from it, and
+   * a merge landing in between must not base the branch on a tree the render
+   * check never verified (F3 TOCTOU).
+   */
+  async resolveRefSha(repo: ResolvedRepo, ref: string): Promise<string> {
+    const { token, base } = this.target(repo.host, repo.projectSlug);
+    const commit = await this.call<{ id: string }>(
+      token,
+      `${base}/repository/commits/${encodeURIComponent(ref)}`,
+    );
+    return commit.id;
+  }
+
+  async ensureBranch(repo: ResolvedRepo, branch: string, ref: string = repo.defaultBranch): Promise<void> {
     const { token, base } = this.target(repo.host, repo.projectSlug);
     try {
       await this.call(token, `${base}/repository/branches`, {
         method: 'POST',
-        body: { branch, ref: repo.defaultBranch },
+        body: { branch, ref },
       });
     } catch (err) {
       const e = err as GitlabRequestError;

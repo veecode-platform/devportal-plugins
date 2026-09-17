@@ -66,6 +66,25 @@ export const ACTIVE_PROMOTION_STATES: PromotionState[] = [
   'applying',
 ];
 
+/**
+ * Thrown by {@link PromotionStore.upsertDraft} when the database's
+ * active-per-route partial-unique index (F4 migration
+ * `20260917120000_promotions_active_unique`) rejects the insert because another
+ * promotion for the same `(instance, route_id, plugin_type)` is already active.
+ * The promote endpoint resolves it per mode — resume the existing record for an
+ * experiment, or refuse with 409 for a code-only edit — instead of surfacing a
+ * raw 500 on a concurrent-promote race.
+ */
+export class ActivePromotionExistsError extends Error {
+  constructor(public readonly active: PromotionRecordRow) {
+    super(
+      `An active promotion (id ${active.id}, state '${active.state}') already exists for ` +
+        `(${active.instance}, ${active.route_id}, ${active.plugin_type})`,
+    );
+    this.name = 'ActivePromotionExistsError';
+  }
+}
+
 export interface PromotionStore {
   /**
    * Inserts a new draft, or returns the existing one for this idempotency
@@ -123,26 +142,42 @@ export class KnexPromotionStore implements PromotionStore {
   }
 
   async upsertDraft(draft: NewPromotionDraft): Promise<PromotionRecordRow> {
-    await this.db(TABLE)
-      .insert({
-        idempotency_key: draft.idempotencyKey,
-        instance: draft.instance,
-        service_name: draft.serviceName,
-        route_id: draft.routeId,
-        plugin_type: draft.pluginType,
-        config_snapshot: JSON.stringify(draft.configSnapshot),
-        state: 'draft',
-        mode: draft.mode ?? DEFAULT_MODE,
-        requester_ref: draft.requesterRef,
-        updated_at: this.db.fn.now(),
-      })
-      .onConflict('idempotency_key')
-      .ignore();
+    try {
+      await this.db(TABLE)
+        .insert({
+          idempotency_key: draft.idempotencyKey,
+          instance: draft.instance,
+          service_name: draft.serviceName,
+          route_id: draft.routeId,
+          plugin_type: draft.pluginType,
+          config_snapshot: JSON.stringify(draft.configSnapshot),
+          state: 'draft',
+          mode: draft.mode ?? DEFAULT_MODE,
+          requester_ref: draft.requesterRef,
+          updated_at: this.db.fn.now(),
+        })
+        .onConflict('idempotency_key')
+        .ignore();
+    } catch (err) {
+      // The idempotency_key conflict is absorbed above; anything escaping the
+      // insert is the active-per-route partial-unique index (F4) rejecting a
+      // concurrent promote for the same route plugin. Surface it typed so the
+      // endpoint decides (resume vs 409) rather than emitting a raw 500.
+      const active = await this.getActiveByRoute(draft.instance, draft.routeId, draft.pluginType);
+      if (active) throw new ActivePromotionExistsError(active);
+      throw err;
+    }
 
     const row = await this.getByIdempotencyKey(draft.idempotencyKey);
     if (!row) {
-      // Only reachable if the unique constraint above is somehow absent;
-      // fail loudly rather than return an invented record.
+      // The insert neither persisted our row nor threw. On some dialects the
+      // `ON CONFLICT (idempotency_key) DO NOTHING` clause also absorbs the
+      // active-per-route unique violation instead of raising it — detect that
+      // real cause rather than reporting a misleading "not persisted".
+      const active = await this.getActiveByRoute(draft.instance, draft.routeId, draft.pluginType);
+      if (active) throw new ActivePromotionExistsError(active);
+      // Only reachable if the idempotency_key unique constraint is somehow
+      // absent; fail loudly rather than return an invented record.
       throw new Error(`Promotion draft for idempotency key '${draft.idempotencyKey}' was not persisted`);
     }
     return row;

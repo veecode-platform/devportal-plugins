@@ -1,5 +1,5 @@
 import { TestDatabases } from '@backstage/backend-test-utils';
-import { KnexPromotionStore, NewPromotionDraft } from './promotionStore';
+import { ActivePromotionExistsError, KnexPromotionStore, NewPromotionDraft } from './promotionStore';
 
 const databases = TestDatabases.create({ ids: ['SQLITE_3'] });
 
@@ -101,8 +101,10 @@ describe('KnexPromotionStore', () => {
       const defaulted = await store.upsertDraft(draft());
       expect(defaulted.mode).toBe('experiment');
 
+      // A different tuple (plugin type) so the one-active-per-route index (F4)
+      // does not reject it — this test is about the mode round-trip, not the race.
       const codeOnly = await store.upsertDraft(
-        draft({ idempotencyKey: 'code-only', mode: 'code-only' }),
+        draft({ idempotencyKey: 'code-only', pluginType: 'correlation-id', mode: 'code-only' }),
       );
       expect(codeOnly.mode).toBe('code-only');
 
@@ -173,6 +175,36 @@ describe('KnexPromotionStore', () => {
 
       const history = await store.listByRoute('default', 'route-1', 'rate-limiting');
       expect(history.map(r => r.id)).toEqual([second.id, first.id]);
+    },
+  );
+
+  it.each(databases.eachSupportedId())(
+    'refuses a second active promotion for the same (instance, route, plugin type) — F4 one-active-per-tuple, %p',
+    async databaseId => {
+      const store = await KnexPromotionStore.create(await databases.init(databaseId));
+      const first = await store.upsertDraft(draft());
+
+      // A second promote for the SAME tuple with a fresh idempotency key (as the
+      // endpoint generates via randomUUID) must not open a second active record:
+      // the DB's partial-unique index rejects it and the store raises a typed
+      // conflict carrying the winner, whatever the dialect does with ON CONFLICT.
+      let caught: unknown;
+      try {
+        await store.upsertDraft(draft({ idempotencyKey: 'a-fresh-uuid' }));
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ActivePromotionExistsError);
+      expect((caught as ActivePromotionExistsError).active.id).toBe(first.id);
+
+      // Exactly one active row remains for the tuple.
+      const active = await store.getActiveByRoute('default', 'route-1', 'rate-limiting');
+      expect(active?.id).toBe(first.id);
+
+      // Once the winner reaches a terminal state, a fresh promote is allowed again.
+      await store.transition(first.id, 'discarded');
+      const reopened = await store.upsertDraft(draft({ idempotencyKey: 'after-discard' }));
+      expect(reopened.id).not.toBe(first.id);
     },
   );
 
