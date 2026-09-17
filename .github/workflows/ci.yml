@@ -17,6 +17,8 @@ jobs:
   changes:
     name: Detect changed workspaces
     runs-on: ubuntu-latest
+    # Report mode (ADR-0011 §2): a detection failure is reported, never red-blocking.
+    continue-on-error: true
     outputs:
       workspaces: ${{ steps.detect.outputs.workspaces }}
     steps:
@@ -35,7 +37,7 @@ jobs:
   workspace:
     name: Workspace ${{ matrix.workspace }} (report mode)
     needs: changes
-    if: ${{ needs.changes.outputs.workspaces != '[]' }}
+    if: ${{ needs.changes.outputs.workspaces != '' && needs.changes.outputs.workspaces != '[]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     continue-on-error: true

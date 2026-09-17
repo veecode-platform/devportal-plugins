@@ -22,7 +22,7 @@ function listWorkspaces() {
 function changedFiles() {
   const output = execFileSync(
     'git',
-    ['diff', '--name-only', `${baseRef}...${headRef}`],
+    ['diff', '--name-only', '--no-renames', `${baseRef}...${headRef}`],
     { cwd: repoRoot, encoding: 'utf8' },
   );
 

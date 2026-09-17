@@ -50,12 +50,15 @@ function workspaceVersions() {
   return fs
     .readdirSync(workspacesRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
+    // A workspace is a directory with a package.json; other directories are residue.
+    .filter(entry => fs.existsSync(path.join(workspacesRoot, entry.name, 'package.json')))
     .map(entry => {
       const workspace = entry.name;
       const file = path.join(workspacesRoot, workspace, 'backstage.json');
 
       if (!fs.existsSync(file)) {
-        return null;
+        console.error(`${workspace}: backstage.json is missing`);
+        return { workspace, version: null };
       }
 
       try {
@@ -70,7 +73,6 @@ function workspaceVersions() {
         return { workspace, version: null };
       }
     })
-    .filter(Boolean)
     .sort((left, right) => left.workspace.localeCompare(right.workspace));
 }
 
@@ -152,7 +154,8 @@ async function main() {
     }
   }
 
-  if (strict && rows.some(row => row.status === 'behind')) {
+  // --strict fails closed: only a table that is entirely `ok` passes (stage 7).
+  if (strict && (!hostVersion || rows.some(row => row.status !== 'ok'))) {
     process.exitCode = 1;
   }
 }

@@ -6,7 +6,8 @@ workspace. With `GITHUB_OUTPUT`, it also writes the `workspaces` output used by 
 
 `check-backstage-version.js` compares every workspace's `backstage.json` with the
 DevPortal host's `backstage.json`. Set `HOST_BACKSTAGE_VERSION` for an offline run;
-`--strict` returns 1 when a workspace is behind. The default report mode returns 0.
+`--strict` returns 1 unless every workspace is `ok` (behind, ahead, missing or host
+unavailable all fail closed). The default report mode returns 0.
 
 Run locally from the repository root:
 
