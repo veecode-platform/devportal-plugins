@@ -285,6 +285,14 @@ time (ADR predates this doc — see `KongInstanceConfig.defaultTags`) means an
 operator who has not opted into tagging gets no gate at all, matching the
 plugin's existing "stays unopinionated about coexistence strategy" stance.
 
+Refinement (2026-09-17, see ADR-021's Refinement and ADR-024): "read only"
+above is no longer unconditional. A code-owned plugin whose live tags carry
+the Kong Ingress Controller's ownership tag renders `code-owned` with
+`editableInCode: true` and gets the "Edit in code" action instead of pure
+read-only (`promotionBadge.ts`'s `derivePromotionBadge`, `PluginCard.tsx`'s
+`showEditInCode`) — the same derivation also applies to a `codified` record
+whose plugin is KIC-managed.
+
 ## ADR-018: Helm Is a Declared Deployment Prerequisite, Detected at Startup
 
 **Date:** 2026-09
@@ -570,6 +578,14 @@ edge (v1): the frontend still offers "Edit in code" from the `defaultTags`
 signal alone, so a plugin that is code-owned but *not* KIC-managed shows the
 button and is then refused with an actionable 400 — a guard rail, not a
 silent failure; plumbing the KIC signal to the card is deferred.
+
+Refinement (2026-09-17, see ADR-021's Refinement): the deferred plumbing
+above shipped — the frontend no longer relies on the `defaultTags` signal
+alone. `derivePromotionBadge` computes `editableInCode` from the plugin's
+own tags (`promotionBadge.ts`), and `PluginCard` gates the "Edit in code"
+button on that flag (`PluginCard.tsx`'s `showEditInCode`), so a
+code-owned-but-not-KIC-managed plugin no longer shows the button at all; the
+400 above is now defense-in-depth rather than the frontend's normal path.
 
 **How the edit reaches the chart (review finding B1, 2026-09-16).** The
 `experiment` mode authors the plugin's chart file itself, so it emits both a
