@@ -1,7 +1,8 @@
 # V3 dynamic smoke loop
 
 This harness loads the GitLab Pipelines frontend and backend bundles from local
-`dist-dynamic/` directories into `veecode/devportal:3.0.0-beta.7`. It is a
+`dist-dynamic/` directories into the v3 image the compose pins by digest
+(3.0.0-beta.8; override with `DEVPORTAL_IMAGE`). It is a
 development and packaging check, not a production deployment.
 
 ## Run

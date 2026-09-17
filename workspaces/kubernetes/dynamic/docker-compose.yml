@@ -83,7 +83,7 @@ services:
   # runs kubectl proxy in the container
   kubectl-cli:
     # image with kubectl
-    image: alpine/kubectl:latest
+    image: alpine/kubectl:1.36.4
     entrypoint: ["/bin/sh", "-c"]
     # replaces "0.0.0.0" with "kubernetes.default"
     command:
