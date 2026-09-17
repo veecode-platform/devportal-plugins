@@ -106,9 +106,13 @@ fields the chart can't reproduce. See
 [Applying changes to Kong](../../docs/applying-changes-to-kong.md).
 
 The backend probes `helm` once at startup (and again, lazily, on every
-gated request while it stays unavailable — no restart needed once fixed) and
-never falls back to running it with `$HOME` as its cache/config/data
-directory, since the portal typically runs with a read-only root filesystem.
+gated request while it stays unavailable — no restart needed once fixed) by
+running `helm version --short` with no environment override, so this probe
+inherits the process's own `$HOME`. It's the render check that runs during
+promote/preview (`helm template`) that never falls back to `$HOME`: each
+invocation gets its own scratch directory via `HELM_CACHE_HOME`,
+`HELM_CONFIG_HOME`, and `HELM_DATA_HOME`, since the portal typically runs
+with a read-only root filesystem.
 
 **The target chart must render with its default values.** The check runs
 exactly `helm template <release> chart/` — no `--set`, no extra values files —
@@ -140,7 +144,7 @@ finalizer therefore removes the experiment at merge and never recreates it:
 |---|---|
 | `awaiting-deploy` | Merged, experiment removed, waiting for the deploy. No timeout: the route runs without the plugin until the chart lands. |
 | `applying` | Deployed; waiting for the code-owned plugin to match the promoted config. |
-| `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (ADR-021). |
+| `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (ADR-021). When the live plugin also carries the Kong Ingress Controller's ownership tag, the frontend renders it as code-owned **and editable** — the "Edit in code" action, not a bare terminal badge (ADR-021 Refinement, ADR-024). |
 | `failed` | `applyTimeoutMinutes` elapsed without convergence. Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, or revert the merge request. |
 | `aborted-teardown` | The service was torn down mid-promotion: project archived, deleted, or unregistered (`catalog-info.yaml` gone from the default branch, ADR-023). Leftover experiment removed, merge request closed, branch deleted. Terminal. |
 | `discarded` | The merge request was closed without merging (or the promotion discarded from the UI): the plugin is a plain experiment again and the promotion branch is deleted (ADR-022). Terminal. |
@@ -258,6 +262,12 @@ All endpoints are served under `/api/kong-service-manager-backend`.
 |---|---|---|
 | `GET` | `/health` | Health check (unauthenticated). |
 
+### Instances
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/instances` | List configured Kong instances (`id`, `apiBaseUrl`, `workspace`, `description`, `defaultTags`). |
+
 ### Services
 
 | Method | Path | Description |
@@ -294,11 +304,15 @@ All endpoints are served under `/api/kong-service-manager-backend`.
 | `PATCH` | `/:instance/routes/:routeId/plugins/:pluginId` | Update route plugin. |
 | `DELETE` | `/:instance/routes/:routeId/plugins/:pluginId` | Remove route plugin. |
 
-### Promotion capabilities
+### Promotion
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/:instance/promotion/capabilities` | Runtime prerequisites for promote-to-code (currently: helm — see [Prerequisites](#prerequisites)). |
+| `GET` | `/:instance/promotion/capabilities` | Runtime capabilities for promote-to-code and edit-in-code: helm availability, whether `editInCode` is enabled, and the list of supported plugin adapters — see [Prerequisites](#prerequisites). |
+| `POST` | `/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote` | Promote an experimental route plugin to code, or (when the plugin is code-owned and edit-in-code applies) edit it in code: opens a merge request against the service's chart and returns the resulting promotion record. `503` if `helm` is unavailable, `409` on a conflicting/no-op edit or an already-open promotion. |
+| `POST` | `/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote/preview` | Side-effect-free dry run of promote: renders the generated chart edit and returns its files plus the normalized config, without opening a merge request or persisting a record. |
+| `DELETE` | `/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promote` | Discard the active promotion for a route plugin: closes its merge request (if open) and removes the experimental tag. `404` if there is no active promotion. |
+| `GET` | `/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promotions` | List promotion records for a route plugin. |
 
 ## RBAC note
 
