@@ -71,10 +71,8 @@ for configuration details.
 Add the plugin to your Entity page in `packages/app/src/components/catalog/EntityPage.tsx`:
 
 ```tsx
-import {
-  KongServiceManagerContent,
-  isKongServiceManagerAvailable,
-} from '@veecode-platform/backstage-plugin-kong-service-manager';
+import { KongServiceManagerContent } from '@veecode-platform/backstage-plugin-kong-service-manager';
+import { isKongServiceManagerAvailable } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 // Inside your EntityLayout:
 <EntityLayout.Route
@@ -148,6 +146,7 @@ when each path applies.
 | `kongServiceManagerApiRef` | ApiRef | API reference for dependency injection. |
 | `KongServiceManagerClient` | Class | Default API client implementation. |
 | `useEntityAnnotations` | Hook | Reads Kong annotations from the current entity. |
+| `kongServiceManagerTranslations` | TranslationResource | Translation resource for the plugin (English default, `pt-BR` bundled). |
 
 ## Dynamic Plugin Wiring
 

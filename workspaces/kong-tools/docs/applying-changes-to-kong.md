@@ -79,8 +79,9 @@ it. The same guarantees as promote-to-code hold, plus two that matter here:
 
 Edit-in-code is only offered for a plugin the Ingress Controller manages (it carries the
 controller's ownership tag), because only then can the merged chart change actually reach the
-gateway. It is gated by `kong.promotion.editInCode` on the Kong instance and, like
-promote-to-code, needs the `helm` CLI on the backend.
+gateway. It is gated by `kong.promotion.editInCode`, a single setting for the whole backend
+deployment (not per Kong instance), and, like promote-to-code, needs the `helm` CLI on the
+backend.
 
 A plugin you *promoted* from an experiment (path 2 above) becomes editable in code once the
 merge deploys and the Ingress Controller applies it: it is now code-owned, so the portal shows
