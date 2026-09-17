@@ -1,0 +1,232 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect changed workspaces
+    runs-on: ubuntu-latest
+    # Report mode (ADR-0011 §2): a detection failure is reported, never red-blocking.
+    continue-on-error: true
+    outputs:
+      workspaces: ${{ steps.detect.outputs.workspaces }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed workspaces
+        id: detect
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || format('origin/{0}', github.event.repository.default_branch) }}
+          HEAD_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci/list-workspaces-with-changes.js "$BASE_REF" "$HEAD_REF"
+
+  workspace:
+    name: Workspace ${{ matrix.workspace }} (report mode)
+    needs: changes
+    if: ${{ needs.changes.outputs.workspaces != '' && needs.changes.outputs.workspaces != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ${{ fromJSON(needs.changes.outputs.workspaces) }}
+    defaults:
+      run:
+        working-directory: workspaces/${{ matrix.workspace }}
+    env:
+      CI: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize workspace summary
+        if: always()
+        run: |
+          {
+            echo '## Workspace `${{ matrix.workspace }}`'
+            echo
+            echo '| Check | Verdict | Details |'
+            echo '| --- | --- | --- |'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # .nvmrc wins when a workspace has one; otherwise Node 22, the version the
+      # existing workflows (automated-update.yml, publish.yml) already use.
+      - name: Resolve Node.js version
+        id: node_version
+        run: |
+          if [ -s .nvmrc ]; then
+            node_version="$(tr -d '[:space:]' < .nvmrc)"
+            echo "Using Node.js $node_version (.nvmrc)"
+          else
+            node_version='22'
+            echo "Using Node.js $node_version (workflow default)"
+          fi
+          echo "version=$node_version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node_version.outputs.version }}
+
+      - name: Enable Corepack
+        run: npm i -g corepack && corepack enable
+
+      - name: yarn install --immutable
+        continue-on-error: true
+        run: |
+          set +e
+          yarn install --immutable
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s |\n' 'yarn install --immutable' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Detect gate scripts
+        id: scripts
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const gates = {
+            tsc_full: 'tsc:full',
+            prettier_check: 'prettier:check',
+            lint_all: 'lint:all',
+            test_all: 'test:all',
+          };
+
+          for (const [output, script] of Object.entries(gates)) {
+            const present = typeof packageJson.scripts?.[script] === 'string'
+              && packageJson.scripts[script].trim() !== '';
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `${output}=${present}\n`);
+          }
+          NODE
+
+      - name: Gate tsc:full
+        if: ${{ always() && steps.scripts.outputs.tsc_full == 'true' }}
+        continue-on-error: true
+        run: |
+          set +e
+          yarn tsc:full
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s |\n' 'tsc:full' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate tsc:full (SKIP)
+        if: ${{ always() && steps.scripts.outputs.tsc_full != 'true' }}
+        continue-on-error: true
+        run: |
+          echo '::notice title=Skipped gate::tsc:full is not defined in package.json'
+          echo '| `tsc:full` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Gate prettier:check
+        if: ${{ always() && steps.scripts.outputs.prettier_check == 'true' }}
+        continue-on-error: true
+        run: |
+          set +e
+          yarn prettier:check
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s |\n' 'prettier:check' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate prettier:check (SKIP)
+        if: ${{ always() && steps.scripts.outputs.prettier_check != 'true' }}
+        continue-on-error: true
+        run: |
+          echo '::notice title=Skipped gate::prettier:check is not defined in package.json'
+          echo '| `prettier:check` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Gate lint:all
+        if: ${{ always() && steps.scripts.outputs.lint_all == 'true' }}
+        continue-on-error: true
+        run: |
+          set +e
+          yarn lint:all
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s |\n' 'lint:all' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate lint:all (SKIP)
+        if: ${{ always() && steps.scripts.outputs.lint_all != 'true' }}
+        continue-on-error: true
+        run: |
+          echo '::notice title=Skipped gate::lint:all is not defined in package.json'
+          echo '| `lint:all` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Gate test:all
+        if: ${{ always() && steps.scripts.outputs.test_all == 'true' }}
+        continue-on-error: true
+        run: |
+          set +e
+          yarn test:all --maxWorkers=2
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s; Jest maxWorkers=2 |\n' 'test:all' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate test:all (SKIP)
+        if: ${{ always() && steps.scripts.outputs.test_all != 'true' }}
+        continue-on-error: true
+        run: |
+          echo '::notice title=Skipped gate::test:all is not defined in package.json'
+          echo '| `test:all` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
+
+      # Playwright/E2E is intentionally deferred to Stage 4/5 because it needs a running portal.
+
+  host-version:
+    name: Host Backstage version (report mode)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Report workspace Backstage versions
+        continue-on-error: true
+        run: node scripts/ci/check-backstage-version.js
