@@ -79,25 +79,6 @@ catalog:
   locations:
     - type: url
       target: https://github.com/veecode-platform/devportal-base/blob/main/catalog-info.yaml
-    # Local example data, file locations are relative to the backend process, typically `packages/backend`
-    - type: file
-      target: /app/examples/entities.yaml
-    # Local example template
-    - type: file
-      target: /app/examples/template/template.yaml
-      rules:
-        - allow: [Template]
-    # Local example organizational data
-    - type: file
-      target: /app/examples/org.yaml
-      rules:
-        - allow: [User, Group]  
-    # Local example apis
-    - type: file
-      target: /app/examples/apis.yaml
-    # Local example resources
-    - type: file
-      target: /app/examples/resources.yaml
-    # Local example clusters
-    - type: file
-      target: /app/examples/clusters.yaml
+    # The 2.x image shipped example entities under /app/examples; the 3.x image
+    # does not, so the six file locations that pointed there were removed
+    # (M8 stage 1). Mount a folder at /opt/app-root/src/examples to add local data.

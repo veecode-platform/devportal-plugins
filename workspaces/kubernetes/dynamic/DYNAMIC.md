@@ -65,7 +65,7 @@ This will create a `dist-dynamic/dist` folder in the plugin directory.
 
 ## Hack our distro
 
-We will use `docker compose` to mount the dynamic plugin directly into the DevPortal dynamic plugins folder:
+We will use `docker compose` to mount the exported plugin into the installer, which copies it into the named dynamic-plugins volume the portal reads:
 
 ```sh
 # start devportal with dynamic plugin mounted

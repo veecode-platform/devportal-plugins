@@ -9,20 +9,20 @@ catalog:
   locations:
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file
-      target: /app/examples/entities.yaml
+      target: /opt/app-root/src/examples/entities.yaml
     # Local example template
     - type: file
-      target: /app/examples/template/template.yaml
+      target: /opt/app-root/src/examples/template/template.yaml
       rules:
         - allow: [Template]
     # Local example organizational data
     - type: file
-      target: /app/examples/org.yaml
+      target: /opt/app-root/src/examples/org.yaml
       rules:
         - allow: [User, Group]
     # Local example cluster data
     - type: file
-      target: /app/examples/clusters.yaml
+      target: /opt/app-root/src/examples/clusters.yaml
       rules:
         - allow: [Resource]
 

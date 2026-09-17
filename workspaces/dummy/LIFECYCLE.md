@@ -44,8 +44,9 @@ make build-all-dynamic
 docker compose up
 ```
 
-Builds `dist-dynamic/` for both plugins and mounts them into the DevPortal container via volumes
-(see `docker-compose.yaml`). No npm publish required.
+Builds `dist-dynamic/` for both plugins and loads them into the pinned 3.x DevPortal image via the
+transitional installer compose (see `docker-compose.yaml`). No npm publish required. The default
+image is the chart-pinned digest; set `DEVPORTAL_IMAGE` to override it when needed.
 
 > **No hot reload in dynamic mode.** `dynamic-plugins.yaml` and `app-config.dynamic.yaml` are
 > read once at container boot. Code changes require a rebuild + container restart. Config-only

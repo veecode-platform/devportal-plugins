@@ -8,7 +8,7 @@ services:
     volumes:
       - dynamic-plugins-root:/dynamic-plugins-root
   install-dynamic-plugins:
-    image: veecode/devportal:3.0.0-beta.7
+    image: ${DEVPORTAL_IMAGE:-veecode/devportal@sha256:a72cf5cb47b87e5c5d62531b7ce554ee05ff7d09c23e74c5aee70c7a248d0941}
     depends_on:
       fix-volume-ownership: { condition: service_completed_successfully }
     entrypoint: ["./install-dynamic-plugins.sh"]
@@ -19,7 +19,7 @@ services:
       - ../plugins/gitlab-pipelines/dist-dynamic:/opt/app-root/src/local-plugins/gitlab-pipelines:ro
       - ../plugins/gitlab-pipelines-backend/dist-dynamic:/opt/app-root/src/local-plugins/gitlab-pipelines-backend:ro
   devportal:
-    image: veecode/devportal:3.0.0-beta.7
+    image: ${DEVPORTAL_IMAGE:-veecode/devportal@sha256:a72cf5cb47b87e5c5d62531b7ce554ee05ff7d09c23e74c5aee70c7a248d0941}
     depends_on:
       install-dynamic-plugins: { condition: service_completed_successfully }
       postgres: { condition: service_started }

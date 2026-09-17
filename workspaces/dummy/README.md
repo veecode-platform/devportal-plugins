@@ -81,8 +81,10 @@ Tests are organized in three layers:
 
 ### Dynamic Plugin Testing (Docker Compose)
 
-Running `docker compose up` will run a devportal container mounting the files and folders below so dynamic loading behavior is tested:
+Running `docker compose up` will run the transitional 3.x DevPortal compose, mounting the files and
+folders below so dynamic loading behavior is tested. Set `DEVPORTAL_IMAGE` to override the default
+chart-pinned image digest:
 
-- The plugins' `dist-dynamic` folders (under `/app/dynamic-plugins/dist/`)
-- The `app-config.dynamic.yaml` file (as `/app/app-config.local.yaml`)
-- The `dynamic-plugins.yaml` file (as `/app/dynamic-plugins.yaml`)
+- The plugins' `dist-dynamic` folders under `/opt/app-root/src/dynamic-plugins/dist/` for the installer
+- The `app-config.dynamic.yaml` file as `/opt/app-root/src/app-config.local.yaml`
+- The `dynamic-plugins.yaml` file as `/opt/app-root/src/dynamic-plugins.yaml`

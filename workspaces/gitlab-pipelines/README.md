@@ -87,7 +87,8 @@ feature is disabled.
 ## Dynamic V3 loop
 
 The `dynamic/` directory is a local smoke harness for
-`veecode/devportal:3.0.0-beta.7`. It mounts the two locally exported
+the v3 image pinned by digest in the compose (3.0.0-beta.8; override with
+`DEVPORTAL_IMAGE`). It mounts the two locally exported
 `dist-dynamic/` folders into the V3 image, installs them into the named
 dynamic-plugin volume, starts PostgreSQL and the portal, and configures the
 frontend cards. The complete loop is:
