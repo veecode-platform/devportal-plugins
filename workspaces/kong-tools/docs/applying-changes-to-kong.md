@@ -82,6 +82,11 @@ controller's ownership tag), because only then can the merged chart change actua
 gateway. It is gated by `kong.promotion.editInCode` on the Kong instance and, like
 promote-to-code, needs the `helm` CLI on the backend.
 
+A plugin you *promoted* from an experiment (path 2 above) becomes editable in code once the
+merge deploys and the Ingress Controller applies it: it is now code-owned, so the portal shows
+it as **Code-owned** with the same **Edit in code** action — adjust its values later without
+hand-editing the chart.
+
 ## Using both: experiment first, make it permanent after
 
 The two paths combine into a workflow rather than a fork:

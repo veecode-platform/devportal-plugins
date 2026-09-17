@@ -149,6 +149,28 @@ export function derivePromotionBadge(
     };
   }
 
+  // A finished promote-to-code (experiment → code) leaves the plugin owned by
+  // the Kong Ingress Controller: the finalizer only reaches `codified` once a
+  // plugin carrying the KIC tag matches the promoted snapshot (promotionFinalizer
+  // `handleApplying`). Such a plugin is editable in code exactly like one that
+  // was born code-owned — the backend's own `resolvePromotionMode` accepts any
+  // not-portal-managed, KIC-tagged plugin for edit-in-code and does not exclude
+  // previously-promoted ones, and a plain code-owned plugin (no record) already
+  // offers the action, letting the backend adjudicate on click. Keeping the
+  // terminal `codified` badge here would single out promoted plugins as the one
+  // code-owned case with no second edit and no way back (see DECISIONS ADR-017).
+  // `mode` is intentionally not checked: it is optional on 1.4.x records, so a
+  // legacy (undefined-mode) codified promotion converts too. `failed` stays
+  // terminal — a failed handover needs a human (ADR-020).
+  if (latest.state === 'codified' && isKicManaged(ownership.pluginTags)) {
+    return {
+      kind: 'code-owned',
+      record: latest,
+      ageMs: now - pluginCreatedAtSeconds * 1000,
+      editableInCode: true,
+    };
+  }
+
   return {
     kind: badgeKind(latest.state),
     record: latest,

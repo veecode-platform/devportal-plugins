@@ -443,6 +443,21 @@ experiment is recreated; the type/route key is what the finalizer needs);
 reaping terminal records server-side when the plugin disappears (a
 finalizer tick per codified record forever, for a purely visual problem).
 
+Refinement (2026-09-17): the same "terminal record + live ownership"
+derivation also decides *editability*, not just staleness. A `codified` record
+whose live plugin carries the KIC ownership tag (`managed-by-ingress-controller`)
+reads as **code-owned** with `editableInCode`, exactly like a plugin that was
+born in the chart or edited via a `code-only` promotion (ADR-024) — the
+finalizer only reaches `codified` once such a KIC-owned plugin matches the
+snapshot (ADR-020 handover), and the backend's `resolvePromotionMode` accepts
+any not-portal-managed, KIC-tagged plugin for edit-in-code without excluding
+previously-promoted ones. Keeping the terminal `codified` badge here was the one
+code-owned case that offered no second edit and no way back (observed in prod on
+`apip-lifecycle-e2e`: a promoted `rate-limiting` showed "Codified" with no Edit
+in code, while a born-in-code `correlation-id` on the same service did). `mode`
+is not consulted (optional on 1.4.x records); `failed` stays terminal — a failed
+handover needs a human.
+
 ## ADR-022: The Promotion Branch Is Reused Only While Its MR Is Open; Otherwise It Is Recreated From the Default Branch
 
 **Date:** 2026-09
