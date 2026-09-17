@@ -633,3 +633,48 @@ branch (defeats the point — the plugin already exists and works, tagging
 and possibly clashing with it serves no purpose); letting `code-only`
 resume an active record like `experiment` does (silently promotes a stale
 edit, per above).
+
+## ADR-025: Hardening the Promote Path Against Concurrency and Orphaned Drafts
+
+**Date:** 2026-09-17
+**Status:** Accepted
+
+Three pre-existing defects in the promote / edit-in-code path, surfaced by a
+cross-vendor review, are fixed together (1.5.2):
+
+- **F4 — one active promotion per route is now enforced by the database.** The
+  endpoint's guard was a check-then-insert (`getActiveByRoute`, then
+  `upsertDraft`) with no lock, and the `idempotency_key` unique never collided on
+  a real race because that key is a fresh `randomUUID()` per call — so two
+  concurrent promotes for the same `(instance, route_id, plugin_type)` both
+  inserted an "active" row. A partial unique index (`WHERE state IN <active
+  states>`, migration `20260917120000`) makes the second insert fail;
+  `upsertDraft` catches it and raises `ActivePromotionExistsError`, which the
+  endpoint resolves per mode — an experiment resumes the winner, a code-only edit
+  gets the same 409 as an already-open promotion.
+- **F5 — a render-check failure no longer strands the draft.** The draft is
+  persisted before the equivalence check; a mismatch is deterministic (it never
+  converges), so the record is now moved to terminal `failed` (with the diff in
+  `detail`) instead of being left `draft`. A `draft` is active, so leaving it
+  would freeze every future code-only promote of that route+plugin-type forever.
+  `failed` over `discarded`: it keeps the record legible and, for `code-only`,
+  still reads as code-owned + editable (ADR-021).
+- **F3 — the render check and the promotion branch are cut from one pinned SHA.**
+  Both previously resolved the default-branch *name* independently; a merge
+  landing in between could base the branch on a tree the render check never
+  verified. `resolveRefSha` pins the commit once and both reuse it.
+
+Dialect note: migration `20260917120000` is the first in this package to use raw
+SQL. A partial unique index is supported by PostgreSQL (prod) and SQLite >= 3.8.0
+(tests: backend-test-utils `SQLITE_3`) — the only two dialects this plugin
+targets; a future MySQL target would need a dialect branch. The migration also
+defensively terminalizes any pre-existing duplicate active rows so the index can
+be created.
+
+Rejected: an advisory lock or SERIALIZABLE transaction for F4 (Postgres-only,
+diverges from the SQLite test path); deriving `idempotency_key` from the tuple
+(breaks re-promotion after a terminal state — the key must stay per-attempt).
+
+Known follow-up (not fixed here): the finalizer's `handleDraft` hardcodes
+`kong-promote/${plugin_type}` instead of calling `promotionBranch()` — if the
+branch convention ever changes, the orphan probe silently stops finding MRs.

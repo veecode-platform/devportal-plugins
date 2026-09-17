@@ -38,6 +38,7 @@ import { renderCheck, type EquivalenceResult } from './services/renderCheck';
 import type { HelmCapabilityGate } from './services/helmCapability';
 import { GitlabClient, type ResolvedRepo } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
+import { ActivePromotionExistsError } from './services/promotionStore';
 import { encodeMrDetail, decodeMrDetail } from './services/mrDetail';
 import { EXPERIMENTAL_TAG_PREFIX, KIC_OWNERSHIP_TAG, promotionBranch } from './services/promotionTags';
 
@@ -316,11 +317,14 @@ export async function createRouter({
   async function materializeAndCheck(
     client: GitlabClient,
     repo: ResolvedRepo,
+    ref: string,
     adapter: KongPluginAdapter,
     edits: FileEdit[],
     liveConfig: NormalizedConfig,
   ): Promise<{ dir: string; cleanup: () => Promise<void>; check: EquivalenceResult }> {
-    const { dir, cleanup } = await client.materializeChart(repo, repo.defaultBranch);
+    // `ref` is a pinned commit SHA (F3), not the moving default-branch name, so
+    // the render check and the promotion branch are cut from the same tree.
+    const { dir, cleanup } = await client.materializeChart(repo, ref);
     const check = await renderCheck({ repoDir: dir, adapter, edits, liveConfig, helmPath, helmTimeoutSeconds });
     return { dir, cleanup, check };
   }
@@ -832,38 +836,69 @@ export async function createRouter({
           );
         }
 
-        promotion = await promotionStore.upsertDraft({
-          idempotencyKey: randomUUID(),
-          instance,
-          serviceName,
-          routeId,
-          pluginType: adapter.pluginType,
-          configSnapshot: editedSnapshot,
-          requesterRef: await requesterRef(req),
-          mode: 'code-only',
-        });
-      } else {
-        // Step 1 (experiment, unchanged): persist the draft before any
-        // external write — a retry resumes the same in-flight record
-        // instead of starting a second attempt.
-        promotion =
-          activeBeforeStart ??
-          (await promotionStore.upsertDraft({
+        try {
+          promotion = await promotionStore.upsertDraft({
             idempotencyKey: randomUUID(),
             instance,
             serviceName,
             routeId,
             pluginType: adapter.pluginType,
-            configSnapshot: adapter.fromRendered({ config: plugin.config }),
+            configSnapshot: editedSnapshot,
             requesterRef: await requesterRef(req),
-            mode: 'experiment',
-          }));
+            mode: 'code-only',
+          });
+        } catch (err) {
+          // F4: a concurrent promote for the same route+plugin-type won the
+          // active-per-route DB guard between the getActiveByRoute check above
+          // and this insert. Same outcome as an already-open promotion — frozen.
+          if (err instanceof ActivePromotionExistsError) {
+            const link = err.active.mr_ref ? ` (${err.active.mr_ref})` : '';
+            throw new ConflictError(
+              `Route plugin '${plugin.name}' on route '${routeId}' has an open promotion${link} — edits are frozen until it merges, fails, or is discarded.`,
+            );
+          }
+          throw err;
+        }
+      } else {
+        // Step 1 (experiment): persist the draft before any external write — a
+        // retry resumes the same in-flight record instead of starting a second
+        // attempt.
+        if (activeBeforeStart) {
+          promotion = activeBeforeStart;
+        } else {
+          try {
+            promotion = await promotionStore.upsertDraft({
+              idempotencyKey: randomUUID(),
+              instance,
+              serviceName,
+              routeId,
+              pluginType: adapter.pluginType,
+              configSnapshot: adapter.fromRendered({ config: plugin.config }),
+              requesterRef: await requesterRef(req),
+              mode: 'experiment',
+            });
+          } catch (err) {
+            // F4: lost the active-per-route race to a concurrent promote of the
+            // same route+plugin-type. Resume the winner instead of a 500 — an
+            // experiment retry is meant to converge on the one in-flight record.
+            if (err instanceof ActivePromotionExistsError) {
+              promotion = err.active;
+            } else {
+              throw err;
+            }
+          }
+        }
       }
       const snapshot = promotion.config_snapshot as NormalizedConfig;
 
       // Step 2: generate + render-check (safe to redo on retry — pure function of the snapshot).
       const credentials = await httpAuth.credentials(req, { allow: ['user'] });
       const repo = await gitlabClient.resolveRepo(entityRef, credentials);
+      // F3: pin the default branch to a commit SHA once and use it for BOTH the
+      // render-check materialization and the promotion branch's base, so a merge
+      // landing on the default branch between the two never bases the branch on a
+      // tree the render check never verified (TOCTOU).
+      const baseSha = await gitlabClient.resolveRefSha(repo, repo.defaultBranch);
 
       // Persist the repo coordinates on the still-draft record before the MR
       // exists (P4 handoff note 1): a crash between the MR actually being
@@ -885,10 +920,22 @@ export async function createRouter({
         mode === 'code-only'
           ? adapter.toChartEdits(snapshot).filter(e => e.op !== 'create')
           : adapter.toChartEdits(snapshot);
-      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, snapshot);
+      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, baseSha, adapter, edits, snapshot);
 
       try {
         if (!check.equal) {
+          // F5 (issue: orphan draft): the draft was persisted before this check
+          // (the `draft` transition above). A render-check mismatch is
+          // deterministic — it will never converge on a retry — so leaving the
+          // record in `draft` strands it: `draft` is an ACTIVE_PROMOTION_STATE,
+          // and for a `code-only` edit the active-record guard would then refuse
+          // every future promote of this route+plugin-type forever. Terminalize
+          // it here (no MR and no Kong tag exist yet — nothing external to undo)
+          // so the route frees up again. `failed` rather than `discarded`: it
+          // keeps the record legible in history with the render diff in `detail`,
+          // and for `code-only` still reads as code-owned + editable
+          // (promotionBadge, ADR-021), so the next edit is offered normally.
+          await promotionStore.transition(promotion.id, 'failed', { detail: check.diff });
           throw new ConflictError(
             mode === 'code-only'
               ? `The chart does not expose '${adapter.pluginType}' as an editable value on this route, so editing in code can't reproduce the requested config — edit the plugin directly in the service's chart. Detail: ${check.diff}`
@@ -920,7 +967,7 @@ export async function createRouter({
         if (!mr) {
           await gitlabClient.deleteBranch(repo, branch);
         }
-        await gitlabClient.ensureBranch(repo, branch);
+        await gitlabClient.ensureBranch(repo, branch, baseSha);
         const existing = await gitlabClient.pathsExistingOnRef(repo, branch, edits.map(e => e.path));
         await gitlabClient.commitEdits(
           repo,
@@ -1025,6 +1072,10 @@ export async function createRouter({
 
       const credentials = await httpAuth.credentials(req, { allow: ['user'] });
       const repo = await gitlabClient.resolveRepo(entityRef, credentials);
+      // Pin the default branch to a SHA so the render check runs against a fixed
+      // tree (F3) — a preview writes nothing, but this keeps its check consistent
+      // with what promote would verify.
+      const baseSha = await gitlabClient.resolveRefSha(repo, repo.defaultBranch);
 
       // Same edit-in-code rule as promote (B1): code-only never rewrites the
       // team's template, only the values it exposes.
@@ -1032,7 +1083,7 @@ export async function createRouter({
         mode === 'code-only'
           ? adapter.toChartEdits(previewConfig).filter(e => e.op !== 'create')
           : adapter.toChartEdits(previewConfig);
-      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, adapter, edits, previewConfig);
+      const { dir, cleanup, check } = await materializeAndCheck(gitlabClient, repo, baseSha, adapter, edits, previewConfig);
 
       try {
         if (!check.equal) {

@@ -8,6 +8,7 @@ import { createRouter } from './router';
 import type { KongServiceManagerService } from './services/KongServiceManagerService';
 import type { GitlabClient } from './services/GitlabClient';
 import type { PromotionRecordRow, PromotionStore } from './services/promotionStore';
+import { ActivePromotionExistsError } from './services/promotionStore';
 import { copyGoldenPathRepo } from './services/__fixtures__/copyGoldenPathRepo';
 import { renderCheck } from './services/renderCheck';
 import type { AssociatedPluginsResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
@@ -95,6 +96,7 @@ function promotionStoreMock(): jest.Mocked<PromotionStore> {
 function gitlabClientMock(): jest.Mocked<GitlabClient> {
   return {
     resolveRepo: jest.fn(),
+    resolveRefSha: jest.fn().mockResolvedValue('base-sha-fixed'),
     materializeChart: jest.fn(),
     pathsExistingOnRef: jest.fn(),
     ensureBranch: jest.fn(),
@@ -235,7 +237,10 @@ describe('promote to code (Task P3)', () => {
 
         expect(res.status).toBe(201);
         expect(res.body).toMatchObject({ state: 'mr-open', mrRef: mr.webUrl, pluginType: 'rate-limiting' });
-        expect(gitlabClient.ensureBranch).toHaveBeenCalledWith(repo, 'kong-promote/rate-limiting');
+        // F3: the branch is cut from the pinned base SHA (not the moving branch
+        // name), the same tree the render check materialized.
+        expect(gitlabClient.ensureBranch).toHaveBeenCalledWith(repo, 'kong-promote/rate-limiting', 'base-sha-fixed');
+        expect(gitlabClient.resolveRefSha).toHaveBeenCalledWith(repo, 'main');
         // No MR open for the branch → any leftover branch is stale and is
         // recreated from the default branch, never committed onto (ADR-022).
         expect(gitlabClient.deleteBranch).toHaveBeenCalledWith(repo, 'kong-promote/rate-limiting');
@@ -755,6 +760,67 @@ describe('promote to code (Task P3)', () => {
       } finally {
         await chart.cleanup();
       }
+    });
+
+    it('promote terminalizes the draft as `failed` (not left `draft`) when the render check can\'t reproduce the edit — the route+plugin-type is not frozen forever (F5)', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const promotionStore = promotionStoreMock();
+      const theDraft = draftRow({ mode: 'code-only', config_snapshot: { minute: 30 } });
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      promotionStore.upsertDraft.mockResolvedValue(theDraft);
+      promotionStore.transition.mockResolvedValue(undefined);
+
+      const gitlabClient = gitlabClientMock();
+      const chart = withCodeOwnedChart(gitlabClient, HARDCODED_RL_TEMPLATE);
+      gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+      try {
+        const res = await request(app)
+          .post(PROMOTE_URL)
+          .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+        expect(res.status).toBe(409);
+        // The draft persisted before the render check (Step 2) is moved to a
+        // terminal `failed` state with the diff, instead of being left `draft`.
+        // A `draft` is an ACTIVE_PROMOTION_STATE, so leaving it would refuse every
+        // future code-only promote of this route+plugin-type indefinitely (F5).
+        expect(promotionStore.transition).toHaveBeenCalledWith(
+          theDraft.id,
+          'failed',
+          expect.objectContaining({ detail: expect.any(String) }),
+        );
+        expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
+      } finally {
+        await chart.cleanup();
+      }
+    });
+
+    it('promote 409s a code-only edit that loses the active-per-route race to a concurrent promote — not a raw 500 (F4)', async () => {
+      const kongService = kongServiceForCodeOwned();
+
+      const promotionStore = promotionStoreMock();
+      // Nothing active at the initial check, but the DB insert loses the race:
+      // the store surfaces the concurrent winner as ActivePromotionExistsError.
+      promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+      const winner = draftRow({
+        state: 'mr-open',
+        mr_ref: 'https://gitlab.example.com/team/svc/-/merge_requests/5',
+      });
+      promotionStore.upsertDraft.mockRejectedValue(new ActivePromotionExistsError(winner));
+
+      const gitlabClient = gitlabClientMock();
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+      const res = await request(app)
+        .post(PROMOTE_URL)
+        .send({ entityRef: 'component:default/svc', config: { minute: 30 } });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.message).toMatch(/has an open promotion/);
+      expect(res.body.error.message).toContain('merge_requests/5');
+      expect(gitlabClient.commitEdits).not.toHaveBeenCalled();
     });
 
     it('promote 409s when the chart declares the plugin type more than once — can\'t tell which one to edit (B1)', async () => {
