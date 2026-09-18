@@ -4,9 +4,10 @@
 
 Run commands from `workspaces/dummy/`.
 
-- Workspace scripts: `yarn install`, `yarn start`, `yarn tsc`, `yarn tsc:full`, `yarn build:all`, `yarn test:all --watchAll=false`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check`.
+- Workspace scripts: `yarn install`, `yarn start`, `yarn tsc`, `yarn tsc:full`, `yarn build:all`, `yarn test:all --watchAll=false`, `yarn test:all --coverage`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check`.
 - In `plugins/dummy` or `plugins/dummy-backend`: `yarn start`, `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
-- Makefile targets: `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, and `make clean-dynamic`.
+- Makefile targets: `make help`, `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, and `make clean-dynamic`.
+- The Makefile also defines `make set-version VERSION=x.y.z`, `make get-version`, `make unpublish`, `make publish`, and `make publish-dynamic` as legacy registry utilities; the official delivery rules are in [Pull requests](../../CONTRIBUTING.md#pull-requests).
 
 ## Layout
 
@@ -40,7 +41,11 @@ the frontend route and the backend health evidence as well as package tests.
 
 Proof 1 is organized in three layers: frontend and backend package tests under
 `plugins/`, dev-shell wiring tests under the `packages/app` and `packages/backend`
-source trees, and the Playwright suite selected by `playwright.config.ts`.
+source trees, and the Playwright suite selected by `playwright.config.ts`. The
+reference test files are `plugins/dummy/src/plugin.test.ts`, component tests under
+`DummyComponent`, `DummyFetchComponent`, `DummyCard`, and `DummyContent`, backend
+`plugin.test.ts` and `router.test.ts`, plus `App.test.tsx` and `index.test.ts` in the
+two dev-shell packages.
 The frontend tests cover plugin export, components, entity rendering, and mocked
 fetch; the backend tests cover the real backend feature and a router with a mocked
 service. The Playwright configuration starts the app and backend through the

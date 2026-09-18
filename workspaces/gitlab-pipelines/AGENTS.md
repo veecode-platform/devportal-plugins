@@ -4,10 +4,11 @@
 
 Run commands from `workspaces/gitlab-pipelines/`.
 
-- Workspace scripts: `yarn install`, `yarn start`, `yarn start:local`, `yarn tsc`, `yarn tsc:full`, `yarn build:all`, `yarn test:all --watchAll=false`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check`.
+- Workspace scripts: `yarn install`, `yarn start`, `yarn start:local`, `yarn tsc`, `yarn tsc:full`, `yarn build:all`, `yarn test:all --watchAll=false`, `yarn test:all --coverage`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check`.
 - In `plugins/gitlab-pipelines` or `plugins/gitlab-pipelines-backend`: `yarn start`, `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
 - In `plugins/gitlab-pipelines-common`: `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
-- Makefile targets: `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, `make clean-dynamic`, `make replace-workspace`, and `make restore-workspace`.
+- Makefile targets: `make help`, `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, `make clean-dynamic`, `make replace-workspace`, and `make restore-workspace`.
+- The Makefile also defines `make set-version VERSION=x.y.z`, `make get-version`, `make unpublish`, `make publish`, and `make publish-dynamic` as legacy registry utilities; the official delivery rules are in [Pull requests](../../CONTRIBUTING.md#pull-requests).
 
 ## Layout
 

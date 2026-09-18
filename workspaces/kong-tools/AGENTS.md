@@ -4,10 +4,11 @@
 
 Run commands from `workspaces/kong-tools/`.
 
-- Workspace scripts: `yarn install`, `yarn start`, `yarn tsc`, `yarn tsc:full`, `yarn build:all`, `yarn test:all --watchAll=false`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check`.
+- Workspace scripts: `yarn install`, `yarn start`, `yarn tsc`, `yarn tsc:full`, `yarn build:all`, `yarn test:all --watchAll=false`, `yarn test:all --coverage`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check`.
 - In `plugins/kong-service-manager`, `plugins/kong-service-manager-backend`, or `plugins/scaffolder-field-extensions-kong`: `yarn start`, `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
 - In `plugins/kong-service-manager-common` or `plugins/scaffolder-backend-module-kong`: `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
-- Makefile targets: `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, and `make clean-dynamic`.
+- Makefile targets: `make help`, `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, and `make clean-dynamic`.
+- The Makefile also defines `make set-version VERSION=x.y.z`, `make get-version`, `make unpublish`, `make publish`, and `make publish-dynamic` as legacy registry utilities; the official delivery rules are in [Pull requests](../../CONTRIBUTING.md#pull-requests).
 
 ## Layout
 
