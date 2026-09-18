@@ -30,6 +30,35 @@ export async function applyFileEdits(repoDir: string, edits: FileEdit[]): Promis
       continue;
     }
 
+    if (edit.op === 'delete') {
+      // Idempotent removal (issue #3, delete-in-code): the file may already be
+      // absent on a retry or preview. `force` makes a missing file a no-op.
+      await fs.rm(targetPath, { force: true });
+      continue;
+    }
+
+    if (edit.op === 'delete-key') {
+      // Remove only the adapter-owned values entry. Keeping the rest of
+      // values.yaml intact preserves team comments and sibling plugin config;
+      // an absent values file is already equivalent to an absent key.
+      let source: string;
+      try {
+        source = await fs.readFile(targetPath, 'utf8');
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw err;
+      }
+      const doc = parseDocument(source);
+      if (doc.errors.length > 0) {
+        throw new Error(`${edit.path}: ${doc.errors.map(e => e.message).join('; ')}`);
+      }
+      if (isMap(doc.contents)) {
+        doc.deleteIn(edit.keyPath);
+        await fs.writeFile(targetPath, doc.toString(), 'utf8');
+      }
+      continue;
+    }
+
     // Comment-preserving merge (#126): edit the YAML document in place with
     // the `yaml` Document API instead of a load/dump round-trip, so every
     // comment, quoting style and key order the adapter does not touch
@@ -78,6 +107,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function hasPluginAnnotation(doc: Record<string, unknown>, pluginName: string): boolean {
+  const metadata = isPlainObject(doc.metadata) ? doc.metadata : undefined;
+  const annotations = metadata && isPlainObject(metadata.annotations) ? metadata.annotations : undefined;
+  const raw = annotations?.['konghq.com/plugins'];
+  return typeof raw === 'string' && raw.split(',').some(value => value.trim() === pluginName);
+}
+
 
 export interface EquivalenceResult {
   equal: boolean;
@@ -104,6 +140,13 @@ export async function renderCheck(params: {
   helmPath?: string;
   /** `kong.promotion.helmTimeoutSeconds`. @default 60 */
   helmTimeoutSeconds?: number;
+  /**
+   * Invert the contract for delete-in-code (issue #3): success is the plugin
+   * type being *absent* from the rendered chart after `edits` (a template
+   * removal) apply. `liveConfig` is not compared in this mode — there is no
+   * config to reproduce, only an absence to confirm.
+   */
+  expectAbsent?: boolean;
 }): Promise<EquivalenceResult> {
   const {
     repoDir,
@@ -113,6 +156,7 @@ export async function renderCheck(params: {
     releaseName = 'promotion-check',
     helmPath = 'helm',
     helmTimeoutSeconds = 60,
+    expectAbsent = false,
   } = params;
 
   await applyFileEdits(repoDir, edits);
@@ -148,10 +192,35 @@ export async function renderCheck(params: {
     await fs.rm(scratchDir, { recursive: true, force: true });
   }
 
-  const manifests = yaml
+  const documents = yaml
     .loadAll(stdout)
-    .filter((doc): doc is Record<string, unknown> => isPlainObject(doc))
-    .filter(doc => doc.kind === 'KongPlugin' && doc.plugin === adapter.pluginType);
+    .filter((doc): doc is Record<string, unknown> => isPlainObject(doc));
+  const manifests = documents.filter(doc => doc.kind === 'KongPlugin' && doc.plugin === adapter.pluginType);
+  const generatedPluginName = `${releaseName}-${adapter.pluginType}`;
+  const attachmentReferences = documents.filter(doc => hasPluginAnnotation(doc, generatedPluginName));
+
+  if (expectAbsent) {
+    // Delete-in-code (issue #3): the removal succeeds exactly when the type no
+    // longer renders and no rendered resource still attaches that generated
+    // name. Any surviving manifest or annotation means the removal was
+    // incomplete — refuse rather than open an MR that leaves the plugin or a
+    // dangling Kong attachment behind.
+    if (manifests.length === 0 && attachmentReferences.length === 0) {
+      return { equal: true };
+    }
+    const details = [
+      manifests.length > 0
+        ? `rendered chart still declares ${manifests.length} KongPlugin manifest(s) of type '${adapter.pluginType}'`
+        : undefined,
+      attachmentReferences.length > 0
+        ? `rendered chart still attaches '${generatedPluginName}' through konghq.com/plugins`
+        : undefined,
+    ].filter((detail): detail is string => !!detail);
+    return {
+      equal: false,
+      diff: `${details.join('; ')} after removing the generated template — the chart references this plugin elsewhere; remove it directly in the repository`,
+    };
+  }
 
   if (manifests.length === 0) {
     return {

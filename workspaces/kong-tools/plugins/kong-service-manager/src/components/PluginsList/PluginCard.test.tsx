@@ -21,12 +21,7 @@ const noop = () => {};
 describe('PluginCard', () => {
   it('renders plugin name and description', () => {
     render(
-      <PluginCard
-        plugin={basePlugin}
-        onEnable={noop}
-        onEdit={noop}
-        onDisable={noop}
-      />,
+      <PluginCard plugin={basePlugin} onEnable={noop} onEdit={noop} />,
     );
 
     expect(screen.getByText('rate-limiting')).toBeInTheDocument();
@@ -35,64 +30,81 @@ describe('PluginCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows Enable button when not associated', () => {
+  it('shows Enable button (and no toggle or removal action) when not associated', () => {
     render(
       <PluginCard
         plugin={basePlugin}
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
+        onToggleEnabled={noop}
       />,
     );
 
     expect(screen.getByRole('button', { name: 'Enable' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Delete plugin' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('shows Disable button when associated', () => {
+  // --- Enable / disable toggle (#2) ---
+
+  it('shows the enabled toggle when associated, not Enable', () => {
     render(
       <PluginCard
         plugin={basePlugin}
         associatedId="plugin-id-123"
+        enabled
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
+        onToggleEnabled={noop}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Disable' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enable' })).not.toBeInTheDocument();
+  });
+
+  it('reflects a disabled plugin: toggle off, label "Disabled"', () => {
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        enabled={false}
+        onEnable={noop}
+        onEdit={noop}
+        onToggleEnabled={noop}
+      />,
+    );
+
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
   });
 
   it('calls onEnable with plugin slug when Enable is clicked', async () => {
     const onEnable = jest.fn();
-    render(
-      <PluginCard
-        plugin={basePlugin}
-        onEnable={onEnable}
-        onEdit={noop}
-        onDisable={noop}
-      />,
-    );
+    render(<PluginCard plugin={basePlugin} onEnable={onEnable} onEdit={noop} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Enable' }));
     expect(onEnable).toHaveBeenCalledWith('rate-limiting');
   });
 
-  it('calls onDisable with plugin id and name when Disable is clicked', async () => {
-    const onDisable = jest.fn();
+  it('calls onToggleEnabled with the next value when the toggle is flipped off', async () => {
+    const onToggleEnabled = jest.fn();
     render(
       <PluginCard
         plugin={basePlugin}
         associatedId="plugin-id-123"
+        enabled
         onEnable={noop}
         onEdit={noop}
-        onDisable={onDisable}
+        onToggleEnabled={onToggleEnabled}
       />,
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Disable' }));
-    expect(onDisable).toHaveBeenCalledWith('plugin-id-123', 'rate-limiting');
+    await userEvent.click(screen.getByRole('checkbox'));
+    expect(onToggleEnabled).toHaveBeenCalledWith('plugin-id-123', 'rate-limiting', false);
   });
 
   it('shows edit button when associated', () => {
@@ -102,7 +114,6 @@ describe('PluginCard', () => {
         associatedId="plugin-id-123"
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
       />,
     );
 
@@ -120,7 +131,6 @@ describe('PluginCard', () => {
         associatedId="plugin-id-123"
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
       />,
     );
 
@@ -138,7 +148,6 @@ describe('PluginCard', () => {
         canPromote
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
       />,
     );
 
@@ -157,7 +166,6 @@ describe('PluginCard', () => {
         canPromote
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onPromote={onPromote}
       />,
     );
@@ -177,7 +185,6 @@ describe('PluginCard', () => {
         promoteDisabledReason="No owning repo — exposure of repo-less APIs is a future milestone"
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
       />,
     );
 
@@ -185,7 +192,7 @@ describe('PluginCard', () => {
     expect(screen.getByText(/No owning repo/)).toBeInTheDocument();
   });
 
-  it('shows Discard promotion instead of Disable while a promotion is open, and calls onDiscardPromotion', async () => {
+  it('shows Discard promotion instead of the toggle while a promotion is open, and calls onDiscardPromotion', async () => {
     const onDiscardPromotion = jest.fn();
     const badge: PromotionBadge = { kind: 'mr-open', ageMs: 60_000 };
     render(
@@ -196,17 +203,18 @@ describe('PluginCard', () => {
         canPromote
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
+        onToggleEnabled={noop}
         onDiscardPromotion={onDiscardPromotion}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete plugin' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Discard promotion' }));
     expect(onDiscardPromotion).toHaveBeenCalledWith('plugin-id-123', 'rate-limiting');
   });
 
-  it('hides Disable, Edit, and Promote actions once codified (read-only)', () => {
+  it('hides toggle, Edit, and Promote actions once codified (read-only)', () => {
     const badge: PromotionBadge = { kind: 'codified', ageMs: 60_000 };
     render(
       <PluginCard
@@ -216,13 +224,15 @@ describe('PluginCard', () => {
         canPromote
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
+        onToggleEnabled={noop}
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete plugin' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit plugin configuration' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Managed from the repository/)).toBeInTheDocument();
   });
 
   it('hides Promote after a failed handover (ADR-020: nothing left to promote)', () => {
@@ -251,7 +261,6 @@ describe('PluginCard', () => {
         canPromote
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onPromote={noop}
       />,
     );
@@ -259,7 +268,7 @@ describe('PluginCard', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
-  it('renders a code-owned plugin read-only: no Promote, Discard, Disable or Edit (ADR-017, #136)', () => {
+  it('renders a code-owned plugin read-only: no Promote, Discard, toggle, or Edit (ADR-017, #136)', () => {
     const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000 };
     render(
       <PluginCard
@@ -269,14 +278,15 @@ describe('PluginCard', () => {
         canPromote
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
+        onToggleEnabled={noop}
         onDiscardPromotion={noop}
       />,
     );
 
     expect(screen.queryByRole('button', { name: /Promote to code/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Discard promotion' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete plugin' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit plugin configuration/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Managed from the repository/)).toBeInTheDocument();
   });
@@ -292,7 +302,6 @@ describe('PluginCard', () => {
         promoteDisabledReason="'request-size-limiting' has no promotion adapter; only correlation-id, rate-limiting can be promoted to code"
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onPromote={noop}
       />,
     );
@@ -313,7 +322,6 @@ describe('PluginCard', () => {
         editInCodeEnabled
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onDiscardPromotion={noop}
         onEditInCode={onEditInCode}
       />,
@@ -332,7 +340,6 @@ describe('PluginCard', () => {
         canPromote
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onDiscardPromotion={noop}
         onEditInCode={noop}
       />,
@@ -342,9 +349,6 @@ describe('PluginCard', () => {
   });
 
   it('hides Edit in code for a code-owned plugin the ingress controller does not manage (would 400)', () => {
-    // Code-owned by ownership (no portal tags) but not KIC-tagged: the backend
-    // W1 gate refuses edit-in-code, so the button must not appear even with the
-    // capability on (issue #135).
     const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000, editableInCode: false };
     render(
       <PluginCard
@@ -355,7 +359,6 @@ describe('PluginCard', () => {
         editInCodeEnabled
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onDiscardPromotion={noop}
         onEditInCode={noop}
       />,
@@ -376,7 +379,6 @@ describe('PluginCard', () => {
         editInCodeEnabled
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onDiscardPromotion={noop}
         onEditInCode={onEditInCode}
       />,
@@ -384,6 +386,65 @@ describe('PluginCard', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit in code' }));
     expect(onEditInCode).toHaveBeenCalledWith('plugin-id-123', basePlugin.slug);
+  });
+
+  // --- Remove from code (issue #3) ---
+
+  it('shows Remove from code for a code-owned KIC plugin when the capability is on', () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000, editableInCode: true };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        editInCodeEnabled
+        onEnable={noop}
+        onEdit={noop}
+        onEditInCode={noop}
+        onDeleteInCode={noop}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Remove from code' })).toBeInTheDocument();
+  });
+
+  it('hides Remove from code for a code-owned plugin the ingress controller does not manage', () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000, editableInCode: false };
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        editInCodeEnabled
+        onEnable={noop}
+        onEdit={noop}
+        onDeleteInCode={noop}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Remove from code' })).not.toBeInTheDocument();
+  });
+
+  it('calls onDeleteInCode with plugin id and name when Remove from code is clicked', async () => {
+    const badge: PromotionBadge = { kind: 'code-owned', ageMs: 60_000, editableInCode: true };
+    const onDeleteInCode = jest.fn();
+    render(
+      <PluginCard
+        plugin={basePlugin}
+        associatedId="plugin-id-123"
+        promotionBadge={badge}
+        canPromote
+        editInCodeEnabled
+        onEnable={noop}
+        onEdit={noop}
+        onDeleteInCode={onDeleteInCode}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from code' }));
+    expect(onDeleteInCode).toHaveBeenCalledWith('plugin-id-123', basePlugin.slug);
   });
 
   it('hides Edit in code once a code-only promotion is active (badge no longer code-owned)', () => {
@@ -397,7 +458,6 @@ describe('PluginCard', () => {
         editInCodeEnabled
         onEnable={noop}
         onEdit={noop}
-        onDisable={noop}
         onDiscardPromotion={noop}
         onEditInCode={noop}
       />,

@@ -197,7 +197,7 @@ test.describe('Permission visibility — Admin', () => {
     await mockKongBackend(page);
   });
 
-  test('Plugins tab: Enable and Disable buttons visible', async ({ page }) => {
+  test('Plugins tab: Enable and the enabled toggle visible', async ({ page }) => {
     await page.goto('/');
 
     // Sign in if guest provider shows Enter button
@@ -213,9 +213,10 @@ test.describe('Permission visibility — Admin', () => {
     // Click the Plugins tab
     await page.getByRole('tab', { name: 'Plugins' }).click();
 
-    // Admin should see Enable and Disable buttons
+    // A non-associated plugin shows Enable; the associated rate-limiting plugin
+    // shows the on/off toggle (a checkbox) — "disable" is toggling it off.
     await expect(page.getByRole('button', { name: 'Enable' }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Disable' }).first()).toBeVisible();
+    await expect(page.getByRole('checkbox').first()).toBeVisible();
   });
 
   test('Routes tab: Create Route, Edit, Delete visible', async ({ page }) => {
@@ -240,7 +241,7 @@ test.describe('Permission visibility — Operator', () => {
     await mockKongBackend(page);
   });
 
-  test('Plugins tab: Enable and Disable buttons visible', async ({ page }) => {
+  test('Plugins tab: Enable and the enabled toggle visible', async ({ page }) => {
     await page.goto('/catalog/default/component/my-service');
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
@@ -250,8 +251,9 @@ test.describe('Permission visibility — Operator', () => {
 
     await page.getByRole('tab', { name: 'Plugins' }).click();
 
+    // Operator has update, so the on/off toggle shows.
     await expect(page.getByRole('button', { name: 'Enable' }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Disable' }).first()).toBeVisible();
+    await expect(page.getByRole('checkbox').first()).toBeVisible();
   });
 
   test('Routes tab: Create Route NOT visible, Edit/Delete NOT visible', async ({ page }) => {
@@ -280,7 +282,7 @@ test.describe('Permission visibility — Viewer', () => {
     await mockKongBackend(page);
   });
 
-  test('Plugins tab: Enable and Disable buttons NOT visible, data still shows', async ({ page }) => {
+  test('Plugins tab: no mutation controls (toggle/Enable), data still shows', async ({ page }) => {
     await page.goto('/catalog/default/component/my-service');
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
@@ -293,9 +295,9 @@ test.describe('Permission visibility — Viewer', () => {
     // Plugin cards should still be visible (data is readable)
     await expect(page.getByText('rate-limiting')).toBeVisible();
 
-    // Mutation buttons should NOT be visible
+    // Mutation controls should NOT be visible for a viewer.
     await expect(page.getByRole('button', { name: 'Enable' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Disable' })).toHaveCount(0);
+    await expect(page.getByRole('checkbox')).toHaveCount(0);
   });
 
   test('Routes tab: data visible, no mutation buttons', async ({ page }) => {

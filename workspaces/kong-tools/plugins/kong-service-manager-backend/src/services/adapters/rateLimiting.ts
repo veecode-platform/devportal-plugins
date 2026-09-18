@@ -1,6 +1,8 @@
 import { FileEdit, KongPluginAdapter, NormalizedConfig } from './types';
 
 const PLUGIN_TYPE = 'rate-limiting';
+const VALUES_PATH = 'chart/values.yaml';
+const VALUES_KEY_PATH = ['kongPlugins', 'rateLimiting'];
 const TEMPLATE_PATH = `chart/templates/kongplugin-${PLUGIN_TYPE}.yaml`;
 
 function manifestTemplate(): string {
@@ -41,7 +43,7 @@ export const rateLimitingAdapter: KongPluginAdapter = {
 
     return [
       {
-        path: 'chart/values.yaml',
+        path: VALUES_PATH,
         op: 'merge',
         values: { kongPlugins: { rateLimiting: { minute } } },
       },
@@ -52,5 +54,16 @@ export const rateLimitingAdapter: KongPluginAdapter = {
   fromRendered(kongPluginManifest: Record<string, unknown>): NormalizedConfig {
     const config = (kongPluginManifest.config ?? {}) as Record<string, unknown>;
     return { minute: Number(config.minute) };
+  },
+
+  expectedTemplate(): { path: string; content: string } {
+    return { path: TEMPLATE_PATH, content: manifestTemplate() };
+  },
+
+  toChartRemoval(): FileEdit[] {
+    return [
+      { path: VALUES_PATH, op: 'delete-key', keyPath: VALUES_KEY_PATH },
+      { path: TEMPLATE_PATH, op: 'delete' },
+    ];
   },
 };

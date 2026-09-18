@@ -161,14 +161,20 @@ async function deletePromotionBranchIfUnused(
 }
 
 /**
- * `mode === 'code-only'` (issue #135) means this record never created,
- * tagged, or froze anything in Kong — it edits an already code-owned plugin
- * directly. Every Kong-write site in the finalizer must skip its write for
- * such a record; reads (e.g. `handleApplying`'s convergence check) are
- * unaffected and need no guard.
+ * Only an `experiment` record ever created, tagged, or froze a plugin in Kong.
+ * A `code-only` edit (issue #135) and a `delete` removal (issue #3) both target
+ * an already code-owned plugin, so every Kong-*write* site in the finalizer
+ * (tag, untag, delete-at-merge) must skip its write for them; reads (the
+ * convergence checks) are unaffected. Gating on "is an experiment" rather than
+ * "is not code-only" keeps a third mode from silently reactivating those writes.
  */
-function isCodeOnly(record: PromotionRecordRow): boolean {
-  return record.mode === 'code-only';
+function isExperimentMode(record: PromotionRecordRow): boolean {
+  return record.mode === 'experiment';
+}
+
+/** Delete-in-code (issue #3): the MR removes the plugin's template; convergence is the KIC-owned plugin *disappearing*, the inverse of the promote/codify check. */
+function isDeleteMode(record: PromotionRecordRow): boolean {
+  return record.mode === 'delete';
 }
 
 async function abortForTeardown(deps: {
@@ -181,9 +187,10 @@ async function abortForTeardown(deps: {
   reason: 'archived' | 'gone' | 'unregistered';
 }): Promise<void> {
   const { logger, gitlab, kong, store, record, detail, reason } = deps;
-  // A code-only record (issue #135) never created an experiment in Kong, so
-  // there is nothing to remove — only the MR/branch cleanup below applies.
-  if (!isCodeOnly(record)) {
+  // A code-only (issue #135) or delete (issue #3) record never created an
+  // experiment in Kong, so there is nothing to remove — only the MR/branch
+  // cleanup below applies.
+  if (isExperimentMode(record)) {
     const experimental = await findExperimentalPlugin(kong, record);
     if (experimental) {
       await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
@@ -204,9 +211,9 @@ async function abortForTeardown(deps: {
     }
   }
   await store.transition(record.id, 'aborted-teardown', {
-    detail: isCodeOnly(record)
-      ? `project ${reason} during an open code-only edit; merge request closed (no experiment in Kong)`
-      : `project ${reason} during an open promotion; leftover experimental plugin removed, merge request closed`,
+    detail: isExperimentMode(record)
+      ? `project ${reason} during an open promotion; leftover experimental plugin removed, merge request closed`
+      : `project ${reason} during an open ${record.mode} operation; merge request closed (no experiment in Kong)`,
   });
   logger.info('kong-service-manager promotion aborted by teardown', {
     promotionId: record.id,
@@ -255,9 +262,9 @@ async function handleMrOpen(deps: {
 
   const mr = await gitlab.getMergeRequest(detail, detail.iid);
   if (mr.state === 'closed') {
-    // A code-only record (issue #135) never tagged an experiment — nothing
-    // to untag; the branch cleanup below applies to both modes.
-    if (!isCodeOnly(record)) {
+    // A code-only (issue #135) or delete (issue #3) record never tagged an
+    // experiment — nothing to untag; the branch cleanup below applies to all modes.
+    if (isExperimentMode(record)) {
       await untagExperimental(kong, record);
     }
     // The branch would otherwise outlive the MR and be found stale by the
@@ -282,9 +289,11 @@ async function handleMrOpen(deps: {
   // Idempotent: if the process crashed between this delete and the
   // transition below, the record is still `mr-open`, the next tick finds no
   // experiment and just transitions.
-  // A `code-only` record (issue #135) never created an experiment — the
-  // plugin it edited was already code-owned — so there is nothing to remove.
-  if (!isCodeOnly(record)) {
+  // A `code-only` (issue #135) or `delete` (issue #3) record never created an
+  // experiment — the plugin was already code-owned — so there is nothing to
+  // remove here. For a delete, the code-owned plugin is removed by the Kong
+  // Ingress Controller once the merged chart (now missing its template) deploys.
+  if (isExperimentMode(record)) {
     const experimental = await findExperimentalPlugin(kong, record);
     if (experimental) {
       await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
@@ -296,7 +305,7 @@ async function handleMrOpen(deps: {
       ...detail,
       parkedSince: new Date().toISOString(),
       mergedAt: mr.mergedAt ?? new Date().toISOString(),
-      experimentRemovedAt: new Date().toISOString(),
+      ...(isExperimentMode(record) ? { experimentRemovedAt: new Date().toISOString() } : {}),
     }),
   });
 }
@@ -334,22 +343,35 @@ async function handleApplying(deps: {
 }): Promise<void> {
   const { logger, kong, store, config, record, detail } = deps;
 
-  // No delete here (ADR-020): the experiment was removed at merge, so by the
-  // time a record reaches `applying` the route is already free for the
-  // code-owned plugin.
-  //
-  // Converged only when the KIC-owned plugin exists AND its
-  // normalized config equals the promoted snapshot — existence alone would
-  // also match an already-codified plugin from an earlier promotion of the
-  // same type/route (the update case), so it is never sufficient on its own.
-  const kicPlugin = await findPluginByTag(
-    kong,
-    record.instance,
-    record.route_id,
-    record.plugin_type,
-    p => (p.tags ?? []).includes(KIC_OWNERSHIP_TAG),
-  );
-  if (kicPlugin) {
+  // No Kong write here (ADR-020): by the time a record reaches `applying` the
+  // route is already handed over — for a promote, the experiment was removed
+  // at merge; for a delete (issue #3), the merged chart no longer declares the
+  // plugin. `applying` only *reads* Kong to confirm the Ingress Controller has
+  // converged.
+  const kicPlugin = isDeleteMode(record)
+    ? await findPluginByTag(kong, record.instance, record.route_id, record.plugin_type, () => true)
+    : await findPluginByTag(
+        kong,
+        record.instance,
+        record.route_id,
+        record.plugin_type,
+        p => (p.tags ?? []).includes(KIC_OWNERSHIP_TAG),
+      );
+
+  if (isDeleteMode(record)) {
+    // Delete converges when no plugin of this type remains — the KIC
+    // reconciled the removed template off the gateway. Query all owners here:
+    // a stale plugin whose KIC tag was removed must not be mistaken for a
+    // successful deletion.
+    if (!kicPlugin) {
+      await store.transition(record.id, 'codified');
+      return;
+    }
+  } else if (kicPlugin) {
+    // Promote/edit converge only when the KIC-owned plugin exists AND its
+    // normalized config equals the promoted snapshot — existence alone would
+    // also match an already-codified plugin from an earlier promotion of the
+    // same type/route (the update case), so it is never sufficient on its own.
     const adapter = getAdapter(record.plugin_type);
     if (adapter) {
       const normalized = adapter.fromRendered({ config: kicPlugin.config });
@@ -372,21 +394,24 @@ async function handleApplying(deps: {
   if (elapsedMs < config.applyTimeoutMinutes * 60_000) return;
 
   // Timeout exceeded — stop automating and hand the route back to a human.
-  // Nothing is restored (ADR-020): recreating the experiment would collide
-  // with the merged chart's plugin on the next controller sync, which is the
-  // incident this ordering exists to prevent. Recovery is a human decision —
-  // fix the chart, or revert the merge request.
+  // Nothing is restored (ADR-020): recovery is a human decision — fix the
+  // chart, or revert the merge request.
   await store.transition(record.id, 'failed', {
-    detail:
-      `code-owned '${record.plugin_type}' plugin did not converge on route '${record.route_id}' within ` +
-      `${config.applyTimeoutMinutes} min after a successful deploy of the merged chart; the experiment was ` +
-      `removed at merge and is intentionally not restored (one plugin per type per route). Check the Kong ` +
-      `Ingress Controller events for the KongPlugin, or revert the merge request.`,
+    detail: isDeleteMode(record)
+      ? `code-owned '${record.plugin_type}' plugin was still present on route '${record.route_id}' ` +
+        `${config.applyTimeoutMinutes} min after a successful deploy of the chart with its template removed; ` +
+        `the Kong Ingress Controller has not removed it. Check its events for the KongPlugin, or revert the ` +
+        `merge request.`
+      : `code-owned '${record.plugin_type}' plugin did not converge on route '${record.route_id}' within ` +
+        `${config.applyTimeoutMinutes} min after a successful deploy of the merged chart; the experiment was ` +
+        `removed at merge and is intentionally not restored (one plugin per type per route). Check the Kong ` +
+        `Ingress Controller events for the KongPlugin, or revert the merge request.`,
   });
   logger.warn('kong-service-manager promotion timed out without converging', {
     promotionId: record.id,
     routeId: record.route_id,
     pluginType: record.plugin_type,
+    mode: record.mode,
     applyTimeoutMinutes: config.applyTimeoutMinutes,
   });
 }

@@ -235,13 +235,33 @@ export class GitlabClient {
     existing: Set<string>,
     message: string,
   ): Promise<{ sha: string }> {
-    const actions = await Promise.all(
-      edits.map(async edit => ({
-        action: existing.has(edit.path) ? 'update' : 'create',
-        file_path: edit.path,
-        content: await fs.readFile(path.join(dir, edit.path), 'utf8'),
-      })),
-    );
+    const actions = (
+      await Promise.all(
+        edits.map(async (edit): Promise<{ action: string; file_path: string; content?: string } | undefined> => {
+          if (edit.op === 'delete') {
+            // Delete-in-code (issue #3): GitLab 400s on deleting a path that is
+            // absent on the ref, so only emit the action when the branch still
+            // has the file — an already-gone file is an idempotent no-op.
+            if (!existing.has(edit.path)) return undefined;
+            return { action: 'delete', file_path: edit.path };
+          }
+          return {
+            action: existing.has(edit.path) ? 'update' : 'create',
+            file_path: edit.path,
+            content: await fs.readFile(path.join(dir, edit.path), 'utf8'),
+          };
+        }),
+      )
+    ).filter((a): a is { action: string; file_path: string; content?: string } => a !== undefined);
+
+    if (actions.length === 0) {
+      // Nothing left to change on the branch (e.g. a removal whose target was
+      // already gone). Return the branch head so the caller can still open or
+      // reuse an MR without a failing empty commit.
+      const head = await this.resolveRefSha(repo, branch);
+      return { sha: head };
+    }
+
     const { token, base } = this.target(repo.host, repo.projectSlug);
     const commit = await this.call<{ id: string }>(token, `${base}/repository/commits`, {
       method: 'POST',

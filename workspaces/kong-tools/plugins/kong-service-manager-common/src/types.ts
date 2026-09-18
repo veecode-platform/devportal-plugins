@@ -175,13 +175,18 @@ export type PromotionState =
   | 'aborted-teardown';
 
 /**
- * How a promotion reaches the chart (issue #135, "edit in code").
+ * How a promotion reaches the chart (issue #135, "edit in code"; issue #3,
+ * "delete in code").
  * `experiment` is the original flow: a portal-created experimental plugin is
  * tagged and frozen in Kong until the MR merges and the finalizer removes it.
  * `code-only` edits an already code-owned (KIC-managed) plugin directly — no
  * experiment is ever created, tagged, frozen, or deleted in Kong for it.
+ * `delete` removes an already code-owned (KIC-managed) plugin from the chart:
+ * the MR deletes the plugin's generated template, and the finalizer confirms
+ * the plugin has disappeared from the gateway after the merge deploys — like
+ * `code-only`, no experiment is ever created, tagged, or deleted in Kong.
  */
-export type PromotionMode = 'experiment' | 'code-only';
+export type PromotionMode = 'experiment' | 'code-only' | 'delete';
 
 /** Promote-to-code record for a route plugin (design 02 / plan P3), as returned by the backend. */
 export type PromotionRecord = {

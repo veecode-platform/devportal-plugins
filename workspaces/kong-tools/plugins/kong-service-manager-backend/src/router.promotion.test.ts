@@ -11,6 +11,7 @@ import type { PromotionRecordRow, PromotionStore } from './services/promotionSto
 import { ActivePromotionExistsError } from './services/promotionStore';
 import { copyGoldenPathRepo } from './services/__fixtures__/copyGoldenPathRepo';
 import { renderCheck } from './services/renderCheck';
+import { rateLimitingAdapter } from './services/adapters/rateLimiting';
 import type { AssociatedPluginsResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 // Wraps the real `renderCheck` in a jest.fn so a single test can force a
@@ -28,6 +29,8 @@ const PLUGIN_ID = 'plugin-1';
 const PROMOTE_URL = `/default/services/svc/routes/${ROUTE_ID}/plugins/${PLUGIN_ID}/promote`;
 const PREVIEW_URL = `${PROMOTE_URL}/preview`;
 const PROMOTIONS_URL = `/default/services/svc/routes/${ROUTE_ID}/plugins/${PLUGIN_ID}/promotions`;
+const DEMOTE_URL = `/default/services/svc/routes/${ROUTE_ID}/plugins/${PLUGIN_ID}/demote`;
+const DEMOTE_PREVIEW_URL = `${DEMOTE_URL}/preview`;
 
 const routePlugin: AssociatedPluginsResponse = {
   id: PLUGIN_ID,
@@ -1142,6 +1145,21 @@ describe('promote to code (Task P3)', () => {
       expect(res.body).toEqual([]);
     });
 
+    it('uses the plugin type hint when delete-to-code already removed the live plugin', async () => {
+      const kongService = kongServiceMock();
+      kongService.getRouteAssociatedPlugins.mockResolvedValue([]);
+
+      const promotionStore = promotionStoreMock();
+      promotionStore.listByRoute.mockResolvedValue([draftRow({ state: 'codified', mode: 'delete' })]);
+
+      const app = await buildApp({ kongService, promotionStore, gitlabClient: gitlabClientMock() });
+      const res = await request(app).get(`${PROMOTIONS_URL}?pluginType=rate-limiting`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject([{ state: 'codified', mode: 'delete', pluginType: 'rate-limiting' }]);
+      expect(promotionStore.listByRoute).toHaveBeenCalledWith('default', ROUTE_ID, 'rate-limiting');
+    });
+
     it('exposes detail only for failure records, never for the MR-coordinates JSON of an active state', async () => {
       const kongService = kongServiceMock();
       kongService.getRouteAssociatedPlugins.mockResolvedValue([routePlugin]);
@@ -1177,5 +1195,176 @@ describe('promote to code (Task P3)', () => {
       expect(mrOpen).not.toHaveProperty('detail');
       expect(failed.detail).toMatch(/did not converge/);
     });
+  });
+});
+
+describe('delete to code / demote (issue #3)', () => {
+  const codeOwnedRlPlugin: AssociatedPluginsResponse = {
+    ...routePlugin,
+    tags: ['managed-by-ingress-controller'],
+  };
+
+  it('happy path: proves the template, opens a removal MR, returns mr-open, touches nothing in Kong', async () => {
+    const kongService = kongServiceMock();
+    kongService.getRouteAssociatedPlugins.mockResolvedValue([codeOwnedRlPlugin]);
+    kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+    const promotionStore = promotionStoreMock();
+    promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+    promotionStore.upsertDraft.mockResolvedValue(draftRow({ mode: 'delete' }));
+    promotionStore.transition.mockResolvedValue(undefined);
+
+    const gitlabClient = gitlabClientMock();
+    // The chart declares the code-owned plugin via the portal's own generated
+    // template — the safety proof must find it unchanged.
+    const chart = withCodeOwnedChart(gitlabClient, rateLimitingAdapter.expectedTemplate().content);
+    // The promotion branch carries the template to delete.
+    gitlabClient.pathsExistingOnRef.mockResolvedValue(
+      new Set(['chart/values.yaml', 'chart/templates/kongplugin-rate-limiting.yaml']),
+    );
+    gitlabClient.findOpenMergeRequest.mockResolvedValue(undefined);
+    gitlabClient.openMergeRequest.mockResolvedValue(mr);
+
+    const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+    try {
+      const res = await request(app).post(DEMOTE_URL).send({ entityRef: 'component:default/svc' });
+
+      expect(res.status).toBe(201);
+      expect(res.body).toMatchObject({ state: 'mr-open', mrRef: mr.webUrl, pluginType: 'rate-limiting' });
+      expect(promotionStore.upsertDraft).toHaveBeenCalledWith(expect.objectContaining({ mode: 'delete' }));
+      expect(gitlabClient.openMergeRequest).toHaveBeenCalledWith(
+        repo,
+        'kong-promote/rate-limiting',
+        expect.stringMatching(/Remove Kong plugin/),
+        expect.any(String),
+      );
+      // The commit carries exactly the template-delete edit.
+      const [, , , editsArg] = gitlabClient.commitEdits.mock.calls[0];
+      expect(editsArg).toEqual([
+        { path: 'chart/values.yaml', op: 'delete-key', keyPath: ['kongPlugins', 'rateLimiting'] },
+        { path: 'chart/templates/kongplugin-rate-limiting.yaml', op: 'delete' },
+      ]);
+      // A delete never creates/tags/removes anything in Kong.
+      expect(kongService.editRoutePlugin).not.toHaveBeenCalled();
+      expect(kongService.removeRoutePlugin).not.toHaveBeenCalled();
+    } finally {
+      await chart.cleanup();
+    }
+  });
+
+  it('refuses (400) a portal-managed plugin — removal from code is for code-owned plugins only', async () => {
+    const kongService = kongServiceMock();
+    kongService.getRouteAssociatedPlugins.mockResolvedValue([{ ...routePlugin, tags: ['portal-managed'] }]);
+    kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+    const app = await buildApp({
+      kongService,
+      promotionStore: promotionStoreMock(),
+      gitlabClient: gitlabClientMock(),
+      editInCodeEnabled: true,
+    });
+
+    const res = await request(app).post(DEMOTE_URL).send({ entityRef: 'component:default/svc' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/portal-managed/);
+  });
+
+  it('refuses (400) when the chart template was modified by hand (ADR-024 safety proof)', async () => {
+    const kongService = kongServiceMock();
+    kongService.getRouteAssociatedPlugins.mockResolvedValue([codeOwnedRlPlugin]);
+    kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+    const promotionStore = promotionStoreMock();
+    promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+    promotionStore.upsertDraft.mockResolvedValue(draftRow({ mode: 'delete' }));
+    promotionStore.transition.mockResolvedValue(undefined);
+
+    const gitlabClient = gitlabClientMock();
+    // A hand-authored template that is not the portal's generated form.
+    const chart = withCodeOwnedChart(gitlabClient, HARDCODED_RL_TEMPLATE);
+
+    const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+    try {
+      const res = await request(app).post(DEMOTE_URL).send({ entityRef: 'component:default/svc' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/modified by hand/);
+      // Nothing external written; the draft is terminalized so the route frees up.
+      expect(gitlabClient.openMergeRequest).not.toHaveBeenCalled();
+      expect(promotionStore.transition).toHaveBeenCalledWith(draftRow().id, 'failed', expect.anything());
+    } finally {
+      await chart.cleanup();
+    }
+  });
+
+  it('refuses (400) when the generated template has only whitespace drift', async () => {
+    const kongService = kongServiceMock();
+    kongService.getRouteAssociatedPlugins.mockResolvedValue([codeOwnedRlPlugin]);
+    kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+    const promotionStore = promotionStoreMock();
+    promotionStore.getActiveByRoute.mockResolvedValue(undefined);
+    promotionStore.upsertDraft.mockResolvedValue(draftRow({ mode: 'delete' }));
+    promotionStore.transition.mockResolvedValue(undefined);
+
+    const gitlabClient = gitlabClientMock();
+    const chart = withCodeOwnedChart(
+      gitlabClient,
+      `${rateLimitingAdapter.expectedTemplate().content}\n`,
+    );
+
+    const app = await buildApp({ kongService, promotionStore, gitlabClient, editInCodeEnabled: true });
+    try {
+      const res = await request(app).post(DEMOTE_URL).send({ entityRef: 'component:default/svc' });
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/modified by hand/);
+      expect(gitlabClient.openMergeRequest).not.toHaveBeenCalled();
+    } finally {
+      await chart.cleanup();
+    }
+  });
+
+  it('refuses (400) when delete-in-code is disabled on the instance', async () => {
+    const kongService = kongServiceMock();
+    kongService.getRouteAssociatedPlugins.mockResolvedValue([codeOwnedRlPlugin]);
+    kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+    const app = await buildApp({
+      kongService,
+      promotionStore: promotionStoreMock(),
+      gitlabClient: gitlabClientMock(),
+      editInCodeEnabled: false,
+    });
+
+    const res = await request(app).post(DEMOTE_URL).send({ entityRef: 'component:default/svc' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toMatch(/disabled/);
+  });
+
+  it('preview returns the template that would be removed', async () => {
+    const kongService = kongServiceMock();
+    kongService.getRouteAssociatedPlugins.mockResolvedValue([codeOwnedRlPlugin]);
+    kongService.getInstanceDefaultTags.mockReturnValue(['portal-managed']);
+
+    const gitlabClient = gitlabClientMock();
+    const chart = withCodeOwnedChart(gitlabClient, rateLimitingAdapter.expectedTemplate().content);
+
+    const app = await buildApp({
+      kongService,
+      promotionStore: promotionStoreMock(),
+      gitlabClient,
+      editInCodeEnabled: true,
+    });
+    try {
+      const res = await request(app).post(DEMOTE_PREVIEW_URL).send({ entityRef: 'component:default/svc' });
+      expect(res.status).toBe(200);
+      expect(res.body.files).toEqual([
+        {
+          path: 'chart/templates/kongplugin-rate-limiting.yaml',
+          content: rateLimitingAdapter.expectedTemplate().content,
+        },
+      ]);
+    } finally {
+      await chart.cleanup();
+    }
   });
 });

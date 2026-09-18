@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { mockUseTranslation } from '../../test-utils/mockTranslations';
 import { RoutePluginsDrawer } from './RoutePluginsDrawer';
@@ -58,13 +58,18 @@ const mockFetchRouteAssociatedPlugins = jest.fn();
 const mockFetchAvailablePlugins = jest.fn();
 const mockRemoveRoutePlugin = jest.fn();
 const mockFetchPromotions = jest.fn();
+const mockRefreshPromotions = jest.fn();
+const mockRefreshRouteAssociatedPlugins = jest.fn();
 const mockFetchInstances = jest.fn();
 const mockFetchPromotionCapabilities = jest.fn();
 const mockPreviewPromotion = jest.fn();
 const mockPromotePlugin = jest.fn();
 const mockDiscardPromotion = jest.fn();
+const mockPreviewDemotion = jest.fn();
+const mockDemotePlugin = jest.fn();
 
 let mockPromotionsByPluginId: Record<string, unknown[]> = {};
+let mockRouteAssociatedPlugins: AssociatedPluginsResponse[] = [routePlugin];
 let mockPromotionCapabilities: { helm: { available: boolean; path: string; error?: string }; editInCode?: boolean } | null = null;
 let mockKongInstances: Array<{ id: string; apiBaseUrl: string; defaultTags?: string[] }> = [];
 const mockFetchPluginFields = jest.fn();
@@ -84,7 +89,7 @@ jest.mock('../../hooks/useTranslation', () => ({
 jest.mock('../../context/KongServiceManagerContext', () => ({
   useKongServiceManager: () => ({
     state: {
-      routeAssociatedPlugins: [routePlugin],
+      routeAssociatedPlugins: mockRouteAssociatedPlugins,
       availablePlugins,
       loading: false,
       instance: 'default',
@@ -93,16 +98,21 @@ jest.mock('../../context/KongServiceManagerContext', () => ({
       kongInstances: mockKongInstances,
       promotionCapabilities: mockPromotionCapabilities,
       pluginFields: mockPluginFields,
+      pluginFieldsKey: 'default:rate-limiting',
     },
     fetchRouteAssociatedPlugins: mockFetchRouteAssociatedPlugins,
     fetchAvailablePlugins: mockFetchAvailablePlugins,
     removeRoutePlugin: mockRemoveRoutePlugin,
     fetchPromotions: mockFetchPromotions,
+    refreshPromotions: mockRefreshPromotions,
+    refreshRouteAssociatedPlugins: mockRefreshRouteAssociatedPlugins,
     fetchInstances: mockFetchInstances,
     fetchPromotionCapabilities: mockFetchPromotionCapabilities,
     previewPromotion: mockPreviewPromotion,
     promotePlugin: mockPromotePlugin,
     discardPromotion: mockDiscardPromotion,
+    previewDemotion: mockPreviewDemotion,
+    demotePlugin: mockDemotePlugin,
     // PluginConfigDrawer's dependencies — the code-mode edit-in-code instance
     // mounted inside RoutePluginsDrawer (issue #135) shares this same mocked
     // context, so it needs these even though most tests here never open it.
@@ -123,6 +133,7 @@ describe('RoutePluginsDrawer', () => {
       metadata: { name: 'my-service', annotations: { 'gitlab.com/project-slug': 'team/my-service' } },
     };
     mockPromotionsByPluginId = {};
+    mockRouteAssociatedPlugins = [routePlugin];
     mockPromotionCapabilities = { helm: { available: true, path: 'helm' } };
     mockKongInstances = [];
     // parseConfigFields only reads the top-level 'config' field's own
@@ -143,7 +154,129 @@ describe('RoutePluginsDrawer', () => {
       />,
     );
 
-    expect(mockFetchPromotions).toHaveBeenCalledWith('route-1', 'plugin-1');
+    expect(mockFetchPromotions).toHaveBeenCalledWith(
+      'route-1',
+      'plugin-1',
+      'rate-limiting',
+    );
+  });
+
+  it('polls an in-flight promotion without refetching history on every associated-list refresh', () => {
+    jest.useFakeTimers();
+    mockPromotionsByPluginId = {
+      'plugin-1': [
+        {
+          id: 1,
+          instance: 'default',
+          serviceName: 'my-service',
+          routeId: 'route-1',
+          pluginType: 'rate-limiting',
+          state: 'applying',
+          mrRef: 'https://gitlab.example.com/team/my-service/-/merge_requests/1',
+          requesterRef: 'user:default/alice',
+          createdAt: '2026-09-01T00:00:00.000Z',
+          updatedAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+    };
+
+    try {
+      const view = render(
+        <RoutePluginsDrawer
+          open
+          route={mockRoute}
+          onClose={jest.fn()}
+          onEnablePlugin={jest.fn()}
+          onEditPlugin={jest.fn()}
+          canPromote
+        />,
+      );
+      const initialFetchCount = mockFetchPromotions.mock.calls.length;
+
+      // A parent render creates a fresh associated-plugin array in the mock,
+      // just like a silent refresh does. The ID-keyed effect must not issue a
+      // second foreground history request.
+      view.rerender(
+        <RoutePluginsDrawer
+          open
+          route={mockRoute}
+          onClose={jest.fn()}
+          onEnablePlugin={jest.fn()}
+          onEditPlugin={jest.fn()}
+          canPromote
+        />,
+      );
+      expect(mockFetchPromotions).toHaveBeenCalledTimes(initialFetchCount);
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(mockRefreshPromotions).toHaveBeenCalledWith(
+        'route-1',
+        'plugin-1',
+        'rate-limiting',
+      );
+      expect(mockRefreshRouteAssociatedPlugins).toHaveBeenCalledWith('route-1');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps polling a delete record after the KIC removes the plugin from the associated list', () => {
+    jest.useFakeTimers();
+    mockPromotionsByPluginId = {
+      'plugin-1': [
+        {
+          id: 1,
+          instance: 'default',
+          serviceName: 'my-service',
+          routeId: 'route-1',
+          pluginType: 'rate-limiting',
+          state: 'applying',
+          mode: 'delete',
+          mrRef: 'https://gitlab.example.com/team/my-service/-/merge_requests/1',
+          requesterRef: 'user:default/alice',
+          createdAt: '2026-09-01T00:00:00.000Z',
+          updatedAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+    };
+
+    try {
+      const view = render(
+        <RoutePluginsDrawer
+          open
+          route={mockRoute}
+          onClose={jest.fn()}
+          onEnablePlugin={jest.fn()}
+          onEditPlugin={jest.fn()}
+          canPromote
+        />,
+      );
+
+      mockRouteAssociatedPlugins = [];
+      view.rerender(
+        <RoutePluginsDrawer
+          open
+          route={mockRoute}
+          onClose={jest.fn()}
+          onEnablePlugin={jest.fn()}
+          onEditPlugin={jest.fn()}
+          canPromote
+        />,
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(mockRefreshPromotions).toHaveBeenCalledWith(
+        'route-1',
+        'plugin-1',
+        'rate-limiting',
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('opens the review dialog and promotes with the entity ref on confirm', async () => {
@@ -328,6 +461,47 @@ describe('RoutePluginsDrawer', () => {
       );
 
       expect(screen.queryByRole('button', { name: 'Edit in code' })).not.toBeInTheDocument();
+    });
+
+    it('opens the removal dialog and demotes the code-owned plugin on confirm (issue #3)', async () => {
+      mockPreviewDemotion.mockResolvedValue({
+        files: [
+          {
+            path: 'chart/templates/kongplugin-rate-limiting.yaml',
+            content: 'apiVersion: configuration.konghq.com/v1\nkind: KongPlugin\n',
+          },
+        ],
+        normalizedConfig: {},
+      });
+      mockDemotePlugin.mockResolvedValue({ id: 1, state: 'mr-open', mode: 'delete' });
+
+      render(
+        <RoutePluginsDrawer
+          open
+          route={mockRoute}
+          onClose={jest.fn()}
+          onEnablePlugin={jest.fn()}
+          onEditPlugin={jest.fn()}
+          canPromote
+          onRemovalOpened={jest.fn()}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove from code' }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText(/Remove rate-limiting from code/)).toBeInTheDocument();
+      // The file that would be removed is shown.
+      expect(within(dialog).getByText(/kongplugin-rate-limiting\.yaml/)).toBeInTheDocument();
+
+      await waitFor(() =>
+        expect(within(dialog).getByRole('button', { name: /Remove from code/i })).toBeEnabled(),
+      );
+      await userEvent.click(within(dialog).getByRole('button', { name: /Remove from code/i }));
+
+      expect(mockDemotePlugin).toHaveBeenCalledWith('route-1', 'plugin-1', expect.any(String));
+      // Delete-in-code never touches the Kong plugin CRUD endpoints.
+      expect(mockRemoveRoutePlugin).not.toHaveBeenCalled();
     });
   });
 });

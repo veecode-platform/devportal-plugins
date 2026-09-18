@@ -694,3 +694,69 @@ diverges from the SQLite test path); deriving `idempotency_key` from the tuple
 Known follow-up (not fixed here): the finalizer's `handleDraft` hardcodes
 `kong-promote/${plugin_type}` instead of calling `promotionBranch()` — if the
 branch convention ever changes, the orphan probe silently stops finding MRs.
+
+## ADR-026: Delete in Code — a `delete` Promotion Mode That Removes a Code-Owned Plugin via MR
+
+**Date:** 2026-09-17
+**Status:** Accepted
+
+"Remove from code" (issue #3) is the photographic negative of Promote to Code:
+for an already code-owned (KIC-managed) route plugin, the portal opens an MR that
+**removes the plugin's generated chart template and its generated values entry**,
+and the finalizer confirms the plugin has disappeared from the gateway once the
+merge deploys. It is a third
+`PromotionMode`, `delete`, alongside `experiment` and `code-only` (ADR-024).
+
+Decisions:
+
+- **The removal deletes the whole generated template file and removes the
+  adapter-owned `values.yaml` entry.** The template is deleted so its
+  unguarded config fields cannot render a broken `KongPlugin`; the nested value
+  is removed as well because the golden chart derives its
+  `konghq.com/plugins` Ingress annotation from that key, and leaving it would
+  retain a dangling attachment. `FileEdit` has a `{ op: 'delete-key' }` YAML
+  edit for the nested value and a `{ op: 'delete' }` edit plus the GitLab
+  file-delete action for the template. `renderCheck` gains an `expectAbsent`
+  mode whose success is the plugin type and its generated attachment both no
+  longer rendering (the inverse polarity of the promote check).
+- **Safety proof before deletion (extends ADR-024's B1 rule).** ADR-024
+  established that the pipeline never rewrites a team-authored chart file. A delete
+  removes exactly such a file, so it first proves the repo's template is still the
+  adapter's own generated form (`adapter.expectedTemplate()` byte-compare) and
+  **refuses (400) a hand-modified template** — the operator removes it in the repo
+  themselves. This is the one place a delete could destroy unrelated work, and it
+  is gated by the same proof the render check embodies everywhere else.
+- **Reuses states and the promote branch — no migration.** `mode` is an
+  unconstrained nullable column (ADR-025 DB note), so `delete` is a one-line
+  type addition. The flow reuses `draft → mr-open → awaiting-deploy → applying →
+  codified`, where `codified` means "removal converged (plugin absent)", and the
+  same `kong-promote/<type>` branch (the active-per-route index keeps a delete and
+  a promote of the same type+route from ever being in flight together). A new
+  *active* state would have required a new migration (the partial unique index
+  bakes in the active-state list), for no behavioural gain.
+- **Finalizer inverts convergence for `delete`.** `handleApplying` codifies when
+  every plugin of the deleted type has *disappeared* (vs. a KIC-owned plugin
+  that exists-and-matches for a promote), and times out to `failed` if any is
+  still present after the deploy. The Kong
+  write sites (tag / untag / delete-at-merge) are guarded by `isExperimentMode`
+  now, so both `code-only` and `delete` skip them — a delete has no experiment.
+- **A finished/failed delete keeps the plugin code-owned in the UI.**
+  `derivePromotionBadge` maps a terminal `delete` record to `code-owned` (like
+  `code-only`), so a *failed* removal leaves the still-present plugin read-only
+  and retryable rather than mis-painting it as a portal-managed experiment. A
+  successful removal deletes the plugin from the route, so no card renders for it.
+- **GitLab only.** The plugin has no GitHub client (ADR-006 deferred it and it was
+  never built), so — like the existing Promote to Code — delete-in-code opens a
+  GitLab MR only. A GitHub/PR provider is separate, orthogonal work (a provider
+  abstraction over the two hardcoded GitLab call sites), not part of this change.
+
+Gating: delete-in-code requires `kong.promotion.editInCode` on, ownership
+code-owned, and the `managed-by-ingress-controller` tag — the same target set as
+edit-in-code, for the same reason (the finalizer only observes convergence on a
+KIC-managed plugin). A portal-managed (experimental) plugin is refused (400)
+here; it retains the toggle, Edit, and Promote actions.
+
+Rejected: leaving the generated `values.yaml` key behind (the chart's Ingress
+template still turns it into a `konghq.com/plugins` attachment); a distinct
+`kong-demote/<type>` branch (would make the `handleDraft` hardcode from ADR-025
+diverge for real, with no benefit given the active-per-route index).

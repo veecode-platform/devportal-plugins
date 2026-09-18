@@ -24,6 +24,7 @@ import { PluginCard } from '../PluginsList/PluginCard';
 import { PluginConfigDrawer } from '../PluginConfigDrawer/PluginConfigDrawer';
 import { derivePromotionBadge } from './promotionBadge';
 import { PromotionReviewDialog } from './PromotionReviewDialog';
+import { CodeRemovalDialog } from './CodeRemovalDialog';
 import type {
   AssociatedPluginsResponse,
   PluginPerCategory,
@@ -34,6 +35,17 @@ import type { kongServiceManagerTranslationRef } from '../../translations';
 
 /** Mirrors GitlabClient's annotation key (backend, not exported to common) — the same key resolves the owning repo for promotion. */
 const GITLAB_PROJECT_SLUG_ANNOTATION = 'gitlab.com/project-slug';
+
+/** Non-terminal promotion states — a record in one of these is still in flight (MR open, deploy pending, applying), so the badge keeps changing on its own and the drawer polls until it settles. */
+const ACTIVE_PROMOTION_STATES = new Set([
+  'draft',
+  'mr-open',
+  'awaiting-deploy',
+  'applying',
+]);
+
+/** How often the drawer refreshes an in-flight promotion. Kept coarse: the pipeline (MR → merge → deploy → finalizer) moves in tens of seconds at best. */
+const PROMOTION_POLL_INTERVAL_MS = 5000;
 
 function formatCategory(
   slug: string,
@@ -64,11 +76,13 @@ type RoutePluginsDrawerProps = {
   onEnablePlugin: (routeId: string, pluginSlug: string) => void;
   onEditPlugin: (routeId: string, pluginId: string, pluginName: string) => void;
   canEnable?: boolean;
-  canDisable?: boolean;
+  canToggleEnabled?: boolean;
   canEdit?: boolean;
   canPromote?: boolean;
   onPromoted?: (pluginName: string) => void;
   onPromotionDiscarded?: (pluginName: string) => void;
+  /** Delete-in-code (issue #3): a removal MR was opened for a code-owned plugin. */
+  onRemovalOpened?: (pluginName: string) => void;
 };
 
 export function RoutePluginsDrawer({
@@ -78,23 +92,27 @@ export function RoutePluginsDrawer({
   onEnablePlugin,
   onEditPlugin,
   canEnable,
-  canDisable,
+  canToggleEnabled,
   canEdit,
   canPromote,
   onPromoted,
   onPromotionDiscarded,
+  onRemovalOpened,
 }: RoutePluginsDrawerProps) {
   const { t } = useTranslation();
   const {
     state,
     fetchRouteAssociatedPlugins,
     fetchAvailablePlugins,
-    removeRoutePlugin,
+    editRoutePlugin,
     fetchPromotions,
+    refreshPromotions,
+    refreshRouteAssociatedPlugins,
     fetchInstances,
     fetchPromotionCapabilities,
     promotePlugin,
     discardPromotion,
+    demotePlugin,
   } = useKongServiceManager();
   const { entity } = useEntity();
 
@@ -110,7 +128,7 @@ export function RoutePluginsDrawer({
   } = state;
 
   const [search, setSearch] = useState('');
-  const [disablingId, setDisablingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [discardingId, setDiscardingId] = useState<string | null>(null);
   const [reviewPlugin, setReviewPlugin] = useState<{
     id: string;
@@ -125,6 +143,10 @@ export function RoutePluginsDrawer({
   // 'code' mode, mounted here (not in the parent homepage) so its submit
   // can hand the edited config straight to the review dialog below.
   const [codeEditTarget, setCodeEditTarget] = useState<{ id: string; name: string; config: Record<string, unknown> } | null>(null);
+  // Delete-in-code (issue #3): the code-owned plugin the removal review dialog targets.
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
+  const [removeSubmitting, setRemoveSubmitting] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const entityRef = useMemo(() => stringifyEntityRef(entity), [entity]);
   // Pure-route (no owning repo) takes priority — helm availability is moot
@@ -172,17 +194,28 @@ export function RoutePluginsDrawer({
     }
   }, [open]);
 
-  // Promotion history is fetched per associated route plugin only (bounded
-  // fan-out) — an unassociated plugin can't have a promotion.
+  // Promotion history is initially fetched per associated route plugin only
+  // (bounded fan-out). An in-flight delete can then make that plugin
+  // unassociated while its promotion record still needs polling, so the
+  // active-ID calculation below retains already-loaded histories.
+  const associatedPluginIdsKey = useMemo(
+    () => routeAssociatedPlugins.map(plugin => plugin.id).sort().join('|'),
+    [routeAssociatedPlugins],
+  );
   useEffect(() => {
     if (!open || !route) return;
-    for (const plugin of routeAssociatedPlugins) {
-      fetchPromotions(route.id, plugin.id);
+    for (const pluginId of associatedPluginIdsKey.split('|').filter(Boolean)) {
+      // Keep the type in the request. A delete-to-code handover removes the
+      // live plugin before its terminal promotion record is read, so the
+      // backend cannot infer the type from Kong on that later poll.
+      const pluginType = routeAssociatedPlugins.find(plugin => plugin.id === pluginId)?.name;
+      fetchPromotions(route.id, pluginId, pluginType);
     }
-    // fetchPromotions is stable (useCallback in the provider); routeAssociatedPlugins
-    // driving this is exactly the fan-out bound we want.
+    // The key, rather than the array identity, keeps a silent refresh from
+    // refetching every history while still rerunning when an ID is added or
+    // removed. Plugin names are stable for a given ID.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, route, routeAssociatedPlugins]);
+  }, [open, route?.id, associatedPluginIdsKey, fetchPromotions]);
 
   const associatedMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -200,6 +233,45 @@ export function RoutePluginsDrawer({
     return map;
   }, [routeAssociatedPlugins]);
 
+  // Route plugin histories whose latest promotion record is still in flight —
+  // the set the drawer must poll so "Applying"/"MR open" advances to
+  // "Codified" on its own. Iterate the histories rather than the associated
+  // plugin list: a delete-to-code handover removes the plugin from Kong before
+  // the finalizer can observe the disappearance and terminalize the record.
+  const activePromotionPluginIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const [pluginId, records] of Object.entries(promotionsByPluginId)) {
+      if (!records || records.length === 0) continue;
+      const latest = records.reduce((a, b) =>
+        new Date(a.updatedAt).getTime() >= new Date(b.updatedAt).getTime() ? a : b,
+      );
+      if (ACTIVE_PROMOTION_STATES.has(latest.state)) ids.push(pluginId);
+    }
+    return ids.sort();
+  }, [promotionsByPluginId]);
+
+  // Poll while any promotion is in flight; stop as soon as none is. `activeKey`
+  // keys the subscription to the *set* of in-flight plugins, so a background
+  // refresh that only changes a record's timestamp doesn't tear down the timer.
+  const activeKey = activePromotionPluginIds.join('|');
+  useEffect(() => {
+    if (!open || !route || activePromotionPluginIds.length === 0) return undefined;
+    const interval = setInterval(() => {
+      for (const id of activePromotionPluginIds) {
+        const records = promotionsByPluginId[id];
+        const latest = records?.reduce((a, b) =>
+          new Date(a.updatedAt).getTime() >= new Date(b.updatedAt).getTime() ? a : b,
+        );
+        refreshPromotions(route.id, id, latest?.pluginType);
+      }
+      // The handover removes the experiment and re-tags the plugin as
+      // code-owned; refresh the list too so ownership/badge follow through.
+      refreshRouteAssociatedPlugins(route.id);
+    }, PROMOTION_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, route?.id, activeKey, refreshPromotions, refreshRouteAssociatedPlugins]);
+
   // Ownership signal (ADR-017) for the current instance — undefined while
   // fetchInstances hasn't resolved yet or found no match, which
   // derivePromotionBadge treats the same as "no ownership gate configured".
@@ -208,17 +280,17 @@ export function RoutePluginsDrawer({
     [kongInstances, instance],
   );
 
-  const handleDisable = useCallback(
-    async (pluginId: string, _pluginName: string) => {
+  const handleToggleEnabled = useCallback(
+    async (pluginId: string, _pluginName: string, nextEnabled: boolean) => {
       if (!route) return;
-      setDisablingId(pluginId);
+      setTogglingId(pluginId);
       try {
-        await removeRoutePlugin(route.id, pluginId);
+        await editRoutePlugin(route.id, pluginId, { enabled: nextEnabled });
       } finally {
-        setDisablingId(null);
+        setTogglingId(null);
       }
     },
-    [route, removeRoutePlugin],
+    [route, editRoutePlugin],
   );
 
   const handleEnable = useCallback(
@@ -308,6 +380,34 @@ export function RoutePluginsDrawer({
     [route, discardPromotion, onPromotionDiscarded],
   );
 
+  // Delete-in-code (issue #3): open the removal review dialog for a code-owned plugin.
+  const handleOpenRemoval = useCallback((pluginId: string, pluginName: string) => {
+    setRemoveError(null);
+    setRemoveTarget({ id: pluginId, name: pluginName });
+  }, []);
+
+  const handleCloseRemoval = useCallback(() => {
+    if (removeSubmitting) return;
+    setRemoveTarget(null);
+    setRemoveError(null);
+  }, [removeSubmitting]);
+
+  const handleConfirmRemoval = useCallback(async () => {
+    if (!route || !removeTarget) return;
+    setRemoveSubmitting(true);
+    setRemoveError(null);
+    try {
+      await demotePlugin(route.id, removeTarget.id, entityRef);
+      const removedName = removeTarget.name;
+      setRemoveTarget(null);
+      onRemovalOpened?.(removedName);
+    } catch (e: unknown) {
+      setRemoveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRemoveSubmitting(false);
+    }
+  }, [route, removeTarget, entityRef, demotePlugin, onRemovalOpened]);
+
   const filterCategories = useCallback(
     (categories: PluginPerCategory[], onlyAssociated: boolean) => {
       const term = search.toLowerCase();
@@ -396,13 +496,14 @@ export function RoutePluginsDrawer({
                 key={plugin.slug}
                 plugin={plugin}
                 associatedId={pluginId}
-                disabling={disablingId === pluginId}
+                enabled={assocPlugin?.enabled}
                 canEnable={canEnable}
-                canDisable={canDisable}
                 canEdit={canEdit}
+                canToggleEnabled={canToggleEnabled}
+                togglingEnabled={togglingId === pluginId}
                 onEnable={handleEnable}
                 onEdit={handleEdit}
-                onDisable={handleDisable}
+                onToggleEnabled={handleToggleEnabled}
                 promotionBadge={promotionBadge}
                 canPromote={canPromote}
                 promoteDisabledReason={promoteDisabledReason ?? noAdapterReason}
@@ -411,6 +512,7 @@ export function RoutePluginsDrawer({
                 onDiscardPromotion={handleDiscard}
                 editInCodeEnabled={promotionCapabilities?.editInCode}
                 onEditInCode={handleOpenCodeEdit}
+                onDeleteInCode={handleOpenRemoval}
               />
             );
           })}
@@ -490,6 +592,18 @@ export function RoutePluginsDrawer({
         onConfirm={handleConfirmPromote}
         submitting={reviewSubmitting}
         error={reviewError}
+      />
+
+      <CodeRemovalDialog
+        open={!!removeTarget}
+        pluginName={removeTarget?.name ?? ''}
+        routeId={route?.id ?? null}
+        pluginId={removeTarget?.id ?? null}
+        entityRef={entityRef}
+        onClose={handleCloseRemoval}
+        onConfirm={handleConfirmRemoval}
+        submitting={removeSubmitting}
+        error={removeError}
       />
     </Drawer>
   );

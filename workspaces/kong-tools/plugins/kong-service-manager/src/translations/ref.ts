@@ -20,6 +20,8 @@ export const kongServiceManagerMessages = {
     routeDeleted: 'Route deleted',
     pluginPromotionOpened:
       'Plugin "{{name}}" promotion opened — see the MR link on its badge',
+    pluginRemovalOpened:
+      'Plugin "{{name}}" removal opened — see the MR link on its badge',
     promotionDiscarded: 'Promotion for plugin "{{name}}" discarded',
     pluginUpdated: 'Plugin "{{name}}" updated',
     pluginEnabled: 'Plugin "{{name}}" enabled',
@@ -58,7 +60,12 @@ export const kongServiceManagerMessages = {
     disable: 'Disable',
     promoteToCode: 'Promote to code',
     editInCode: 'Edit in code',
+    deleteInCode: 'Remove from code',
+    deleteInCodeTooltip:
+      "Open a merge request that removes this plugin from the service's chart.",
     enable: 'Enable',
+    enabledLabel: 'Enabled',
+    disabledLabel: 'Disabled',
     managedFromRepository:
       'Managed from the repository — editing here would be overwritten by the next deploy.',
   },
@@ -139,6 +146,15 @@ export const kongServiceManagerMessages = {
     generatingPreview: 'Generating preview...',
     cancel: 'Cancel',
     promoteToCode: 'Promote to code',
+  },
+  codeRemovalDialog: {
+    title: 'Remove {{pluginName}} from code',
+    description:
+      "This opens a merge request in the service's repository that deletes this plugin from the chart. Once it merges and deploys, the portal verifies the plugin has been removed from the gateway. Only the portal-generated template is removed — a hand-edited one is refused here.",
+    filesRemoved: 'Files removed',
+    generatingPreview: 'Generating preview...',
+    cancel: 'Cancel',
+    confirm: 'Remove from code',
   },
   routePluginsDrawer: {
     title: 'Plugins for route: {{routeLabel}}',

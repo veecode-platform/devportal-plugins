@@ -19,6 +19,8 @@ const kongServiceManagerTranslationPtBR = createTranslationMessages({
     'homepage.routeDeleted': 'Rota excluída',
     'homepage.pluginPromotionOpened':
       'Promoção do plugin "{{name}}" aberta — veja o link da MR no selo',
+    'homepage.pluginRemovalOpened':
+      'Remoção do plugin "{{name}}" aberta — veja o link da MR no selo',
     'homepage.promotionDiscarded': 'Promoção do plugin "{{name}}" descartada',
     'homepage.pluginUpdated': 'Plugin "{{name}}" atualizado',
     'homepage.pluginEnabled': 'Plugin "{{name}}" ativado',
@@ -55,7 +57,12 @@ const kongServiceManagerTranslationPtBR = createTranslationMessages({
     'pluginCard.disable': 'Desativar',
     'pluginCard.promoteToCode': 'Promover para código',
     'pluginCard.editInCode': 'Editar no código',
+    'pluginCard.deleteInCode': 'Remover do código',
+    'pluginCard.deleteInCodeTooltip':
+      'Abre uma merge request que remove este plugin do chart do serviço.',
     'pluginCard.enable': 'Ativar',
+    'pluginCard.enabledLabel': 'Ativado',
+    'pluginCard.disabledLabel': 'Desativado',
     'pluginCard.managedFromRepository':
       'Gerenciado a partir do repositório — editar aqui seria sobrescrito no próximo deploy.',
 
@@ -129,6 +136,13 @@ const kongServiceManagerTranslationPtBR = createTranslationMessages({
     'promotionReviewDialog.generatingPreview': 'Gerando pré-visualização...',
     'promotionReviewDialog.cancel': 'Cancelar',
     'promotionReviewDialog.promoteToCode': 'Promover para código',
+    'codeRemovalDialog.title': 'Remover {{pluginName}} do código',
+    'codeRemovalDialog.description':
+      'Abre uma merge request no repositório do serviço que exclui este plugin do chart. Quando ela for mesclada e implantada, o portal verifica que o plugin foi removido do gateway. Só o template gerado pelo portal é removido — um editado à mão é recusado aqui.',
+    'codeRemovalDialog.filesRemoved': 'Arquivos removidos',
+    'codeRemovalDialog.generatingPreview': 'Gerando pré-visualização...',
+    'codeRemovalDialog.cancel': 'Cancelar',
+    'codeRemovalDialog.confirm': 'Remover do código',
 
     'routePluginsDrawer.title': 'Plugins da rota: {{routeLabel}}',
     'routePluginsDrawer.noOwningRepoReason':

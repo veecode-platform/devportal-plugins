@@ -330,6 +330,75 @@ export async function createRouter({
   }
 
   /**
+   * Delete-in-code (issue #3) safety gate mirroring `resolvePromotionMode`'s
+   * code-owned branch: removing a plugin from the chart only applies to a
+   * code-owned, Kong-Ingress-Controller-managed plugin. Portal-managed
+   * (experimental) plugins stay on the gateway flow, and a code-owned plugin
+   * the controller does not manage could never be observed to disappear, so
+   * the finalizer could never confirm the removal.
+   */
+  function assertDeletableInCode(
+    ownership: PluginOwnership,
+    pluginName: string,
+    routeId: string,
+    pluginTags: string[],
+  ): void {
+    if (!editInCodeEnabled) {
+      throw new InputError(
+        `Removing a plugin from code is disabled on this instance (kong.promotion.editInCode)`,
+      );
+    }
+    if (ownership === 'portal-managed') {
+      throw new InputError(
+        `Plugin '${pluginName}' on route '${routeId}' is portal-managed (experimental); ` +
+          `remove it directly through the gateway instead of opening a merge request`,
+      );
+    }
+    if (!pluginTags.includes(KIC_OWNERSHIP_TAG)) {
+      throw new InputError(
+        `Plugin '${pluginName}' on route '${routeId}' is not managed by the Kong Ingress Controller ` +
+          `(no '${KIC_OWNERSHIP_TAG}' tag), so a removal from the chart could never be reconciled off the ` +
+          `gateway; remove it wherever it is currently managed`,
+      );
+    }
+  }
+
+  /**
+   * Proves the chart's generated template for this plugin type is still the
+   * adapter's own output before a delete-in-code removes it (ADR-024: the
+   * pipeline never clobbers a team-authored chart file). Returns the current
+   * template content (for the removal preview) on success; throws a 400/409
+   * naming the reason on any mismatch. `dir` is a materialized chart checkout.
+   */
+  async function assertRemovableTemplate(
+    dir: string,
+    adapter: KongPluginAdapter,
+    routeId: string,
+  ): Promise<{ path: string; content: string }> {
+    const expected = adapter.expectedTemplate();
+    let current: string;
+    try {
+      current = await fs.readFile(path.join(dir, expected.path), 'utf8');
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new ConflictError(
+          `The chart does not declare '${adapter.pluginType}' via '${expected.path}', so there is nothing ` +
+            `to remove for route '${routeId}'. It may already have been removed, or is defined elsewhere in the chart.`,
+        );
+      }
+      throw err;
+    }
+    if (current !== expected.content) {
+      throw new InputError(
+        `The chart's '${expected.path}' was modified by hand and is no longer the portal-generated template ` +
+          `for '${adapter.pluginType}'; removing it automatically could drop unrelated changes — remove it ` +
+          `directly in the service's chart.`,
+      );
+    }
+    return { path: expected.path, content: current };
+  }
+
+  /**
    * Gates preview/promote on the startup helm capability probe (helm is a
    * declared deployment prerequisite — ADR-018): 503 with an actionable
    * message instead of letting `renderCheck` fail deep inside with a raw
@@ -398,6 +467,11 @@ export async function createRouter({
      * rejects this field.
      */
     config: z.record(z.unknown()).optional(),
+  });
+
+  /** Delete-in-code (issue #3): only the owning entity ref — a removal carries no config. */
+  const demoteBody = z.object({
+    entityRef: z.string(),
   });
 
   const createRouteBody = z.object({
@@ -1155,6 +1229,212 @@ export async function createRouter({
     },
   );
 
+  // --- Delete to code / demote (issue #3, mirrors Promote to code) ---
+
+  // POST /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/demote/preview
+  router.post(
+    '/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/demote/preview',
+    async (req, res) => {
+      await authorize(req, kongPluginPromotePermission);
+
+      if (!promotionStore || !gitlabClient) {
+        throw new ConflictError('Kong plugin promotion is not enabled on this instance');
+      }
+      await assertHelmAvailable();
+
+      const params = instanceServiceRoutePluginParams.safeParse(req.params);
+      if (!params.success) throw new InputError(params.error.toString());
+      const body = demoteBody.safeParse(req.body);
+      if (!body.success) throw new InputError(body.error.toString());
+
+      const { instance, routeId, pluginId } = params.data;
+      const { entityRef } = body.data;
+
+      const { plugin, adapter, ownership } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
+      assertDeletableInCode(ownership, plugin.name, routeId, plugin.tags ?? []);
+
+      const credentials = await httpAuth.credentials(req, { allow: ['user'] });
+      const repo = await gitlabClient.resolveRepo(entityRef, credentials);
+      const baseSha = await gitlabClient.resolveRefSha(repo, repo.defaultBranch);
+
+      const { dir, cleanup } = await gitlabClient.materializeChart(repo, baseSha);
+      try {
+        // Prove the file we would delete is still the portal's own template
+        // (ADR-024) — read it BEFORE the render check below, which deletes it
+        // from `dir`.
+        const removed = await assertRemovableTemplate(dir, adapter, routeId);
+        const check = await renderCheck({
+          repoDir: dir,
+          adapter,
+          edits: adapter.toChartRemoval(),
+          liveConfig: {},
+          helmPath,
+          helmTimeoutSeconds,
+          expectAbsent: true,
+        });
+        if (!check.equal) {
+          throw new InputError(
+            `Removing '${adapter.pluginType}' from the chart would not fully remove it: ${check.diff}`,
+          );
+        }
+        // `files` are what the merge request removes — the review dialog renders
+        // them under a "will be removed" heading.
+        res.json({ files: [removed], normalizedConfig: adapter.fromRendered({ config: plugin.config }) });
+      } finally {
+        await cleanup();
+      }
+    },
+  );
+
+  // POST /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/demote
+  router.post(
+    '/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/demote',
+    async (req, res) => {
+      await authorize(req, kongPluginPromotePermission);
+
+      if (!promotionStore || !gitlabClient) {
+        throw new ConflictError('Kong plugin promotion is not enabled on this instance');
+      }
+      await assertHelmAvailable();
+
+      const params = instanceServiceRoutePluginParams.safeParse(req.params);
+      if (!params.success) throw new InputError(params.error.toString());
+      const body = demoteBody.safeParse(req.body);
+      if (!body.success) throw new InputError(body.error.toString());
+
+      const { instance, serviceName, routeId, pluginId } = params.data;
+      const { entityRef } = body.data;
+
+      const { plugin, adapter, ownership } = await resolvePromotableRoutePlugin(instance, routeId, pluginId);
+      assertDeletableInCode(ownership, plugin.name, routeId, plugin.tags ?? []);
+
+      // A delete never resumes an active record — any open promotion/edit/delete
+      // for this route+type is a conflict, same wording family as edit-in-code.
+      const active = await promotionStore.getActiveByRoute(instance, routeId, adapter.pluginType);
+      if (active) {
+        const link = active.mr_ref ? ` (${active.mr_ref})` : '';
+        throw new ConflictError(
+          `Route plugin '${plugin.name}' on route '${routeId}' has an open promotion${link} — ` +
+            `it is frozen until that merges, fails, or is discarded.`,
+        );
+      }
+
+      let promotion: PromotionRecordRow;
+      try {
+        promotion = await promotionStore.upsertDraft({
+          idempotencyKey: randomUUID(),
+          instance,
+          serviceName,
+          routeId,
+          pluginType: adapter.pluginType,
+          // The config being removed, recorded for the audit trail; the removal
+          // itself is config-independent.
+          configSnapshot: adapter.fromRendered({ config: plugin.config }),
+          requesterRef: await requesterRef(req),
+          mode: 'delete',
+        });
+      } catch (err) {
+        if (err instanceof ActivePromotionExistsError) {
+          const link = err.active.mr_ref ? ` (${err.active.mr_ref})` : '';
+          throw new ConflictError(
+            `Route plugin '${plugin.name}' on route '${routeId}' has an open promotion${link} — ` +
+              `it is frozen until that merges, fails, or is discarded.`,
+          );
+        }
+        throw err;
+      }
+
+      const credentials = await httpAuth.credentials(req, { allow: ['user'] });
+      const repo = await gitlabClient.resolveRepo(entityRef, credentials);
+      const baseSha = await gitlabClient.resolveRefSha(repo, repo.defaultBranch);
+      await promotionStore.transition(promotion.id, 'draft', {
+        detail: encodeMrDetail({ host: repo.host, projectSlug: repo.projectSlug, projectId: repo.projectId }),
+      });
+
+      const edits = adapter.toChartRemoval();
+      const { dir, cleanup } = await gitlabClient.materializeChart(repo, baseSha);
+
+      try {
+        // Safety proof (ADR-024): read + compare the template BEFORE the render
+        // check below deletes it from `dir`. Any failure terminalizes the draft
+        // (nothing external written yet) so the route frees up again (F5).
+        let removed: { path: string; content: string };
+        try {
+          removed = await assertRemovableTemplate(dir, adapter, routeId);
+        } catch (err) {
+          await promotionStore.transition(promotion.id, 'failed', {
+            detail: err instanceof Error ? err.message : String(err),
+          });
+          throw err;
+        }
+        const check = await renderCheck({
+          repoDir: dir,
+          adapter,
+          edits,
+          liveConfig: {},
+          helmPath,
+          helmTimeoutSeconds,
+          expectAbsent: true,
+        });
+        if (!check.equal) {
+          await promotionStore.transition(promotion.id, 'failed', { detail: check.diff });
+          throw new ConflictError(
+            `Removing '${adapter.pluginType}' from the chart would not fully remove it: ${check.diff}`,
+          );
+        }
+
+        // Branch/commit/MR — same branch convention and per-route ownership
+        // guard as promote (the active-per-route index keeps a delete and a
+        // promote of the same type+route from ever being in flight together).
+        const branch = promotionBranch(adapter.pluginType);
+        let mr = await gitlabClient.findOpenMergeRequest(repo, branch);
+        if (mr && !mergeRequestBelongsToRoute(mr, routeId)) {
+          throw new ConflictError(
+            `Another promotion of '${adapter.pluginType}' is open in this repository (${mr.webUrl}); merge or close it first`,
+          );
+        }
+        if (!mr) {
+          await gitlabClient.deleteBranch(repo, branch);
+        }
+        await gitlabClient.ensureBranch(repo, branch, baseSha);
+        const existing = await gitlabClient.pathsExistingOnRef(repo, branch, edits.map(e => e.path));
+        await gitlabClient.commitEdits(
+          repo,
+          branch,
+          dir,
+          edits,
+          existing,
+          `kong: remove ${adapter.pluginType} on route ${routeId} from code`,
+        );
+
+        if (!mr) {
+          mr = await gitlabClient.openMergeRequest(
+            repo,
+            branch,
+            `Remove Kong plugin '${adapter.pluginType}' from code`,
+            [
+              `Removes the code-owned \`${adapter.pluginType}\` plugin on route \`${routeId}\` `,
+              `(service \`${serviceName}\`, Kong instance \`${instance}\`) from the chart by deleting its `,
+              `generated template (\`${removed.path}\`).`,
+              '',
+              'Generated by the DevPortal Kong plugin "remove from code" flow. Once this merges and deploys, ',
+              'the portal verifies the plugin has been removed from the gateway by the Kong Ingress Controller.',
+            ].join('\n'),
+          );
+        }
+
+        await promotionStore.transition(promotion.id, 'mr-open', {
+          mrRef: mr.webUrl,
+          detail: encodeMrDetail({ host: repo.host, projectSlug: repo.projectSlug, projectId: mr.projectId, iid: mr.iid }),
+        });
+
+        res.status(201).json(toPromotionDto({ ...promotion, state: 'mr-open', mr_ref: mr.webUrl }));
+      } finally {
+        await cleanup();
+      }
+    },
+  );
+
   // GET /:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promotions
   router.get(
     '/:instance/services/:serviceName/routes/:routeId/plugins/:pluginId/promotions',
@@ -1171,7 +1451,14 @@ export async function createRouter({
       const { instance, routeId, pluginId } = params.data;
 
       const plugin = await findRoutePlugin(instance, routeId, pluginId);
-      const adapter = plugin ? getAdapter(plugin.name) : undefined;
+      // Delete-in-code removes the live plugin before the frontend's next
+      // silent poll. Keep accepting the plugin type as a query hint so the
+      // terminal delete record remains visible after Kong no longer returns
+      // the plugin. When it is still live, the Kong response remains the
+      // source of truth and the hint is ignored.
+      const pluginTypeHint = typeof req.query.pluginType === 'string' ? req.query.pluginType : undefined;
+      const pluginType = plugin?.name ?? pluginTypeHint;
+      const adapter = pluginType ? getAdapter(pluginType) : undefined;
       if (!adapter) {
         res.json([]);
         return;

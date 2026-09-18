@@ -23,10 +23,19 @@ export type NormalizedConfig = Record<string, unknown>;
  * - `create`: write `content` verbatim, creating the file if it doesn't
  *   exist and overwriting it (idempotently) if it does. Used for
  *   `chart/templates/kongplugin-<type>.yaml`.
+ * - `delete-key`: remove one nested key from a YAML mapping while preserving
+ *   the rest of the file. Used to clear the plugin's values entry and any
+ *   chart condition that derives from it.
+ * - `delete`: remove the file at `path` (idempotent — a no-op if absent).
+ *   Used by delete-in-code (issue #3) to remove the plugin's generated
+ *   template. The template is removed together with its values key so charts
+ *   do not retain a dangling `konghq.com/plugins` reference.
  */
 export type FileEdit =
   | { path: string; op: 'merge'; values: Record<string, unknown> }
-  | { path: string; op: 'create'; content: string };
+  | { path: string; op: 'create'; content: string }
+  | { path: string; op: 'delete-key'; keyPath: string[] }
+  | { path: string; op: 'delete' };
 
 export interface KongPluginAdapter {
   /** Kong plugin name, e.g. `rate-limiting` — matches the Admin API and the rendered manifest's `plugin` field. */
@@ -41,4 +50,20 @@ export interface KongPluginAdapter {
   toChartEdits(liveConfig: NormalizedConfig): FileEdit[];
   /** Rendered `KongPlugin` manifest (from `helm template`) → normalized config, for the generation-time equivalence check. */
   fromRendered(kongPluginManifest: Record<string, unknown>): NormalizedConfig;
+  /**
+   * The generated template file this adapter owns (issue #3, delete-in-code):
+   * its repo-relative `path` and the exact `content` a `create` edit writes.
+   * Delete-in-code compares the repo's file against this to prove the template
+   * is still the adapter's own generated form before removing it — a
+   * hand-modified template is refused rather than clobbered (ADR-024's rule
+   * that the pipeline never overwrites a team-authored chart file). Config-
+   * independent: the template routes config through `{{ .Values }}`.
+   */
+  expectedTemplate(): { path: string; content: string };
+  /**
+   * Chart edits that remove this plugin from the chart (issue #3): the
+   * values entry and the `delete` of the generated template. Symmetric
+   * negative of the `create` half of {@link toChartEdits}.
+   */
+  toChartRemoval(): FileEdit[];
 }

@@ -180,6 +180,19 @@ const mockApi: KongServiceManagerApi = {
   previewPromotion: async () => mockPromotionPreview,
   promotePlugin: async () => mockPromotion,
   discardPromotion: async () => {},
+  previewDemotion: async () => ({
+    files: [
+      {
+        path: 'chart/templates/kongplugin-rate-limiting.yaml',
+        content: '',
+      },
+    ],
+    normalizedConfig: {},
+  }),
+  demotePlugin: async () => ({
+    ...mockPromotion,
+    mode: 'delete',
+  }),
   getPromotions: async () => [mockPromotion],
 };
 

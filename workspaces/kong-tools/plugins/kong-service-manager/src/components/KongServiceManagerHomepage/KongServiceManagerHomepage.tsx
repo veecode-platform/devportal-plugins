@@ -25,6 +25,7 @@ export function KongServiceManagerHomepage() {
   const [drawerPluginName, setDrawerPluginName] = useState('');
   const [drawerPluginId, setDrawerPluginId] = useState<string | undefined>();
   const [drawerConfig, setDrawerConfig] = useState<Record<string, unknown> | undefined>();
+  const [drawerEnabled, setDrawerEnabled] = useState<boolean | undefined>();
   const [drawerScope, setDrawerScope] = useState<'service' | 'route'>('service');
   const [drawerRouteId, setDrawerRouteId] = useState<string | undefined>();
 
@@ -48,19 +49,24 @@ export function KongServiceManagerHomepage() {
     setDrawerPluginId(undefined);
     setDrawerPluginName(pluginSlug);
     setDrawerConfig(undefined);
+    setDrawerEnabled(undefined);
     setDrawerScope('service');
     setDrawerRouteId(undefined);
     setDrawerOpen(true);
   }, []);
 
   const handleEditPlugin = useCallback((pluginId: string, pluginName: string) => {
+    // Edit must open on the plugin's live config/enabled, not schema defaults —
+    // the associated-plugins list already carries both.
+    const existing = state.associatedPlugins.find(p => p.id === pluginId);
     setDrawerPluginId(pluginId);
     setDrawerPluginName(pluginName);
-    setDrawerConfig(undefined);
+    setDrawerConfig(existing?.config);
+    setDrawerEnabled(existing?.enabled);
     setDrawerScope('service');
     setDrawerRouteId(undefined);
     setDrawerOpen(true);
-  }, []);
+  }, [state.associatedPlugins]);
 
   const handleManageRoutePlugins = useCallback((route: RouteResponse) => {
     setRoutePluginsRoute(route);
@@ -70,19 +76,24 @@ export function KongServiceManagerHomepage() {
     setDrawerPluginId(undefined);
     setDrawerPluginName(pluginSlug);
     setDrawerConfig(undefined);
+    setDrawerEnabled(undefined);
     setDrawerScope('route');
     setDrawerRouteId(routeId);
     setDrawerOpen(true);
   }, []);
 
   const handleEditRoutePlugin = useCallback((routeId: string, pluginId: string, pluginName: string) => {
+    // The route-plugins drawer has already fetched this route's associated
+    // plugins into state, so its live config/enabled are available here.
+    const existing = state.routeAssociatedPlugins.find(p => p.id === pluginId);
     setDrawerPluginId(pluginId);
     setDrawerPluginName(pluginName);
-    setDrawerConfig(undefined);
+    setDrawerConfig(existing?.config);
+    setDrawerEnabled(existing?.enabled);
     setDrawerScope('route');
     setDrawerRouteId(routeId);
     setDrawerOpen(true);
-  }, []);
+  }, [state.routeAssociatedPlugins]);
 
   const handleEditRoute = useCallback((route: RouteResponse) => {
     setEditingRoute(route);
@@ -121,9 +132,13 @@ export function KongServiceManagerHomepage() {
           <PluginsList
             onEnablePlugin={handleEnablePlugin}
             onEditPlugin={handleEditPlugin}
-            onPluginDisabled={name => setSuccessMessage(t('homepage.pluginDisabled', { name }))}
+            onPluginToggled={(name, enabled) =>
+              setSuccessMessage(
+                t(enabled ? 'homepage.pluginEnabled' : 'homepage.pluginDisabled', { name }),
+              )
+            }
             canEnable={permissions.canAddServicePlugin}
-            canDisable={permissions.canDisableServicePlugin}
+            canToggleEnabled={permissions.canUpdateServicePlugin}
             canEdit={permissions.canUpdateServicePlugin}
           />
         </Box>
@@ -163,11 +178,12 @@ export function KongServiceManagerHomepage() {
         onEnablePlugin={handleEnableRoutePlugin}
         onEditPlugin={handleEditRoutePlugin}
         canEnable={permissions.canAddRoutePlugin}
-        canDisable={permissions.canDisableRoutePlugin}
+        canToggleEnabled={permissions.canUpdateRoutePlugin}
         canEdit={permissions.canUpdateRoutePlugin}
         canPromote={permissions.canPromotePlugin}
         onPromoted={name => setSuccessMessage(t('homepage.pluginPromotionOpened', { name }))}
         onPromotionDiscarded={name => setSuccessMessage(t('homepage.promotionDiscarded', { name }))}
+        onRemovalOpened={name => setSuccessMessage(t('homepage.pluginRemovalOpened', { name }))}
       />
 
       <PluginConfigDrawer
@@ -175,6 +191,7 @@ export function KongServiceManagerHomepage() {
         pluginName={drawerPluginName}
         pluginId={drawerPluginId}
         existingConfig={drawerConfig}
+        existingEnabled={drawerEnabled}
         scope={drawerScope}
         routeId={drawerRouteId}
         onClose={() => setDrawerOpen(false)}

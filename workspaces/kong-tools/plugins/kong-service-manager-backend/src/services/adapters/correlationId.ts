@@ -1,6 +1,8 @@
 import { FileEdit, KongPluginAdapter, NormalizedConfig } from './types';
 
 const PLUGIN_TYPE = 'correlation-id';
+const VALUES_PATH = 'chart/values.yaml';
+const VALUES_KEY_PATH = ['kongPlugins', 'correlationId'];
 const TEMPLATE_PATH = `chart/templates/kongplugin-${PLUGIN_TYPE}.yaml`;
 
 /** Kong's own defaults for the two fields we promote (Admin API always returns them). */
@@ -45,7 +47,7 @@ export const correlationIdAdapter: KongPluginAdapter = {
 
     return [
       {
-        path: 'chart/values.yaml',
+        path: VALUES_PATH,
         op: 'merge',
         values: { kongPlugins: { correlationId: { headerName, generator, echoDownstream } } },
       },
@@ -63,5 +65,16 @@ export const correlationIdAdapter: KongPluginAdapter = {
           ? config.echo_downstream
           : String(config.echo_downstream) === 'true',
     };
+  },
+
+  expectedTemplate(): { path: string; content: string } {
+    return { path: TEMPLATE_PATH, content: manifestTemplate() };
+  },
+
+  toChartRemoval(): FileEdit[] {
+    return [
+      { path: VALUES_PATH, op: 'delete-key', keyPath: VALUES_KEY_PATH },
+      { path: TEMPLATE_PATH, op: 'delete' },
+    ];
   },
 };

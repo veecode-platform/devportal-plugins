@@ -212,4 +212,29 @@ describe('derivePromotionBadge', () => {
       expect(badge.kind).toBe('mr-open');
     });
   });
+
+  // Delete-in-code (issue #3): a terminal delete record describes a code-owned
+  // plugin, never an experiment — a failed removal must keep the card read-only.
+  describe('delete-in-code records (issue #3)', () => {
+    it('keeps a failed delete as code-owned (the plugin is still present, read-only)', () => {
+      const badge = derivePromotionBadge(
+        [record({ state: 'failed', mode: 'delete' })],
+        1757764800,
+        NOW,
+        { pluginTags: ['managed-by-ingress-controller'], instanceDefaultTags: ['portal-managed'] },
+      );
+      expect(badge.kind).toBe('code-owned');
+      expect(badge.editableInCode).toBe(true);
+    });
+
+    it('shows the in-flight removal as mr-open (Discard cancels it)', () => {
+      const badge = derivePromotionBadge(
+        [record({ state: 'mr-open', mode: 'delete' })],
+        1757764800,
+        NOW,
+        { pluginTags: ['managed-by-ingress-controller'], instanceDefaultTags: ['portal-managed'] },
+      );
+      expect(badge.kind).toBe('mr-open');
+    });
+  });
 });

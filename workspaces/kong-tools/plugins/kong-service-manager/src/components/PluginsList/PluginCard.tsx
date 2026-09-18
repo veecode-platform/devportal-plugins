@@ -6,7 +6,9 @@ import {
   CardContent,
   CardHeader,
   CircularProgress,
+  FormControlLabel,
   IconButton,
+  Switch,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -19,15 +21,18 @@ import { useTranslation } from '../../hooks/useTranslation';
 
 type PluginCardProps = {
   plugin: PluginCardType;
-  /** ID from associated plugins list, present when the plugin is enabled */
+  /** ID from associated plugins list, present when the plugin is attached to the gateway */
   associatedId?: string;
-  disabling?: boolean;
+  /** The attached plugin's live `enabled` flag — drives the on/off toggle and its label. */
+  enabled?: boolean;
   canEnable?: boolean;
-  canDisable?: boolean;
   canEdit?: boolean;
   onEnable: (pluginSlug: string) => void;
   onEdit: (pluginId: string, pluginName: string) => void;
-  onDisable: (pluginId: string, pluginName: string) => void;
+  /** Toggle the plugin's `enabled` flag in the gateway (PATCH) — "disable" is toggling it off; the plugin stays attached. Portal-managed plugins only. */
+  canToggleEnabled?: boolean;
+  togglingEnabled?: boolean;
+  onToggleEnabled?: (pluginId: string, pluginName: string, nextEnabled: boolean) => void;
   /** Promotion state (design 02 / plan P5) — omitted entirely outside route scope, where promotion doesn't apply. */
   promotionBadge?: PromotionBadge;
   canPromote?: boolean;
@@ -36,21 +41,24 @@ type PluginCardProps = {
   discardingPromotion?: boolean;
   onPromote?: (pluginId: string, pluginName: string) => void;
   onDiscardPromotion?: (pluginId: string, pluginName: string) => void;
-  /** `kong.promotion.editInCode` capability (issue #135) — gates the "Edit in code" action for a code-owned plugin. */
+  /** `kong.promotion.editInCode` capability (issue #135) — gates the "Edit in code" and "Remove from code" actions for a code-owned plugin. */
   editInCodeEnabled?: boolean;
   onEditInCode?: (pluginId: string, pluginName: string) => void;
+  /** Delete-in-code (issue #3): remove a code-owned plugin from the chart via an MR. Gated like edit-in-code (KIC-managed + capability on). */
+  onDeleteInCode?: (pluginId: string, pluginName: string) => void;
 };
 
 export function PluginCard({
   plugin,
   associatedId,
-  disabling,
+  enabled = true,
   canEnable = true,
-  canDisable = true,
   canEdit = true,
   onEnable,
   onEdit,
-  onDisable,
+  canToggleEnabled = true,
+  togglingEnabled,
+  onToggleEnabled,
   promotionBadge,
   canPromote = true,
   promoteDisabledReason,
@@ -59,6 +67,7 @@ export function PluginCard({
   onDiscardPromotion,
   editInCodeEnabled,
   onEditInCode,
+  onDeleteInCode,
 }: PluginCardProps) {
   const { t } = useTranslation();
   const isAssociated = !!associatedId;
@@ -87,6 +96,11 @@ export function PluginCard({
   // offer a dead click (issue #135, edit-in-code ships on by default).
   const showEditInCode =
     isAssociated && isCodeOwned && !!promotionBadge?.editableInCode && !!editInCodeEnabled && !!onEditInCode;
+  // Remove-from-code (issue #3): same gate as edit-in-code — a code-owned,
+  // KIC-managed plugin with the capability on. The backend refuses a demote of
+  // a non-KIC plugin, so hide the button rather than offer a dead click.
+  const showDeleteInCode =
+    isAssociated && isCodeOwned && !!promotionBadge?.editableInCode && !!editInCodeEnabled && !!onDeleteInCode && canPromote;
 
   return (
     <Card
@@ -164,17 +178,30 @@ export function PluginCard({
                 {discardingPromotion ? <CircularProgress size={18} /> : t('pluginCard.discardPromotion')}
               </Button>
             ) : (
-              canDisable &&
-              !isReadOnly && (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  disabled={disabling}
-                  onClick={() => onDisable(associatedId, plugin.slug)}
-                >
-                  {disabling ? <CircularProgress size={18} /> : t('pluginCard.disable')}
-                </Button>
+              !isReadOnly &&
+              canToggleEnabled &&
+              onToggleEnabled && (
+                <FormControlLabel
+                  sx={{ mr: 0 }}
+                  control={
+                    <Switch
+                      size="small"
+                      color="primary"
+                      checked={enabled}
+                      disabled={togglingEnabled}
+                      onChange={e =>
+                        onToggleEnabled(associatedId, plugin.slug, e.target.checked)
+                      }
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" color="text.secondary">
+                      {enabled
+                        ? t('pluginCard.enabledLabel')
+                        : t('pluginCard.disabledLabel')}
+                    </Typography>
+                  }
+                />
               )
             )}
             {showPromote && (
@@ -207,6 +234,21 @@ export function PluginCard({
                 </span>
               </Tooltip>
             )}
+            {showDeleteInCode && (
+              <Tooltip title={t('pluginCard.deleteInCodeTooltip')}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    disabled={!!promoteDisabledReason}
+                    onClick={() => onDeleteInCode?.(associatedId, plugin.slug)}
+                  >
+                    {t('pluginCard.deleteInCode')}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
           </>
         ) : (
           canEnable && (
@@ -235,6 +277,7 @@ export function PluginCard({
           </Typography>
         </Box>
       )}
+
     </Card>
   );
 }

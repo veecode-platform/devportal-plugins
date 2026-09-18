@@ -16,7 +16,10 @@ import {
 import { useKongServiceManager } from '../../context/KongServiceManagerContext';
 import { useTranslation } from '../../hooks/useTranslation';
 import { PluginCard } from './PluginCard';
-import type { PluginPerCategory } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
+import type {
+  AssociatedPluginsResponse,
+  PluginPerCategory,
+} from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import type { TranslationFunction } from '@backstage/core-plugin-api/alpha';
 import type { kongServiceManagerTranslationRef } from '../../translations';
 
@@ -60,19 +63,26 @@ function PluginCardSkeleton() {
 type PluginsListProps = {
   onEnablePlugin: (pluginSlug: string) => void;
   onEditPlugin: (pluginId: string, pluginName: string) => void;
-  onPluginDisabled?: (pluginName: string) => void;
+  onPluginToggled?: (pluginName: string, enabled: boolean) => void;
   canEnable?: boolean;
-  canDisable?: boolean;
+  canToggleEnabled?: boolean;
   canEdit?: boolean;
 };
 
-export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, canEnable, canDisable, canEdit }: PluginsListProps) {
+export function PluginsList({
+  onEnablePlugin,
+  onEditPlugin,
+  onPluginToggled,
+  canEnable,
+  canToggleEnabled,
+  canEdit,
+}: PluginsListProps) {
   const { t } = useTranslation();
   const {
     state,
     fetchAssociatedPlugins,
     fetchAvailablePlugins,
-    removeServicePlugin,
+    editServicePlugin,
   } = useKongServiceManager();
 
   const {
@@ -84,7 +94,7 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
   } = state;
 
   const [search, setSearch] = useState('');
-  const [disablingId, setDisablingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (instance && serviceName) {
@@ -93,27 +103,28 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
     }
   }, [instance, serviceName, fetchAssociatedPlugins, fetchAvailablePlugins]);
 
-  const associatedMap = useMemo(() => {
-    const map = new Map<string, string>();
+  const associatedByName = useMemo(() => {
+    const map = new Map<string, AssociatedPluginsResponse>();
     for (const p of associatedPlugins) {
-      map.set(p.name, p.id);
+      map.set(p.name, p);
     }
     return map;
   }, [associatedPlugins]);
 
-  const handleDisable = useCallback(
-    async (pluginId: string, pluginName: string) => {
-      setDisablingId(pluginId);
+  const handleToggleEnabled = useCallback(
+    async (pluginId: string, pluginName: string, nextEnabled: boolean) => {
+      setTogglingId(pluginId);
       try {
-        await removeServicePlugin(pluginId);
-        onPluginDisabled?.(pluginName);
+        await editServicePlugin(pluginId, { enabled: nextEnabled });
+        onPluginToggled?.(pluginName, nextEnabled);
       } catch {
-        // Error already handled by context (state.error)
+        // Error already handled by context (state.error); the refetch on
+        // editServicePlugin restores the switch to the gateway's real state.
       } finally {
-        setDisablingId(null);
+        setTogglingId(null);
       }
     },
-    [removeServicePlugin, onPluginDisabled],
+    [editServicePlugin, onPluginToggled],
   );
 
   const filterCategories = useCallback(
@@ -123,7 +134,7 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
         .map(cat => ({
           ...cat,
           plugins: cat.plugins.filter(p => {
-            if (onlyAssociated && !associatedMap.has(p.slug)) return false;
+            if (onlyAssociated && !associatedByName.has(p.slug)) return false;
             if (term && !p.name.toLowerCase().includes(term) && !p.slug.toLowerCase().includes(term)) {
               return false;
             }
@@ -132,7 +143,7 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
         }))
         .filter(cat => cat.plugins.length > 0);
     },
-    [search, associatedMap],
+    [search, associatedByName],
   );
 
   const allFiltered = useMemo(
@@ -168,20 +179,24 @@ export function PluginsList({ onEnablePlugin, onEditPlugin, onPluginDisabled, ca
           {formatCategory(cat.category, t)}
         </Typography>
         <ItemCardGrid>
-          {cat.plugins.map(plugin => (
-            <PluginCard
-              key={plugin.slug}
-              plugin={plugin}
-              associatedId={associatedMap.get(plugin.slug)}
-              disabling={disablingId === associatedMap.get(plugin.slug)}
-              canEnable={canEnable}
-              canDisable={canDisable}
-              canEdit={canEdit}
-              onEnable={onEnablePlugin}
-              onEdit={onEditPlugin}
-              onDisable={handleDisable}
-            />
-          ))}
+          {cat.plugins.map(plugin => {
+            const assoc = associatedByName.get(plugin.slug);
+            return (
+              <PluginCard
+                key={plugin.slug}
+                plugin={plugin}
+                associatedId={assoc?.id}
+                enabled={assoc?.enabled}
+                canEnable={canEnable}
+                canEdit={canEdit}
+                canToggleEnabled={canToggleEnabled}
+                togglingEnabled={togglingId === assoc?.id}
+                onEnable={onEnablePlugin}
+                onEdit={onEditPlugin}
+                onToggleEnabled={handleToggleEnabled}
+              />
+            );
+          })}
         </ItemCardGrid>
       </Box>
     ));

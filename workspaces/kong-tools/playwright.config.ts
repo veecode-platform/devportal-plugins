@@ -17,6 +17,15 @@
 import { defineConfig } from '@playwright/test';
 import { generateProjects } from '@backstage/e2e-test-utils/playwright';
 
+// Backstage's helper selects the branded Chrome channel. The repository's
+// canonical Playwright image provides the bundled Chromium binary instead;
+// remove the channel override so the generated projects use that binary.
+const projects = generateProjects().map(project => {
+  const use = { ...project.use };
+  delete use.channel;
+  return { ...project, use };
+});
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -62,5 +71,5 @@ export default defineConfig({
 
   outputDir: 'node_modules/.cache/e2e-test-results',
 
-  projects: generateProjects(), // Find all packages with e2e-test folders
+  projects, // Find all packages with e2e-test folders
 });

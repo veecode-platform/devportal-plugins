@@ -164,11 +164,39 @@ export interface KongServiceManagerApi {
     pluginId: string,
   ): Promise<void>;
 
+  /**
+   * Dry-run of a delete-in-code (issue #3) — no side effects. Returns the
+   * chart file(s) that removing the code-owned plugin would delete. Gated the
+   * same way as {@link demotePlugin}; a hand-modified template surfaces as a 400.
+   */
+  previewDemotion(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionPreview>;
+
+  /**
+   * Remove an already code-owned route plugin from the chart (issue #3) — opens
+   * an MR deleting the plugin's generated template. The finalizer confirms the
+   * plugin disappears from the gateway once the merge deploys.
+   */
+  demotePlugin(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionRecord>;
+
   /** Promotion history for a route plugin, newest first. Empty when promotion is disabled. */
   getPromotions(
     instance: string,
     serviceName: string,
     routeId: string,
     pluginId: string,
+    /** Needed after delete-in-code removes the live plugin before its terminal record is read. */
+    pluginType?: string,
   ): Promise<PromotionRecord[]>;
 }

@@ -118,4 +118,72 @@ describe('renderCheck', () => {
     expect(result.equal).toBe(false);
     expect(result.diff).toContain('rate-limiting');
   });
+
+  // --- delete-in-code (issue #3): expectAbsent inverts the contract ---
+
+  it('expectAbsent: succeeds once the generated template is removed', async () => {
+    // Present first (a normal promote), then remove it.
+    await renderCheck({
+      repoDir,
+      adapter: rateLimitingAdapter,
+      edits: rateLimitingAdapter.toChartEdits({ minute: 60 }),
+      liveConfig: { minute: 60 },
+    });
+    const templatePath = path.join(repoDir, 'chart/templates/kongplugin-rate-limiting.yaml');
+    await expect(fs.access(templatePath)).resolves.toBeUndefined();
+
+    const result = await renderCheck({
+      repoDir,
+      adapter: rateLimitingAdapter,
+      edits: rateLimitingAdapter.toChartRemoval(),
+      liveConfig: {},
+      expectAbsent: true,
+    });
+
+    expect(result).toEqual({ equal: true });
+    await expect(fs.access(templatePath)).rejects.toThrow();
+    const values = await fs.readFile(path.join(repoDir, 'chart/values.yaml'), 'utf8');
+    expect(values).not.toMatch(/^\s+rateLimiting:/m);
+  });
+
+  it('expectAbsent: fails while the plugin still renders (removal incomplete)', async () => {
+    await renderCheck({
+      repoDir,
+      adapter: rateLimitingAdapter,
+      edits: rateLimitingAdapter.toChartEdits({ minute: 60 }),
+      liveConfig: { minute: 60 },
+    });
+
+    // No removal edit applied — the plugin is still declared.
+    const result = await renderCheck({
+      repoDir,
+      adapter: rateLimitingAdapter,
+      edits: [],
+      liveConfig: {},
+      expectAbsent: true,
+    });
+
+    expect(result.equal).toBe(false);
+    expect(result.diff).toContain('still declares');
+  });
+
+  it('expectAbsent: rejects a deleted template that leaves its generated Ingress attachment behind', async () => {
+    await renderCheck({
+      repoDir,
+      adapter: rateLimitingAdapter,
+      edits: rateLimitingAdapter.toChartEdits({ minute: 60 }),
+      liveConfig: { minute: 60 },
+    });
+
+    const result = await renderCheck({
+      repoDir,
+      adapter: rateLimitingAdapter,
+      edits: [{ path: 'chart/templates/kongplugin-rate-limiting.yaml', op: 'delete' }],
+      liveConfig: {},
+      expectAbsent: true,
+    });
+
+    expect(result.equal).toBe(false);
+    expect(result.diff).toContain('konghq.com/plugins');
+  });
 });

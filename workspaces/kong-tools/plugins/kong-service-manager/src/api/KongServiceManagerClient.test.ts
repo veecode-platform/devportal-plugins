@@ -318,4 +318,16 @@ describe('KongServiceManagerClient', () => {
     );
     expect(result).toEqual([]);
   });
+
+  it('includes the plugin type hint for history after the live plugin is removed', async () => {
+    const { client, mockFetch } = createMocks();
+    mockFetch.mockResolvedValue(jsonResponse([]));
+
+    await client.getPromotions('default', 'my-service', 'route-abc', 'plugin-xyz', 'rate-limiting');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${BASE_URL}/default/services/my-service/routes/route-abc/plugins/plugin-xyz/promotions?pluginType=rate-limiting`,
+      expect.anything(),
+    );
+  });
 });

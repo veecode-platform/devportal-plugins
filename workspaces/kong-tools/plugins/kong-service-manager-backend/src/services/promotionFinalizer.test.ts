@@ -474,6 +474,76 @@ describe('reconcilePromotions', () => {
       expect(kong.addPluginToRoute).not.toHaveBeenCalled();
       expect(store.transitionCalls).toEqual([]);
     });
+
+    // Delete-in-code (issue #3) inverts convergence: the removal is done once
+    // the KIC-owned plugin has *disappeared* from the gateway.
+    it('delete mode: marks codified once the KIC-owned plugin has disappeared', async () => {
+      const record = applyingRow({ mode: 'delete' });
+      const store = fakeStore([record]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }), fileExistsOnRef: jest.fn().mockResolvedValue(true) };
+      const kong: any = {
+        // The controller reconciled the removed template off the gateway.
+        getRouteAssociatedPlugins: jest.fn().mockResolvedValue([]),
+        removeRoutePlugin: jest.fn(),
+      };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
+      expect(store.transitionCalls).toEqual([[1, 'codified', undefined]]);
+    });
+
+    it('delete mode: stays in applying while the KIC-owned plugin is still present', async () => {
+      const record = applyingRow({ mode: 'delete' });
+      const store = fakeStore([record]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }), fileExistsOnRef: jest.fn().mockResolvedValue(true) };
+      const kong: any = {
+        getRouteAssociatedPlugins: jest
+          .fn()
+          .mockResolvedValue([plugin({ id: 'plugin-2', tags: ['managed-by-ingress-controller'], config: { minute: 60 } })]),
+        removeRoutePlugin: jest.fn(),
+      };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(store.transitionCalls).toEqual([]); // still present, not timed out yet
+    });
+
+    it('delete mode: does not treat a same-type plugin without the KIC tag as absent', async () => {
+      const record = applyingRow({ mode: 'delete' });
+      const store = fakeStore([record]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }), fileExistsOnRef: jest.fn().mockResolvedValue(true) };
+      const kong: any = {
+        // A tag mutation or another writer must not make a still-present
+        // same-type plugin look deleted.
+        getRouteAssociatedPlugins: jest.fn().mockResolvedValue([plugin({ tags: [] })]),
+        removeRoutePlugin: jest.fn(),
+      };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(store.transitionCalls).toEqual([]);
+    });
+
+    it('delete mode: times out to failed when the plugin is still present after the deadline', async () => {
+      const staleApplyingSince = new Date(Date.now() - 20 * 60_000).toISOString();
+      const record = applyingRow({ mode: 'delete' }, staleApplyingSince);
+      const store = fakeStore([record]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }), fileExistsOnRef: jest.fn().mockResolvedValue(true) };
+      const kong: any = {
+        getRouteAssociatedPlugins: jest
+          .fn()
+          .mockResolvedValue([plugin({ id: 'plugin-2', tags: ['managed-by-ingress-controller'], config: { minute: 60 } })]),
+        removeRoutePlugin: jest.fn(),
+      };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(store.transitionCalls).toHaveLength(1);
+      const [id, state, extra] = store.transitionCalls[0];
+      expect([id, state]).toEqual([1, 'failed']);
+      expect(extra.detail).toContain('still present');
+    });
   });
 
   describe('teardown interaction', () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -31,6 +31,8 @@ type PluginConfigDrawerProps = {
   pluginName: string;
   pluginId?: string;
   existingConfig?: Record<string, unknown>;
+  /** Current `enabled` flag of the plugin being edited (kong mode). Undefined for a new plugin → defaults to enabled. Ignored in code mode, where `enabled` isn't part of the submit. */
+  existingEnabled?: boolean;
   scope: 'service' | 'route';
   routeId?: string;
   onClose: () => void;
@@ -50,6 +52,7 @@ export function PluginConfigDrawer({
   pluginName,
   pluginId,
   existingConfig,
+  existingEnabled,
   scope,
   routeId,
   onClose,
@@ -72,12 +75,18 @@ export function PluginConfigDrawer({
   const [enabled, setEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Key of the plugin whose form we've already seeded this open. Guards the
+  // seeding effect so it runs once per (plugin, open) instead of on every
+  // parent re-render — the parent hands a fresh `existingConfig` object each
+  // time, which would otherwise re-seed and wipe the user's in-progress edits.
+  const seededKeyRef = useRef<string | null>(null);
 
   // Parse schema into config fields
   const configFields: ConfigField[] = useMemo(() => {
-    if (!state.pluginFields) return [];
+    const fieldsKey = `${state.instance}:${pluginName}`;
+    if (!state.pluginFields || state.pluginFieldsKey !== fieldsKey) return [];
     return parseConfigFields(state.pluginFields);
-  }, [state.pluginFields]);
+  }, [state.instance, state.pluginFields, state.pluginFieldsKey, pluginName]);
 
   // Fetch schema and seed form state when drawer opens
   useEffect(() => {
@@ -87,9 +96,19 @@ export function PluginConfigDrawer({
     }
   }, [open, pluginName, fetchPluginFields]);
 
-  // Seed config state from schema defaults + existing config
+  // Seed config state from schema defaults + existing config. Runs once per
+  // (plugin, open): the guard below keeps a fresh `existingConfig` identity on
+  // a parent re-render from re-seeding over the user's edits, and the reset on
+  // close lets the next open seed again.
   useEffect(() => {
-    if (!open || configFields.length === 0) return;
+    if (!open) {
+      seededKeyRef.current = null;
+      return;
+    }
+    if (configFields.length === 0) return;
+
+    const key = `${state.instance}:${pluginName}:${pluginId ?? 'new'}`;
+    if (seededKeyRef.current === key) return;
 
     const seeded: Record<string, unknown> = {};
     for (const field of configFields) {
@@ -108,8 +127,20 @@ export function PluginConfigDrawer({
     }
 
     setConfigState(seeded);
-    setEnabled(true);
-  }, [open, configFields, existingConfig]);
+    // Reflect the plugin's real enabled state on edit; a new plugin (or a
+    // code-mode submit, where `enabled` is not part of the payload) defaults on.
+    setEnabled(mode === 'kong' ? existingEnabled ?? true : true);
+    seededKeyRef.current = key;
+  }, [
+    open,
+    configFields,
+    existingConfig,
+    existingEnabled,
+    pluginName,
+    pluginId,
+    mode,
+    state.instance,
+  ]);
 
   const handleFieldChange = useCallback(
     (fieldName: string, value: unknown) => {
@@ -291,7 +322,7 @@ export function PluginConfigDrawer({
                         variant="outlined"
                         fullWidth
                         required={field.required}
-                        defaultValue={value ?? ''}
+                        value={value ?? ''}
                         onChange={e =>
                           handleFieldChange(field.name, e.target.value)
                         }
@@ -308,7 +339,7 @@ export function PluginConfigDrawer({
                         variant="outlined"
                         fullWidth
                         required={field.required}
-                        defaultValue={value ?? ''}
+                        value={value ?? ''}
                         onChange={e =>
                           handleFieldChange(field.name, Number(e.target.value))
                         }

@@ -135,12 +135,17 @@ export function derivePromotionBadge(
     return { kind: 'experimental', ageMs: now - pluginCreatedAtSeconds * 1000 };
   }
 
-  // A finished `code-only` promotion (issue #135) describes an edit to a
-  // plugin that was code-owned before the promotion and stays code-owned
-  // after it — there was never an experiment. Keeping its terminal
+  // A finished `code-only` edit (issue #135) or a `delete` removal (issue #3)
+  // both describe an operation on a plugin that was code-owned before and
+  // stays code-owned after — there was never an experiment. Keeping a terminal
   // `codified`/`failed` badge would strip the plugin of every action the card
-  // offers, including a second edit in code, with no way back.
-  if (TERMINAL_STATES.has(latest.state) && latest.mode === 'code-only') {
+  // offers (a second edit, or a retry of the removal) with no way back. A
+  // successful delete removes the plugin from the route, so this branch only
+  // paints a card for a *failed* delete (the plugin is still present).
+  if (
+    TERMINAL_STATES.has(latest.state) &&
+    (latest.mode === 'code-only' || latest.mode === 'delete')
+  ) {
     return {
       kind: 'code-owned',
       record: latest,

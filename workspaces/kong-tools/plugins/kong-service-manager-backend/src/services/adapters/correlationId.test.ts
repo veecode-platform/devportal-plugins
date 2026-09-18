@@ -56,4 +56,18 @@ describe('correlationIdAdapter', () => {
     const rendered = correlationIdAdapter.fromRendered({ config: { header_name: 'X-Request-Id', echo_downstream: true, generator: 'uuid' } });
     expect(rendered).toEqual(live);
   });
+
+  it('removes the plugin by deleting its generated template, and expectedTemplate matches the create edit (issue #3)', () => {
+    expect(correlationIdAdapter.toChartRemoval()).toEqual([
+      { path: 'chart/values.yaml', op: 'delete-key', keyPath: ['kongPlugins', 'correlationId'] },
+      { path: 'chart/templates/kongplugin-correlation-id.yaml', op: 'delete' },
+    ]);
+    const created = correlationIdAdapter
+      .toChartEdits({ header_name: 'X-Correlation-Id' })
+      .find(e => e.op === 'create') as { content: string };
+    expect(correlationIdAdapter.expectedTemplate()).toEqual({
+      path: 'chart/templates/kongplugin-correlation-id.yaml',
+      content: created.content,
+    });
+  });
 });

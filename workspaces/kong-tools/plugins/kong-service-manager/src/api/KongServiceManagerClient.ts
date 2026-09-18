@@ -347,14 +347,42 @@ export class KongServiceManagerClient implements KongServiceManagerApi {
     );
   }
 
+  async previewDemotion(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionPreview> {
+    return this.request(
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/demote/preview`,
+      { method: 'POST', body: JSON.stringify({ entityRef }) },
+    );
+  }
+
+  async demotePlugin(
+    instance: string,
+    serviceName: string,
+    routeId: string,
+    pluginId: string,
+    entityRef: string,
+  ): Promise<PromotionRecord> {
+    return this.request(
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/demote`,
+      { method: 'POST', body: JSON.stringify({ entityRef }) },
+    );
+  }
+
   async getPromotions(
     instance: string,
     serviceName: string,
     routeId: string,
     pluginId: string,
+    pluginType?: string,
   ): Promise<PromotionRecord[]> {
+    const query = pluginType ? `?pluginType=${encodeURIComponent(pluginType)}` : '';
     return this.request(
-      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promotions`,
+      `${this.promotionPath(instance, serviceName, routeId, pluginId)}/promotions${query}`,
     );
   }
 }

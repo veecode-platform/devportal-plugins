@@ -37,4 +37,21 @@ describe('rateLimitingAdapter', () => {
 
     expect(rendered).toEqual({ minute: 60 });
   });
+
+  it('removes the plugin by deleting its generated template (issue #3)', () => {
+    expect(rateLimitingAdapter.toChartRemoval()).toEqual([
+      { path: 'chart/values.yaml', op: 'delete-key', keyPath: ['kongPlugins', 'rateLimiting'] },
+      { path: 'chart/templates/kongplugin-rate-limiting.yaml', op: 'delete' },
+    ]);
+  });
+
+  it('expectedTemplate matches the create edit the promote path writes (safety proof source)', () => {
+    const created = rateLimitingAdapter
+      .toChartEdits({ minute: 60 })
+      .find(e => e.op === 'create') as { content: string };
+    expect(rateLimitingAdapter.expectedTemplate()).toEqual({
+      path: 'chart/templates/kongplugin-rate-limiting.yaml',
+      content: created.content,
+    });
+  });
 });

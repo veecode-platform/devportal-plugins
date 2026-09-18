@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useReducer,
 } from 'react';
 import { useApi } from '@backstage/core-plugin-api';
@@ -32,6 +33,8 @@ type State = {
   selectedRoute: RouteResponse | null;
   routeAssociatedPlugins: AssociatedPluginsResponse[];
   pluginFields: PluginFieldsResponse | null;
+  /** Identity of the schema currently in `pluginFields`; prevents a previous plugin/instance from seeding a new drawer. */
+  pluginFieldsKey: string | null;
   /** Promotion history per route plugin id (design 02 / plan P5) — only populated for plugins the drawer has fetched. */
   promotionsByPluginId: Record<string, PromotionRecord[]>;
   /** Configured Kong instances, including ownership-marker defaultTags — empty until fetchInstances resolves. */
@@ -51,7 +54,7 @@ type Action =
   | { type: 'SET_ROUTES'; data: RoutesResponse }
   | { type: 'SET_SELECTED_ROUTE'; data: RouteResponse | null }
   | { type: 'SET_ROUTE_ASSOCIATED_PLUGINS'; data: AssociatedPluginsResponse[] }
-  | { type: 'SET_PLUGIN_FIELDS'; data: PluginFieldsResponse | null }
+  | { type: 'SET_PLUGIN_FIELDS'; data: PluginFieldsResponse | null; key: string | null }
   | { type: 'SET_PROMOTIONS_FOR_PLUGIN'; pluginId: string; data: PromotionRecord[] }
   | { type: 'SET_KONG_INSTANCES'; data: KongInstanceInfo[] }
   | { type: 'SET_PROMOTION_CAPABILITIES'; data: PromotionCapabilities }
@@ -77,7 +80,7 @@ function reducer(state: State, action: Action): State {
     case 'SET_ROUTE_ASSOCIATED_PLUGINS':
       return { ...state, routeAssociatedPlugins: action.data };
     case 'SET_PLUGIN_FIELDS':
-      return { ...state, pluginFields: action.data };
+      return { ...state, pluginFields: action.data, pluginFieldsKey: action.key };
     case 'SET_PROMOTIONS_FOR_PLUGIN':
       return {
         ...state,
@@ -109,6 +112,7 @@ const initialState: State = {
   selectedRoute: null,
   routeAssociatedPlugins: [],
   pluginFields: null,
+  pluginFieldsKey: null,
   promotionsByPluginId: {},
   kongInstances: [],
   promotionCapabilities: null,
@@ -137,13 +141,21 @@ type KongServiceManagerContextValue = {
   addPluginToRoute: (routeId: string, plugin: CreatePlugin) => Promise<void>;
   editRoutePlugin: (routeId: string, pluginId: string, plugin: Partial<CreatePlugin>) => Promise<void>;
   removeRoutePlugin: (routeId: string, pluginId: string) => Promise<void>;
-  fetchPromotions: (routeId: string, pluginId: string) => Promise<void>;
+  fetchPromotions: (routeId: string, pluginId: string, pluginType?: string) => Promise<void>;
+  /** Background refresh of a plugin's promotion history — silent (no global spinner/error), for polling an in-flight promotion to its terminal state. */
+  refreshPromotions: (routeId: string, pluginId: string, pluginType?: string) => Promise<void>;
+  /** Background refresh of a route's associated plugins — silent, so a finalized handover (experiment removed, plugin now code-owned) shows up without a manual reopen. */
+  refreshRouteAssociatedPlugins: (routeId: string) => Promise<void>;
   /** Fetches the configured Kong instances (for ownership-marker defaultTags). Best-effort: a denied/failed call leaves `kongInstances` empty rather than surfacing the global error, since only the promotion badge depends on it and an empty list degrades safely to "no ownership gate". */
   fetchInstances: () => Promise<void>;
   fetchPromotionCapabilities: () => Promise<void>;
   previewPromotion: (routeId: string, pluginId: string, entityRef: string, config?: Record<string, unknown>) => Promise<PromotionPreview>;
   promotePlugin: (routeId: string, pluginId: string, entityRef: string, config?: Record<string, unknown>) => Promise<PromotionRecord>;
   discardPromotion: (routeId: string, pluginId: string) => Promise<void>;
+  /** Dry-run of a delete-in-code (issue #3) — dialog-scoped, no global spinner. */
+  previewDemotion: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionPreview>;
+  /** Remove a code-owned route plugin from the chart (issue #3) — opens the removal MR. */
+  demotePlugin: (routeId: string, pluginId: string, entityRef: string) => Promise<PromotionRecord>;
 };
 
 const KongServiceManagerContext =
@@ -156,6 +168,7 @@ export function KongServiceManagerProvider({
 }) {
   const api = useApi(kongServiceManagerApiRef);
   const [state, dispatch] = useReducer(reducer, initialState);
+  const pluginFieldsRequestRef = useRef(0);
 
   const setInstance = useCallback((instance: string) => {
     dispatch({ type: 'SET_INSTANCE', instance });
@@ -236,9 +249,20 @@ export function KongServiceManagerProvider({
 
   const fetchPluginFields = useCallback(
     async (pluginName: string) => {
+      const requestId = ++pluginFieldsRequestRef.current;
+      const key = `${state.instance}:${pluginName}`;
+      // Clear the shared slot first: it holds one global schema, so without
+      // this a drawer opened right after another would render the previous
+      // plugin's fields until the new schema lands (stale-slot first-open bug).
+      dispatch({ type: 'SET_PLUGIN_FIELDS', data: null, key: null });
       await withLoading(async () => {
         const data = await api.getPluginFields(state.instance, pluginName);
-        dispatch({ type: 'SET_PLUGIN_FIELDS', data });
+        // A drawer can change plugin or instance while an earlier request is
+        // still in flight. Only the latest response may populate the shared
+        // schema slot; otherwise the old response can seed the new form.
+        if (requestId === pluginFieldsRequestRef.current) {
+          dispatch({ type: 'SET_PLUGIN_FIELDS', data, key });
+        }
       });
     },
     [api, state.instance, withLoading],
@@ -393,9 +417,9 @@ export function KongServiceManagerProvider({
   );
 
   const fetchPromotions = useCallback(
-    async (routeId: string, pluginId: string) => {
+    async (routeId: string, pluginId: string, pluginType?: string) => {
       await withLoading(async () => {
-        const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId);
+        const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId, pluginType);
         dispatch({ type: 'SET_PROMOTIONS_FOR_PLUGIN', pluginId, data });
       });
     },
@@ -408,6 +432,33 @@ export function KongServiceManagerProvider({
   // /instances call just leaves kongInstances empty, which is the same as
   // "no ownership signal" — the promotion badge falls back to today's
   // behaviour instead of the request surfacing as a user-facing error.
+  // Silent background refreshers (skip withLoading): a poll must not toggle the
+  // page-wide spinner or clear the error snackbar every few seconds. A transient
+  // failure is swallowed — the next tick retries.
+  const refreshPromotions = useCallback(
+    async (routeId: string, pluginId: string, pluginType?: string) => {
+      try {
+        const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId, pluginType);
+        dispatch({ type: 'SET_PROMOTIONS_FOR_PLUGIN', pluginId, data });
+      } catch {
+        // best-effort — see comment above
+      }
+    },
+    [api, state.instance, state.serviceName],
+  );
+
+  const refreshRouteAssociatedPlugins = useCallback(
+    async (routeId: string) => {
+      try {
+        const data = await api.getRouteAssociatedPlugins(state.instance, routeId);
+        dispatch({ type: 'SET_ROUTE_ASSOCIATED_PLUGINS', data });
+      } catch {
+        // best-effort — see comment above
+      }
+    },
+    [api, state.instance],
+  );
+
   const fetchInstances = useCallback(async () => {
     try {
       const data = await api.getInstances();
@@ -458,6 +509,27 @@ export function KongServiceManagerProvider({
     [api, state.instance, state.serviceName, withLoading],
   );
 
+  // Dialog-scoped like previewPromotion: no withLoading, so the removal review
+  // dialog owns its own loading/error and never toggles the page spinner.
+  const previewDemotion = useCallback(
+    async (routeId: string, pluginId: string, entityRef: string) =>
+      api.previewDemotion(state.instance, state.serviceName, routeId, pluginId, entityRef),
+    [api, state.instance, state.serviceName],
+  );
+
+  const demotePluginAction = useCallback(
+    async (routeId: string, pluginId: string, entityRef: string) => {
+      let result!: PromotionRecord;
+      await withLoading(async () => {
+        result = await api.demotePlugin(state.instance, state.serviceName, routeId, pluginId, entityRef);
+        const data = await api.getPromotions(state.instance, state.serviceName, routeId, pluginId);
+        dispatch({ type: 'SET_PROMOTIONS_FOR_PLUGIN', pluginId, data });
+      });
+      return result;
+    },
+    [api, state.instance, state.serviceName, withLoading],
+  );
+
   const value = useMemo<KongServiceManagerContextValue>(
     () => ({
       state,
@@ -481,11 +553,15 @@ export function KongServiceManagerProvider({
       editRoutePlugin,
       removeRoutePlugin,
       fetchPromotions,
+      refreshPromotions,
+      refreshRouteAssociatedPlugins,
       fetchInstances,
       fetchPromotionCapabilities,
       previewPromotion,
       promotePlugin: promotePluginAction,
       discardPromotion,
+      previewDemotion,
+      demotePlugin: demotePluginAction,
     }),
     [
       state,
@@ -509,11 +585,15 @@ export function KongServiceManagerProvider({
       editRoutePlugin,
       removeRoutePlugin,
       fetchPromotions,
+      refreshPromotions,
+      refreshRouteAssociatedPlugins,
       fetchInstances,
       fetchPromotionCapabilities,
       previewPromotion,
       promotePluginAction,
       discardPromotion,
+      previewDemotion,
+      demotePluginAction,
     ],
   );
 
