@@ -695,7 +695,63 @@ Known follow-up (not fixed here): the finalizer's `handleDraft` hardcodes
 `kong-promote/${plugin_type}` instead of calling `promotionBranch()` — if the
 branch convention ever changes, the orphan probe silently stops finding MRs.
 
-## ADR-026: Delete in Code — a `delete` Promotion Mode That Removes a Code-Owned Plugin via MR
+## ADR-026: The Kong plugin supports two ways of applying changes, without picking one
+
+Moved from devportal-plugins-parent ADR-0005 (2026-09-17); the parent record is retired.
+
+**Date:** 2026-09-17
+
+The plugin lets a developer manage Kong from the portal: create routes and enable or
+disable Kong plugins on a service. The direct path calls Kong's Admin API and requires
+a database-backed gateway. A declarative path is needed for deployments whose
+configuration is generated from files or Kubernetes resources kept in Git, because
+direct writes can fail or be overwritten by reconciliation.
+
+Evidence considered before deciding included Kong Ingress Controller ownership tags,
+decK `select_tags`, and Kong's federated-configuration guidance. Those mechanisms
+preserve entities outside the automation's selected tag set and support coexistence
+between writers.
+
+**Decision:**
+
+1. The plugin supports two write paths: direct writes to Kong's Admin API (immediate,
+   for database-backed gateways) and export of the same change as declarative
+   artifacts (Kubernetes resources or configuration files) for Git-managed gateways.
+2. The plugin ships no default and enforces neither path. Documentation describes both,
+   with their requirements and trade-offs, and the team deploying the portal chooses
+   the path for its context.
+3. Every entity created through the Admin API carries a distinctive configurable tag,
+   such as `devportal-managed`, so automation scoped by its own tags leaves those
+   entities alone.
+4. The `kong-tools` workspace documents the deployment choices in
+   `docs/applying-changes-to-kong.md` for readers without prior Kong context.
+
+**Rationale:** The direct path preserves immediate feedback for database-backed
+gateways, while the declarative path preserves Git as the source of truth for
+Git-managed gateways. A cooperative tag convention is the mechanism Kong's tooling
+uses to let independently managed entities coexist.
+
+**Consequences:**
+
+- **Positive:** one plugin serves both operating models; an experiment-then-promote
+  workflow is possible; no deployment is forced to change its configuration model.
+- **Negative / trade-offs:** tag scoping is cooperative rather than enforced by Kong;
+  a misconfigured automation can still remove portal-created entities; supporting two
+  paths costs more documentation and, when export lands, more code.
+- **Follow-ups:** maintain the deployment blueprint, design declarative export, and
+  define name-collision handling between portal-created and Git-managed entities.
+
+**Alternatives considered:**
+
+- **Opinionated default:** rejected because the deployer knows the operating context;
+  the plugin documents and the deployer chooses.
+- **Admin API only:** rejected because it excludes database-less gateways behind an
+  ingress controller.
+- **Declarative export only:** rejected because it loses the immediate feedback that
+  makes the portal useful as an experimentation surface and excludes database-backed
+  gateways.
+
+## ADR-027: Delete in Code — a `delete` Promotion Mode That Removes a Code-Owned Plugin via MR
 
 **Date:** 2026-09-17
 **Status:** Accepted

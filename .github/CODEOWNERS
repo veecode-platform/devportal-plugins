@@ -1,0 +1,5 @@
+# Repository-wide agent guardrails and contribution rules (ADR-0008 §6).
+/.agents/        @Elesiann
+/.claude/        @Elesiann
+/CONTRIBUTING.md @Elesiann
+/templates/      @Elesiann
