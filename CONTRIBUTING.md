@@ -105,18 +105,17 @@ stage 7. The script's local contract is in [`scripts/ci/README.md`](scripts/ci/R
 
 ## The four proofs and the official test flow
 
-Use the [four proof definitions in CONTEXT.md](CONTEXT.md) without redefining them.
-Proof 1 is exercised in the workspace; proof 2 uses `devportal-local` without
-publishing; proof 3 is the overlay smoke on the published OCI artifact; proof 4 is
-the delivered user journey in `devportal-local`. No proof substitutes for another,
-and `devportal-local` is the only runner for proofs 2 and 4.
+The four proofs, the official flow, the rule that no proof substitutes for another,
+and the fact that `devportal-local` is the only runner for proofs 2 and 4 are all
+defined in [CONTEXT.md](CONTEXT.md#proving-a-plugin). Do not restate them here or in a
+workspace `AGENTS.md`; link to that section. This section adds only the rules that
+follow from those definitions:
 
-Build in devportal-plugins, prove in devportal-local, publish through the export-overlays.
-
-The overlay is a distribution recipe, not a development environment. Develop an
-adaptation in the source checkout, prove it with proofs 1 and 2, then register the
-result in the overlay recipe. Existing per-workspace compose files are transitional
-harnesses and do not change the official proof ownership.
+- The overlay is a distribution recipe, not a development environment. Develop an
+  adaptation in the source checkout, prove it with proofs 1 and 2, then register the
+  result in the overlay recipe.
+- Existing per-workspace compose files are transitional harnesses; they do not change
+  the official proof ownership.
 
 ## Which proofs apply to which `backstage.role`
 
