@@ -695,7 +695,7 @@ Known follow-up (not fixed here): the finalizer's `handleDraft` hardcodes
 `kong-promote/${plugin_type}` instead of calling `promotionBranch()` — if the
 branch convention ever changes, the orphan probe silently stops finding MRs.
 
-## ADR-026: The Kong plugin supports two ways of applying changes, without picking one
+## ADR-026: Two Write Paths for Kong — Direct Admin API and Declarative Export, With No Default
 
 Moved from devportal-plugins-parent ADR-0005 (2026-09-17); the parent record is retired.
 
