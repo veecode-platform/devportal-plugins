@@ -16,7 +16,19 @@ Deployments enabling this module must also allow the kind in `catalog.rules`:
 ```yaml
 catalog:
   rules:
-    - allow: [Component, System, API, Resource, Location, Template, Group, User, Domain, AiResource]
+    - allow:
+        [
+          Component,
+          System,
+          API,
+          Resource,
+          Location,
+          Template,
+          Group,
+          User,
+          Domain,
+          AiResource,
+        ]
 ```
 
 Example entity:

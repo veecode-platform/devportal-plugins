@@ -6,6 +6,8 @@
     "node": "20 || 22"
   },
   "scripts": {
+    "start": "backstage-cli repo start",
+    "build:backend": "yarn workspace backend build",
     "build:all": "backstage-cli repo build --all",
     "tsc": "tsc",
     "tsc:full": "tsc --skipLibCheck false --incremental false",
@@ -15,10 +17,12 @@
     "update-backstage": "backstage-cli versions:bump",
     "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint",
-    "prettier:check": "prettier --check ."
+    "prettier:check": "prettier --check .",
+    "dev:dynamic": "bash ../../.agents/skills/devportal-context/scripts/export-dev-dynamic.sh plugins/aws-s3-catalog-module"
   },
   "workspaces": {
     "packages": [
+      "packages/*",
       "plugins/*"
     ]
   },
@@ -27,8 +31,10 @@
   },
   "devDependencies": {
     "@backstage/cli": "^0.36.0",
+    "@jest/environment-jsdom-abstract": "^30.0.0",
     "@types/jest": "^30.0.0",
     "jest": "^30.2.0",
+    "jsdom": "^27.1.0",
     "prettier": "^2.3.2",
     "typescript": "~5.8.0"
   },

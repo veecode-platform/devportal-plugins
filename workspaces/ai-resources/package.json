@@ -6,6 +6,8 @@
     "node": "20 || 22"
   },
   "scripts": {
+    "start": "backstage-cli repo start",
+    "build:backend": "yarn workspace backend build",
     "build:all": "backstage-cli repo build --all",
     "tsc": "tsc",
     "tsc:full": "tsc --skipLibCheck false --incremental false",
@@ -16,18 +18,22 @@
     "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
-    "new": "backstage-cli new"
+    "new": "backstage-cli new",
+    "dev:dynamic": "bash ../../.agents/skills/devportal-context/scripts/export-dev-dynamic.sh plugins/catalog-backend-module-ai-resources"
   },
   "workspaces": {
     "packages": [
+      "packages/*",
       "plugins/*"
     ]
   },
   "devDependencies": {
     "@backstage/cli": "^0.36.0",
+    "@jest/environment-jsdom-abstract": "^30.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.5.9",
     "jest": "^30.2.0",
+    "jsdom": "^27.1.0",
     "prettier": "^3.3.3",
     "typescript": "~5.5.0"
   },
