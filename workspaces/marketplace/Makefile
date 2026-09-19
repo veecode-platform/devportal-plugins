@@ -18,7 +18,7 @@ PENDING_CHANGES_DIR      = plugins/devportal-pending-changes
 
 # Dynamic wrapper directories
 MARKETPLACE_FRONTEND_DYN = plugins/devportal-marketplace-frontend-dynamic
-MARKETPLACE_BACKEND_DYN  = plugins/devportal-marketplace-backend-dynamic
+MARKETPLACE_BACKEND_DYN  = $(MARKETPLACE_BACKEND_DIR)
 PENDING_CHANGES_DYN      = plugins/devportal-pending-changes-dynamic
 
 ALL_PLUGIN_DIRS     = $(MARKETPLACE_FRONTEND_DIR) $(MARKETPLACE_BACKEND_DIR) $(PENDING_CHANGES_DIR)
