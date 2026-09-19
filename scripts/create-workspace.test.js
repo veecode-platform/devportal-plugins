@@ -61,6 +61,8 @@ test('creates a frontend-plugin workspace with an app harness', () => {
   assert.equal(rootPackage.name, 'hello');
   assert.equal(pluginPackage.name, '@veecode-platform/backstage-plugin-hello');
   assert.equal(pluginPackage.backstage.role, 'frontend-plugin');
+  assert.equal(pluginPackage.scalprum.name, 'veecode-platform.backstage-plugin-hello');
+  assert.equal(pluginPackage.scalprum.exposedModules.PluginRoot, './src/index.ts');
   assert.ok(fs.existsSync(path.join(workspace, 'packages', 'app')));
   assert.ok(fs.existsSync(path.join(workspace, 'playwright.config.ts')));
   assert.ok(fs.existsSync(path.join(workspace, 'e2e-tests', 'app.test.ts')));
