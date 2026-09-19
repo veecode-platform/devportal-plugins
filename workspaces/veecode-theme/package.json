@@ -17,11 +17,14 @@
     "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
+    "test:e2e": "playwright test",
+    "dev:dynamic": "bash ../../.agents/skills/devportal-context/scripts/export-dev-dynamic.sh plugins/veecode-platform-plugin-veecode-theme",
     "new": "backstage-cli new",
     "update-backstage": "backstage-cli versions:bump"
   },
   "workspaces": {
     "packages": [
+      "packages/*",
       "plugins/*"
     ]
   },
@@ -29,6 +32,7 @@
     "@backstage/cli": "^0.36.0",
     "@backstage/e2e-test-utils": "^0.1.2",
     "@jest/environment-jsdom-abstract": "^30.0.0",
+    "@playwright/test": "^1.32.3",
     "@material-ui/core": "^4.12.2",
     "@types/jest": "^30.0.0",
     "@types/react": "^18",
