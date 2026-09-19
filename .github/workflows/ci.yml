@@ -14,6 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  structure:
+    name: Workspace structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check scaffold and role harnesses
+        run: |
+          node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js
+          node scripts/ci/check-workspace-harnesses.js
+
   changes:
     name: Detect changed workspaces
     runs-on: ubuntu-latest
@@ -115,6 +132,7 @@ jobs:
             prettier_check: 'prettier:check',
             lint_all: 'lint:all',
             test_all: 'test:all',
+            test_e2e: 'test:e2e',
           };
 
           for (const [output, script] of Object.entries(gates)) {
@@ -212,7 +230,32 @@ jobs:
           echo '::notice title=Skipped gate::test:all is not defined in package.json'
           echo '| `test:all` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
 
-      # Playwright/E2E is intentionally deferred to Stage 4/5 because it needs a running portal.
+      - name: Install Playwright Chromium
+        if: ${{ always() && steps.scripts.outputs.test_e2e == 'true' }}
+        continue-on-error: true
+        run: yarn playwright install --with-deps chromium chrome
+
+      - name: Gate test:e2e
+        if: ${{ always() && steps.scripts.outputs.test_e2e == 'true' }}
+        continue-on-error: true
+        run: |
+          set +e
+          yarn test:e2e
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s |\n' 'test:e2e' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate test:e2e (SKIP)
+        if: ${{ always() && steps.scripts.outputs.test_e2e != 'true' }}
+        continue-on-error: true
+        run: |
+          echo '::notice title=Skipped gate::test:e2e is not defined in package.json'
+          echo '| `test:e2e` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
 
   host-version:
     name: Host Backstage version (report mode)
