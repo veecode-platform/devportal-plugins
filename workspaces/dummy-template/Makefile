@@ -1,0 +1,14 @@
+PLUGIN_DIR ?= plugins/{{plugin_path}}
+
+.PHONY: build build-dynamic clean
+
+build:
+	yarn tsc:full
+	yarn build:all
+
+build-dynamic: build
+	cd $(PLUGIN_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
+
+clean:
+	yarn clean
+	rm -rf dist-types dist-dynamic

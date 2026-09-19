@@ -1,0 +1,42 @@
+{
+  "kind": "workspace-template",
+  "version": 1,
+  "common": [
+    ".eslintignore",
+    ".eslintrc.js",
+    ".gitignore",
+    ".prettierignore",
+    ".yarnrc.yml",
+    "AGENTS.md",
+    "DECISIONS.md",
+    "LIFECYCLE.md",
+    "Makefile",
+    "README.md",
+    "backstage.json",
+    "catalog-info.yaml",
+    ".changeset/README.md",
+    ".changeset/config.json",
+    "tsconfig.json"
+  ],
+  "roles": {
+    "frontend-plugin": [
+      "package.json",
+      "app-config.yaml",
+      "playwright.config.ts",
+      "dynamic-plugins.yaml",
+      "yarn.lock",
+      "packages/app",
+      "e2e-tests",
+      "plugins/plugin/src/routes.ts",
+      "plugins/plugin"
+    ],
+    "backend-plugin": [
+      "package.json",
+      "app-config.yaml",
+      "dynamic-plugins.yaml",
+      "yarn.lock",
+      "packages/backend",
+      "plugins/plugin-backend"
+    ]
+  }
+}

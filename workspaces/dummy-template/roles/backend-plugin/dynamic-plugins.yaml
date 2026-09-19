@@ -1,0 +1,3 @@
+plugins:
+  - package: ./dynamic-plugins/dist/{{dynamic_package}}-dynamic
+    disabled: false

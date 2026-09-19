@@ -1,0 +1,13 @@
+playwright.config.ts
+dist
+dist-types
+coverage
+.vscode
+.git
+.yarn/cache
+.yarn/install-state.gz
+node_modules
+packages/*/src
+packages/*/node_modules
+plugins
+*.local.yaml
