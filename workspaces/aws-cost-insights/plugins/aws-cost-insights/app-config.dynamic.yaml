@@ -1,0 +1,19 @@
+dynamicPlugins:
+  frontend:
+    veecode-platform.plugin-aws-cost-insights:
+      dynamicRoutes:
+        - path: /cost-insights
+          importName: CostInsightsPage
+          menuItem:
+            icon: monetizationOn
+            text: Cost Insights
+
+# The upstream `@backstage-community/plugin-cost-insights` config schema declares
+# `costInsights` and `costInsights.engineerCost` as REQUIRED. The app backend
+# validates the frontend config at startup, so a portal that installs this plugin
+# without them fails to boot entirely — not just this plugin, the whole app.
+#
+# Ship a neutral default so installing the plugin is always safe. Operators
+# override `engineerCost` (and the optional keys) in their own app-config.
+costInsights:
+  engineerCost: 0

@@ -1,0 +1,23 @@
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-plugin-aws-cost-insights-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.plugin-aws-cost-insights:
+            appIcons:
+              - name: costInsightsIcon
+                importName: CostInsightsIcon
+            dynamicRoutes:
+              - path: /cost-insights
+                importName: CostInsightsPage
+                menuItem:
+                  icon: costInsightsIcon
+                  text: Cost Insights
+      # The upstream `@backstage-community/plugin-cost-insights` schema declares
+      # `costInsights.engineerCost` as REQUIRED. The app backend validates the
+      # frontend config at startup, so installing this plugin without it makes the
+      # whole portal fail to boot (HTTP 503), not just this plugin. Ship a neutral
+      # default; operators override it in their own app-config.
+      costInsights:
+        engineerCost: 0
