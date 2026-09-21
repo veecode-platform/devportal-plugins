@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 import { convertLegacyRouteRefs } from '@backstage/core-compat-api';
-import { createFrontendPlugin } from '@backstage/frontend-plugin-api';
+import {
+  createFrontendPlugin,
+  type FrontendPlugin,
+} from '@backstage/frontend-plugin-api';
 import {
   GithubWorkflowsTabContent,
   GithubWorkflowsOverviewContent,
@@ -25,7 +28,7 @@ import { rootRouteRef } from './routes';
 /**
  * @alpha
  */
-export default createFrontendPlugin({
+const githubWorkflowsPlugin: FrontendPlugin = createFrontendPlugin({
   pluginId: 'github-workflows',
   routes: convertLegacyRouteRefs({
     entityContent: rootRouteRef,
@@ -39,3 +42,5 @@ export default createFrontendPlugin({
     GithubWorkflowsOverviewContent,
   ],
 });
+
+export default githubWorkflowsPlugin;
