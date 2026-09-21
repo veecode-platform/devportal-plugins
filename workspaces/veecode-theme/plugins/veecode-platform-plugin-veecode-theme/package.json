@@ -11,7 +11,6 @@
   },
   "backstage": {
     "role": "frontend-plugin",
-    "supported-versions": "1.49.4",
     "pluginId": "veecode-theme",
     "pluginPackage": "veecode-platform-plugin-veecode-theme",
     "pluginPackages": [
