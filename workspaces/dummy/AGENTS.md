@@ -15,7 +15,7 @@ Run commands from `workspaces/dummy/`.
 `frontend-plugin` package and `plugins/dummy-backend` is the `backend-plugin`
 package; both have dynamic export scripts and `dist-dynamic` output. The workspace
 root is private, and both plugin packages are `private: true`. `backstage.json`
-currently declares Backstage `1.49.2`.
+currently declares Backstage `1.52.0`.
 
 The local configuration consists of `app-config.yaml`, the dynamic configuration,
 the example catalog/template data, and the transitional `docker-compose.yaml`.
