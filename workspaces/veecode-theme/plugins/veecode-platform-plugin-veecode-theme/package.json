@@ -11,7 +11,6 @@
   },
   "backstage": {
     "role": "frontend-plugin",
-    "supported-versions": "1.49.4",
     "pluginId": "veecode-theme",
     "pluginPackage": "veecode-platform-plugin-veecode-theme",
     "pluginPackages": [
@@ -35,8 +34,8 @@
     "export-dynamic:clean": "run export-dynamic --clean"
   },
   "dependencies": {
-    "@backstage/core-plugin-api": "^1.12.0",
-    "@backstage/theme": "^0.7.2"
+    "@backstage/core-plugin-api": "^1.12.7",
+    "@backstage/theme": "^0.7.3"
   },
   "peerDependencies": {
     "@material-ui/core": "^4.12.2",
@@ -44,7 +43,7 @@
     "react-dom": "^18"
   },
   "devDependencies": {
-    "@backstage/cli": "^0.36.1",
+    "@backstage/cli": "^0.36.3",
     "@red-hat-developer-hub/cli": "latest",
     "typescript": "~5.8.0"
   },
