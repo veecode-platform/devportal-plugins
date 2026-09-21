@@ -41,8 +41,9 @@ guards. The frontend renders the recorded teardown state in the entity's CI tab.
 Apply the [role matrix](../../CONTRIBUTING.md#which-proofs-apply-to-which-backstagerole):
 this workspace has a `frontend-plugin`, a `backend-plugin`, and a `common-library`.
 Proof 1 uses package unit tests and the dev shell; the common package is proven by
-the frontend and backend consumers. There is no `playwright.config.ts` in this
-workspace, so the existing `test:e2e` script is not a configured Playwright proof.
+the frontend and backend consumers. The Playwright config starts the workspace with
+`yarn start` when `PLAYWRIGHT_URL` is absent, or runs against an already-running
+portal when `PLAYWRIGHT_URL` is set.
 
 For proof 2, `make build-dynamic` exports the frontend and backend and embeds the
 private common package. The current V3 compose receives those exports under
