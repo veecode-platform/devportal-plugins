@@ -1,10 +1,10 @@
-import { createBackendModule } from '@backstage/backend-plugin-api';
+import { createBackendModule } from "@backstage/backend-plugin-api";
 import {
   CatalogModelSources,
   aiResourceEntityModel,
   mcpServerApiEntityModel,
-} from '@backstage/catalog-model/alpha';
-import { catalogModelExtensionPoint } from '@backstage/plugin-catalog-node/alpha';
+} from "@backstage/catalog-model/alpha";
+import { catalogModelExtensionPoint } from "@backstage/plugin-catalog-node/alpha";
 
 /**
  * Registers Backstage core's AiResource entity kind (skill/rule spec types)
@@ -21,8 +21,8 @@ import { catalogModelExtensionPoint } from '@backstage/plugin-catalog-node/alpha
  * @public
  */
 export const catalogModuleAiResources = createBackendModule({
-  pluginId: 'catalog',
-  moduleId: 'ai-resources',
+  pluginId: "catalog",
+  moduleId: "ai-resources",
   register(reg) {
     reg.registerInit({
       deps: {

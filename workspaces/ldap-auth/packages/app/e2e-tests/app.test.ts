@@ -16,12 +16,12 @@
 
 import { test, expect } from '@playwright/test';
 
-test('App should render the welcome page', async ({ page }) => {
+test('LDAP app renders the LDAP sign-in form', async ({ page }) => {
   await page.goto('/');
 
-  const enterButton = page.getByRole('button', { name: 'Enter' });
-  await expect(enterButton).toBeVisible();
-  await enterButton.click();
-
-  await expect(page.getByText('My Company Catalog')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'LDAP Name' })).toBeVisible();
+  await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Login', exact: true }),
+  ).toBeVisible();
 });

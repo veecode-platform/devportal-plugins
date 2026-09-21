@@ -23,6 +23,9 @@ directory.
 
 From a plugin workspace, `yarn dev:dynamic` exports each workspace plugin with the
 Red Hat Developer Hub CLI in `--dev` mode into
-`$DEVPORTAL_LOCAL_DIR/dynamic-plugins-root-dev`. It does not start Docker. After the
-export it prints the exact `docker compose -f ... -f ... up -d` command to run in
-`devportal-local` with `docker-compose.dynamic-plugins-root.yml`.
+`$DEVPORTAL_LOCAL_DIR/dynamic-plugins-root-dev`, carries the workspace's
+`dynamic-plugins.yaml` entries into a generated local operator config, and prints
+the exact `docker compose -f ... -f ... -f ... up -d` command to run in
+`devportal-local` with `docker-compose.dynamic-plugins-root.yml`. It does not start
+Docker. The generated files live under the ignored
+`dynamic-plugins-root-dev/` directory; no tracked runner config is edited.

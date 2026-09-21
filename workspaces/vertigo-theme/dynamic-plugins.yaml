@@ -1,0 +1,21 @@
+plugins:
+  - package: ./dynamic-plugins/dist/vertigo-platform-plugin-vertigo-theme-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          vertigo-platform.plugin-vertigo-theme:
+            themes:
+              - id: light
+                title: Vertigo Light
+                variant: light
+                importName: VertigoLightThemeProvider
+              - id: dark
+                title: Vertigo Dark
+                variant: dark
+                importName: VertigoDarkThemeProvider
+            mountPoints:
+              - mountPoint: global.header/component
+                importName: VertigoHeaderBadge
+                config:
+                  priority: 98

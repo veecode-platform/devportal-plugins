@@ -59,5 +59,11 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "scalprum": {
+    "name": "veecode-platform.backstage-plugin-kong-service-manager",
+    "exposedModules": {
+      "PluginRoot": "./src/index.ts"
+    }
+  }
 }

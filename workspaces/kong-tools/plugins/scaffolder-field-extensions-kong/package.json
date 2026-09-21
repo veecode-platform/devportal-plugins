@@ -52,5 +52,11 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "scalprum": {
+    "name": "veecode-platform.backstage-plugin-scaffolder-field-extensions-kong",
+    "exposedModules": {
+      "PluginRoot": "./src/index.ts"
+    }
+  }
 }

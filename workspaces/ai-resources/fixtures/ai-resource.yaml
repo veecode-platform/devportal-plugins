@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: AiResource
+metadata:
+  name: template-builder
+  description: A catalog fixture for the AiResource backend module.
+spec:
+  type: skill
+  lifecycle: production
+  owner: group:default/platform-team
+  agents:
+    - devportal

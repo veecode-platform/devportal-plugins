@@ -61,5 +61,11 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "scalprum": {
+    "name": "veecode-platform.backstage-plugin-dummy",
+    "exposedModules": {
+      "PluginRoot": "./src/index.ts"
+    }
+  }
 }

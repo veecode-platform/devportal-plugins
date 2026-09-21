@@ -4,4 +4,4 @@
  * @packageDocumentation
  */
 
-export { catalogModuleAiResources as default } from './module';
+export { catalogModuleAiResources as default } from "./module";
