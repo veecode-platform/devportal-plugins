@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+/*
+ * Copyright Red Hat, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 'use strict';
 
 // Adapted from redhat-developer/rhdh-plugins scripts/generate-upgrade-dashboard.js.
@@ -9,7 +24,9 @@
 // override as scripts/ci/check-backstage-version.js). It also drops the
 // `semver` and `fs-extra` dependencies upstream uses, since this repo does
 // not carry them at the root; version comparison reuses the plain-Node
-// parser already in scripts/ci/check-backstage-version.js.
+// parser already in scripts/ci/check-backstage-version.js. The template
+// workspace is excluded because CONTRIBUTING.md excludes template.json
+// workspaces from product gates.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -30,7 +47,7 @@ function parseVersion(value) {
 }
 
 // Positive: workspace is behind by that many minor versions on the same major.
-// 10: major version behind. 0: same or ahead.
+// Negative: workspace is ahead of the host. 10: major version behind.
 function minorVersionsBehind(currentVersion, hostVersion) {
   const current = parseVersion(currentVersion);
   const host = parseVersion(hostVersion);
@@ -39,10 +56,10 @@ function minorVersionsBehind(currentVersion, hostVersion) {
   }
 
   if (current[0] !== host[0]) {
-    return host[0] > current[0] ? 10 : 0;
+    return host[0] > current[0] ? 10 : -10;
   }
 
-  return Math.max(0, host[1] - current[1]);
+  return host[1] - current[1];
 }
 
 function listWorkspaces() {
@@ -50,6 +67,7 @@ function listWorkspaces() {
     .readdirSync(workspacesRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .filter(entry => fs.existsSync(path.join(workspacesRoot, entry.name, 'package.json')))
+    .filter(entry => !fs.existsSync(path.join(workspacesRoot, entry.name, 'template.json')))
     .map(entry => entry.name)
     .sort();
 }
@@ -93,11 +111,12 @@ function getWorkspaceVersions() {
 }
 
 function categorizeWorkspaces(workspaces, hostVersion) {
-  const tiers = { tier1: [], tier2: [], tier3: [] };
+  const tiers = { tier1: [], tier2: [], tier3: [], aheadOfHost: [] };
 
   workspaces.forEach(workspace => {
     const behind = minorVersionsBehind(workspace.version, hostVersion);
-    if (behind >= 3) tiers.tier1.push(workspace);
+    if (behind < 0) tiers.aheadOfHost.push(workspace);
+    else if (behind >= 3) tiers.tier1.push(workspace);
     else if (behind === 2) tiers.tier2.push(workspace);
     else if (behind === 1) tiers.tier3.push(workspace);
   });
@@ -129,7 +148,11 @@ function generateDashboard(workspaces, tiers, hostVersion) {
   output += `**DevPortal host version:** ${hostVersion}\n\n`;
   output += '---\n\n';
 
-  const totalOutdated = tiers.tier1.length + tiers.tier2.length + tiers.tier3.length;
+  const totalOutdated =
+    tiers.tier1.length +
+    tiers.tier2.length +
+    tiers.tier3.length +
+    tiers.aheadOfHost.length;
   if (totalOutdated === 0) {
     output += '## Summary: All workspaces are up to date! 🎉\n\n';
   } else {
@@ -137,12 +160,14 @@ function generateDashboard(workspaces, tiers, hostVersion) {
   }
   const totalUpToDate = workspaces.length - totalOutdated;
 
+  output += generateTierSummary(tiers.aheadOfHost.length, '⚠️', 'ahead of host');
   output += generateTierSummary(tiers.tier1.length, '🔴', '≥ 3 minor versions behind');
   output += generateTierSummary(tiers.tier2.length, '🟠', '2 minor versions behind');
   output += generateTierSummary(tiers.tier3.length, '🟡', '1 minor version behind');
   output += generateTierSummary(totalUpToDate, '🟢', 'up to date');
   output += '\n';
 
+  output += generateTierTable(tiers.aheadOfHost, '⚠️', 'ahead of host');
   output += generateTierTable(tiers.tier1, '🔴', '≥ 3 minor versions behind');
   output += generateTierTable(tiers.tier2, '🟠', '2 minor versions behind');
   output += generateTierTable(tiers.tier3, '🟡', '1 minor version behind');
