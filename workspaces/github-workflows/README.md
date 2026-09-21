@@ -18,8 +18,4 @@ yarn start
 
 ## Publish Plugins
 
-```sh
-make publish-common
-```
-
-## Publish Dynamic  Plugin
+npm publishing is retired; plugins now ship through the export overlay (OCI).

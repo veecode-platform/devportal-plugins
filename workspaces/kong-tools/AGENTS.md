@@ -8,7 +8,7 @@ Run commands from `workspaces/kong-tools/`.
 - In `plugins/kong-service-manager`, `plugins/kong-service-manager-backend`, or `plugins/scaffolder-field-extensions-kong`: `yarn start`, `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
 - In `plugins/kong-service-manager-common` or `plugins/scaffolder-backend-module-kong`: `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
 - Makefile targets: `make help`, `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, and `make clean-dynamic`.
-- The Makefile also defines `make set-version VERSION=x.y.z`, `make get-version`, `make unpublish`, `make publish`, and `make publish-dynamic` as legacy registry utilities; the official delivery rules are in [Pull requests](../../CONTRIBUTING.md#pull-requests).
+- The Makefile also defines `make set-version VERSION=x.y.z`, `make get-version`, and `make unpublish` as legacy registry utilities. npm publishing is retired; plugins now ship through the export overlay (OCI). The official delivery rules are in [Pull requests](../../CONTRIBUTING.md#pull-requests).
 
 ## Layout
 

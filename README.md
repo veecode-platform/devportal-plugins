@@ -47,8 +47,7 @@ cd workspaces/<name>
 make help               # Show all available commands
 make build              # Build all static plugins
 make build-dynamic      # Build all dynamic plugins (uses @red-hat-developer-hub/cli)
-make publish            # Publish static plugins to npm
-make publish-dynamic    # Publish dynamic plugins to npm
+# npm publishing is retired; plugins now ship through the export overlay (OCI)
 make set-version VERSION=x.y.z  # Set version for all plugins in workspace
 make get-version        # Show latest published versions
 make clean              # Full clean
@@ -62,19 +61,7 @@ make copy-dynamic-plugins
 
 ## Using a Private Registry
 
-You can validate publishing locally with [Verdaccio](https://verdaccio.org/):
-
-```sh
-verdaccio -l 0.0.0.0:4873
-```
-
-Some Makefile tasks accept a `NPM_REGISTRY` parameter to specify a custom registry. For example:
-
-```sh
-make publish NPM_REGISTRY=http://localhost:4873
-```
-
-This is important for testing dynamic plugins publishing (the `export-dynamic` task may break internal dependencies sometimes).
+npm publishing is retired; plugins now ship through the export overlay (OCI).
 
 ## Reference Implementation
 

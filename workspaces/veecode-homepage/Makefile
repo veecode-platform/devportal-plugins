@@ -16,7 +16,7 @@ PLUGIN_DIR = plugins/veecode-homepage
 
 ALL_PLUGIN_DIRS = $(PLUGIN_DIR)
 
-.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+.PHONY: help build build-dynamic pack pack-dynamic \
 	set-version get-version unpublish clean clean-dynamic
 
 help:
@@ -30,10 +30,6 @@ help:
 	@echo "Package Commands:"
 	@echo "  make pack                - Pack all static plugins to .tgz"
 	@echo "  make pack-dynamic        - Pack all dynamic plugins to .tgz"
-	@echo ""
-	@echo "Publish Commands:"
-	@echo "  make publish             - Publish all static plugins"
-	@echo "  make publish-dynamic     - Publish all dynamic plugins"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
@@ -82,27 +78,6 @@ pack:
 pack-dynamic:
 	cd $(PLUGIN_DIR)/dist-dynamic && npm pack
 
-# Helper: publish a single plugin if not already published
-define publish_plugin
-	@cd $(1) && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish --access public $(NPM_REGISTRY_ARGS); \
-	fi
-endef
-
-# Publish all static plugins
-publish: build
-	@echo "Publishing homepage plugin..."
-	$(call publish_plugin,$(PLUGIN_DIR))
-
-# Publish all dynamic plugins
-publish-dynamic: build-dynamic
-	@echo "Publishing dynamic variant..."
-	@cd $(PLUGIN_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:

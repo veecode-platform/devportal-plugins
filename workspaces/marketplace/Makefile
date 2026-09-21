@@ -24,7 +24,7 @@ PENDING_CHANGES_DYN      = plugins/devportal-pending-changes-dynamic
 ALL_PLUGIN_DIRS     = $(MARKETPLACE_FRONTEND_DIR) $(MARKETPLACE_BACKEND_DIR) $(PENDING_CHANGES_DIR)
 ALL_DYNAMIC_DIRS    = $(MARKETPLACE_FRONTEND_DYN) $(MARKETPLACE_BACKEND_DYN) $(PENDING_CHANGES_DYN)
 
-.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+.PHONY: help build build-dynamic pack pack-dynamic \
 	set-version get-version unpublish clean clean-dynamic
 
 help:
@@ -38,10 +38,6 @@ help:
 	@echo "Package Commands:"
 	@echo "  make pack                - Pack all static plugins to .tgz"
 	@echo "  make pack-dynamic        - Pack all dynamic plugins to .tgz"
-	@echo ""
-	@echo "Publish Commands:"
-	@echo "  make publish             - Publish all static plugins"
-	@echo "  make publish-dynamic     - Publish all dynamic plugins"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
@@ -84,31 +80,6 @@ pack-dynamic:
 	cd $(MARKETPLACE_BACKEND_DYN)/dist-dynamic && npm pack
 	cd $(PENDING_CHANGES_DYN)/dist-dynamic && npm pack
 
-# Helper: publish a single plugin if not already published
-define publish_plugin
-	@cd $(1) && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish --access public $(NPM_REGISTRY_ARGS); \
-	fi
-endef
-
-# Publish all static plugins
-publish: build
-	@echo "Publishing marketplace static plugins..."
-	$(call publish_plugin,$(MARKETPLACE_FRONTEND_DIR))
-	$(call publish_plugin,$(MARKETPLACE_BACKEND_DIR))
-	$(call publish_plugin,$(PENDING_CHANGES_DIR))
-
-# Publish all dynamic plugins
-publish-dynamic: build-dynamic
-	@echo "Publishing dynamic variants..."
-	@cd $(MARKETPLACE_FRONTEND_DYN)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
-	@cd $(MARKETPLACE_BACKEND_DYN)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
-	@cd $(PENDING_CHANGES_DYN)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:

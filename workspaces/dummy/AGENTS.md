@@ -7,7 +7,7 @@ Run commands from `workspaces/dummy/`.
 - Workspace scripts: `yarn install`, `yarn start`, `yarn tsc`, `yarn tsc:full`, `yarn build:all`, `yarn test:all --watchAll=false`, `yarn test:all --coverage`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check`.
 - In `plugins/dummy` or `plugins/dummy-backend`: `yarn start`, `yarn build`, `yarn test --watchAll=false`, and `yarn lint`.
 - Makefile targets: `make help`, `make build`, `make build-dynamic`, `make pack`, `make pack-dynamic`, `make clean`, and `make clean-dynamic`.
-- The Makefile also defines `make set-version VERSION=x.y.z`, `make get-version`, `make unpublish`, `make publish`, and `make publish-dynamic` as legacy registry utilities; the official delivery rules are in [Pull requests](../../CONTRIBUTING.md#pull-requests).
+- The Makefile also defines `make set-version VERSION=x.y.z`, `make get-version`, and `make unpublish` as legacy registry utilities. npm publishing is retired; plugins now ship through the export overlay (OCI). The official delivery rules are in [Pull requests](../../CONTRIBUTING.md#pull-requests).
 
 ## Layout
 
