@@ -19,7 +19,7 @@ BACKEND_DIR = plugins/github-workflow-backend
 
 ALL_PLUGIN_DIRS = $(COMMON_DIR) $(FRONTEND_DIR) $(BACKEND_DIR)
 
-.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+.PHONY: help build build-dynamic pack pack-dynamic \
 	set-version get-version unpublish clean clean-dynamic \
 	replace-workspace restore-workspace
 
@@ -34,10 +34,6 @@ help:
 	@echo "Package Commands:"
 	@echo "  make pack                - Pack all static plugins to .tgz"
 	@echo "  make pack-dynamic        - Pack all dynamic plugins to .tgz"
-	@echo ""
-	@echo "Publish Commands:"
-	@echo "  make publish             - Publish all static plugins"
-	@echo "  make publish-dynamic     - Publish all dynamic plugins"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
@@ -79,52 +75,6 @@ pack-dynamic:
 	cd $(FRONTEND_DIR)/dist-dynamic && npm pack
 	cd $(BACKEND_DIR)/dist-dynamic && npm pack
 
-# Helper: publish a single plugin if not already published (with workspace:* safety check)
-define publish_plugin_safe
-	@cd $(1) && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm pack --pack-destination . && \
-		TAR_FILE=$$(echo $$PACKAGE_NAME-$(VERSION).tgz | sed 's/\//-/g' | sed 's/^@//') && \
-		tar -xzf $$TAR_FILE package/package.json && \
-		if grep -q "workspace:" package/package.json; then \
-			echo "Workspace references found in packed package. Please fix dependencies first."; \
-			rm -rf package $$TAR_FILE; \
-			exit 1; \
-		fi && \
-		rm -rf package && \
-		npm publish --access public $$TAR_FILE $(NPM_REGISTRY_ARGS) && \
-		rm $$TAR_FILE; \
-	fi
-endef
-
-# Helper: publish a single plugin if not already published (simple)
-define publish_plugin
-	@cd $(1) && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish --access public $(NPM_REGISTRY_ARGS); \
-	fi
-endef
-
-# Publish all static plugins (common first, then replace workspace refs, then frontend/backend)
-publish: replace-workspace build
-	@echo "Publishing github-workflows plugins..."
-	$(call publish_plugin,$(COMMON_DIR))
-	$(call publish_plugin_safe,$(FRONTEND_DIR))
-	$(call publish_plugin_safe,$(BACKEND_DIR))
-
-# Publish all dynamic plugins
-publish-dynamic: replace-workspace build-dynamic
-	@echo "Publishing dynamic variants..."
-	@cd $(FRONTEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
-	@cd $(BACKEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:

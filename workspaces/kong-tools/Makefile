@@ -21,7 +21,7 @@ KSM_SCAFFOLDER_EXT_DIR = plugins/scaffolder-field-extensions-kong
 
 ALL_PLUGIN_DIRS = $(SCAFFOLDER_MODULE_DIR) $(KSM_COMMON_DIR) $(KSM_BACKEND_DIR) $(KSM_FRONTEND_DIR) $(KSM_SCAFFOLDER_EXT_DIR)
 
-.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+.PHONY: help build build-dynamic pack pack-dynamic \
 	set-version get-version unpublish clean clean-dynamic
 
 help:
@@ -35,10 +35,6 @@ help:
 	@echo "Package Commands:"
 	@echo "  make pack                - Pack all static plugins to .tgz"
 	@echo "  make pack-dynamic        - Pack all dynamic plugins to .tgz"
-	@echo ""
-	@echo "Publish Commands:"
-	@echo "  make publish             - Publish all static plugins"
-	@echo "  make publish-dynamic     - Publish all dynamic plugins"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
@@ -81,33 +77,6 @@ pack-dynamic:
 	cd $(KSM_FRONTEND_DIR)/dist-dynamic && npm pack
 	cd $(KSM_SCAFFOLDER_EXT_DIR)/dist-dynamic && npm pack
 
-# Helper: publish a single plugin if not already published
-define publish_plugin
-	@cd $(1) && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish --access public $(NPM_REGISTRY_ARGS); \
-	fi
-endef
-
-# Publish all static plugins (common first since others depend on it)
-publish: build
-	@echo "Publishing kong-tools plugins..."
-	$(call publish_plugin,$(KSM_COMMON_DIR))
-	$(call publish_plugin,$(SCAFFOLDER_MODULE_DIR))
-	$(call publish_plugin,$(KSM_BACKEND_DIR))
-	$(call publish_plugin,$(KSM_FRONTEND_DIR))
-	$(call publish_plugin,$(KSM_SCAFFOLDER_EXT_DIR))
-
-# Publish dynamic variants
-publish-dynamic: build-dynamic
-	@echo "Publishing dynamic variants..."
-	@cd $(KSM_BACKEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
-	@cd $(KSM_FRONTEND_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
-	@cd $(KSM_SCAFFOLDER_EXT_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 # Get latest versions in npm registry
 get-version:

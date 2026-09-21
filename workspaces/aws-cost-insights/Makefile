@@ -14,7 +14,7 @@ PLUGIN_DIR = plugins/aws-cost-insights
 
 ALL_PLUGIN_DIRS = $(PLUGIN_DIR)
 
-.PHONY: help build build-dynamic pack pack-dynamic publish publish-dynamic \
+.PHONY: help build build-dynamic pack pack-dynamic \
 	set-version get-version unpublish clean clean-dynamic
 
 help:
@@ -28,10 +28,6 @@ help:
 	@echo "Package Commands:"
 	@echo "  make pack                - Pack all static plugins to .tgz"
 	@echo "  make pack-dynamic        - Pack all dynamic plugins to .tgz"
-	@echo ""
-	@echo "Publish Commands:"
-	@echo "  make publish             - Publish all static plugins"
-	@echo "  make publish-dynamic     - Publish all dynamic plugins"
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
@@ -60,25 +56,6 @@ pack:
 
 pack-dynamic:
 	cd $(PLUGIN_DIR)/dist-dynamic && npm pack
-
-define publish_plugin
-	@cd $(1) && \
-	PACKAGE_NAME=$$(node -p "require('./package.json').name") && \
-	if npm view $$PACKAGE_NAME@$(VERSION) version $(NPM_REGISTRY_ARGS) >/dev/null 2>&1; then \
-		echo "$$PACKAGE_NAME@$(VERSION) is already published. Skipping."; \
-	else \
-		echo "Publishing $$PACKAGE_NAME@$(VERSION)..."; \
-		npm publish --access public $(NPM_REGISTRY_ARGS); \
-	fi
-endef
-
-publish: build
-	@echo "Publishing aws-cost-insights plugin..."
-	$(call publish_plugin,$(PLUGIN_DIR))
-
-publish-dynamic: build-dynamic
-	@echo "Publishing dynamic variant..."
-	@cd $(PLUGIN_DIR)/dist-dynamic && npm publish --access public $(NPM_REGISTRY_ARGS) || true
 
 get-version:
 	@echo "Getting latest version in npm registry..."
