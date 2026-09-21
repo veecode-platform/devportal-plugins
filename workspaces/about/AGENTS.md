@@ -18,7 +18,7 @@ the root configuration and `dynamic-plugins.yaml` describe local loading.
 
 The frontend exposes the About page and the backend supplies the corresponding
 Backstage backend feature. Harness code stays in `packages/`; product behavior
-stays in `plugins/`. The workspace declares Backstage `1.49.2`.
+stays in `plugins/`. The workspace declares Backstage `1.52.0`.
 
 ## How to test
 
