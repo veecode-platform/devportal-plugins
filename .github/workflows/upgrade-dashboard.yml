@@ -1,0 +1,46 @@
+name: Backstage Upgrade Dashboard
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'workspaces/*/backstage.json'
+  schedule:
+    - cron: '0 6 * * MON' # run at 6 AM UTC every week on Monday
+  workflow_dispatch: # allow manual triggers
+
+jobs:
+  update-dashboard:
+    name: Generate Upgrade Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Update Issue
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const dashboardContent = execSync('node scripts/generate-upgrade-dashboard.js', { encoding: 'utf8' });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 155,
+              body: dashboardContent
+            });
