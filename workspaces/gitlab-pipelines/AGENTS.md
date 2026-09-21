@@ -15,7 +15,7 @@ Run commands from `workspaces/gitlab-pipelines/`.
 `packages/app` and `packages/backend` are the dev shell. The product packages are
 `gitlab-pipelines` (`frontend-plugin`), `gitlab-pipelines-backend`
 (`backend-plugin`), and `gitlab-pipelines-common` (`common-library`). The workspace
-currently declares Backstage `1.49.2` in `backstage.json`.
+currently declares Backstage `1.52.0` in `backstage.json`.
 
 The frontend and backend export dynamically; the common package is embedded by the
 backend export rather than exported as a separate dynamic package. The `dynamic/`
