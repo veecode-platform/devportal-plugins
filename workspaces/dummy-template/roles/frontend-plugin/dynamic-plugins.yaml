@@ -1,0 +1,13 @@
+plugins:
+  - package: ./dynamic-plugins/dist/{{dynamic_package}}-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-{{name}}:
+            dynamicRoutes:
+              - path: /{{name}}
+                importName: {{pascalName}}Page
+                menuItem:
+                  text: {{pascalName}}
+                  enabled: true

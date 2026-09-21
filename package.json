@@ -1,0 +1,12 @@
+{
+  "name": "@veecode-platform/devportal-plugins-tools",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "create-workspace": "node scripts/create-workspace.js",
+    "test:create-workspace": "node --test scripts/create-workspace.test.js",
+    "test": "node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js",
+    "check:workspace-harnesses": "node scripts/ci/check-workspace-harnesses.js"
+  },
+  "packageManager": "yarn@4.12.0"
+}

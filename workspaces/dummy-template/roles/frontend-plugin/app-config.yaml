@@ -1,0 +1,21 @@
+app:
+  title: {{pascalName}} plugin development
+  baseUrl: http://localhost:3000
+
+organization:
+  name: VeeCode
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+
+auth:
+  environment: development
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
