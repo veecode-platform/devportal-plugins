@@ -89,19 +89,9 @@ Produces a `dist-dynamic/` for each plugin with a package name following the pat
 - `@veecode-platform/backstage-plugin-<plugin>-dynamic`
 - `@veecode-platform/backstage-plugin-<plugin>-backend-dynamic`
 
-### 3.3 Publish to npm
+### 3.3 Publish
 
-```bash
-make publish-all-dynamic
-```
-
-The Makefile checks if the version already exists before publishing — safe to re-run.
-
-To publish to a private registry:
-
-```bash
-make publish-all-dynamic NPM_REGISTRY=https://your-registry
-```
+npm publishing is retired; plugins now ship through the export overlay (OCI).
 
 ### 3.4 Verify published versions
 
@@ -120,7 +110,7 @@ make get-version
 | Start dynamic container | `docker compose up` |
 | Restart container | `docker compose restart` |
 | Bump version | `make set-version <PLUGIN>_VERSION=x.y.z` |
-| Publish dynamic packages | `make publish-all-dynamic` |
+| Publish dynamic packages | retired — see the export overlay (OCI) |
 | Check published versions | `make get-version` |
 | Clean dynamic artifacts | `make clean-dynamic` |
 | Run tests | `make test` |

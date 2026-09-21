@@ -122,30 +122,6 @@ Or just bump it (it will do `set-version` too):
 make bump-version
 ```
 
-### Publish Static plugin
+### Publish
 
-Just run the `publish` task to release the static plugin:
-
-```sh
-make publish
-```
-
-You can test this against a local registry (like Verdaccio):
-
-```sh
-make publish NPM_REGISTRY=http://localhost:4873
-```
-
-### Publish Dynamic plugin
-
-Just run the `publish` task to release the static plugin:
-
-```sh
-make publish-dynamic
-```
-
-You can test this against a local registry (like Verdaccio):
-
-```sh
-make publish-dynamic NPM_REGISTRY=http://localhost:4873
-```
+npm publishing is retired; plugins now ship through the export overlay (OCI).
