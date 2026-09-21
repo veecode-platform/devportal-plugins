@@ -1,0 +1,32 @@
+app:
+  title: Marketplace Dev
+  baseUrl: http://localhost:3000
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+
+auth:
+  providers:
+    guest: {}
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location]
+  locations: []
+
+extensions:
+  installation:
+    saveToSingleFile:
+      file: /tmp/devportal-marketplace-extensions-install.yaml
+
+permission:
+  enabled: true
