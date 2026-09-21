@@ -6277,16 +6277,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@internationalized/date@npm:^3.11.0":
-  version: 3.11.0
-  resolution: "@internationalized/date@npm:3.11.0"
-  dependencies:
-    "@swc/helpers": "npm:^0.5.0"
-  checksum: 10c0/05dfa06806cb0c58c51a99ae3ccae2eebeafb645f8d55f2956b448db21996b9eef61c3da0f8b2256e76cd457bfd0efd1ef62f987e547d75611c2fb6ae3dd2bef
-  languageName: node
-  linkType: hard
-
-"@internationalized/date@npm:^3.12.0, @internationalized/date@npm:^3.12.1":
+"@internationalized/date@npm:^3.11.0, @internationalized/date@npm:^3.12.0, @internationalized/date@npm:^3.12.1":
   version: 3.12.4
   resolution: "@internationalized/date@npm:3.12.4"
   dependencies:
