@@ -11,7 +11,7 @@ const generatorModule = require(generator);
 
 function runGenerator(name, role) {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'devportal-workspace-'));
-  execFileSync(process.execPath, [generator, name, '--role', role, '--output-root', outputRoot], {
+  execFileSync(process.execPath, [generator, name, '--role', role, '--output-root', outputRoot, '--shell-only'], {
     cwd: repoRoot,
     stdio: 'pipe',
     encoding: 'utf8',
@@ -51,24 +51,18 @@ function workspaceSnapshot(root) {
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
-test('creates a frontend-plugin workspace with an app harness', () => {
+test('creates a frontend-plugin workspace shell with an app harness', () => {
   const workspace = runGenerator('hello', 'frontend-plugin');
   const rootPackage = JSON.parse(fs.readFileSync(path.join(workspace, 'package.json')));
-  const pluginPackage = JSON.parse(
-    fs.readFileSync(path.join(workspace, 'plugins', 'hello', 'package.json')),
-  );
 
   assert.equal(rootPackage.name, 'hello');
-  assert.equal(pluginPackage.name, '@veecode-platform/backstage-plugin-hello');
-  assert.equal(pluginPackage.backstage.role, 'frontend-plugin');
-  assert.equal(pluginPackage.scalprum.name, 'veecode-platform.backstage-plugin-hello');
-  assert.equal(pluginPackage.scalprum.exposedModules.PluginRoot, './src/index.ts');
+  assert.ok(!fs.existsSync(path.join(workspace, 'plugins')));
+  assert.equal(fs.readFileSync(path.join(workspace, 'yarn.lock'), 'utf8'), '');
   assert.ok(fs.existsSync(path.join(workspace, 'packages', 'app')));
   assert.ok(fs.existsSync(path.join(workspace, 'playwright.config.ts')));
   assert.ok(fs.existsSync(path.join(workspace, 'e2e-tests', 'app.test.ts')));
   assert.ok(fs.existsSync(path.join(workspace, '.changeset', 'config.json')));
   assert.ok(fs.existsSync(path.join(workspace, 'dynamic-plugins.yaml')));
-  assert.ok(fs.existsSync(path.join(workspace, 'yarn.lock')));
   assert.ok(fs.existsSync(path.join(workspace, 'AGENTS.md')));
   const agents = fs.readFileSync(path.join(workspace, 'AGENTS.md'), 'utf8');
   assert.match(agents, /harness is `packages\/app plus Playwright`/);
@@ -89,30 +83,28 @@ test('creates a frontend-plugin workspace with an app harness', () => {
     path.join(workspace, 'packages', 'app', 'src', 'App.tsx'),
     'utf8',
   );
-  assert.match(app, /path="\/hello"/);
-  const lock = fs.readFileSync(path.join(workspace, 'yarn.lock'), 'utf8');
-  assert.match(lock, /"hello@workspace:\.":/);
-  assert.ok(lock.indexOf('"hello@workspace:.":') > 0);
+  assert.doesNotMatch(app, /backstage-plugin-hello/);
   assertNoTemplateTokens(workspace);
 });
 
-test('creates a backend-plugin workspace with a backend harness', () => {
+test('creates a backend-plugin workspace shell with a backend harness', () => {
   const workspace = runGenerator('hello', 'backend-plugin');
   const rootPackage = JSON.parse(fs.readFileSync(path.join(workspace, 'package.json')));
-  const pluginPackage = JSON.parse(
-    fs.readFileSync(path.join(workspace, 'plugins', 'hello-backend', 'package.json')),
-  );
 
   assert.equal(rootPackage.name, 'hello');
-  assert.equal(pluginPackage.name, '@veecode-platform/backstage-plugin-hello-backend');
-  assert.equal(pluginPackage.backstage.role, 'backend-plugin');
   assert.ok(fs.existsSync(path.join(workspace, 'packages', 'backend')));
+  assert.ok(!fs.existsSync(path.join(workspace, 'plugins')));
+  const backendIndex = fs.readFileSync(
+    path.join(workspace, 'packages', 'backend', 'src', 'index.ts'),
+    'utf8',
+  );
+  assert.doesNotMatch(backendIndex, /backstage-plugin-hello/);
   assert.ok(!fs.existsSync(path.join(workspace, 'packages', 'app')));
   assert.ok(fs.existsSync(path.join(workspace, 'dynamic-plugins.yaml')));
-  assert.ok(fs.existsSync(path.join(workspace, 'yarn.lock')));
   assert.ok(fs.existsSync(path.join(workspace, 'AGENTS.md')));
   const agents = fs.readFileSync(path.join(workspace, 'AGENTS.md'), 'utf8');
   assert.match(agents, /harness is `packages\/backend plus backend unit tests`/);
+  assert.match(agents, /\/api\/hello\/health/);
   assert.doesNotMatch(agents, /``/);
   assertNoTemplateTokens(workspace);
 });
@@ -189,6 +181,7 @@ test('rolls back only the destination created by a failed execution', () => {
         name: 'hello',
         role: 'frontend-plugin',
         outputRoot,
+        shellOnly: true,
       }),
       /injected copy failure/,
     );
@@ -206,12 +199,123 @@ test('generates deterministic content for the same input', () => {
     name: 'hello',
     role: 'frontend-plugin',
     outputRoot: firstRoot,
+    shellOnly: true,
   });
   const second = generatorModule.createWorkspace({
     name: 'hello',
     role: 'frontend-plugin',
     outputRoot: secondRoot,
+    shellOnly: true,
   });
 
   assert.deepEqual(workspaceSnapshot(first), workspaceSnapshot(second));
+});
+
+test('grafts the dynamic-export fields onto what backstage-cli new writes', () => {
+  const upstream = {
+    name: '@veecode-platform/backstage-plugin-hello',
+    backstage: { role: 'frontend-plugin', pluginId: 'hello' },
+    scripts: { build: 'backstage-cli package build' },
+  };
+  const grafted = generatorModule.graftProductManifest(upstream, {
+    role: 'frontend-plugin',
+    packageName: upstream.name,
+  });
+
+  assert.equal(grafted.private, true);
+  assert.deepEqual(grafted.backstage, {
+    role: 'frontend-plugin',
+    pluginId: 'hello',
+    pluginPackages: ['@veecode-platform/backstage-plugin-hello'],
+  });
+  assert.equal(grafted.scripts.build, 'backstage-cli package build');
+  assert.match(grafted.scripts['export-dynamic'], /plugin export$/);
+  assert.deepEqual(grafted.scalprum, {
+    name: 'veecode-platform.backstage-plugin-hello',
+    exposedModules: { PluginRoot: './src/index.ts' },
+  });
+
+  const backend = generatorModule.graftProductManifest(
+    { name: '@veecode-platform/backstage-plugin-hello-backend', backstage: {}, scripts: {} },
+    { role: 'backend-plugin', packageName: '@veecode-platform/backstage-plugin-hello-backend' },
+  );
+  assert.equal(backend.scalprum, undefined);
+});
+
+test('declares /health unauthenticated in the generated backend plugin', () => {
+  const pluginSource = [
+    "      async init({ httpAuth, httpRouter, todoList }) {",
+    '        httpRouter.use(',
+    '          await createRouter({',
+    '            httpAuth,',
+    '            todoList,',
+    '          }),',
+    '        );',
+    '      },',
+    '',
+  ].join('\n');
+  const patched = generatorModule.addHealthPolicy(pluginSource);
+
+  assert.equal(
+    patched,
+    [
+      "      async init({ httpAuth, httpRouter, todoList }) {",
+      '        httpRouter.use(',
+      '          await createRouter({',
+      '            httpAuth,',
+      '            todoList,',
+      '          }),',
+      '        );',
+      '        httpRouter.addAuthPolicy({',
+      "          path: '/health',",
+      "          allow: 'unauthenticated',",
+      '        });',
+      '      },',
+      '',
+    ].join('\n'),
+  );
+  assert.throws(
+    () => generatorModule.addHealthPolicy('export const x = 1;\n'),
+    /template changed shape/,
+  );
+});
+
+test('adds the health route to the generated router', () => {
+  const routerSource = '  const router = Router();\n  router.use(express.json());\n';
+  const patched = generatorModule.addHealthRoute(routerSource);
+
+  assert.equal(
+    patched,
+    [
+      '  const router = Router();',
+      "  router.get('/health', (_req, res) => {",
+      "    res.json({ status: 'ok' });",
+      '  });',
+      '  router.use(express.json());',
+      '',
+    ].join('\n'),
+  );
+  assert.throws(
+    () => generatorModule.addHealthRoute('const r = 1;\n'),
+    /template changed shape/,
+  );
+});
+
+test('writes a health test that calls the route without credentials', () => {
+  const source = generatorModule.healthTestSource({
+    name: 'hello-world',
+    camelName: 'helloWorld',
+  });
+
+  assert.match(source, /import \{ helloWorldPlugin \} from '\.\/plugin';/);
+  assert.match(source, /get\('\/api\/hello-world\/health'\)/);
+  assert.doesNotMatch(source, /Authorization|token/i);
+});
+
+test('asks backstage-cli new for the template that matches the dev shell', () => {
+  assert.deepEqual(generatorModule.templateCandidatesFor('frontend-plugin'), [
+    'frontend-plugin-legacy',
+    'frontend-plugin',
+  ]);
+  assert.deepEqual(generatorModule.templateCandidatesFor('backend-plugin'), ['backend-plugin']);
 });
