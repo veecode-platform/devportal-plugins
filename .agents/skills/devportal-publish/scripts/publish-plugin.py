@@ -297,6 +297,10 @@ spec:
   packageName: "{package_name}"
   dynamicArtifact: {dynamic_artifact}
   version: {version}
+  # TODO(devportal-publish): if the plugin needs app-config, drop the opt-out
+  # below and fill appConfigExamples. The overlay gate
+  # (scripts/validate-app-config-examples.py) rejects an empty list without it.
+  appConfigNotRequired: true
   appConfigExamples: []
   backstage:
     role: {role}
@@ -633,7 +637,10 @@ def main() -> int:
     branch = f"publish/{flattened}-{facts.version}"
     print()
     print(f"## opening PR on branch {branch}")
-    run(["git", "checkout", "-B", branch], cwd=overlays_repo)
+    # Always branch from the remote base: the local checkout may sit on a
+    # previous publish branch and would otherwise carry its commits along.
+    run(["git", "fetch", "origin", args.base_branch], cwd=overlays_repo)
+    run(["git", "checkout", "-B", branch, f"origin/{args.base_branch}"], cwd=overlays_repo)
     run(["git", "add",
          str(source_json_path.relative_to(overlays_repo)),
          str(plugins_list_path.relative_to(overlays_repo)),
@@ -647,12 +654,17 @@ def main() -> int:
     body = (
         f"Publishes `{facts.package_name}@{facts.version}` from `{args.workspace}/{facts.plugin_dir}` "
         f"at `{ref}`.\n\n4-way coherence check passed (package.json, metadata spec.version, "
-        f"dynamicArtifact tag, source.json repo-ref).\n\n/publish\n"
+        f"dynamicArtifact tag, source.json repo-ref).\n"
     )
     pr = run(["gh", "pr", "create", "--base", args.base_branch, "--head", branch,
               "--title", f"publish: {facts.package_name}@{facts.version}", "--body", body],
              cwd=overlays_repo)
-    print(pr.stdout.strip())
+    pr_url = pr.stdout.strip()
+    print(pr_url)
+    # pr-actions.yaml listens to issue_comment only; a slash command in the PR
+    # body never fires. Post it as a comment so the candidate build starts.
+    run(["gh", "pr", "comment", pr_url, "--body", "/publish"], cwd=overlays_repo)
+    print("posted /publish comment; pr-actions.yaml builds the pr_<n>__<version> candidate")
     return 0
 
 
