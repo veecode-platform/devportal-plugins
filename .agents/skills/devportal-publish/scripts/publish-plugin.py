@@ -183,8 +183,14 @@ def resolve_ref(devportal_plugins_repo: Path, ref_arg: Optional[str]) -> tuple[s
         res = run(["git", "rev-parse", "HEAD"], cwd=devportal_plugins_repo)
         sha = res.stdout.strip()
     reachable = run(["git", "branch", "-r", "--contains", sha], cwd=devportal_plugins_repo, check=False)
-    if reachable.returncode != 0 or not reachable.stdout.strip():
-        return sha, (f"'{sha}' is not reachable from any remote-tracking branch in "
+    if reachable.returncode == 0 and reachable.stdout.strip():
+        return sha, None
+    # A checkout whose fetch refspec tracks only some branches has no
+    # remote-tracking ref for a pushed branch outside it; ask the remote
+    # whether any branch tip is this commit (the usual case: a pushed HEAD).
+    tips = run(["git", "ls-remote", "--heads", "origin"], cwd=devportal_plugins_repo, check=False)
+    if tips.returncode != 0 or not any(line.split("\t", 1)[0] == sha for line in tips.stdout.splitlines()):
+        return sha, (f"'{sha}' is not reachable on origin from "
                       f"{devportal_plugins_repo}. Push it before the overlay PR is opened, "
                       f"or CI there will not be able to fetch this ref.")
     return sha, None
