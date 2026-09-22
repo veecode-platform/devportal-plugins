@@ -1,5 +1,5 @@
 # Transitional compose; replaced by devportal-local in M8 stage 4
-# (devportal-plugins-parent ADR-0009).
+# (plugins ADR-0009, docs/adr/).
 #
 # Starts DevPortal with pretty logging:
 #
