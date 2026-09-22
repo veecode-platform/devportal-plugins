@@ -69,6 +69,12 @@ dev app, no code tests.
    runs the same specs against `devportal-local` on `localhost:7007` with the exported or
    published plugin — proof 4, catches dynamic-loading defects the dev app cannot (the
    kong-tools pt-BR gap: translations rendered in the dev app and were silent in the portal).
+
+   *Amended 2026-09-22:* the switch is the upstream `PLAYWRIGHT_URL` variable, not
+   `PLAYWRIGHT_TARGET`. Unset, the suite starts the dev app (proof 1); set to a running
+   portal such as `http://localhost:7007`, it targets that portal without starting a server
+   (proof 4). The decision is unchanged; see `CONTRIBUTING.md` and the template's
+   `playwright.config.ts`.
 7. Drydock is out of the flow (stale). Upstream `rhdh-e2e-test-utils` is not adopted (it
    requires OpenShift and Keycloak); its metadata-resolution module may be copied later
    with the overlays fork sync, which is a separate PR.
