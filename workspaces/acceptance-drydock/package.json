@@ -1,0 +1,41 @@
+{
+  "name": "acceptance-drydock",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "22 || 24"
+  },
+  "scripts": {
+    "start": "backstage-cli repo start",
+    "build:all": "backstage-cli repo build --all",
+    "tsc": "tsc",
+    "tsc:full": "tsc --skipLibCheck false --incremental false",
+    "clean": "backstage-cli repo clean",
+    "test": "backstage-cli repo test",
+    "test:all": "backstage-cli repo test --coverage",
+    "fix": "backstage-cli repo fix",
+    "lint": "backstage-cli repo lint --since origin/main",
+    "lint:all": "backstage-cli repo lint",
+    "prettier:check": "prettier --check .",
+    "prettier:fix": "prettier --write .",
+    "dev:dynamic": "bash ../../.agents/skills/devportal-context/scripts/export-dev-dynamic.sh plugins/acceptance-drydock-backend",
+    "new": "backstage-cli new"
+  },
+  "workspaces": ["packages/*", "plugins/*"],
+  "devDependencies": {
+    "@backstage/backend-test-utils": "^1.11.1",
+    "@backstage/cli": "^0.36.0",
+    "@jest/environment-jsdom-abstract": "^30.0.0",
+    "@changesets/cli": "^2.27.1",
+    "@red-hat-developer-hub/cli": "latest",
+    "@types/jest": "^30.0.0",
+    "@types/supertest": "^2.0.12",
+    "jest": "^30.2.0",
+    "jsdom": "^27.1.0",
+    "prettier": "^2.3.2",
+    "supertest": "^6.2.4",
+    "typescript": "~5.8.0"
+  },
+  "prettier": "@backstage/cli/config/prettier",
+  "packageManager": "yarn@4.12.0"
+}

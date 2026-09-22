@@ -1,0 +1,3 @@
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-acceptance-drydock-backend-dynamic
+    disabled: false

@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: acceptance-drydock
+  description: A scaffolded VeeCode plugin workspace.
+spec:
+  type: library
+  owner: platform
+  lifecycle: experimental
