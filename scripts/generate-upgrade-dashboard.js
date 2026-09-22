@@ -24,9 +24,7 @@
 // override as scripts/ci/check-backstage-version.js). It also drops the
 // `semver` and `fs-extra` dependencies upstream uses, since this repo does
 // not carry them at the root; version comparison reuses the plain-Node
-// parser already in scripts/ci/check-backstage-version.js. The template
-// workspace is excluded because CONTRIBUTING.md excludes template.json
-// workspaces from product gates.
+// parser already in scripts/ci/check-backstage-version.js.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -67,7 +65,6 @@ function listWorkspaces() {
     .readdirSync(workspacesRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .filter(entry => fs.existsSync(path.join(workspacesRoot, entry.name, 'package.json')))
-    .filter(entry => !fs.existsSync(path.join(workspacesRoot, entry.name, 'template.json')))
     .map(entry => entry.name)
     .sort();
 }

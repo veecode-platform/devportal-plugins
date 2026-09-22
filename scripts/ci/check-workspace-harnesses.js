@@ -110,7 +110,6 @@ function listProductWorkspaces(workspacesRoot) {
     .readdirSync(workspacesRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .filter(entry => entry.name !== 'dummy')
-    .filter(entry => !fs.existsSync(path.join(workspacesRoot, entry.name, 'template.json')))
     .filter(entry => fs.existsSync(path.join(workspacesRoot, entry.name, 'package.json')))
     .map(entry => entry.name)
     .sort();

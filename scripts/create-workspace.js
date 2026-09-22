@@ -346,7 +346,7 @@ function createProductPackage(destination, values) {
 
 function createWorkspace(options) {
   const repoRoot = path.resolve(__dirname, '..');
-  const templateRoot = path.join(repoRoot, 'workspaces', 'dummy-template');
+  const templateRoot = path.join(repoRoot, 'scripts', 'workspace-template');
   const manifestPath = path.join(templateRoot, 'template.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const roleEntries = manifest.roles[options.role];

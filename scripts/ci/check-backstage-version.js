@@ -50,7 +50,6 @@ function workspaceVersions() {
   return fs
     .readdirSync(workspacesRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
-    .filter(entry => !fs.existsSync(path.join(workspacesRoot, entry.name, 'template.json')))
     // A workspace is a directory with a package.json; other directories are residue.
     .filter(entry => fs.existsSync(path.join(workspacesRoot, entry.name, 'package.json')))
     .map(entry => {
