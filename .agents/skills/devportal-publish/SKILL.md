@@ -146,10 +146,14 @@ title and description have been written.
 Never happens automatically. `--open-pr` alone is refused; it additionally
 requires `--write` and `--yes` in the same invocation, and only runs after
 the coherence check passes. When honored, it creates branch
-`publish/<flattened-name>-<version>` in the overlays repo, commits the
-changed files, pushes, and opens the PR with `gh pr create`, whose body ends
-in `/publish` (the PR-comment trigger `pr-actions.yaml` reacts to, per
-`devportal-plugin-export-overlays/CLAUDE.md`).
+`publish/<flattened-name>-<version>` from `origin/<base-branch>` in the
+overlays repo, commits the changed files, pushes, opens the PR with
+`gh pr create`, and then posts `/publish` as a PR **comment**.
+`pr-actions.yaml` reacts to `issue_comment` only: a slash command in the PR
+body fires nothing and fails silently, so the comment is what starts the
+`pr_<number>__<version>` candidate build. Run the proof-2 check on the runner
+before opening the PR; nothing in the overlay verifies that the plugin ever
+loaded outside CI.
 
 ```bash
 # plan only (read-only, safe to run anytime)
