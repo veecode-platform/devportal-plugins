@@ -5,8 +5,6 @@
 #
 
 VERSION ?= 1.1.0
-NPM_REGISTRY =
-NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
 # Cross-platform sed in-place
 SED_INPLACE := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "sed -i ''"; else echo "sed -i"; fi)
@@ -17,7 +15,7 @@ PLUGIN_DIR = plugins/kubernetes-backend-module-getsecret
 ALL_PLUGIN_DIRS = $(PLUGIN_DIR)
 
 .PHONY: help build build-dynamic pack pack-dynamic \
-	set-version get-version unpublish clean clean-dynamic
+	set-version clean clean-dynamic
 
 help:
 	@echo "Kubernetes Workspace Makefile"
@@ -33,8 +31,6 @@ help:
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
-	@echo "  make get-version         - Show latest published versions"
-	@echo "  make unpublish           - Unpublish all packages at current version"
 	@echo "  make clean               - Full clean (node_modules, dist, logs, .tgz)"
 	@echo "  make clean-dynamic       - Clean only dist-dynamic directories"
 
@@ -61,26 +57,6 @@ pack:
 # Pack all dynamic plugins
 pack-dynamic:
 	cd $(PLUGIN_DIR)/dist-dynamic && npm pack
-
-
-# Get latest versions in npm registry
-get-version:
-	@echo "Getting latest versions in npm registry for kubernetes plugin..."
-	@for dir in $(ALL_PLUGIN_DIRS); do \
-		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
-		echo "$$PACKAGE_NAME:"; \
-		npm view $$PACKAGE_NAME version $(NPM_REGISTRY_ARGS) 2>/dev/null || echo "  Not published yet"; \
-	done
-
-# Unpublish all packages
-unpublish:
-	@echo "Unpublishing kubernetes packages..."
-	@for dir in $(ALL_PLUGIN_DIRS); do \
-		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
-		npm unpublish $$PACKAGE_NAME@$(VERSION) $(NPM_REGISTRY_ARGS) 2>/dev/null || true; \
-		echo "  Unpublished $$PACKAGE_NAME@$(VERSION)"; \
-	done
-	@echo "Packages unpublished."
 
 # Full clean
 clean:

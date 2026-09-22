@@ -6,8 +6,6 @@
 #
 
 VERSION ?= 1.4.0
-NPM_REGISTRY =
-NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
 # Cross-platform sed in-place
 SED_INPLACE := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "sed -i ''"; else echo "sed -i"; fi)
@@ -20,7 +18,7 @@ BACKEND_DIR = plugins/github-workflow-backend
 ALL_PLUGIN_DIRS = $(COMMON_DIR) $(FRONTEND_DIR) $(BACKEND_DIR)
 
 .PHONY: help build build-dynamic pack pack-dynamic \
-	set-version get-version unpublish clean clean-dynamic \
+	set-version clean clean-dynamic \
 	replace-workspace restore-workspace
 
 help:
@@ -37,8 +35,6 @@ help:
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
-	@echo "  make get-version         - Show latest published versions"
-	@echo "  make unpublish           - Unpublish all packages at current version"
 	@echo "  make clean               - Full clean (node_modules, dist, logs, .tgz)"
 	@echo "  make clean-dynamic       - Clean only dist-dynamic directories"
 
@@ -74,26 +70,6 @@ pack:
 pack-dynamic:
 	cd $(FRONTEND_DIR)/dist-dynamic && npm pack
 	cd $(BACKEND_DIR)/dist-dynamic && npm pack
-
-
-# Get latest versions in npm registry
-get-version:
-	@echo "Getting latest versions in npm registry for github-workflows plugins..."
-	@for dir in $(ALL_PLUGIN_DIRS); do \
-		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
-		echo "$$PACKAGE_NAME:"; \
-		npm view $$PACKAGE_NAME version $(NPM_REGISTRY_ARGS) 2>/dev/null || echo "  Not published yet"; \
-	done
-
-# Unpublish all packages (common last since others depend on it)
-unpublish:
-	@echo "Unpublishing github-workflows packages..."
-	@for dir in $(FRONTEND_DIR) $(BACKEND_DIR) $(COMMON_DIR); do \
-		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
-		npm unpublish $$PACKAGE_NAME@$(VERSION) $(NPM_REGISTRY_ARGS) 2>/dev/null || true; \
-		echo "  Unpublished $$PACKAGE_NAME@$(VERSION)"; \
-	done
-	@echo "Packages unpublished."
 
 # Full clean
 clean:

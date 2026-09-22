@@ -5,8 +5,6 @@
 #
 
 VERSION ?= 0.1.0
-NPM_REGISTRY =
-NPM_REGISTRY_ARGS = $(if $(NPM_REGISTRY),--registry $(NPM_REGISTRY))
 
 SED_INPLACE := $(shell if [ "$$(uname)" = "Darwin" ]; then echo "sed -i ''"; else echo "sed -i"; fi)
 
@@ -15,7 +13,7 @@ PLUGIN_DIR = plugins/aws-cost-insights
 ALL_PLUGIN_DIRS = $(PLUGIN_DIR)
 
 .PHONY: help build build-dynamic pack pack-dynamic \
-	set-version get-version unpublish clean clean-dynamic
+	set-version clean clean-dynamic
 
 help:
 	@echo "AWS Cost Insights Workspace Makefile"
@@ -31,8 +29,6 @@ help:
 	@echo ""
 	@echo "Utility Commands:"
 	@echo "  make set-version VERSION=x.y.z - Set version for all packages"
-	@echo "  make get-version         - Show latest published versions"
-	@echo "  make unpublish           - Unpublish all packages at current version"
 	@echo "  make clean               - Full clean (node_modules, dist, logs, .tgz)"
 	@echo "  make clean-dynamic       - Clean only dist-dynamic directories"
 
@@ -56,23 +52,6 @@ pack:
 
 pack-dynamic:
 	cd $(PLUGIN_DIR)/dist-dynamic && npm pack
-
-get-version:
-	@echo "Getting latest version in npm registry..."
-	@for dir in $(ALL_PLUGIN_DIRS); do \
-		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
-		echo "$$PACKAGE_NAME:"; \
-		npm view $$PACKAGE_NAME version $(NPM_REGISTRY_ARGS) 2>/dev/null || echo "  Not published yet"; \
-	done
-
-unpublish:
-	@echo "Unpublishing package..."
-	@for dir in $(ALL_PLUGIN_DIRS); do \
-		PACKAGE_NAME=$$(node -p "require('./$$dir/package.json').name"); \
-		npm unpublish $$PACKAGE_NAME@$(VERSION) $(NPM_REGISTRY_ARGS) 2>/dev/null || true; \
-		echo "  Unpublished $$PACKAGE_NAME@$(VERSION)"; \
-	done
-	@echo "Package unpublished."
 
 clean:
 	@echo "Cleaning workspace..."

@@ -42,16 +42,11 @@ make build              # Build all static plugins
 make build-dynamic      # Build all dynamic plugins (uses @red-hat-developer-hub/cli)
 # npm publishing is retired; plugins now ship through the export overlay (OCI)
 make set-version VERSION=x.y.z  # Set version for all plugins in workspace
-make get-version        # Show latest published versions
 make clean              # Full clean
 ```
 
 To load a workspace's export in the local DevPortal runner (proof 2), run `yarn dev:dynamic`
 inside the workspace and follow the Compose command it prints (`devportal-local`).
-
-## Using a Private Registry
-
-npm publishing is retired; plugins now ship through the export overlay (OCI).
 
 ## Reference Implementation
 
