@@ -1,133 +1,34 @@
-# Plugin Lifecycle Guide
+# dummy workspace lifecycle
 
-Reference guide for developing, testing, and releasing a plugin pair
-(frontend + backend). This document uses the `dummy` workspace as the concrete example —
-the same workflow applies to all plugin workspaces in this repository.
+`dummy` is the preserved reference fixture (plugins ADR-0003, ADR-0012): a frontend plugin
+(`plugins/dummy`) and a backend plugin (`plugins/dummy-backend`) with the dev shell under
+`packages/`. It is never published. New workspaces come from `yarn create-workspace`, not from
+copying this one.
 
----
+1. **Develop** under `plugins/`. `yarn start` runs the dev shell with hot reload.
+2. **Proof 1** — `yarn tsc:full`, `yarn lint:all`, `yarn test:all`, `yarn prettier:check`, and
+   `yarn test:e2e` for the frontend (set `PLAYWRIGHT_URL` to target a running portal).
+3. **Proof 2** — `yarn dev:dynamic` exports both plugins into the `devportal-local` runner and
+   prints the Compose command to run there. Proof 2 needs no publication.
+4. **Publish** — for a real workspace, the `devportal-publish` skill opens the overlay pull
+   request; `/publish` as a PR comment builds the `pr_<n>__<version>` candidate and the overlay
+   smoke test is proof 3. A changeset records the version intent (plugins ADR-0011).
 
-## Architecture Overview
+The proofs and the official flow are defined once, in
+[`CONTEXT.md`](../../CONTEXT.md#proving-a-plugin) and [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
-Each plugin workspace follows this structure:
+## Makefile targets
 
-```
-plugins/<plugin>/                → frontend plugin source
-plugins/<plugin>-backend/        → backend plugin source
+| Target                              | What it does                                                        |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| `make build`                        | Builds the static packages                                          |
+| `make build-dynamic`                | Builds, then exports both plugins with `@red-hat-developer-hub/cli` |
+| `make pack` / `make pack-dynamic`   | Packs static / dynamic artifacts locally                            |
+| `make set-version VERSION=x.y.z`    | Sets the version of every plugin package                            |
+| `make clean` / `make clean-dynamic` | Removes build / export output                                       |
 
-plugins/<plugin>/dist/               → static build (backstage-cli)
-plugins/<plugin>/dist-dynamic/       → dynamic build (rhdh-cli export-dynamic)
+The npm-facing targets still in the Makefile (`get-version`, `unpublish`) predate plugins
+ADR-0010 and do not apply: nothing is published to npm.
 
-plugins/<plugin>-backend/dist/
-plugins/<plugin>-backend/dist-dynamic/
-```
-
-`dist-dynamic/` is always derived from `dist/` — never edited directly.
-It is what gets published to npm and consumed by the DevPortal container.
-
----
-
-## 1. Local Development
-
-### Static mode (hot reload)
-
-```bash
-make dev
-```
-
-Starts a standalone Backstage app with both plugins loaded statically. Changes to `src/` are
-reflected immediately. Use this for day-to-day development.
-
-### Dynamic mode (Docker)
-
-```bash
-make build-all-dynamic
-docker compose up
-```
-
-Builds `dist-dynamic/` for both plugins and loads them into the pinned 3.x DevPortal image via the
-transitional installer compose (see `docker-compose.yaml`). No npm publish required. The default
-image is the chart-pinned digest; set `DEVPORTAL_IMAGE` to override it when needed.
-
-> **No hot reload in dynamic mode.** `dynamic-plugins.yaml` and `app-config.dynamic.yaml` are
-> read once at container boot. Code changes require a rebuild + container restart. Config-only
-> changes require only a restart.
-
----
-
-## 2. Making a Code Change
-
-1. Edit source under `plugins/<plugin>/src/` or `plugins/<plugin>-backend/src/`
-2. Develop and test in static mode: `make dev`
-3. Build dynamic artifacts: `make build-all-dynamic`
-4. Restart the container: `docker compose restart`
-5. Verify at `http://localhost:7007`
-
----
-
-## 3. Release
-
-### 3.1 Bump the version
-
-Each workspace defines its own version variable in the Makefile. Check the variable name at the
-top of the `Makefile` (e.g., `DUMMY_VERSION`, `KONG_TOOLS_VERSION`), then run:
-
-```bash
-# dummy workspace example
-make set-version DUMMY_VERSION=0.2.0
-```
-
-Updates `package.json` in both plugins and cleans `dist-dynamic/` to ensure a fresh build.
-
-### 3.2 Build dynamic artifacts
-
-```bash
-make build-all-dynamic
-```
-
-Produces a `dist-dynamic/` for each plugin with a package name following the pattern:
-
-- `@veecode-platform/backstage-plugin-<plugin>-dynamic`
-- `@veecode-platform/backstage-plugin-<plugin>-backend-dynamic`
-
-### 3.3 Publish
-
-npm publishing is retired; plugins now ship through the export overlay (OCI).
-
-### 3.4 Verify published versions
-
-```bash
-make get-version
-```
-
----
-
-## 4. Quick Reference
-
-| Goal | Command |
-|---|---|
-| Start dev (static, hot reload) | `make dev` |
-| Build dynamic artifacts | `make build-all-dynamic` |
-| Start dynamic container | `docker compose up` |
-| Restart container | `docker compose restart` |
-| Bump version | `make set-version <PLUGIN>_VERSION=x.y.z` |
-| Publish dynamic packages | retired — see the export overlay (OCI) |
-| Check published versions | `make get-version` |
-| Clean dynamic artifacts | `make clean-dynamic` |
-| Run tests | `make test` |
-| Run linter | `make lint` |
-
----
-
-## 5. Package Naming Convention
-
-VeeCode plugins follow this naming pattern on npm:
-
-| Role | npm package name |
-|---|---|
-| Frontend — static | `@veecode-platform/backstage-plugin-<plugin>` |
-| Frontend — dynamic | `@veecode-platform/backstage-plugin-<plugin>-dynamic` |
-| Backend — static | `@veecode-platform/backstage-plugin-<plugin>-backend` |
-| Backend — dynamic | `@veecode-platform/backstage-plugin-<plugin>-backend-dynamic` |
-
-Static packages: added as `package.json` dependencies in Backstage apps.
-Dynamic packages: published to npm as standalone artifacts.
+`docker-compose.yaml` in this workspace is a transitional harness kept until the per-workspace
+composes are retired; proof 2 runs in `devportal-local`.

@@ -90,7 +90,7 @@ curl -X POST http://localhost:7007/api/notifications/notifications \
       }'
 ```
 
-We have made available a helper script at `/scripts/send-notification.sh` to make it easier to send notifications. You can run it like this:
+A helper script at the repository root, `scripts/send-notification.sh`, sends one. Run it from the repository root:
 
 ```bash
 ./scripts/send-notification.sh "Your custom message here"

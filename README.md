@@ -8,16 +8,9 @@ Plugins are published as dynamic plugins, one OCI image per plugin on `quay.io/v
 
 Each workspace groups related plugins together. A workspace is an independent Backstage app used to develop and test its plugins.
 
-| Workspace | Plugins | Description | Status |
-|-----------|---------|-------------|--------|
-| [veecode-homepage](workspaces/veecode-homepage/) | veecode-homepage | Homepage plugin | Ready |
-| [global-header](workspaces/global-header/) | veecode-global-header | Global header plugin | Ready |
-| [github-workflows](workspaces/github-workflows/) | github-workflows, github-workflows-common, github-workflow-backend | GitHub workflows (frontend + backend + common) | Ready |
-| [ldap-auth](workspaces/ldap-auth/) | ldap-auth, ldap-auth-backend | LDAP auth (port from @immobiliarelabs) | Ready |
-| [kong-tools](workspaces/kong-tools/) | scaffolder-backend-module-kong, kong-service-manager, kong-service-manager-backend, kong-service-manager-common, scaffolder-field-extensions-kong | Kong scaffolder actions and service manager | Ready |
-| [kubernetes](workspaces/kubernetes/) | kubernetes-backend-module-getsecret | Kubernetes secret access module | WIP |
-| [about](workspaces/about/) | about, about-backend | About plugin | ready. |
-| [dummy](workspaces/dummy/) | dummy, dummy-backend | **Reference implementation** for plugin authors | Ready |
+The workspaces are the directories under [`workspaces/`](workspaces/); each has an `AGENTS.md`
+that says what it contains and how to prove it. That directory is the inventory, so this
+file does not keep a second list.
 
 ## Getting Started
 
@@ -53,11 +46,8 @@ make get-version        # Show latest published versions
 make clean              # Full clean
 ```
 
-To copy dynamic plugins to a local DevPortal instance for testing:
-
-```sh
-make copy-dynamic-plugins
-```
+To load a workspace's export in the local DevPortal runner (proof 2), run `yarn dev:dynamic`
+inside the workspace and follow the Compose command it prints (`devportal-local`).
 
 ## Using a Private Registry
 

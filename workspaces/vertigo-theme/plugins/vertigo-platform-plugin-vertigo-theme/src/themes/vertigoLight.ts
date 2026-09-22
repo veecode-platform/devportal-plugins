@@ -28,7 +28,7 @@ const header = genPageTheme({ colors: [navy, navyDeep], shape: shapes.wave });
 /*
  * RHDH 3.x layout contract — theme.palette.rhdh.general.*.
  *
- * The 3.x app shell (devportal-core-main/packages/app) does layout arithmetic
+ * The 3.x app shell (veecode-platform/devportal-core, packages/app) does layout arithmetic
  * with this subtree, which the old-generation `createUnifiedTheme` form never
  * emitted:
  *   - Root.tsx:171            reads pageInset (docked-drawer margin calc())
@@ -89,7 +89,8 @@ export const vertigoLight = createUnifiedTheme({
     app: header,
     apis: header,
   },
-  fontFamily: '"Geist Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+  fontFamily:
+    '"Geist Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
   typography,
   components: makeComponents('light'),
 });

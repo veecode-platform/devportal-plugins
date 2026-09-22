@@ -195,7 +195,7 @@ Maintained and updated by [VeeCode Platform](https://github.com/veecode-platform
 
 ## License
 
-MIT License - see [LICENSE](../../LICENSE) for details.
+MIT License - see [LICENSE](../ldap-auth-backend/LICENSE) for details.
 
 Original work Copyright (c) ImmobiliareLabs  
 Modified work Copyright (c) VeeCode Platform
