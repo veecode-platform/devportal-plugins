@@ -184,7 +184,7 @@ delivery channel.
 Create one with `yarn changeset` inside the affected workspace (every workspace
 declares `@changesets/cli`, as upstream does); CI verifies changesets in report mode.
 
-The named CI gates are `tsc:full`, `prettier:check`, `lint:all`, and `test:all`.
+The named CI gates are `tsc:full`, `build:all`, `prettier:check`, `lint:all`, and `test:all`.
 They currently run in report mode. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 and [`scripts/ci/README.md`](scripts/ci/README.md) for the implementation and local
 contract.
