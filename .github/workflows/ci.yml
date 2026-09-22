@@ -28,7 +28,7 @@ jobs:
 
       - name: Check scaffold and role harnesses
         run: |
-          node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js
+          node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js scripts/ci/verify-changesets.test.js
           node scripts/ci/check-workspace-harnesses.js
 
   changes:
@@ -141,6 +141,21 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `${output}=${present}\n`);
           }
           NODE
+
+      - name: Verify changesets
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          node ../../scripts/ci/verify-changesets.js "${{ matrix.workspace }}"
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s; report mode |\n' 'changesets' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       - name: Gate tsc:full
         if: ${{ always() && steps.scripts.outputs.tsc_full == 'true' }}
