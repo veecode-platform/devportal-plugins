@@ -28,7 +28,7 @@ jobs:
 
       - name: Check scaffold and role harnesses
         run: |
-          node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js scripts/ci/verify-changesets.test.js
+          node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js scripts/ci/verify-changesets.test.js scripts/ci/check-dynamic-plugin-config.test.js
           node scripts/ci/check-workspace-harnesses.js
 
   changes:
@@ -156,6 +156,40 @@ jobs:
             verdict=FAIL
           fi
           printf '| `%s` | %s | exit %s; report mode |\n' 'changesets' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate dynamic plugin config (report mode)
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          node ../../scripts/ci/check-dynamic-plugin-config.js "${{ matrix.workspace }}"
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s; report mode |\n' 'dynamic plugin config' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate app config:check --lax (report mode)
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ ! -f app-config.yaml ]; then
+            echo '| `backstage-cli config:check --lax` | SKIP | app-config.yaml is absent |' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
+          yarn backstage-cli config:check --lax
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s; report mode |\n' 'backstage-cli config:check --lax' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 
       - name: Gate tsc:full
