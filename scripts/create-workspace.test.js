@@ -66,6 +66,8 @@ test('creates a frontend-plugin workspace shell with an app harness', () => {
   assert.ok(fs.existsSync(path.join(workspace, 'AGENTS.md')));
   const agents = fs.readFileSync(path.join(workspace, 'AGENTS.md'), 'utf8');
   assert.match(agents, /harness is `packages\/app plus Playwright`/);
+  assert.match(agents, /PLAYWRIGHT_URL/);
+  assert.doesNotMatch(agents, /source for generated/);
   assert.doesNotMatch(agents, /``/);
   const dynamicConfig = fs.readFileSync(
     path.join(workspace, 'dynamic-plugins.yaml'),
@@ -105,6 +107,8 @@ test('creates a backend-plugin workspace shell with a backend harness', () => {
   const agents = fs.readFileSync(path.join(workspace, 'AGENTS.md'), 'utf8');
   assert.match(agents, /harness is `packages\/backend plus backend unit tests`/);
   assert.match(agents, /\/api\/hello\/health/);
+  assert.doesNotMatch(agents, /Playwright/);
+  assert.doesNotMatch(agents, /source for generated/);
   assert.doesNotMatch(agents, /``/);
   assertNoTemplateTokens(workspace);
 });
