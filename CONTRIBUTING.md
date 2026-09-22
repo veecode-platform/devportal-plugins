@@ -26,8 +26,7 @@ and templates:
 - `AGENTS.md` and `.agents/skills/` route an agent to a workspace.
 - `CONTRIBUTING.md` owns these cross-workspace rules.
 - `CONTEXT.md` owns the glossary.
-- Decisions that constrain every workspace are ADRs in `devportal-plugins-parent/docs/adr/`
-  (sibling repository); this repository keeps no ADR directory of its own.
+- `docs/adr/` holds the decisions that constrain every workspace.
 - `.github/workflows/` and `scripts/` hold repository-wide automation. The
   `workspaces/dummy-template/` workspace is the single source for new workspace
   scaffolding; it is marked as a template and is excluded from product gates.
@@ -150,6 +149,15 @@ The harness is sized to the package role; not every workspace needs the same she
 | `backend-plugin-module` auth | `packages/backend` + its fixture | Test sign-in completes |
 | `common-library` | Unit tests | None; consumers prove it |
 
+## Third-party code
+
+A plugin we fork or vendor stays traceable to its source. Either it lives in a sibling fork
+repository with the upstream remote configured, or the vendored copy carries a `NOTICE` or
+`UPSTREAM.md` naming the upstream repository and commit it came from (examples:
+`workspaces/aws-cost-insights/plugins/*/NOTICE`,
+`workspaces/marketplace/plugins/devportal-marketplace-frontend/UPSTREAM.md`). Update that
+file whenever the copy is re-synced.
+
 ## Exposure rule
 
 This public repository documents plugin behavior and the code needed to operate it.
@@ -159,11 +167,11 @@ context in the consumption repositories and link the relevant business decision 
 
 ## Decisions
 
-Put an ADR in `devportal-plugins-parent/docs/adr/` only when the decision constrains every workspace.
-Put a workspace-only decision in that workspace's `DECISIONS.md` as a PDR, using the
-[PDR format](https://github.com/veecode-platform/devportal-plugins-parent/blob/main/docs/adr/README.md).
-Business context lives in `devportal-plugins-parent`; link it rather than copying it
-into this repository.
+Put an ADR in [`docs/adr/`](docs/adr/README.md) only when the decision constrains every
+workspace. Put a workspace-only decision in that workspace's `DECISIONS.md` as a PDR, in
+the format described in the same README. Roadmap, milestones and business context live in
+[`devportal-plugins-parent`](https://github.com/veecode-platform/devportal-plugins-parent);
+link it rather than copying it into this repository.
 
 ## Pull requests
 

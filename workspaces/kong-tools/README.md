@@ -10,7 +10,7 @@ they survive — depends on how your team runs Kong. Read
 before installing this plugin anywhere. The plugin supports two paths (direct writes, and
 promoting an experimental plugin change to your chart via a Git merge request) and
 deliberately recommends neither — that choice belongs to the team deploying it (recorded
-internally as plugins ADR-0005). Promote-to-code needs the `helm` CLI as a deployment
+as kong-tools PDR-026). Promote-to-code needs the `helm` CLI as a deployment
 prerequisite — see the backend package's README, "Prerequisites".
 
 ## Reference implementation

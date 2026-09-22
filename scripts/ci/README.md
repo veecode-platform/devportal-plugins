@@ -18,4 +18,4 @@ HOST_BACKSTAGE_VERSION=1.52.0 node scripts/ci/check-backstage-version.js
 ```
 
 CI gates are intentionally in report mode in this stage. Their contract is governed by
-[ADR-0011](https://github.com/veecode-platform/devportal-plugins-parent/blob/main/docs/adr/0011-ci-gates-are-the-standards-versioning-by-changesets.md).
+[ADR-0011](../../docs/adr/0011-ci-gates-are-the-standards-versioning-by-changesets.md).
