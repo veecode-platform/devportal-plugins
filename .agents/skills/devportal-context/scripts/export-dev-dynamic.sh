@@ -25,6 +25,12 @@ fi
 
 mkdir -p "$dynamic_plugins_root" "$export_source_root"
 
+# The export reads dist-types/, which only the type build writes. The
+# Makefile's build-dynamic runs it first; dev:dynamic calls this script
+# directly, so a fresh install stopped at "No declaration files found".
+printf 'Building types in %s\n' "$workspace_root"
+(cd -- "$workspace_root" && yarn tsc)
+
 declare -a source_package_bases=()
 declare -a exported_plugin_dirs=()
 
