@@ -9,5 +9,7 @@ test('renders the scaffolded frontend plugin', async ({ page }) => {
     ).toBeVisible({ timeout: 30_000 });
   }
   await page.goto('/{{name}}');
-  await expect(page.getByTestId('{{name}}-page')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to {{name}}!' }),
+  ).toBeVisible();
 });

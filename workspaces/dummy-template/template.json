@@ -24,19 +24,14 @@
       "app-config.yaml",
       "playwright.config.ts",
       "dynamic-plugins.yaml",
-      "yarn.lock",
       "packages/app",
-      "e2e-tests",
-      "plugins/plugin/src/routes.ts",
-      "plugins/plugin"
+      "e2e-tests"
     ],
     "backend-plugin": [
       "package.json",
       "app-config.yaml",
       "dynamic-plugins.yaml",
-      "yarn.lock",
-      "packages/backend",
-      "plugins/plugin-backend"
+      "packages/backend"
     ]
   }
 }
