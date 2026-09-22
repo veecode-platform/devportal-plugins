@@ -160,6 +160,30 @@ def report_dynamic_plugins_wiring(ws_dir: Path, plugin_dir_name: str) -> str:
     )
 
 
+def proof2_trace(devportal_plugins_repo: Path, facts: PluginFacts) -> tuple[bool, str]:
+    """Proof 2 is the default before publishing, not a gate: this looks for
+    the trace `yarn dev:dynamic` leaves in devportal-local (an export of this
+    package at this version, staged in dynamic-plugins.local.yaml) so the PR
+    can say whether it ran. It cannot see whether the portal was opened."""
+    resolver = devportal_plugins_repo / ".agents/skills/devportal-context/scripts/resolve-devportal-local-dir.sh"
+    res = run(["bash", str(resolver)], cwd=devportal_plugins_repo, check=False)
+    if res.returncode != 0:
+        return False, f"devportal-local checkout not found: {res.stderr.strip()}"
+    local_dir = Path(res.stdout.strip())
+    local_config = local_dir / "dynamic-plugins-root-dev" / "dynamic-plugins.local.yaml"
+    for manifest in sorted((local_dir / "dynamic-plugins-src-dev").glob("*/package.json")):
+        exported = read_json(manifest)
+        if exported.get("name") not in (facts.package_name, f"{facts.package_name}-dynamic"):
+            continue
+        if exported.get("version") != facts.version:
+            return False, (f"the export in {manifest.parent} is version {exported.get('version')}, "
+                           f"not {facts.version}; run `yarn dev:dynamic` again")
+        if local_config.is_file() and f"./dynamic-plugins-src/{manifest.parent.name}" in local_config.read_text():
+            return True, f"{facts.package_name}@{facts.version} exported and staged in {local_config}"
+        return False, f"exported to {manifest.parent} but not staged in {local_config}"
+    return False, f"no export of {facts.package_name} in {local_dir / 'dynamic-plugins-src-dev'}; run `yarn dev:dynamic`"
+
+
 def repo_remote_url(devportal_plugins_repo: Path) -> str:
     res = run(["git", "remote", "get-url", "origin"], cwd=devportal_plugins_repo, check=False)
     url = res.stdout.strip()
@@ -499,6 +523,8 @@ def main() -> int:
     ap.add_argument("--open-pr", action="store_true", help="push a branch and open the overlay PR. Requires --write and --yes.")
     ap.add_argument("--yes", action="store_true", help="confirm --open-pr. Without it --open-pr is refused even if passed.")
     ap.add_argument("--base-branch", default="main")
+    ap.add_argument("--skip-proof2", metavar="REASON",
+                     help="publish without proof 2 on purpose (e.g. a hotfix); the reason goes in the PR body")
     args = ap.parse_args()
 
     if args.open_pr and not (args.write and args.yes):
@@ -627,6 +653,20 @@ def main() -> int:
               "(title, links, support, appConfigExamples, description). Fill those in by hand "
               "before opening the PR -- the coherence check does not and cannot validate prose.")
 
+    print()
+    print("## proof 2 (the default before publishing)")
+    proof2_ok, proof2_detail = proof2_trace(devportal_plugins_repo, facts)
+    # The PR is public: record the outcome, never the local paths in the detail.
+    if proof2_ok:
+        proof2_line = f"Proof 2: ran (`{facts.package_name}@{facts.version}` exported and staged in devportal-local)."
+        print(f"  found: {proof2_detail}")
+    else:
+        reason = args.skip_proof2 or "no reason given"
+        proof2_line = f"Proof 2: **not run** ({reason})."
+        print(f"  WARNING: {proof2_detail}")
+        print("  The official flow proves the export in devportal-local before publishing. Run proof 2,")
+        print("  or pass --skip-proof2 \"<reason>\" to publish anyway; the PR body records it either way.")
+
     if not args.open_pr:
         print()
         print("(dry run / no PR: pass --write to apply the files above, and --write --open-pr --yes to also push and open the PR)")
@@ -654,7 +694,7 @@ def main() -> int:
     body = (
         f"Publishes `{facts.package_name}@{facts.version}` from `{args.workspace}/{facts.plugin_dir}` "
         f"at `{ref}`.\n\n4-way coherence check passed (package.json, metadata spec.version, "
-        f"dynamicArtifact tag, source.json repo-ref).\n"
+        f"dynamicArtifact tag, source.json repo-ref).\n\n{proof2_line}\n"
     )
     pr = run(["gh", "pr", "create", "--base", args.base_branch, "--head", branch,
               "--title", f"publish: {facts.package_name}@{facts.version}", "--body", body],

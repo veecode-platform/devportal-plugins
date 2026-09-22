@@ -126,6 +126,11 @@ defined in [CONTEXT.md](CONTEXT.md#proving-a-plugin). Do not restate them here o
 workspace `AGENTS.md`; link to that section. This section adds only the rules that
 follow from those definitions:
 
+- Prove before you publish. Proofs 1 and 2 come before the overlay PR, every time:
+  proof 3 runs in the overlay CI, the most expensive place to find a defect the
+  local runner would have shown. Skipping proof 2 is allowed only on purpose (a
+  hotfix, for example), and the overlay PR says so: the `devportal-publish` skill
+  records whether proof 2 ran, and `--skip-proof2 "<reason>"` records why it did not.
 - The overlay is a distribution recipe, not a development environment. Develop an
   adaptation in the source checkout, prove it with proofs 1 and 2, then register the
   result in the overlay recipe.

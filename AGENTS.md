@@ -7,3 +7,8 @@ Use the [`devportal-workspace` skill](.agents/skills/devportal-workspace/SKILL.m
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for cross-workspace rules and gates.
 
 Use [CONTEXT.md](CONTEXT.md) for vocabulary.
+
+Work in the official order: build in the workspace, prove in `devportal-local` (proofs 1
+and 2), then publish through `export-overlays`. Publishing before proof 2 is an exception
+you state in the overlay PR, never the default; see
+[CONTRIBUTING.md](CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
