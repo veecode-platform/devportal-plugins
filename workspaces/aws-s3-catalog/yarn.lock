@@ -4424,7 +4424,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@changesets/cli@npm:^2.29.4":
+"@changesets/cli@npm:^2.27.1, @changesets/cli@npm:^2.29.4":
   version: 2.31.1
   resolution: "@changesets/cli@npm:2.31.1"
   dependencies:
@@ -11203,6 +11203,7 @@ __metadata:
   resolution: "aws-s3-catalog-workspace@workspace:."
   dependencies:
     "@backstage/cli": "npm:^0.36.3"
+    "@changesets/cli": "npm:^2.27.1"
     "@jest/environment-jsdom-abstract": "npm:^30.0.0"
     "@types/jest": "npm:^30.0.0"
     jest: "npm:^30.2.0"

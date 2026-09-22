@@ -159,8 +159,8 @@ into this repository.
 Keep pull requests small and use one workspace per pull request when possible.
 Changesets are for versioning intent only, as defined by ADR-0011; they are not a
 delivery channel.
-Create one with `yarn changeset` inside an affected workspace that declares
-`@changesets/cli`; CI currently verifies changesets in report mode.
+Create one with `yarn changeset` inside the affected workspace (every workspace
+declares `@changesets/cli`, as upstream does); CI verifies changesets in report mode.
 
 The named CI gates are `tsc:full`, `prettier:check`, `lint:all`, and `test:all`.
 They currently run in report mode. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
