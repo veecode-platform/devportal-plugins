@@ -14,7 +14,7 @@ Cite these as `plugins ADR-NNNN` outside this repository.
 | [0004](0004-workspaces-track-the-devportal-host-backstage-version.md) | Workspaces track the DevPortal host's Backstage version, never "latest" | Accepted 2026-09-10; amended 2026-09-22 (§5) |
 | [0006](0006-adopt-rhdh-plugin-program-patterns-by-criterion.md) | Adopt the RHDH plugin-program patterns as our reference, by criterion | Accepted 2026-09-17 |
 | [0008](0008-workspace-is-the-unit-root-is-a-router.md) | The workspace is the unit; the monorepo root is a router | Accepted 2026-09-17 |
-| [0009](0009-four-named-proofs-and-the-official-test-flow.md) | Four named proofs and the official test flow | Accepted 2026-09-17 |
+| [0009](0009-four-named-proofs-and-the-official-test-flow.md) | Four named proofs and the official test flow | Accepted 2026-09-17; amended 2026-09-22 (§6) |
 | [0010](0010-publish-only-through-the-export-overlays-retire-npm.md) | Plugins are published only through the export overlays; npm publish is retired | Accepted 2026-09-17 |
 | [0011](0011-ci-gates-are-the-standards-versioning-by-changesets.md) | CI gates are the standards; versions come from changesets | Accepted 2026-09-17 |
 | [0012](0012-workspaces-are-scaffolded-from-a-template-dummy-is-its-proof.md) | Workspaces are scaffolded from a template | Accepted 2026-09-17; superseded in part 2026-09-21; §3 implemented 2026-09-22 |
