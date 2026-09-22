@@ -1,56 +1,17 @@
 #
 # Root Makefile for devportal-plugins monorepo
 #
-# Each workspace has its own Makefile with build, publish, and utility commands.
-# Use: cd workspaces/<name> && make help
-#
-# Workspaces:
-# - veecode-homepage:         cd workspaces/veecode-homepage && make help
-# - global-header:    cd workspaces/global-header && make help
-# - github-workflows: cd workspaces/github-workflows && make help
-# - ldap-auth:        cd workspaces/ldap-auth && make help
-# - kong-tools:       cd workspaces/kong-tools && make help
+# Each workspace has its own Makefile. Use: cd workspaces/<name> && make help
+# The workspaces are the directories under workspaces/ (the repository is the inventory).
 #
 
-# For copying dynamic plugins to a local devportal-base
-DEVPORTAL_BASE_PATH ?= $(HOME)/projetos/veecode/devportal-base
-DYNAMIC_PLUGIN_ROOT ?= $(DEVPORTAL_BASE_PATH)/dynamic-plugins-root
-
-.PHONY: help echo-paths copy-dynamic-plugins
+.PHONY: help
 
 help:
 	@echo "DevPortal Plugins Monorepo"
 	@echo "=========================="
 	@echo ""
-	@echo "Each workspace has its own Makefile. Navigate to the workspace first:"
+	@echo "Each workspace has its own Makefile. List them with: ls workspaces/"
+	@echo "Then: cd workspaces/<name> && make help"
 	@echo ""
-	@echo "  cd workspaces/veecode-homepage && make help"
-	@echo "  cd workspaces/global-header && make help"
-	@echo "  cd workspaces/github-workflows && make help"
-	@echo "  cd workspaces/gitlab-pipelines && make help"
-	@echo "  cd workspaces/ldap-auth && make help"
-	@echo "  cd workspaces/kong-tools && make help"
-	@echo ""
-	@echo "Root-level commands:"
-	@echo "  make echo-paths              - Show dynamic plugin paths"
-	@echo "  make copy-dynamic-plugins    - Copy the global-header and veecode-homepage exports to DYNAMIC_PLUGIN_ROOT (legacy; proof 2 uses yarn dev:dynamic)"
-
-echo-paths:
-	@echo "DEVPORTAL_BASE_PATH: $(DEVPORTAL_BASE_PATH)"
-	@echo "DYNAMIC_PLUGIN_ROOT: $(DYNAMIC_PLUGIN_ROOT)"
-
-# Legacy helper for the two product-face plugins; the official proof-2 path is
-# `yarn dev:dynamic` inside the workspace (CONTRIBUTING.md).
-copy-dynamic-plugins: echo-paths
-	@echo "Copying dynamic plugins to DYNAMIC_PLUGIN_ROOT..."
-	@if [ -d "workspaces/global-header/plugins/veecode-global-header/dist-dynamic" ]; then \
-		rm -Rf $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-global-header-dynamic; \
-		cp -R workspaces/global-header/plugins/veecode-global-header/dist-dynamic $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-global-header-dynamic; \
-		echo "Copied global-header dynamic plugin"; \
-	fi
-	@if [ -d "workspaces/veecode-homepage/plugins/veecode-homepage/dist-dynamic" ]; then \
-		rm -Rf $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic; \
-		cp -R workspaces/veecode-homepage/plugins/veecode-homepage/dist-dynamic $(DYNAMIC_PLUGIN_ROOT)/veecode-platform-plugin-veecode-homepage-dynamic; \
-		echo "Copied homepage dynamic plugin"; \
-	fi
-	@echo "Done."
+	@echo "Proof 2 (load an export in the local runner): yarn dev:dynamic inside the workspace."

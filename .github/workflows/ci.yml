@@ -84,7 +84,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       # .nvmrc wins when a workspace has one; otherwise Node 22, the version the
-      # existing workflows (automated-update.yml, publish.yml) already use.
+      # other workflows in this repository use.
       - name: Resolve Node.js version
         id: node_version
         run: |

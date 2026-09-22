@@ -28,9 +28,9 @@ const header = genPageTheme({ colors: [navy, navyDeep], shape: shapes.wave });
 /*
  * RHDH 3.x layout contract — theme.palette.rhdh.general.*.
  *
- * The 3.x app shell (devportal-core-main/packages/app) does layout arithmetic
- * with this subtree, which the old-generation `createUnifiedTheme` form never
- * emitted:
+ * The 3.x app shell (veecode-platform/devportal-core, packages/app) does layout
+ * arithmetic with this subtree, which the old-generation `createUnifiedTheme`
+ * form never emitted:
  *   - Root.tsx:171            reads pageInset (docked-drawer margin calc())
  *   - ResizableDrawer.tsx:117 reads sidebarBackgroundColor (drawer paper)
  *   - useThemedConfig.ts:20   reads appBarBackgroundScheme (logo variant)

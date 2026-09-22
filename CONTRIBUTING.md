@@ -34,9 +34,7 @@ and templates:
   replace a workspace's package manager or lockfile.
 
 The root `Makefile`, `README.md`, and `ROADMAP.md` remain repository-level entry
-points. Root-level Makefile helpers include `make echo-paths` and
-`make copy-dynamic-plugins`; workspace work still starts from the affected workspace
-root.
+points; workspace work starts from the affected workspace root.
 
 ## Workspace layout
 

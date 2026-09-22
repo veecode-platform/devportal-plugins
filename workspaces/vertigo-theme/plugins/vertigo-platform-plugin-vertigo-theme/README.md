@@ -16,7 +16,7 @@ layer in `src/styles/component-fixes.css`.
 
 ## RHDH 3.x contract (`palette.rhdh.general`)
 
-Rebuilt against the 3.x app-shell layout contract. The shell (`devportal-core-main/packages/app`)
+Rebuilt against the 3.x app-shell layout contract. The shell (`veecode-platform/devportal-core`, `packages/app`)
 does layout arithmetic with `theme.palette.rhdh.general.*`, which the old-generation
 `createUnifiedTheme` form (only `primary`/`secondary`/`navigation.*`) never emitted — mounting it
 reproduced the sidebar↔content gap, the Administration-expand shift and the full-height loader.
