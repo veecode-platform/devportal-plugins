@@ -11,6 +11,11 @@ repo_root=$(CDPATH= cd -- "$workspace_root/../.." && pwd -P)
 resolver="$repo_root/.agents/skills/devportal-context/scripts/resolve-devportal-local-dir.sh"
 devportal_local_dir=$("$resolver")
 dynamic_plugins_root="$devportal_local_dir/dynamic-plugins-root-dev"
+# The export lands beside the runner's plugin root, never inside it. The
+# portal scans every directory under the root, so an export sitting there is
+# loaded a second time next to the copy the installer writes, and a backend
+# plugin then dies with "Plugin '<id>' is already registered".
+export_source_root="$devportal_local_dir/dynamic-plugins-src-dev"
 workspace_dynamic_config="$workspace_root/dynamic-plugins.yaml"
 
 if [[ ! -f "$workspace_dynamic_config" ]]; then
@@ -18,7 +23,7 @@ if [[ ! -f "$workspace_dynamic_config" ]]; then
   exit 1
 fi
 
-mkdir -p "$dynamic_plugins_root"
+mkdir -p "$dynamic_plugins_root" "$export_source_root"
 
 declare -a source_package_bases=()
 declare -a exported_plugin_dirs=()
@@ -44,13 +49,13 @@ export_one() {
     printf 'Plugin directory does not exist: %s\n' "$plugin_path" >&2
     exit 1
   fi
-  printf 'Exporting %s to %s\n' "$plugin_dir" "$dynamic_plugins_root"
+  printf 'Exporting %s to %s\n' "$plugin_dir" "$export_source_root"
   (
     cd -- "$plugin_path"
     YARN_ENABLE_IMMUTABLE_INSTALLS=false \
       npx @red-hat-developer-hub/cli@latest plugin export \
       --dev \
-      --dynamic-plugins-root "$dynamic_plugins_root"
+      --dynamic-plugins-root "$export_source_root"
   )
 
   package_manifest="$plugin_path/dist-dynamic/package.json"
@@ -65,10 +70,19 @@ export_one() {
     process.stdout.write(packageJson.name);
   ' "$package_manifest")
   source_package_base=$(flatten_package_name "$package_name")
-  exported_plugin_dir=${source_package_base%-dynamic}
 
-  if [[ ! -d "$dynamic_plugins_root/$exported_plugin_dir" ]]; then
-    printf 'Dynamic export directory not found: %s\n' "$dynamic_plugins_root/$exported_plugin_dir" >&2
+  # The CLI drops the -dynamic suffix from the copied folder for a frontend
+  # plugin and keeps it for a backend one, so probe for both rather than
+  # assuming either. Stripping unconditionally aborted every backend export.
+  exported_plugin_dir=$source_package_base
+  if [[ ! -d "$export_source_root/$exported_plugin_dir" ]]; then
+    exported_plugin_dir=${source_package_base%-dynamic}
+  fi
+
+  if [[ ! -d "$export_source_root/$exported_plugin_dir" ]]; then
+    printf 'Dynamic export directory not found: %s (nor %s)\n' \
+      "$export_source_root/$source_package_base" \
+      "$export_source_root/${source_package_base%-dynamic}" >&2
     exit 1
   fi
 
@@ -113,7 +127,7 @@ fi
 
 for index in "${!source_package_bases[@]}"; do
   sed -i \
-    "s#./dynamic-plugins/dist/${source_package_bases[$index]}#./dynamic-plugins-root/${exported_plugin_dirs[$index]}#g" \
+    "s#./dynamic-plugins/dist/${source_package_bases[$index]}#./dynamic-plugins-src/${exported_plugin_dirs[$index]}#g" \
     "$temporary_dynamic_config"
 done
 
@@ -130,6 +144,7 @@ services:
   install-dynamic-plugins:
     volumes:
       - ./dynamic-plugins-root-dev/dynamic-plugins.local.yaml:/opt/app-root/src/dynamic-plugins.operator.yaml:ro
+      - ./dynamic-plugins-src-dev:/opt/app-root/src/dynamic-plugins-src
 YAML
 
 printf '\nRun in devportal-local:\n'
