@@ -40,6 +40,6 @@ yarn workspace veecode-platform-plugin-veecode-theme export-dynamic   # rhdh-cli
 
 `backstage-cli package build` (the `build` script / Rollup) currently errors on
 the `src/styles/bui-tokens.css` import and is **not** needed — `rhdh-cli plugin
-export` (webpack) builds straight from `src/` and handles the CSS. See ADR-011
-(`docs/adr/011-frontend-design-system.md`) for the rationale and the validation
+export` (webpack) builds straight from `src/` and handles the CSS. See the frontend design-system
+decision in `devportal-planning/docs/adr/` (sibling repository) for the rationale and the validation
 criteria this plugin must satisfy.

@@ -2,7 +2,7 @@
 
 This repository hosts Backstage plugins developed by VeeCode for [VeeCode DevPortal](https://docs.platform.vee.codes/devportal/), an open-source Backstage distribution for Internal Developer Portals (IDP).
 
-Plugins are published to the `@veecode-platform` npm namespace in both static and dynamic formats. They are compatible with any Backstage build and with Red Hat Developer Hub (RHDH).
+Plugins are published as dynamic plugins, one OCI image per plugin on `quay.io/veecode`, through the export overlay (`devportal-plugin-export-overlays`); npm publishing is retired. They are built for VeeCode DevPortal and Red Hat Developer Hub (RHDH).
 
 ## Workspaces
 

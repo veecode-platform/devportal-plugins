@@ -1,6 +1,6 @@
 # Context — VeeCode DevPortal plugins program
 
-Glossary for the plugin monorepo and the people and agents who work in it. Pure vocabulary: how things work lives in `CONTRIBUTING.md`, each workspace's `AGENTS.md`, and `docs/adr/`. Platform-level terms (image, chart, cutover) live in `devportal-planning/CONTEXT.md`; the two glossaries reference each other and never restate.
+Glossary for the plugin monorepo and the people and agents who work in it. Pure vocabulary: how things work lives in `CONTRIBUTING.md`, each workspace's `AGENTS.md`, and the plugin-program ADRs in `devportal-plugins-parent/docs/adr/` (sibling repository). Platform-level terms (image, chart, cutover) live in `devportal-planning/CONTEXT.md` (sibling repository); the two glossaries reference each other and never restate.
 
 ## Language
 
@@ -33,7 +33,7 @@ _Avoid_: test environment, sandbox
 The `backstage.role` field of a package (`frontend-plugin`, `backend-plugin`, `backend-plugin-module`, `common-library`, …). Decides the harness and the minimum proof before publishing.
 
 **PDR (plugin decision record)**:
-A decision recorded in a workspace's `DECISIONS.md`, numbered `PDR-NNN`, binding only that family. A decision that binds every workspace is an ADR in `docs/adr/`.
+A decision recorded in a workspace's `DECISIONS.md`, numbered `PDR-NNN`, binding only that family. A decision that binds every workspace is an ADR in `devportal-plugins-parent/docs/adr/` (sibling repository), cited as `ADR-NNNN`.
 _Avoid_: calling a PDR an ADR
 
 ### Proving a plugin
