@@ -36,6 +36,11 @@ workspaces are red today under `tsc:full` and `lint:all`.
    matrix job running, per workspace, `tsc:full`, `prettier:check`, `lint:all`, `test:all`,
    Playwright when `playwright.config.ts` exists, and the ADR-0004 check (`backstage.json`
    equals the host's, or a declared exception).
+
+   *Amended 2026-09-22:* the matrix also runs `build:all` (`backstage-cli repo build
+   --all`), as upstream `rhdh-plugins` does in every workspace job, so a package that
+   type-checks but does not build fails in the plugin's own PR, not first in the overlay
+   export.
 3. **Report mode first.** The gate ships with `continue-on-error` until the workspaces are
    green, then becomes blocking. Heavier checks (API reports, knip, `config:check`,
    `list-deprecations`) are opt-in per workspace, as `community-plugins` does with

@@ -129,6 +129,7 @@ jobs:
           const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
           const gates = {
             tsc_full: 'tsc:full',
+            build_all: 'build:all',
             prettier_check: 'prettier:check',
             lint_all: 'lint:all',
             test_all: 'test:all',
@@ -178,6 +179,28 @@ jobs:
         run: |
           echo '::notice title=Skipped gate::tsc:full is not defined in package.json'
           echo '| `tsc:full` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Gate build:all
+        if: ${{ always() && steps.scripts.outputs.build_all == 'true' }}
+        continue-on-error: true
+        run: |
+          set +e
+          yarn build:all
+          status=$?
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          printf '| `%s` | %s | exit %s |\n' 'build:all' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Gate build:all (SKIP)
+        if: ${{ always() && steps.scripts.outputs.build_all != 'true' }}
+        continue-on-error: true
+        run: |
+          echo '::notice title=Skipped gate::build:all is not defined in package.json'
+          echo '| `build:all` | SKIP | script absent from package.json |' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Gate prettier:check
         if: ${{ always() && steps.scripts.outputs.prettier_check == 'true' }}
