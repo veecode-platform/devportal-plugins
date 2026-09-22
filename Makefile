@@ -33,13 +33,14 @@ help:
 	@echo ""
 	@echo "Root-level commands:"
 	@echo "  make echo-paths              - Show dynamic plugin paths"
-	@echo "  make copy-dynamic-plugins    - Copy all dynamic plugins to DYNAMIC_PLUGIN_ROOT"
+	@echo "  make copy-dynamic-plugins    - Copy the global-header and veecode-homepage exports to DYNAMIC_PLUGIN_ROOT (legacy; proof 2 uses yarn dev:dynamic)"
 
 echo-paths:
 	@echo "DEVPORTAL_BASE_PATH: $(DEVPORTAL_BASE_PATH)"
 	@echo "DYNAMIC_PLUGIN_ROOT: $(DYNAMIC_PLUGIN_ROOT)"
 
-# Copy dynamic plugins to local devportal-base for testing
+# Legacy helper for the two product-face plugins; the official proof-2 path is
+# `yarn dev:dynamic` inside the workspace (CONTRIBUTING.md).
 copy-dynamic-plugins: echo-paths
 	@echo "Copying dynamic plugins to DYNAMIC_PLUGIN_ROOT..."
 	@if [ -d "workspaces/global-header/plugins/veecode-global-header/dist-dynamic" ]; then \

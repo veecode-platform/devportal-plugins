@@ -4,7 +4,7 @@ Decisions taken during the migration of kong-service-manager plugins from
 [platform-backstage-plugins](https://github.com/veecode-platform/platform-backstage-plugins)
 to the new `@veecode-platform/backstage-plugin-kong-service-manager-*` packages.
 
-## ADR-001: New Backstage Backend System
+## PDR-001: New Backstage Backend System
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -16,7 +16,7 @@ system (`createBackendPlugin`).
 **Rationale:** The legacy backend system is deprecated. Shipping only the new
 system reduces maintenance surface and aligns with Backstage direction.
 
-## ADR-002: Drop Controller Layer
+## PDR-002: Drop Controller Layer
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -30,10 +30,10 @@ handles HTTP concerns and Zod validation, then delegates to
 `KongServiceManagerService` for Kong Admin API calls.
 
 **Rationale:** Simpler code, fewer abstractions. Permission enforcement is
-deferred to a later phase (see ADR-004) and will be added as middleware, not
+deferred to a later phase (see PDR-004) and will be added as middleware, not
 embedded in controllers.
 
-## ADR-003: Zod Validation on All Mutation Endpoints
+## PDR-003: Zod Validation on All Mutation Endpoints
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -44,10 +44,10 @@ Zod schemas before calling the service layer.
 **Rationale:** Catches malformed requests early, provides clear error messages,
 and serves as living documentation for the API contract.
 
-## ADR-004: Defer Permission Enforcement
+## PDR-004: Defer Permission Enforcement
 
 **Date:** 2025-01
-**Status:** Superseded by ADR-010
+**Status:** Superseded by PDR-010
 
 The 12 core permissions are **defined** in the common library but are **not
 enforced** in the backend router yet. Enforcement is planned for Phase 6.
@@ -55,7 +55,7 @@ enforced** in the backend router yet. Enforcement is planned for Phase 6.
 **Rationale:** Get the core CRUD working and tested first. Permissions add
 complexity that is easier to layer on once the base is stable.
 
-## ADR-005: Simplified Permission Set
+## PDR-005: Simplified Permission Set
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -69,7 +69,7 @@ services, routes, and plugins.
 with a smaller, simpler set reduces initial complexity. Additional permissions
 can be added in Phase 9 without breaking changes.
 
-## ADR-006: Defer OpenAPI Spec and Git Integration
+## PDR-006: Defer OpenAPI Spec and Git Integration
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -82,7 +82,7 @@ migration.
 plugin and touches external systems (GitHub API, GitLab API). Deferring it
 lets us ship a solid core faster. Planned for Phases 7-8.
 
-## ADR-007: Context-Based State Management
+## PDR-007: Context-Based State Management
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -95,7 +95,7 @@ state or a third-party state library.
 (one service, its routes, its plugins) and fits well in a single context.
 The reducer pattern makes state transitions explicit and testable.
 
-## ADR-008: Plugin Category Mapping in Frontend Client
+## PDR-008: Plugin Category Mapping in Frontend Client
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -108,7 +108,7 @@ in the backend or common library.
 the frontend decides how to present it. If the mapping needs to be shared
 later (e.g., for category-level permissions), it can be moved to common.
 
-## ADR-009: Single Package for Frontend Plugin
+## PDR-009: Single Package for Frontend Plugin
 
 **Date:** 2025-01
 **Status:** Accepted
@@ -121,10 +121,10 @@ package.
 plugins to consume its hooks or context. A single package is simpler to
 publish and consume.
 
-## ADR-010: Permission Enforcement and Role-Based Policy
+## PDR-010: Permission Enforcement and Role-Based Policy
 
 **Date:** 2025-02
-**Status:** Accepted (supersedes ADR-004)
+**Status:** Accepted (supersedes PDR-004)
 
 All 12 core permissions are now **enforced** in the backend router via an
 `authorize()` helper that checks each request against the Backstage permission
@@ -138,7 +138,7 @@ three user profiles (admin, operator, viewer) to three role groups
 **Rationale:** The core CRUD is stable and tested. Adding enforcement now
 completes the security model before moving to spec/Git integration.
 
-## ADR-011: DEVPORTAL_USER Env Var for Local Profile Switching
+## PDR-011: DEVPORTAL_USER Env Var for Local Profile Switching
 
 **Date:** 2025-02
 **Status:** Accepted
@@ -153,7 +153,7 @@ test all three permission profiles with a backend restart. The permission
 policy, catalog entities, and auth identity all use the same user references,
 so the full chain works end-to-end.
 
-## ADR-012: Promotion Records Use a Surrogate PK plus an Idempotency Key
+## PDR-012: Promotion Records Use a Surrogate PK plus an Idempotency Key
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -172,7 +172,7 @@ server-generated on the first attempt; retry safety comes from the at-most-one
 active promotion per (instance, route, plugin type) invariant, so a repeated
 promote resumes the active record instead of opening a second MR.
 
-## ADR-013: FileEdit Is a Two-Variant Type; the Ingress Annotation Is Not an Edit
+## PDR-013: FileEdit Is a Two-Variant Type; the Ingress Annotation Is Not an Edit
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -188,7 +188,7 @@ chart context, and keeps the equivalence check (`renderCheck`) comparing the
 one artifact that matters — the rendered `KongPlugin` manifest — rather than
 chasing annotation formatting.
 
-## ADR-014: MR Coordinates Ride the `detail` Column
+## PDR-014: MR Coordinates Ride the `detail` Column
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -203,7 +203,7 @@ is discardable. Constraint on the finalizer (P4): it must not clobber `detail`
 on any transition where the record can still be discarded; once the MR is
 merged, `detail` is free for human-readable failure diffs.
 
-## ADR-015: Finalizer Advances One State Per Tick and Leaves Coordinate-less Drafts Alone
+## PDR-015: Finalizer Advances One State Per Tick and Leaves Coordinate-less Drafts Alone
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -216,10 +216,10 @@ lookup, and re-invoking promote resumes the same record. Teardown detection is
 project-level only (project archived or 404); entity-level detection would
 require an `entity_ref` column and is deferred until a concrete need.
 
-Amendment to ADR-014: the promote endpoint now persists the repo coordinates
+Amendment to PDR-014: the promote endpoint now persists the repo coordinates
 (`{ host, projectSlug, projectId }`) into `detail` immediately after repo
 resolution — before the MR exists — so the finalizer's draft-orphan probe can
-find an already-opened MR after a crash. ADR-014's constraint stands: the
+find an already-opened MR after a crash. PDR-014's constraint stands: the
 finalizer never clobbers `detail` while the record is still discardable.
 
 **Rationale:** One-state-per-tick keeps every transition individually
@@ -229,7 +229,7 @@ Reaping coordinate-less drafts would require distinguishing "abandoned" from
 "in flight", which the record cannot express; resuming on re-promote is the
 safe recovery path.
 
-## ADR-016: Promotion Preview Is a Side-Effect-Free Twin of Promote; `detail` Reaches the Client Only on Failure
+## PDR-016: Promotion Preview Is a Side-Effect-Free Twin of Promote; `detail` Reaches the Client Only on Failure
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -249,12 +249,12 @@ The promotion DTO exposes `detail?: string` only when the record's state is
 **Rationale:** Synthesizing the generated YAML client-side would reimplement
 `toChartEdits` and drift from what renderCheck actually verifies the moment an
 adapter changes; the server is the single source of the rendered truth. The
-`detail` column doubles as internal bookkeeping (ADR-014: MR coordinates while
+`detail` column doubles as internal bookkeeping (PDR-014: MR coordinates while
 discardable) — exposing it unconditionally would leak plumbing to the client,
 so it crosses the API boundary only in the one state where it carries the
 human-readable failure diff.
 
-## ADR-017: Plugin Ownership Is Derived From Instance defaultTags, Not Stored
+## PDR-017: Plugin Ownership Is Derived From Instance defaultTags, Not Stored
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -285,7 +285,7 @@ time (ADR predates this doc — see `KongInstanceConfig.defaultTags`) means an
 operator who has not opted into tagging gets no gate at all, matching the
 plugin's existing "stays unopinionated about coexistence strategy" stance.
 
-Refinement (2026-09-17, see ADR-021's Refinement and ADR-024): "read only"
+Refinement (2026-09-17, see PDR-021's Refinement and PDR-024): "read only"
 above is no longer unconditional. A code-owned plugin whose live tags carry
 the Kong Ingress Controller's ownership tag renders `code-owned` with
 `editableInCode: true` and gets the "Edit in code" action instead of pure
@@ -293,12 +293,12 @@ read-only (`promotionBadge.ts`'s `derivePromotionBadge`, `PluginCard.tsx`'s
 `showEditInCode`) — the same derivation also applies to a `codified` record
 whose plugin is KIC-managed.
 
-## ADR-018: Helm Is a Declared Deployment Prerequisite, Detected at Startup
+## PDR-018: Helm Is a Declared Deployment Prerequisite, Detected at Startup
 
 **Date:** 2026-09
 **Status:** Accepted
 
-`renderCheck` (ADR-013, used by both promote and preview) shells out to
+`renderCheck` (PDR-013, used by both promote and preview) shells out to
 `helm template` to verify a generated chart reproduces the live config. A
 production deployment hit this as a `500 helm CLI not found on PATH` on the
 preview endpoint — the portal image doesn't bundle helm, and that dependency
@@ -328,7 +328,7 @@ mismatch aborts before any write). Declared prerequisite plus graceful
 degradation keeps the real Helm engine (no semantic risk) while making the
 dependency visible and the failure mode actionable instead of silent.
 
-## ADR-019: "Deployed" Means a Successful GitLab Deployment, Not a Successful Pipeline
+## PDR-019: "Deployed" Means a Successful GitLab Deployment, Not a Successful Pipeline
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -358,11 +358,11 @@ blocking manual job (teardown, approvals) makes it a wrong proxy for "was
 deployed"; the deployments API is the object GitLab itself maintains for that
 question. Residual edge: a manual re-run of an *older* pipeline's deploy job
 after the merge also records a deployment — the finalizer then moves to
-`applying`, and the existing `applyTimeoutMinutes` restore path (ADR-014)
+`applying`, and the existing `applyTimeoutMinutes` restore path (PDR-014)
 handles a code-owned plugin that never converges. Prerequisite for services:
 the deploy job must declare a GitLab `environment:` (the golden path does).
 
-## ADR-020: Handover — the Experiment Is Removed at Merge and Never Coexists With the Code-Owned Plugin
+## PDR-020: Handover — the Experiment Is Removed at Merge and Never Coexists With the Code-Owned Plugin
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -377,7 +377,7 @@ controller got a `409` uniqueness violation creating the code-owned plugin;
 on a db-backed Kong that failure aborts the whole configuration sync, not
 just the one plugin, and the dataplane keeps serving the last good config
 until someone deletes the experiment by hand. Observed in production
-(2026-09-15) as a route returning 504 — the same incident ADR-019 documents
+(2026-09-15) as a route returning 504 — the same incident PDR-019 documents
 from the other side, where the finalizer stayed parked because pipeline
 status never turned green and so never reached its delete step at all.
 
@@ -400,10 +400,10 @@ What changed:
 - `failed-restored` remains in the state enums so stored records keep
   parsing, but nothing produces it any more.
 
-Amendment to ADR-016: `detail` crosses the API boundary on **both** failure
+Amendment to PDR-016: `detail` crosses the API boundary on **both** failure
 states (`failed` and the legacy `failed-restored`), not only the latter.
 
-Amendment to ADR-019: the residual edge in its last paragraph — a manual
+Amendment to PDR-019: the residual edge in its last paragraph — a manual
 re-run of an older pipeline's deploy job records a deployment, so the record
 advances to `applying` before the merge is really out — now ends in `failed`
 rather than in a restore.
@@ -425,21 +425,21 @@ keeping the restore but gating it on the code-owned plugin being absent
 (a check that is racy by construction — the controller can create it a
 millisecond later).
 
-## ADR-021: A Terminal Promotion Record Describes a Plugin That No Longer Exists; the Badge Must Not Outlive It
+## PDR-021: A Terminal Promotion Record Describes a Plugin That No Longer Exists; the Badge Must Not Outlive It
 
 **Date:** 2026-09
 **Status:** Accepted
 
 Promotion records are keyed by (instance, route, plugin type), not by Kong
-plugin id (ADR-012). A terminal record (`codified`, `failed`) therefore stays
+plugin id (PDR-012). A terminal record (`codified`, `failed`) therefore stays
 attached to the *type* after the plugin it describes is gone: the code-owned
-plugin removed from the chart, or the experiment deleted at merge (ADR-020).
+plugin removed from the chart, or the experiment deleted at merge (PDR-020).
 Observed 2026-09-16: after the promoted `rate-limiting` was dropped from a
 service's chart, a fresh `rate-limiting` experiment on the same route rendered
 as "Codificado · 16h" and lost its Promote button.
 
 Decision: the frontend derives the badge from the record **and** the live
-plugin's ownership (ADR-017). When the latest record is terminal and the live
+plugin's ownership (PDR-017). When the latest record is terminal and the live
 plugin carries the instance `defaultTags`, the record is stale and the plugin
 is a plain experiment. Active records (`draft`, `mr-open`, `awaiting-deploy`,
 `applying`) still win — a frozen experiment is the plugin itself. Instances
@@ -455,9 +455,9 @@ Refinement (2026-09-17): the same "terminal record + live ownership"
 derivation also decides *editability*, not just staleness. A `codified` record
 whose live plugin carries the KIC ownership tag (`managed-by-ingress-controller`)
 reads as **code-owned** with `editableInCode`, exactly like a plugin that was
-born in the chart or edited via a `code-only` promotion (ADR-024) — the
+born in the chart or edited via a `code-only` promotion (PDR-024) — the
 finalizer only reaches `codified` once such a KIC-owned plugin matches the
-snapshot (ADR-020 handover), and the backend's `resolvePromotionMode` accepts
+snapshot (PDR-020 handover), and the backend's `resolvePromotionMode` accepts
 any not-portal-managed, KIC-tagged plugin for edit-in-code without excluding
 previously-promoted ones. Keeping the terminal `codified` badge here was the one
 code-owned case that offered no second edit and no way back (observed in prod on
@@ -466,13 +466,13 @@ in code, while a born-in-code `correlation-id` on the same service did). `mode`
 is not consulted (optional on 1.4.x records); `failed` stays terminal — a failed
 handover needs a human.
 
-## ADR-022: The Promotion Branch Is Reused Only While Its MR Is Open; Otherwise It Is Recreated From the Default Branch
+## PDR-022: The Promotion Branch Is Reused Only While Its MR Is Open; Otherwise It Is Recreated From the Default Branch
 
 **Date:** 2026-09
 **Status:** Accepted
 
 `ensureBranch` treated "branch already exists" as success so a promote retried
-after a crash would find its own commit and MR again (ADR-015 idiom). That
+after a crash would find its own commit and MR again (PDR-015 idiom). That
 rule also reused a branch **nobody was using**: GitLab did not honour
 `remove_source_branch` on a merge performed from its UI (2026-09-15), and a
 discard closes the MR without touching the branch. The next promotion of the
@@ -485,7 +485,7 @@ other case the promote endpoint deletes it (404 = already gone) and recreates
 it from the default branch head before committing. The finalizer deletes the
 branch when it discards a closed MR, best-effort, so leftovers are rare rather
 than merely harmless. Create-vs-update detection keeps running against the
-promotion branch (ADR-015).
+promotion branch (PDR-015).
 
 Rejected: unique branch names per promotion (`kong-promote/<type>-<ts>`) — the
 crash-retry would then have to find its branch through the record, and the
@@ -500,7 +500,7 @@ its route (the generated description carries the route id); and every branch
 deletion — discard, teardown abort — first checks that no MR is open on the
 branch, so a delayed finalizer never deletes a newer promotion's branch.
 
-## ADR-023: An Unregistered Service Is a Teardown; the Finalizer Aborts and Closes the MR
+## PDR-023: An Unregistered Service Is a Teardown; the Finalizer Aborts and Closes the MR
 
 **Date:** 2026-09
 **Status:** Accepted
@@ -535,12 +535,12 @@ confirmed 404 on one file of a project that answered 200 a moment earlier.
 Any other GitLab error skips the record for this tick and is logged; it never
 triggers cleanup.
 
-## ADR-024: Edit in Code — a `code-only` Promotion Mode With No Experiment in Kong
+## PDR-024: Edit in Code — a `code-only` Promotion Mode With No Experiment in Kong
 
 **Date:** 2026-09
 **Status:** Accepted
 
-A code-owned plugin (ADR-017: reconciled onto Kong by an external
+A code-owned plugin (PDR-017: reconciled onto Kong by an external
 controller from the service's chart, not created by the portal) was
 read-only — the only path to changing it was editing the chart by hand.
 Issue #135 adds "edit in code": the user edits the config in the existing
@@ -563,7 +563,7 @@ Kong and needed no change.
 
 **Ownership by `defaultTags`, plus the KIC tag as a second gate.** A plugin
 is classified `code-owned` by `resolvePromotableRoutePlugin`'s existing
-`defaultTags` derivation (ADR-017) — the same one the frontend's
+`defaultTags` derivation (PDR-017) — the same one the frontend's
 `derivePromotionBadge` keys its badge on. But a `code-only` promotion is
 additionally refused (400) unless the live plugin also carries the Kong
 Ingress Controller's `managed-by-ingress-controller` tag (review finding W1,
@@ -573,13 +573,13 @@ portal-managed" — which also matches a plugin created straight through the
 Admin API — is too wide a gate; accepting one of those would open a merge
 request the finalizer could never close, stranding the record in `failed`.
 Corollary: an instance with no `defaultTags` configured has no ownership
-signal at all (ADR-017), so `editInCode` can never fire there. Accepted
+signal at all (PDR-017), so `editInCode` can never fire there. Accepted
 edge (v1): the frontend still offers "Edit in code" from the `defaultTags`
 signal alone, so a plugin that is code-owned but *not* KIC-managed shows the
 button and is then refused with an actionable 400 — a guard rail, not a
 silent failure; plumbing the KIC signal to the card is deferred.
 
-Refinement (2026-09-17, see ADR-021's Refinement): the deferred plumbing
+Refinement (2026-09-17, see PDR-021's Refinement): the deferred plumbing
 above shipped — the frontend no longer relies on the `defaultTags` signal
 alone. `derivePromotionBadge` computes `editableInCode` from the plugin's
 own tags (`promotionBadge.ts`), and `PluginCard` gates the "Edit in code"
@@ -620,7 +620,7 @@ Kong config count, since the portal form seeds schema defaults Kong may omit.
 
 **A `code-only` request never resumes an active record.** The `experiment`
 flow resumes an in-flight draft by (instance, route, plugin type) so a
-retried promote doesn't open a second MR (ADR-012). Resuming for
+retried promote doesn't open a second MR (PDR-012). Resuming for
 `code-only` would either take the Step-4 branch of whatever mode the
 stale record was actually in, or silently promote a snapshot from a
 previous edit instead of the config the user just submitted. An active
@@ -634,7 +634,7 @@ config that normalizes identically to the live config has nothing to
 promote — promote 409s before writing a draft. Preview's job is to show
 the generated YAML for whatever the user typed, including a config that
 happens to match live, so it runs the equivalence render-check but skips
-the no-op comparison (ADR-016 precedent: promote and preview already differ
+the no-op comparison (PDR-016 precedent: promote and preview already differ
 on status for the same renderCheck mismatch, 409 vs. 400).
 
 **MR title/description/commit message name the mode.** A `code-only` MR
@@ -650,7 +650,7 @@ and possibly clashing with it serves no purpose); letting `code-only`
 resume an active record like `experiment` does (silently promotes a stale
 edit, per above).
 
-## ADR-025: Hardening the Promote Path Against Concurrency and Orphaned Drafts
+## PDR-025: Hardening the Promote Path Against Concurrency and Orphaned Drafts
 
 **Date:** 2026-09-17
 **Status:** Accepted
@@ -674,7 +674,7 @@ cross-vendor review, are fixed together (1.5.2):
   `detail`) instead of being left `draft`. A `draft` is active, so leaving it
   would freeze every future code-only promote of that route+plugin-type forever.
   `failed` over `discarded`: it keeps the record legible and, for `code-only`,
-  still reads as code-owned + editable (ADR-021).
+  still reads as code-owned + editable (PDR-021).
 - **F3 — the render check and the promotion branch are cut from one pinned SHA.**
   Both previously resolved the default-branch *name* independently; a merge
   landing in between could base the branch on a tree the render check never
@@ -695,7 +695,7 @@ Known follow-up (not fixed here): the finalizer's `handleDraft` hardcodes
 `kong-promote/${plugin_type}` instead of calling `promotionBranch()` — if the
 branch convention ever changes, the orphan probe silently stops finding MRs.
 
-## ADR-026: Two Write Paths for Kong — Direct Admin API and Declarative Export, With No Default
+## PDR-026: Two Write Paths for Kong — Direct Admin API and Declarative Export, With No Default
 
 Moved from devportal-plugins-parent ADR-0005 (2026-09-17); the parent record is retired.
 
@@ -751,7 +751,7 @@ uses to let independently managed entities coexist.
   makes the portal useful as an experimentation surface and excludes database-backed
   gateways.
 
-## ADR-027: Delete in Code — a `delete` Promotion Mode That Removes a Code-Owned Plugin via MR
+## PDR-027: Delete in Code — a `delete` Promotion Mode That Removes a Code-Owned Plugin via MR
 
 **Date:** 2026-09-17
 **Status:** Accepted
@@ -761,7 +761,7 @@ for an already code-owned (KIC-managed) route plugin, the portal opens an MR tha
 **removes the plugin's generated chart template and its generated values entry**,
 and the finalizer confirms the plugin has disappeared from the gateway once the
 merge deploys. It is a third
-`PromotionMode`, `delete`, alongside `experiment` and `code-only` (ADR-024).
+`PromotionMode`, `delete`, alongside `experiment` and `code-only` (PDR-024).
 
 Decisions:
 
@@ -775,7 +775,7 @@ Decisions:
   file-delete action for the template. `renderCheck` gains an `expectAbsent`
   mode whose success is the plugin type and its generated attachment both no
   longer rendering (the inverse polarity of the promote check).
-- **Safety proof before deletion (extends ADR-024's B1 rule).** ADR-024
+- **Safety proof before deletion (extends PDR-024's B1 rule).** PDR-024
   established that the pipeline never rewrites a team-authored chart file. A delete
   removes exactly such a file, so it first proves the repo's template is still the
   adapter's own generated form (`adapter.expectedTemplate()` byte-compare) and
@@ -783,7 +783,7 @@ Decisions:
   themselves. This is the one place a delete could destroy unrelated work, and it
   is gated by the same proof the render check embodies everywhere else.
 - **Reuses states and the promote branch — no migration.** `mode` is an
-  unconstrained nullable column (ADR-025 DB note), so `delete` is a one-line
+  unconstrained nullable column (PDR-025 DB note), so `delete` is a one-line
   type addition. The flow reuses `draft → mr-open → awaiting-deploy → applying →
   codified`, where `codified` means "removal converged (plugin absent)", and the
   same `kong-promote/<type>` branch (the active-per-route index keeps a delete and
@@ -801,7 +801,7 @@ Decisions:
   `code-only`), so a *failed* removal leaves the still-present plugin read-only
   and retryable rather than mis-painting it as a portal-managed experiment. A
   successful removal deletes the plugin from the route, so no card renders for it.
-- **GitLab only.** The plugin has no GitHub client (ADR-006 deferred it and it was
+- **GitLab only.** The plugin has no GitHub client (PDR-006 deferred it and it was
   never built), so — like the existing Promote to Code — delete-in-code opens a
   GitLab MR only. A GitHub/PR provider is separate, orthogonal work (a provider
   abstraction over the two hardcoded GitLab call sites), not part of this change.
@@ -814,5 +814,5 @@ here; it retains the toggle, Edit, and Promote actions.
 
 Rejected: leaving the generated `values.yaml` key behind (the chart's Ingress
 template still turns it into a `konghq.com/plugins` attachment); a distinct
-`kong-demote/<type>` branch (would make the `handleDraft` hardcode from ADR-025
+`kong-demote/<type>` branch (would make the `handleDraft` hardcode from PDR-025
 diverge for real, with no benefit given the active-per-route index).

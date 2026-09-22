@@ -25,7 +25,7 @@ The registry tag `spec.dynamicArtifact` writes to is immutable. If a content
 change ships under a version that already has a tag, the push is skipped, CI
 stays green, and the catalog index keeps pointing at the old digest — nobody
 gets an error. The local agent
-[`plugin-releaser`](file:///home/gio/.claude/agents/plugin-releaser.md) drives
+The `plugin-releaser` agent (a user-level Claude Code agent, when installed) drives
 the release cycle end to end and names the exact failure mode; this skill
 automates the part of its job that is mechanical (generating/updating the
 overlay files) and, more importantly, the part that is easy to get wrong by

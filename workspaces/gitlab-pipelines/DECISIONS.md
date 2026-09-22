@@ -3,7 +3,7 @@
 Decisions taken while building the `@veecode-platform/backstage-plugin-gitlab-pipelines-*`
 packages in this workspace.
 
-## ADR-001: Unregister Commit Skips CI
+## PDR-001: Unregister Commit Skips CI
 
 **Date:** 2026-09
 **Status:** Accepted
