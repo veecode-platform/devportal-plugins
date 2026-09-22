@@ -65,10 +65,19 @@ export_one() {
     process.stdout.write(packageJson.name);
   ' "$package_manifest")
   source_package_base=$(flatten_package_name "$package_name")
-  exported_plugin_dir=${source_package_base%-dynamic}
+
+  # The CLI drops the -dynamic suffix from the copied folder for a frontend
+  # plugin and keeps it for a backend one, so probe for both rather than
+  # assuming either. Stripping unconditionally aborted every backend export.
+  exported_plugin_dir=$source_package_base
+  if [[ ! -d "$dynamic_plugins_root/$exported_plugin_dir" ]]; then
+    exported_plugin_dir=${source_package_base%-dynamic}
+  fi
 
   if [[ ! -d "$dynamic_plugins_root/$exported_plugin_dir" ]]; then
-    printf 'Dynamic export directory not found: %s\n' "$dynamic_plugins_root/$exported_plugin_dir" >&2
+    printf 'Dynamic export directory not found: %s (nor %s)\n' \
+      "$dynamic_plugins_root/$source_package_base" \
+      "$dynamic_plugins_root/${source_package_base%-dynamic}" >&2
     exit 1
   fi
 
