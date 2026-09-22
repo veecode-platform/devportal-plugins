@@ -9,11 +9,19 @@ description: >-
 
 Use this skill from inside a `devportal-plugins` workspace (e.g.
 `workspaces/about`) once a plugin's `product` (the packages under `plugins/`,
-per [CONTEXT.md](../../../CONTEXT.md)) is ready to publish: proof 1 done, and
-proof 2 run against `devportal-local` via the
-[`devportal-context` skill](../devportal-context/SKILL.md) if you need to
-re-check the export. This skill covers the third leg of the official flow —
-"publish through `export-overlays`" — up to opening the overlay PR.
+per [CONTEXT.md](../../../CONTEXT.md)) is ready to publish. This skill covers the
+third leg of the official flow — "publish through `export-overlays`" — up to
+opening the overlay PR.
+
+**Before running it, run proofs 1 and 2.** Proof 2 is `yarn dev:dynamic` plus the
+printed Compose command in `devportal-local` (the
+[`devportal-context` skill](../devportal-context/SKILL.md)), with the plugin seen
+working in that portal. This is the default, not a formality: the overlay CI is the
+most expensive place to find what the local runner shows in minutes. The script
+does not block without it, so a hotfix can go straight out, but it looks for the
+trace proof 2 leaves (this package, at this version, exported and staged in
+`devportal-local`), warns when it is missing, and writes the outcome in the PR
+body. To skip on purpose, pass `--skip-proof2 "<reason>"`; the reason is recorded.
 
 It does not build, export, or push anything itself. It edits metadata in
 `devportal-plugin-export-overlays` and checks that the numbers in that
@@ -151,9 +159,9 @@ overlays repo, commits the changed files, pushes, opens the PR with
 `gh pr create`, and then posts `/publish` as a PR **comment**.
 `pr-actions.yaml` reacts to `issue_comment` only: a slash command in the PR
 body fires nothing and fails silently, so the comment is what starts the
-`pr_<number>__<version>` candidate build. Run the proof-2 check on the runner
-before opening the PR; nothing in the overlay verifies that the plugin ever
-loaded outside CI.
+`pr_<number>__<version>` candidate build. The PR body states whether proof 2
+ran (see the top of this file); nothing in the overlay verifies that the plugin
+ever loaded on the VeeCode image outside CI.
 
 ```bash
 # plan only (read-only, safe to run anytime)
@@ -167,6 +175,11 @@ python3 .agents/skills/devportal-publish/scripts/publish-plugin.py \
 # apply and open the PR (two-gate confirmation)
 python3 .agents/skills/devportal-publish/scripts/publish-plugin.py \
   --workspace about --plugin about --write --open-pr --yes
+
+# a deliberate skip of proof 2, recorded in the PR body
+python3 .agents/skills/devportal-publish/scripts/publish-plugin.py \
+  --workspace about --plugin about --write --open-pr --yes \
+  --skip-proof2 "hotfix for <issue>; proven after merge"
 ```
 
 After opening the PR, hand off to `/publish` and, once the artifact lands,

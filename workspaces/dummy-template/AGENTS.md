@@ -24,7 +24,8 @@ until it is registered through the export overlay. Keep workspace-only decisions
 Use the [four proofs and official flow](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
 For this `{{role}}`, proof 1 is `{{proof1}}`; proof 2 is `{{proof2}}`.
 {{playwright_note}}Build in `devportal-plugins`, prove in `devportal-local`, then publish through
-`export-overlays`. No publication is needed for proof 2.
+`export-overlays`, in that order: run proofs 1 and 2 before publishing, and state it in
+the overlay PR when you skip proof 2 on purpose. No publication is needed for proof 2.
 
 ## Pull requests and changesets
 
