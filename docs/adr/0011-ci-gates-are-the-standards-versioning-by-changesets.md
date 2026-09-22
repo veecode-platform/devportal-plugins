@@ -45,6 +45,12 @@ workspaces are red today under `tsc:full` and `lint:all`.
    green, then becomes blocking. Heavier checks (API reports, knip, `config:check`,
    `list-deprecations`) are opt-in per workspace, as `community-plugins` does with
    `bcp.json`.
+
+   *Amended 2026-09-22:* `config:check --lax` is not opt-in: it runs in every workspace
+   that has an `app-config.yaml`, as upstream `rhdh-plugins` does. The job also validates
+   the config a workspace ships (`pluginConfig` in `dynamic-plugins.yaml`) against the
+   schemas of its plugin packages and their runtime dependencies (issue #165: a missing
+   required property takes the whole portal down).
 4. `test:all` must pass with "no tests found" where the role matrix (ADR-0009 §5) allows
    zero tests (themes, `common-library`); the exemption is written in that workspace's
    `AGENTS.md`.
