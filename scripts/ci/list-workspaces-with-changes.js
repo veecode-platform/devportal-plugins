@@ -14,7 +14,6 @@ function listWorkspaces() {
   return fs
     .readdirSync(workspacesRoot, { withFileTypes: true })
     .filter(entry => entry.isDirectory())
-    .filter(entry => !fs.existsSync(path.join(workspacesRoot, entry.name, 'template.json')))
     .filter(entry => fs.existsSync(path.join(workspacesRoot, entry.name, 'package.json')))
     .map(entry => entry.name)
     .sort();

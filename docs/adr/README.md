@@ -17,7 +17,7 @@ Cite these as `plugins ADR-NNNN` outside this repository.
 | [0009](0009-four-named-proofs-and-the-official-test-flow.md) | Four named proofs and the official test flow | Accepted 2026-09-17; amended 2026-09-22 (§6) |
 | [0010](0010-publish-only-through-the-export-overlays-retire-npm.md) | Plugins are published only through the export overlays; npm publish is retired | Accepted 2026-09-17 |
 | [0011](0011-ci-gates-are-the-standards-versioning-by-changesets.md) | CI gates are the standards; versions come from changesets | Accepted 2026-09-17; amended 2026-09-22 (§2, §3) |
-| [0012](0012-workspaces-are-scaffolded-from-a-template-dummy-is-its-proof.md) | Workspaces are scaffolded from a template | Accepted 2026-09-17; superseded in part 2026-09-21; §3 implemented 2026-09-22 |
+| [0012](0012-workspaces-are-scaffolded-from-a-template-dummy-is-its-proof.md) | Workspaces are scaffolded from a template | Accepted 2026-09-17; superseded in part 2026-09-21; §3 implemented 2026-09-22; amended 2026-09-22 (§1, template location) |
 
 The numbers are those of the series that started in `devportal-plugins-parent`; these
 eight moved here on 2026-09-22. The gaps are records that stay with the program there:

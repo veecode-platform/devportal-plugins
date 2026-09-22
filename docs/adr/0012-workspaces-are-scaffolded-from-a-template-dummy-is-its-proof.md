@@ -3,6 +3,7 @@
 - **Status**: Accepted (owner decision, 2026-09-17)
 - **§3 implemented (2026-09-22)**: `yarn create-workspace` now creates the product package with `backstage-cli new` (`devportal-plugins` #178) after the M8 acceptance runs showed the hand-copied skeleton falling behind the host line and lacking the upstream auth pattern; the template keeps only the workspace shell.
 - **Superseded in part (2026-09-21)**: By owner decision, `workspaces/dummy-template/` is the single source of truth for scaffolding new workspaces; `workspaces/dummy` is a preserved reference fixture, not regenerated from the template, and no CI equivalence check exists. This corrects the executed scaffold model.
+- **Amended (2026-09-22)**: the template lives in `scripts/workspace-template/` (§1).
 - **Date**: 2026-09-17
 - **Deciders**: Giovani Corrêa (decision), André Fernandes (ratification)
 - **Supersedes**: [0003](0003-dummy-workspace-is-the-reference-implementation.md) §2, §4 and §5 only (the generator direction: `dummy-template` is the source for new workspaces; `dummy` remains a preserved reference fixture). §1, §3 (as amended by ADR-0009 §5), §6–9 of ADR-0003 stand.
@@ -32,6 +33,13 @@ and host-image proofs.
    by role (ADR-0009 §5): dev app, dev backend, Playwright config, `yarn dev:dynamic`,
    `.changeset/`, the `AGENTS.md` template with the "how to test" section pre-filled for the
    role. No dependency on `@backstage/create-app`; the format allows switching later.
+
+   *Amended 2026-09-22 (owner decision):* the template moved from `workspaces/dummy-template/`
+   to `scripts/workspace-template/`, beside the script that renders it, as upstream keeps its
+   workspace template inside its repo tooling (`rhdh-plugins`
+   `workspaces/repo-tools/packages/cli/src/lib/workspaces/templates/workspace`). It is not a
+   workspace, so it no longer needs a marker to be excluded from the gates. Earlier mentions
+   of `workspaces/dummy-template/` in this record refer to that location.
 2. **`workspaces/dummy` is a preserved reference fixture, not a generated output.** It is
    not regenerated from `workspaces/dummy-template/`, and no CI check renders the template
    and asserts equality with it. It remains the reference that builds, tests, exports

@@ -27,9 +27,10 @@ and templates:
 - `CONTRIBUTING.md` owns these cross-workspace rules.
 - `CONTEXT.md` owns the glossary.
 - `docs/adr/` holds the decisions that constrain every workspace.
-- `.github/workflows/` and `scripts/` hold repository-wide automation. The
-  `workspaces/dummy-template/` workspace is the single source for new workspace
-  scaffolding; it is marked as a template and is excluded from product gates.
+- `.github/workflows/` and `scripts/` hold repository-wide automation.
+  `scripts/workspace-template/` is the single source for new workspace scaffolding. It
+  lives with the scaffold script, not under `workspaces/`, as upstream keeps its
+  workspace template inside its repo tooling, so no gate mistakes it for a workspace.
 - The root tooling scripts validate and generate workspace structure; they do not
   replace a workspace's package manager or lockfile.
 
@@ -85,7 +86,7 @@ backend harness; its dynamic export remains a separate proof boundary.
 
 ## Reference implementation
 
-`workspaces/dummy-template` is the source for new workspace scaffolding. It contains
+`scripts/workspace-template` is the source for new workspace scaffolding. It contains
 the common shape plus the role-sized `frontend-plugin` and `backend-plugin` harnesses:
 the dev shell, the dynamic-plugin configuration, the Playwright harness and the agent
 guidance. The product package itself is not in the template. `yarn create-workspace`
@@ -192,8 +193,7 @@ contract.
 ## Agent guardrails
 
 Every product workspace must have an `AGENTS.md` following the five-section source in
-[`workspaces/dummy-template/AGENTS.md`](workspaces/dummy-template/AGENTS.md). The
-template links back here instead of copying cross-workspace rules. The template
-workspace itself also carries that file but is excluded from product gates.
+[`scripts/workspace-template/AGENTS.md`](scripts/workspace-template/AGENTS.md). The
+template links back here instead of copying cross-workspace rules.
 [`/.agents/`](.agents/) and [`/.claude/`](.claude/) are protected by
 [`.github/CODEOWNERS`](.github/CODEOWNERS) so agent guardrails require owner review.
