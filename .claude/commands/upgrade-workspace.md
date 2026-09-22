@@ -35,7 +35,9 @@ checkpoints.
 4. **Run the upgrade**:
 
    ```bash
-   yarn backstage-cli versions:bump --pattern '@{backstage,roadiehq,backstage-community}/*'
+   HOST=$(curl -fsSL https://raw.githubusercontent.com/veecode-platform/devportal-core/main/backstage.json | node -p 'JSON.parse(require("fs").readFileSync(0)).version')
+   yarn backstage-cli versions:bump --release "$HOST" --pattern '@{backstage,roadiehq,backstage-community}/*'
+   yarn dedupe
    ```
 
 5. **Check for actual changes**:

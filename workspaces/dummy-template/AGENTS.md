@@ -1,5 +1,3 @@
-<!-- This file is the source for generated workspace AGENTS.md files. -->
-
 ## Commands
 
 Run commands from `workspaces/{{name}}/`.
@@ -25,10 +23,7 @@ until it is registered through the export overlay. Keep workspace-only decisions
 
 Use the [four proofs and official flow](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
 For this `{{role}}`, proof 1 is `{{proof1}}`; proof 2 is `{{proof2}}`.
-The Playwright configuration follows the upstream `PLAYWRIGHT_URL` convention:
-without it, the workspace starts its own Backstage environment; with it, no
-server is started and the tests target the supplied portal URL.
-Build in `devportal-plugins`, prove in `devportal-local`, then publish through
+{{playwright_note}}Build in `devportal-plugins`, prove in `devportal-local`, then publish through
 `export-overlays`. No publication is needed for proof 2.
 
 ## Pull requests and changesets

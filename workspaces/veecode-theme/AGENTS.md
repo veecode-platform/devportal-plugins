@@ -5,6 +5,7 @@
 Run commands from `workspaces/veecode-theme/`.
 
 - `yarn install`, `yarn start`, `yarn tsc:full`, `yarn test:all`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check` are the harness gates.
+- No unit tests: a theme's behaviour is its rendering, proven by `yarn test:e2e` and in the runner. `yarn test:all` passing with no tests found is expected (plugins ADR-0011 §4).
 - Use `yarn dev:dynamic` for the official RHDH dynamic-plugin export. The plugin README explains why the CSS-bearing package is not validated through the Rollup package build.
 
 ## Layout

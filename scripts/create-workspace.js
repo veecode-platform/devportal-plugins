@@ -100,6 +100,12 @@ function templateValues({ name, role, devportalContextScript }) {
       role === 'frontend-plugin'
         ? 'the exported route renders in devportal-local'
         : `/api/${name}/health responds in devportal-local`,
+    playwright_note:
+      role === 'frontend-plugin'
+        ? 'The Playwright configuration follows the upstream `PLAYWRIGHT_URL` convention:\n' +
+          'without it, the workspace starts its own Backstage environment; with it, no\n' +
+          'server is started and the tests target the supplied portal URL.\n'
+        : '',
     harness_commands:
       role === 'frontend-plugin'
         ? '- `yarn test:e2e` — run the Playwright harness. Set `PLAYWRIGHT_URL` when the\n' +
