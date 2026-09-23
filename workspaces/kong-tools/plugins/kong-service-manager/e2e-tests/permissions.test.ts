@@ -30,6 +30,10 @@ function decidePermission(role: Role, permissionName: string): 'ALLOW' | 'DENY' 
   return 'DENY';
 }
 
+// The example entity in examples/entities.yaml carries the Kong annotations; the
+// plugin's Service, Plugins and Routes tabs live under its /kong entity tab.
+const ENTITY_KONG_TAB = '/catalog/default/component/example-kong-service/kong';
+
 // ---------------------------------------------------------------------------
 // Mock Kong backend data
 // ---------------------------------------------------------------------------
@@ -114,10 +118,11 @@ async function mockPermissionsForRole(page: Page, role: Role) {
     const postData = request.postDataJSON();
     const items = postData?.items ?? [];
 
-    const results = items.map((item: { permission: { name: string } }) => {
-      const result = decidePermission(role, item.permission.name);
-      return { result };
-    });
+    // PermissionClient rejects a response whose ids do not match the request's.
+    const results = items.map((item: { id: string; permission: { name: string } }) => ({
+      id: item.id,
+      result: decidePermission(role, item.permission.name),
+    }));
 
     await route.fulfill({
       status: 200,
@@ -129,7 +134,7 @@ async function mockPermissionsForRole(page: Page, role: Role) {
 
 async function mockKongBackend(page: Page) {
   // Service info
-  await page.route('**/api/kong-service-manager/*/services/*', async (route: PwRoute) => {
+  await page.route('**/api/kong-service-manager-backend/*/services/**', async (route: PwRoute) => {
     if (route.request().method() !== 'GET') {
       await route.continue();
       return;
@@ -169,7 +174,7 @@ async function mockKongBackend(page: Page) {
   });
 
   // Available plugins
-  await page.route('**/api/kong-service-manager/*/plugins', async (route: PwRoute) => {
+  await page.route('**/api/kong-service-manager-backend/*/plugins', async (route: PwRoute) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -178,7 +183,7 @@ async function mockKongBackend(page: Page) {
   });
 
   // Route associated plugins
-  await page.route('**/api/kong-service-manager/*/routes/*/plugins/associated', async (route: PwRoute) => {
+  await page.route('**/api/kong-service-manager-backend/*/routes/*/plugins/associated', async (route: PwRoute) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -198,17 +203,12 @@ test.describe('Permission visibility — Admin', () => {
   });
 
   test('Plugins tab: Enable and the enabled toggle visible', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(ENTITY_KONG_TAB);
 
-    // Sign in if guest provider shows Enter button
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
       await enterButton.click();
     }
-
-    // Navigate to the entity page with kong-service-manager
-    // The exact URL depends on the catalog entity; use a known test entity
-    await page.goto('/catalog/default/component/my-service');
 
     // Click the Plugins tab
     await page.getByRole('tab', { name: 'Plugins' }).click();
@@ -220,7 +220,7 @@ test.describe('Permission visibility — Admin', () => {
   });
 
   test('Routes tab: Create Route, Edit, Delete visible', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -230,8 +230,8 @@ test.describe('Permission visibility — Admin', () => {
     await page.getByRole('tab', { name: 'Routes' }).click();
 
     await expect(page.getByRole('button', { name: 'Create Route' })).toBeVisible();
-    await expect(page.locator('[title="Edit route"]').first()).toBeVisible();
-    await expect(page.locator('[title="Delete route"]').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit route' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete route' }).first()).toBeVisible();
   });
 });
 
@@ -242,7 +242,7 @@ test.describe('Permission visibility — Operator', () => {
   });
 
   test('Plugins tab: Enable and the enabled toggle visible', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -257,7 +257,7 @@ test.describe('Permission visibility — Operator', () => {
   });
 
   test('Routes tab: Create Route NOT visible, Edit/Delete NOT visible', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -271,8 +271,8 @@ test.describe('Permission visibility — Operator', () => {
 
     // Mutation buttons should NOT be visible
     await expect(page.getByRole('button', { name: 'Create Route' })).not.toBeVisible();
-    await expect(page.locator('[title="Edit route"]')).toHaveCount(0);
-    await expect(page.locator('[title="Delete route"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Edit route' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete route' })).toHaveCount(0);
   });
 });
 
@@ -283,7 +283,7 @@ test.describe('Permission visibility — Viewer', () => {
   });
 
   test('Plugins tab: no mutation controls (toggle/Enable), data still shows', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -293,7 +293,7 @@ test.describe('Permission visibility — Viewer', () => {
     await page.getByRole('tab', { name: 'Plugins' }).click();
 
     // Plugin cards should still be visible (data is readable)
-    await expect(page.getByText('rate-limiting')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'rate-limiting' })).toBeVisible();
 
     // Mutation controls should NOT be visible for a viewer.
     await expect(page.getByRole('button', { name: 'Enable' })).toHaveCount(0);
@@ -301,7 +301,7 @@ test.describe('Permission visibility — Viewer', () => {
   });
 
   test('Routes tab: data visible, no mutation buttons', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -315,7 +315,7 @@ test.describe('Permission visibility — Viewer', () => {
 
     // Mutation buttons should NOT be visible
     await expect(page.getByRole('button', { name: 'Create Route' })).not.toBeVisible();
-    await expect(page.locator('[title="Edit route"]')).toHaveCount(0);
-    await expect(page.locator('[title="Delete route"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Edit route' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete route' })).toHaveCount(0);
   });
 });
