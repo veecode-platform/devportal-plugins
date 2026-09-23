@@ -1,5 +1,11 @@
 # @veecode-platform/backstage-plugin-about
 
+## 1.2.1
+
+### Patch Changes
+
+- 1f3fb05: Declare `@backstage/errors` as a direct dependency; it was previously resolved through hoisting.
+
 ## 1.2.0
 
 ### Minor Changes
