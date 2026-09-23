@@ -18,10 +18,11 @@ Run commands from `workspaces/gitlab-pipelines/`.
 currently declares Backstage `1.52.0` in `backstage.json`.
 
 The frontend and backend export dynamically; the common package is embedded by the
-backend export rather than exported as a separate dynamic package. The `dynamic/`
-directory contains the V3 local smoke harness, its config, catalog fixture, compose,
-and `run-dynamic.sh`. The Makefile's `replace-workspace` and `restore-workspace`
-targets manage the `workspace:*` references used by the frontend and backend.
+backend export rather than exported as a separate dynamic package. The root
+`dynamic-plugins.yaml` contains the proof-2 runner config; `examples/entities.yaml`
+shows the entity annotations the plugins read. The Makefile's `replace-workspace` and
+`restore-workspace` targets manage the `workspace:*` references used by the frontend
+and backend.
 
 ## Architecture
 
@@ -45,14 +46,10 @@ the frontend and backend consumers. The Playwright config starts the workspace w
 `yarn start` when `PLAYWRIGHT_URL` is absent, or runs against an already-running
 portal when `PLAYWRIGHT_URL` is set.
 
-For proof 2, `make build-dynamic` exports the frontend and backend and embeds the
-private common package. The current V3 compose receives those exports under
-`/opt/app-root/src/local-plugins/<pkg>`, copies them into the named
-`dynamic-plugins-root` volume, and the portal reads that volume at
-`/opt/app-root/src/dynamic-plugins-root`. Its default image is digest-pinned and can
-be overridden with `DEVPORTAL_IMAGE`; its app configuration and sample catalog are
-under `dynamic/`. The dynamic smoke first proves loading, while real GitLab data and
-actions require configured integration inputs.
+For proof 2, `yarn dev:dynamic` exports the frontend and backend and embeds the
+private common package, then prints the exact `devportal-local` command. The dynamic
+smoke proves loading; real GitLab data and actions require configured integration
+inputs.
 
 The backend role evidence is the entity-anchored health and permission behavior; the
 frontend evidence is the configured entity cards. The common library has no separate

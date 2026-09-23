@@ -4,7 +4,9 @@ This repo contains a few Backstage plugins and plugin extensions for Kubernetes-
 
 This document also helps you start a local temporary Kubernetes cluster to test the plugin connection against it in several scenarios.
 
-You can also build a dynamic version of this module and test its behavior as a dynamic plugin without the need to push it into NPM. Check the [DYNAMIC.md](./dynamic/DYNAMIC.md) file for more information.
+Proof 2 for the dynamic module runs in `devportal-local`. From the workspace root,
+run `yarn dev:dynamic` and then the command printed by the exporter; no package
+release is required.
 
 ## Custom Secret Auth Module (Kubernetes Plugin Extension)
 

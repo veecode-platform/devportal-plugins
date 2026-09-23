@@ -21,11 +21,18 @@ If the runner is not found, tell the user to clone `devportal-local` and set
 `DEVPORTAL_LOCAL_DIR` to that checkout. Do not invent or silently select another
 directory.
 
-From a plugin workspace, `yarn dev:dynamic` exports each workspace plugin with the
-Red Hat Developer Hub CLI in `--dev` mode into
-`$DEVPORTAL_LOCAL_DIR/dynamic-plugins-root-dev`, carries the workspace's
-`dynamic-plugins.yaml` entries into a generated local operator config, and prints
-the exact `docker compose -f ... -f ... -f ... up -d` command to run in
-`devportal-local` with `docker-compose.dynamic-plugins-root.yml`. It does not start
-Docker. The generated files live under the ignored
-`dynamic-plugins-root-dev/` directory; no tracked runner config is edited.
+From a plugin workspace, `yarn dev:dynamic` runs the type build, exports each
+workspace plugin with the Red Hat Developer Hub CLI in `--dev` mode into
+`$DEVPORTAL_LOCAL_DIR/dynamic-plugins-src-dev` (beside the runner's plugin root, never
+inside it), carries the workspace's `dynamic-plugins.yaml` entries into a generated
+local operator config under `dynamic-plugins-root-dev/`, and prints the exact
+`docker compose -f ... -f ... -f ... up -d` command to run in `devportal-local`. It
+does not start the portal, and no tracked runner config is edited.
+
+When the product face already ships the plugin being proven (the face is baked into
+the runner image as `/opt/app-root/src/dynamic-plugins.veecode.yaml`), the generated
+config disables that face entry with its exact ref and `disabled: true`, the override
+described in `devportal-chart` `docs/product-face-overrides.md`, so the export is the
+only copy loaded. The script reads the face from the image the runner uses
+(`DEVPORTAL_IMAGE`, else the `devportal-local` compose default) and matches by plugin
+identity, so there is no list to maintain; it fails if it cannot read the face.

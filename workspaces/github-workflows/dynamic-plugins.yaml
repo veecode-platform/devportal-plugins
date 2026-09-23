@@ -2,14 +2,8 @@ includes:
   - dynamic-plugins.default.yaml
 
 plugins:
-  - package: ./dynamic-plugins/dist/backstage-community-plugin-github-actions-dynamic
-    disabled: false
-#  - package: "@veecode-platform/backstage-plugin-github-workflows-backend-dynamic@${VERSION}"
-#    integrity: $BACKEND_INTEGRITY
   - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-backend-dynamic
     disabled: false
-#  - package: "@veecode-platform/backstage-plugin-github-workflows-dynamic@${VERSION}"
-#    integrity: $FRONTEND_INTEGRITY
   - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-dynamic
     disabled: false
     pluginConfig:

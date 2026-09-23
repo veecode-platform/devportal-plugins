@@ -18,7 +18,7 @@ root is private, and both plugin packages are `private: true`. `backstage.json`
 currently declares Backstage `1.52.0`.
 
 The local configuration consists of `app-config.yaml`, the dynamic configuration,
-the example catalog/template data, and the transitional `docker-compose.yaml`.
+and the example catalog/template data.
 The dev shell is not a product package; see [workspace layout](../../CONTRIBUTING.md#workspace-layout)
 and [CONTEXT.md](../../CONTEXT.md).
 
@@ -51,12 +51,9 @@ fetch; the backend tests cover the real backend feature and a router with a mock
 service. The Playwright configuration starts the app and backend through the
 workspace `start` script when not running in CI and accepts `PLAYWRIGHT_URL`.
 
-For proof 2, `make build-dynamic` exports both plugin packages. The current compose
-file is transitional and defaults to the digest-pinned `veecode/devportal` image,
-overridable with `DEVPORTAL_IMAGE`. The installer receives each export at
-`/opt/app-root/src/dynamic-plugins/dist/<pkg>`, copies it into the named
-`dynamic-plugins-root` volume, and the portal reads that volume at
-`/opt/app-root/src/dynamic-plugins-root`.
+For proof 2, `yarn dev:dynamic` exports both plugin packages and prints the exact
+`devportal-local` command to run. The runner receives each export under its local
+dynamic-plugin root and loads it without rebuilding the portal.
 
 Proofs 3 and 4 use the role evidence and flow linked from
 [the four proofs](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow);
