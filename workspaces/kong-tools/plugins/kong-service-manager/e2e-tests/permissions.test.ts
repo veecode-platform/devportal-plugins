@@ -230,8 +230,8 @@ test.describe('Permission visibility — Admin', () => {
     await page.getByRole('tab', { name: 'Routes' }).click();
 
     await expect(page.getByRole('button', { name: 'Create Route' })).toBeVisible();
-    await expect(page.locator('[title="Edit route"]').first()).toBeVisible();
-    await expect(page.locator('[title="Delete route"]').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit route' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete route' }).first()).toBeVisible();
   });
 });
 
@@ -271,8 +271,8 @@ test.describe('Permission visibility — Operator', () => {
 
     // Mutation buttons should NOT be visible
     await expect(page.getByRole('button', { name: 'Create Route' })).not.toBeVisible();
-    await expect(page.locator('[title="Edit route"]')).toHaveCount(0);
-    await expect(page.locator('[title="Delete route"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Edit route' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete route' })).toHaveCount(0);
   });
 });
 
@@ -315,7 +315,7 @@ test.describe('Permission visibility — Viewer', () => {
 
     // Mutation buttons should NOT be visible
     await expect(page.getByRole('button', { name: 'Create Route' })).not.toBeVisible();
-    await expect(page.locator('[title="Edit route"]')).toHaveCount(0);
-    await expect(page.locator('[title="Delete route"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Edit route' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete route' })).toHaveCount(0);
   });
 });
