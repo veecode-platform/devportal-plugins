@@ -151,7 +151,7 @@ This is a module of the Kubernetes backend plugin, so that plugin must be enable
 
 #### VeeCode DevPortal
 
-The DevPortal image ships the Kubernetes backend plugin, but not this module. Build the module with `yarn export-dynamic` in this directory, then mount its `dist-dynamic` directory into the portal container, for example at `/opt/app-root/src/dynamic-plugins-src/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic`. Local paths in `dynamic-plugins.yaml` resolve from `/opt/app-root/src`. Enable the plugin and add the module:
+The DevPortal image ships the Kubernetes backend plugin, but not this module. Build the module with `yarn export-dynamic` in this directory, then mount its `dist-dynamic` directory into the `install-dynamic-plugins` container (an init container in the Helm chart, a service in `devportal-local`), for example at `/opt/app-root/src/dynamic-plugins-src/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic`. That installer copies each enabled plugin into the portal's plugin root, so a mount on the portal container alone is not enough. Local paths in `dynamic-plugins.yaml` resolve from `/opt/app-root/src`. Enable the plugin and add the module:
 
 ```yaml
 plugins:
