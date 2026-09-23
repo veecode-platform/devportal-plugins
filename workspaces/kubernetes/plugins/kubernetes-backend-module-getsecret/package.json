@@ -26,26 +26,23 @@
     "clean": "backstage-cli package clean",
     "prepack": "backstage-cli package prepack",
     "postpack": "backstage-cli package postpack",
-    "export-dynamic": "rhdh-cli plugin export",
+    "export-dynamic": "rhdh-cli plugin export --embed-package @backstage/plugin-kubernetes-backend",
     "export-dynamic:clean": "run export-dynamic --clean",
     "dev": "backstage-cli package start"
   },
   "dependencies": {
+    "@backstage/plugin-kubernetes-backend": "^0.21.5",
+    "@backstage/plugin-kubernetes-common": "^0.9.12",
+    "@backstage/plugin-kubernetes-node": "^0.4.5",
     "@kubernetes/client-node": "^1.4.0"
   },
   "peerDependencies": {
-    "@backstage/backend-plugin-api": "^1.9.2",
-    "@backstage/plugin-kubernetes-backend": "^0.21.5",
-    "@backstage/plugin-kubernetes-common": "^0.9.12",
-    "@backstage/plugin-kubernetes-node": "^0.4.5"
+    "@backstage/backend-plugin-api": "^1.9.2"
   },
   "devDependencies": {
     "@backstage/backend-plugin-api": "^1.9.2",
     "@backstage/backend-test-utils": "^1.11.4",
     "@backstage/cli": "^0.36.3",
-    "@backstage/plugin-kubernetes-backend": "^0.21.5",
-    "@backstage/plugin-kubernetes-common": "^0.9.12",
-    "@backstage/plugin-kubernetes-node": "^0.4.5",
     "@red-hat-developer-hub/cli": "latest"
   },
   "engines": {
