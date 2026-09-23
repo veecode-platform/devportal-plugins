@@ -36,12 +36,7 @@ This plugin serves as a reference implementation for backend plugin patterns and
 
 ### Installation
 
-This plugin is installed via the `@veecode-platform/backstage-plugin-dummy-backend` package. To install it to your backend package, run the following command:
-
-```bash
-# From your root directory
-yarn --cwd packages/backend add @veecode-platform/backstage-plugin-dummy-backend
-```
+This private fixture is part of the dummy workspace and is consumed by its backend shell.
 
 ### Adding the Plugin to the Backend
 
@@ -55,23 +50,9 @@ backend.add(import('@veecode-platform/backstage-plugin-dummy-backend'));
 
 ## Dynamic Plugin Wiring
 
-**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
-
-This plugin can be dynamically downloaded and installed from the public npm registry:
-
-```yaml
-plugins:
-  - package: @veecode-platform/backstage-plugin-dummy-backend-dynamic
-    disabled: false
-```
-
-VeeCode DevPortal already bundles the dynamic plugin as a pre-installed plugin, so it can be loaded using a local path:
-
-```yaml
-plugins:
-  - package: ./dynamic-plugins/dist/backstage-plugin-dummy-backend-dynamic
-    disabled: false
-```
+This private fixture is exported locally from the dummy workspace for the
+`devportal-local` proof. Run `yarn dev:dynamic` from the workspace root and
+follow the command it prints.
 
 ## Development
 

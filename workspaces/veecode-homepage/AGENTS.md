@@ -21,9 +21,8 @@ they are not folded into the homepage product.
 
 ## How to test
 
-Frontend proof uses the app, Playwright harness, and package tests. Use the four
-proofs and official flow in `../../CONTRIBUTING.md`; dynamic export and runtime
-loading remain separate evidence.
+Frontend proof uses the app, Playwright harness, and package tests. Use the
+[four proofs and official flow](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
 
 ## Pull requests and changesets
 

@@ -109,8 +109,8 @@ both say so explicitly in a comment ("intentionally NO Plugin catalog entity
 ... must NOT appear in the client marketplace"). Pass `--catalog-entry`
 explicitly when this plugin is meant to appear in the Extensions UI.
 
-No file outside `.agents/skills/devportal-publish/` is ever touched by this
-skill, and nothing is written at all unless `--write` is passed.
+The skill never writes to the `devportal-plugins` checkout. Nothing is written
+at all unless `--write` is passed, and then only the overlay files listed above.
 
 ## The coherence check
 

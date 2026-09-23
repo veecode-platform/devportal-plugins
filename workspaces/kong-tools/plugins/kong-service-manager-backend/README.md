@@ -16,10 +16,9 @@ from the Backstage UI.
 
 ## Installation
 
-```bash
-# From your Backstage root directory
-yarn --cwd packages/backend add @veecode-platform/backstage-plugin-kong-service-manager-backend
-```
+This plugin ships as an OCI artifact through `devportal-plugin-export-overlays`.
+DevPortal installs it from `quay.io/veecode`; see the [root README](../../../../README.md)
+for the distribution flow.
 
 ## Configuration
 
@@ -127,14 +126,14 @@ relies on: values that only CI overrides never influence the rendered
 **The deploy job must declare a GitLab `environment:`.** The promotion
 finalizer decides "the merge was deployed" from the GitLab *deployments* API
 (a successful deployment of the default branch created at or after the merge —
-ADR-019), not from pipeline status: a pipeline with a blocking manual job
+PDR-019), not from pipeline status: a pipeline with a blocking manual job
 (e.g. a teardown job with `allow_failure: false`) reports `manual`, never
 `success`. Without an `environment:` on the deploy job no deployment is
 recorded, and the finalizer falls back to "a successful pipeline for a commit
 at or after the merge" — which such pipelines never satisfy.
 
 **The experimental plugin is deleted when the merge request is merged**, not
-when the deploy lands (ADR-020). Kong allows one plugin per (type, route), so
+when the deploy lands (PDR-020). Kong allows one plugin per (type, route), so
 an experiment still on the route when the merged chart reaches the gateway
 makes the ingress controller fail to create the code-owned plugin — and a
 DB-backed Kong stops syncing the whole dataplane, not just that plugin. The
@@ -144,10 +143,10 @@ finalizer therefore removes the experiment at merge and never recreates it:
 |---|---|
 | `awaiting-deploy` | Merged, experiment removed, waiting for the deploy. No timeout: the route runs without the plugin until the chart lands. |
 | `applying` | Deployed; waiting for the code-owned plugin to match the promoted config. |
-| `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (ADR-021). When the live plugin also carries the Kong Ingress Controller's ownership tag, the frontend renders it as code-owned **and editable** — the "Edit in code" action, not a bare terminal badge (ADR-021 Refinement, ADR-024). |
+| `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (PDR-021). When the live plugin also carries the Kong Ingress Controller's ownership tag, the frontend renders it as code-owned **and editable** — the "Edit in code" action, not a bare terminal badge (PDR-021 Refinement, PDR-024). |
 | `failed` | `applyTimeoutMinutes` elapsed without convergence. Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, or revert the merge request. |
-| `aborted-teardown` | The service was torn down mid-promotion: project archived, deleted, or unregistered (`catalog-info.yaml` gone from the default branch, ADR-023). Leftover experiment removed, merge request closed, branch deleted. Terminal. |
-| `discarded` | The merge request was closed without merging (or the promotion discarded from the UI): the plugin is a plain experiment again and the promotion branch is deleted (ADR-022). Terminal. |
+| `aborted-teardown` | The service was torn down mid-promotion: project archived, deleted, or unregistered (`catalog-info.yaml` gone from the default branch, PDR-023). Leftover experiment removed, merge request closed, branch deleted. Terminal. |
+| `discarded` | The merge request was closed without merging (or the promotion discarded from the UI): the plugin is a plain experiment again and the promotion branch is deleted (PDR-022). Terminal. |
 
 Where pipelines are fast, lower `kong.promotion.reconcileIntervalSeconds`
 (e.g. `30`): a deploy that lands before the finalizer has seen the merge
@@ -196,7 +195,7 @@ kong:
 
 A plugin already reconciled onto Kong by an external controller (e.g. the
 Kong Ingress Controller, from the service's own chart) is **code-owned**
-(ADR-017) and read-only in the portal — there's no live experiment to
+(PDR-017) and read-only in the portal — there's no live experiment to
 promote. `kong.promotion.editInCode` lets the portal edit such a plugin
 directly instead: the user edits its config in the portal form, and the
 backend opens a merge request with the edited config, with **no experiment
@@ -332,15 +331,9 @@ so that you can control access to it via "homemade" RBAC using the bundled OSS p
 
 ## Dynamic Plugin Wiring
 
-**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
-
-This plugin can be dynamically downloaded and installed from the public npm registry, as well as its UI elements can be configured without any source code changes:
-
-```yaml
-plugins:
-  - package: @veecode-platform/backstage-plugin-kong-service-manager-backend-dynamic
-    disabled: false
-```
+This plugin ships as an OCI artifact through `devportal-plugin-export-overlays`.
+DevPortal installs it from `quay.io/veecode`; see the [root README](../../../../README.md)
+for the distribution flow.
 
 **VeeCode DevPortal** already bundles the dynamic plugin as a pre-installed plugin with default configs, so it can be alternatively be loaded just using a local path:
 

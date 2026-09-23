@@ -161,18 +161,11 @@ plugins:
     disabled: false
 ```
 
-#### Red Hat Developer Hub (RHDH)
+#### Other portals
 
-RHDH can **download the plugin at runtime** using NPM, once a release that bundles the Kubernetes libraries is published (see the note above). With the Kubernetes backend plugin enabled, add it to `dynamic-plugins.yaml`:
-
-```yaml
-plugins:
-  - package: '@veecode-platform/plugin-kubernetes-backend-module-getsecret-dynamic@<version>'
-    disabled: false
-    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-```
-
-**Tip**: Check the [npm registry](https://www.npmjs.com/package/@veecode-platform/plugin-kubernetes-backend-module-getsecret-dynamic) for the latest version and integrity hash.
+The module is not published as an OCI artifact through `devportal-plugin-export-overlays`
+yet, and the npm releases up to `1.1.0` fail to load on DevPortal 3.x (see the note
+above). Until it is published, load a local export as shown for VeeCode DevPortal.
 
 ## Configuration
 

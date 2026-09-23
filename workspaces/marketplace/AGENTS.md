@@ -26,9 +26,8 @@ wrapper directory.
 ## How to test
 
 Frontend proof uses the app and Playwright route smoke test; backend proof uses
-the backend harness and package tests. Dynamic export is proof of the artifact
-boundary; runtime loading is proven only by the `devportal-local` flow. Use the
-four proofs in `../../CONTRIBUTING.md`.
+the backend harness and package tests. Use the
+[four proofs and official flow](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
 
 ## Pull requests and changesets
 

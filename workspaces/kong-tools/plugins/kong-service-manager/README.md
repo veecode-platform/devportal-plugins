@@ -49,22 +49,10 @@ and plugins directly from the catalog.
 
 ## Installation
 
-```bash
-# From your Backstage root directory
-yarn --cwd packages/app add @veecode-platform/backstage-plugin-kong-service-manager
-```
-
-### Prerequisites
-
-This plugin requires the backend plugin to be installed:
-
-```bash
-yarn --cwd packages/backend add @veecode-platform/backstage-plugin-kong-service-manager-backend
-```
-
-See the
-[backend plugin README](https://www.npmjs.com/package/@veecode-platform/backstage-plugin-kong-service-manager-backend)
-for configuration details.
+This plugin ships as an OCI artifact through `devportal-plugin-export-overlays`.
+DevPortal installs it from `quay.io/veecode`; see the [root README](../../../../README.md)
+for the distribution flow. The backend plugin is also required; see the
+[backend plugin README](../kong-service-manager-backend/README.md).
 
 ## Setup
 
@@ -150,13 +138,14 @@ when each path applies.
 
 ## Dynamic Plugin Wiring
 
-**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
-
-This plugin can be dynamically downloaded and installed from the public npm registry, as well as its UI elements can be configured without any source code changes:
+This plugin ships as an OCI artifact through `devportal-plugin-export-overlays`.
+DevPortal installs it from `quay.io/veecode`; see the [root README](../../../../README.md)
+for the distribution flow. Its UI elements are configured without source changes:
 
 ```yaml
 plugins:
-  - package: @veecode-platform/backstage-plugin-kong-service-manager-dynamic
+  # Tag from the overlay metadata: bs_<backstage>__<version>
+  - package: oci://quay.io/veecode/veecode-platform-backstage-plugin-kong-service-manager:bs_<backstage>__<version>!veecode-platform-backstage-plugin-kong-service-manager
     disabled: false
     pluginConfig:
       dynamicPlugins:

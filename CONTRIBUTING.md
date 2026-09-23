@@ -34,8 +34,9 @@ and templates:
 - The root tooling scripts validate and generate workspace structure; they do not
   replace a workspace's package manager or lockfile.
 
-The root `Makefile`, `README.md`, and `ROADMAP.md` remain repository-level entry
-points; workspace work starts from the affected workspace root.
+The root `Makefile` and `README.md` remain repository-level entry points; program
+roadmaps and milestones live in `devportal-plugins-parent`. Workspace work starts
+from the affected workspace root.
 
 ## Workspace layout
 

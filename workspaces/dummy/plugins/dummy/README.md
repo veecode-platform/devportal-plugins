@@ -39,10 +39,7 @@ The frontend plugin presents itself in 3 ways:
 
 ### Installation
 
-```bash
-# From your Backstage root directory
-yarn --cwd packages/app add @veecode-platform/backstage-plugin-dummy
-```
+This private fixture is part of the dummy workspace and is consumed by its app shell.
 
 ### Adding the Plugin Page
 
@@ -94,25 +91,6 @@ import { DummyIcon } from '@veecode-platform/backstage-plugin-dummy';
 
 ## Dynamic Plugin Wiring
 
-**Note:** dynamic plugin loading is a feature supported by VeeCode DevPortal and by RHDH (Red Hat Developer Hub).
-
-This plugin can be dynamically downloaded and installed from the public npm registry, as well as its UI elements can be configured:
-
-```yaml
-plugins:
-  - package: @veecode-platform/backstage-plugin-dummy-dynamic
-    disabled: false
-    pluginConfig:
-      dynamicPlugins:
-        frontend:
-          veecode-platform.backstage-plugin-dummy:
-            # more configs...
-```
-
-VeeCode DevPortal already bundles the dynamic plugin as a pre-installed plugin, so it can be loaded using a local path. Notice that pre-installed plugins come with good defaults, so yo usually just have to enable them.
-
-```yaml
-plugins:
-  - package: ./dynamic-plugins/dist/backstage-plugin-dummy-dynamic
-    disabled: false
-```
+This private fixture is exported locally from the dummy workspace for the
+`devportal-local` proof. Run `yarn dev:dynamic` from the workspace root and
+follow the command it prints.

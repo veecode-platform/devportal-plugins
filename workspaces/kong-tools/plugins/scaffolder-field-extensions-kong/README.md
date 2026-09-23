@@ -12,17 +12,15 @@ Provides a **KongInstancePicker** custom field that lets users select a Kong ins
 
 ## Installation
 
-```bash
-# yarn
-yarn add @veecode-platform/backstage-plugin-scaffolder-field-extensions-kong
-
-# npm
-npm install @veecode-platform/backstage-plugin-scaffolder-field-extensions-kong
-```
+This plugin is not published as an OCI artifact yet: the `kong-tools` workspace in
+`devportal-plugin-export-overlays` publishes the Kong Service Manager frontend and backend
+only. Until it is, register it in a static app (below), or load its local export with
+`yarn dev:dynamic` from the `kong-tools` workspace.
 
 ### Prerequisites
 
-This plugin requires the [`kong-service-manager-backend`](https://www.npmjs.com/package/@veecode-platform/backstage-plugin-kong-service-manager-backend) plugin to be installed and configured, as it fetches instances from its `/instances` endpoint.
+This plugin requires the [`kong-service-manager-backend`](../kong-service-manager-backend/README.md)
+plugin to be configured, as it fetches instances from its `/instances` endpoint.
 
 ## Usage
 

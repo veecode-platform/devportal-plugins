@@ -27,7 +27,7 @@ export default defineConfig({
     timeout: 5_000,
   },
 
-  // Run your local dev server before starting the tests
+  // Start the app and backend unless PLAYWRIGHT_URL targets an existing portal.
   webServer: process.env.PLAYWRIGHT_URL
     ? []
     : [

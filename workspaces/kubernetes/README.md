@@ -112,16 +112,10 @@ yarn start
 
 ### Set release version
 
-Define the release version editing the Makefile itself (KUBERNETES_VERSION variable) and call:
+Set the release version with:
 
 ```sh
-make set-version
-```
-
-Or just bump it (it will do `set-version` too):
-
-```sh
-make bump-version
+make set-version VERSION=x.y.z
 ```
 
 ### Publish

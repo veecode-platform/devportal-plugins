@@ -30,6 +30,9 @@ metadata (`backstage.pluginPackages`, `scalprum.exposedModules`, `files`) for re
 into `packages/`. It returns 1 when either check finds a reference. CI records the
 result in report mode.
 
+The check reads each product package's `files` list. Product packages should declare
+`files`; without it, npm ships test and story directories, which the check then scans.
+
 Run locally from the repository root:
 
 ```sh

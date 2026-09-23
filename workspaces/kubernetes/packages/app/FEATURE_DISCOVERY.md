@@ -19,8 +19,7 @@ export default app.createRoot();
 
 ```yaml
 app:
-  experimental:
-    packages: all  # Auto-discover all plugins from package.json
+  packages: all  # Auto-discover all plugins from package.json
   
   extensions:
     # Configure specific extensions
@@ -130,7 +129,7 @@ extensions:
 ### ⚠️ Considerations
 
 1. **Build Time** - Must run `yarn workspace app build` after config changes
-2. **Discovery Mode** - Currently experimental (`experimental.packages`)
+2. **Discovery Mode** - Configure automatic discovery with `app.packages`
 3. **Explicit Control** - Less obvious what's installed (but more flexible)
 
 ## Manual Override
@@ -152,7 +151,7 @@ const app = createApp({
 });
 ```
 
-Then remove `experimental.packages` from `app-config.yaml`.
+Then remove `app.packages` from `app-config.yaml`.
 
 ## Troubleshooting
 

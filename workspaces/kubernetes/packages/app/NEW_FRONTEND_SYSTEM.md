@@ -30,8 +30,7 @@ export default app.createRoot();
 ```yaml
 app:
   # Auto-discover plugins from package.json
-  experimental:
-    packages: all
+  packages: all
   
   # Configure specific extensions
   extensions:
@@ -75,7 +74,7 @@ In the new system, entity pages, routes, and plugins are handled automatically t
 
 ### Auto-Discovery (Feature Discovery)
 
-With `experimental.packages: all` in `app-config.yaml`, plugins are **automatically discovered** from your `package.json` dependencies. Any plugin with an `/alpha` export is automatically loaded.
+With `app.packages: all` in `app-config.yaml`, plugins are **automatically discovered** from your `package.json` dependencies. Any plugin with an `/alpha` export is automatically loaded.
 
 For example, `@backstage/plugin-kubernetes` version 0.12.12+ includes an `/alpha` export:
 - Main export: `@backstage/plugin-kubernetes` (old frontend system)
@@ -122,8 +121,8 @@ filter: kind:*                   # Show on all entity kinds
 ## Running the App
 
 ```bash
-# From the root of the monorepo
-yarn dev
+# From the Kubernetes workspace root
+yarn start
 
 # Or just the frontend
 yarn workspace app start
@@ -138,9 +137,9 @@ The Kubernetes plugin will appear as a "KUBERNETES" tab on entity pages for:
 
 ## Next Steps
 
-As more plugins add `/alpha` exports, you can:
+For manual installation instead of auto-discovery, you can:
 
-1. Add them to the `features` array in `App.tsx`
+1. Add them to the manual `features` array in `App.tsx`
 2. Configure their extensions in `app-config.yaml`
 3. Remove manual integrations from old files
 
