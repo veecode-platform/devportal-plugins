@@ -1,9 +1,15 @@
 includes:
   - dynamic-plugins.default.yaml
+
 plugins:
-  - package: ./local-plugins/gitlab-pipelines-backend
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-gitlab-pipelines-backend-dynamic
     disabled: false
-  - package: ./local-plugins/gitlab-pipelines
+    pluginConfig:
+      catalog:
+        locations:
+          - type: file
+            target: /opt/app-root/src/examples/entities.yaml
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-gitlab-pipelines-dynamic
     disabled: false
     pluginConfig:
       dynamicPlugins:

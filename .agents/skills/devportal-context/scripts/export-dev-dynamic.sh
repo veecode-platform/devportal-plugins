@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if (( $# == 0 )); then
-  printf 'Usage: %s <plugin-directory> [...]\n' "$0" >&2
+  printf 'Usage: %s <plugin-directory> [export-option...] [<plugin-directory> ...]\n' "$0" >&2
   exit 1
 fi
 
@@ -33,6 +33,7 @@ printf 'Building types in %s\n' "$workspace_root"
 
 declare -a source_package_bases=()
 declare -a exported_plugin_dirs=()
+declare -a exported_package_names=()
 
 flatten_package_name() {
   local package_name=$1
@@ -45,6 +46,8 @@ flatten_package_name() {
 
 export_one() {
   local plugin_dir=$1
+  shift
+  local -a export_options=("$@")
   local plugin_path="$workspace_root/$plugin_dir"
   local package_manifest
   local package_name
@@ -55,13 +58,28 @@ export_one() {
     printf 'Plugin directory does not exist: %s\n' "$plugin_path" >&2
     exit 1
   fi
+  # A backend export resolves its dependencies from npm, where a workspace-only
+  # library such as a -common package does not exist. The CLI embeds a sibling
+  # library by itself only when its name is the plugin's with -backend swapped
+  # for -common; the overlay passes --embed-package for the rest, and so does this.
+  local -a embed_args=()
+  mapfile -t embed_args < <(node -e '
+    const pkg = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+    if (!["backend-plugin", "backend-plugin-module"].includes(pkg.backstage?.role)) process.exit(0);
+    const embedded = Object.entries(pkg.dependencies ?? {})
+      .filter(([, spec]) => spec.startsWith("workspace:"))
+      .map(([name]) => name);
+    if (embedded.length > 0) console.log(["--embed-package", ...embedded].join("\n"));
+  ' "$plugin_path/package.json")
   printf 'Exporting %s to %s\n' "$plugin_dir" "$export_source_root"
   (
     cd -- "$plugin_path"
     YARN_ENABLE_IMMUTABLE_INSTALLS=false \
       npx @red-hat-developer-hub/cli@latest plugin export \
       --dev \
-      --dynamic-plugins-root "$export_source_root"
+      --dynamic-plugins-root "$export_source_root" \
+      "${embed_args[@]}" \
+      "${export_options[@]}"
   )
 
   package_manifest="$plugin_path/dist-dynamic/package.json"
@@ -99,9 +117,21 @@ export_one() {
 
   source_package_bases+=("$source_package_base")
   exported_plugin_dirs+=("$exported_plugin_dir")
+  exported_package_names+=("$package_name")
 }
 
-for plugin_dir in "$@"; do export_one "$plugin_dir"; done
+# Arguments read like the overlay's plugins-list.yaml: a plugin directory, then
+# the export options for that plugin only, such as --embed-package for a -node
+# library the portal does not ship.
+declare -a plugin_arguments=()
+for argument in "$@"; do
+  if [[ -d "$workspace_root/$argument" && ${#plugin_arguments[@]} -gt 0 ]]; then
+    export_one "${plugin_arguments[@]}"
+    plugin_arguments=()
+  fi
+  plugin_arguments+=("$argument")
+done
+export_one "${plugin_arguments[@]}"
 
 local_dynamic_config="$dynamic_plugins_root/dynamic-plugins.local.yaml"
 temporary_dynamic_config=$(mktemp "$dynamic_plugins_root/.dynamic-plugins.local.XXXXXX")
@@ -137,10 +167,67 @@ for index in "${!source_package_bases[@]}"; do
     "$temporary_dynamic_config"
 done
 
-if grep -Eq '^[[:space:]]*- package:[[:space:]]*\./dynamic-plugins/dist/' "$temporary_dynamic_config"; then
-  printf 'Workspace dynamic plugin config references an unexported package. Pass every plugin directory listed in dynamic-plugins.yaml.\n' >&2
+# A ./dynamic-plugins/dist/ entry left over is either a plugin the image ships
+# (a host plugin the workspace extends, such as the kubernetes backend) or a
+# workspace plugin that was not exported; only the second is a mistake.
+unexported_workspace_plugins=$(node -e '
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const [config, pluginsRoot] = process.argv.slice(1);
+  const refs = [...fs.readFileSync(config, "utf8").matchAll(/^\s*- package:\s*\.\/dynamic-plugins\/dist\/(\S+)/gm)]
+    .map(([, ref]) => ref);
+  const workspacePackages = fs.readdirSync(pluginsRoot)
+    .filter((dir) => fs.existsSync(path.join(pluginsRoot, dir, "package.json")))
+    .map((dir) => JSON.parse(fs.readFileSync(path.join(pluginsRoot, dir, "package.json"), "utf8")).name)
+    .map((name) => name.replace(/^@/, "").replace("/", "-"));
+  console.log(refs.filter((ref) => workspacePackages.includes(ref.replace(/-dynamic$/, ""))).join(" "));
+' "$temporary_dynamic_config" "$workspace_root/plugins")
+if [[ -n "$unexported_workspace_plugins" ]]; then
+  printf 'Workspace dynamic plugin config references unexported workspace plugins: %s. Pass every plugin directory listed in dynamic-plugins.yaml.\n' "$unexported_workspace_plugins" >&2
   exit 1
 fi
+
+# A plugin the product face already ships would load twice on the runner (the
+# face copy and this export) and the backend refuses the second registration.
+# The face is baked into the runner's image, so read it there and disable the
+# face copy of each exported plugin with a level-1 override, the mechanism in
+# devportal-chart docs/product-face-overrides.md. Matching is by plugin
+# identity, so a plugin added to the face later needs no change here.
+devportal_image=${DEVPORTAL_IMAGE:-$({ grep -o -m1 'DEVPORTAL_IMAGE:-[^}]*' "$devportal_local_dir/docker-compose.yml" || true; } | sed 's/^DEVPORTAL_IMAGE:-//')}
+if [[ -z "$devportal_image" ]]; then
+  printf 'Could not find the runner image: set DEVPORTAL_IMAGE or check %s\n' "$devportal_local_dir/docker-compose.yml" >&2
+  exit 1
+fi
+if ! product_face=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/dynamic-plugins.veecode.yaml); then
+  printf 'Could not read the product face from %s; without it face plugins would load twice.\n' "$devportal_image" >&2
+  exit 1
+fi
+package_indent=$({ grep -m1 -o '^[[:space:]]*- package:' "$temporary_dynamic_config" || true; } | sed 's/- package://')
+printf '%s\n' "$product_face" | node -e '
+  const [indent, ...exported] = process.argv.slice(1);
+  const flatten = (name) => name.replace(/^@/, "").replace("/", "-");
+  const identities = new Set();
+  for (const name of exported) {
+    for (const id of [name, flatten(name)]) {
+      identities.add(id);
+      identities.add(id.replace(/-dynamic$/, ""));
+    }
+  }
+  const identityOf = (ref) => {
+    if (ref.startsWith("oci://")) return ref.slice(ref.indexOf("!") + 1);
+    if (ref.startsWith("./")) return ref.split("/").pop();
+    const at = ref.indexOf("@", ref.startsWith("@") ? 1 : 0);
+    return at === -1 ? ref : ref.slice(0, at);
+  };
+  const face = require("node:fs").readFileSync(0, "utf8");
+  for (const [, raw] of face.matchAll(/^- package:\s*("[^"]+"|\x27[^\x27]+\x27|\S+)/gm)) {
+    const ref = raw.replace(/^["\x27]|["\x27]$/g, "");
+    const id = identityOf(ref);
+    if (!identities.has(id) && !identities.has(id.replace(/-dynamic$/, ""))) continue;
+    process.stderr.write(`Disabling the face copy of ${ref}\n`);
+    process.stdout.write(`${indent}- package: ${JSON.stringify(ref)}\n${indent}  disabled: true\n`);
+  }
+' "$package_indent" "${exported_package_names[@]}" >> "$temporary_dynamic_config"
 
 mv "$temporary_dynamic_config" "$local_dynamic_config"
 
@@ -152,6 +239,12 @@ services:
       - ./dynamic-plugins-root-dev/dynamic-plugins.local.yaml:/opt/app-root/src/dynamic-plugins.operator.yaml:ro
       - ./dynamic-plugins-src-dev:/opt/app-root/src/dynamic-plugins-src
 YAML
+
+# The catalog fixtures a workspace's dynamic-plugins.yaml registers live in its
+# examples/; the portal reads them at the path the per-workspace composes used.
+if [[ -d "$workspace_root/examples" ]]; then
+  printf '  devportal:\n    volumes:\n      - "%s:/opt/app-root/src/examples:ro"\n' "$workspace_root/examples" >> "$local_compose_override"
+fi
 
 printf '\nRun in devportal-local:\n'
 printf 'cd %q && docker compose -f docker-compose.yml -f docker-compose.dynamic-plugins-root.yml -f dynamic-plugins-root-dev/docker-compose.dynamic-plugins-root.local.yml up -d\n' "$devportal_local_dir"

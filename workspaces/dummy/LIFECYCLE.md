@@ -27,5 +27,5 @@ The proofs and the official flow are defined once, in
 | `make set-version VERSION=x.y.z`    | Sets the version of every plugin package                            |
 | `make clean` / `make clean-dynamic` | Removes build / export output                                       |
 
-`docker-compose.yaml` in this workspace is a transitional harness kept until the per-workspace
-composes are retired; proof 2 runs in `devportal-local`.
+Proof 2 runs in `devportal-local`; `yarn dev:dynamic` exports this workspace and
+prints the runner command.

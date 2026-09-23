@@ -10,14 +10,15 @@ Run commands from `workspaces/github-workflows/`.
 ## Layout
 
 `packages/app` and `packages/backend` are the local harness. Product packages
-live under `plugins/`: frontend, backend, and common-library roles. The `dynamic/`
-directory contains the transitional runtime smoke configuration.
+live under `plugins/`: frontend, backend, and common-library roles. The root
+`dynamic-plugins.yaml` contains the configuration used by the official proof-2
+runner.
 
 ## Architecture
 
 The frontend and backend packages are the product pair and the common package is
-their shared contract. Runtime configuration is kept in `dynamic/`; it is not
-product implementation.
+their shared contract. Runtime configuration is kept in the root dynamic-plugin
+configuration; it is not product implementation.
 
 ## How to test
 

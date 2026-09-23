@@ -20,7 +20,8 @@
     "update-backstage": "backstage-cli versions:bump",
     "lint": "backstage-cli repo lint --since origin/main",
     "lint:all": "backstage-cli repo lint",
-    "prettier:check": "prettier --check ."
+    "prettier:check": "prettier --check .",
+    "dev:dynamic": "bash ../../.agents/skills/devportal-context/scripts/export-dev-dynamic.sh plugins/about-backend plugins/about"
   },
   "workspaces": {
     "packages": [

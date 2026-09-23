@@ -12,7 +12,6 @@ workspaces/dummy/
 ├── plugins/
 │   ├── dummy/            # Frontend plugin (@veecode-platform/backstage-plugin-dummy)
 │   └── dummy-backend/    # Backend plugin (@veecode-platform/backstage-plugin-dummy-backend)
-├── docker-compose.yaml   # Dynamic plugin testing with DevPortal container
 ├── dynamic-plugins.yaml  # Dynamic plugin configuration
 ├── app-config.yaml       # Backstage config for local development
 └── Makefile              # Build, publish, and utility targets
@@ -77,14 +76,10 @@ Tests are organized in three layers:
 
 2. **Hosting app wiring tests** (`packages/app/src/`, `packages/backend/src/`): Verify plugins are correctly registered, exported, and accessible through the hosting app.
 
-3. **Integration testing**: Run the hosting app (`yarn start`) to test plugins working together without mocks. Run `docker compose up` to test dynamic plugin loading in a DevPortal container (see below).
+3. **Integration testing**: Run the hosting app (`yarn start`) to test plugins working together without mocks. Run `yarn dev:dynamic` and then the printed `devportal-local` command to test dynamic plugin loading (see below).
 
-### Dynamic Plugin Testing (Docker Compose)
+### Dynamic Plugin Testing
 
-Running `docker compose up` will run the transitional 3.x DevPortal compose, mounting the files and
-folders below so dynamic loading behavior is tested. Set `DEVPORTAL_IMAGE` to override the default
-chart-pinned image digest:
-
-- The plugins' `dist-dynamic` folders under `/opt/app-root/src/dynamic-plugins/dist/` for the installer
-- The `app-config.dynamic.yaml` file as `/opt/app-root/src/app-config.local.yaml`
-- The `dynamic-plugins.yaml` file as `/opt/app-root/src/dynamic-plugins.yaml`
+Run `yarn dev:dynamic` from this workspace. It exports both plugins into the
+`devportal-local` checkout, generates the local operator config, and prints the exact
+runner command to start the proof-2 portal.

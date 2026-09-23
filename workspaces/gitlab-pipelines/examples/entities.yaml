@@ -1,12 +1,12 @@
 apiVersion: backstage.io/v1alpha1
-kind: Resource
+kind: Component
 metadata:
   name: sample-gitlab-component
-  description: Catalog resource used by the GitLab Pipelines dynamic smoke loop.
+  description: Example component with the annotations the GitLab Pipelines plugins read.
   annotations:
     gitlab.com/project-slug: some-group/some-repo
     backstage.io/source-location: url:https://gitlab.example.com/some-group/some-repo
 spec:
-  type: repository
+  type: service
   lifecycle: experimental
   owner: user:development/guest

@@ -6,7 +6,8 @@ Run commands from `workspaces/about/`.
 
 - `yarn install`, `yarn start`, `yarn tsc:full`, `yarn build:all`, `yarn test:all`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check` are the workspace gates.
 - `packages/app` and `packages/backend` are the local dev shell; the product packages have their own package-level `start`, `build`, `test`, and `lint` scripts.
-- `make build-dynamic` is the legacy multi-package export helper. The official delivery rules are in the repository contribution guide.
+- `yarn dev:dynamic` exports both plugins and prints the official `devportal-local`
+  proof command. The official delivery rules are in the repository contribution guide.
 
 ## Layout
 

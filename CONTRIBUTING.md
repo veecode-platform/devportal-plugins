@@ -138,7 +138,7 @@ follow from those definitions:
 - The overlay is a distribution recipe, not a development environment. Develop an
   adaptation in the source checkout, prove it with proofs 1 and 2, then register the
   result in the overlay recipe.
-- Existing per-workspace compose files are transitional harnesses; they do not change
+- The official runner owns proof 2; workspace-local development aids do not change
   the official proof ownership.
 
 ## Which proofs apply to which `backstage.role`

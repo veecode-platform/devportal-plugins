@@ -84,39 +84,16 @@ an operation is `consumed`. The card renders nothing when the entity has no
 teardown operations, which is also what the endpoint returns while the
 feature is disabled.
 
-## Dynamic V3 loop
+## Proof 2 in the runner
 
-The `dynamic/` directory is a local smoke harness for
-the v3 image pinned by digest in the compose (3.0.0-beta.8; override with
-`DEVPORTAL_IMAGE`). It mounts the two locally exported
-`dist-dynamic/` folders into the V3 image, installs them into the named
-dynamic-plugin volume, starts PostgreSQL and the portal, and configures the
-frontend cards. The complete loop is:
-
-```sh
-cd workspaces/gitlab-pipelines
-make build-dynamic
-cd dynamic
-GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy docker compose up -d
-curl -sS http://localhost:7007/api/scalprum/plugins
-docker compose down -v
-```
-
-If the checkout and Docker daemon are on another build host, run the same
-commands there through SSH, replacing the placeholders with that host and its
-checkout path:
-
-```sh
-ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines && make build-dynamic'
-ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines/dynamic && GITLAB_HOST=gitlab.example.com GITLAB_TOKEN=dummy docker compose up -d'
-ssh <build-host> 'curl -sS http://localhost:7007/api/scalprum/plugins'
-ssh <build-host> 'cd <workspace-path>/workspaces/gitlab-pipelines/dynamic && docker compose down -v'
-```
-
-The first smoke only proves that both dynamic plugins load; it deliberately
-does not make a live GitLab call. Replace the placeholder environment values
-with a test host and token when exercising pipeline data and actions. See
-[`dynamic/README.md`](dynamic/README.md) for the harness details.
+Proof 2 runs in `devportal-local`. From this workspace, `yarn dev:dynamic`
+exports the frontend and backend (embedding the private common package),
+writes the runner's local plugin config and prints the exact `devportal-local`
+command to run. The runner registers the example entity from `examples/`, so
+its CI tab renders. The tab shows the plugin's empty state there, because the
+runner passes no GitLab host or token to the portal, and the backend refuses
+the guest, who does not own the example entity. Exercising pipeline data and actions needs
+a test GitLab host and token in the portal's configuration.
 
 ## Development
 

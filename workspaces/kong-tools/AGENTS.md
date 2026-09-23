@@ -25,8 +25,8 @@ The common library and scaffolder backend module remain static packages. The
 service-manager backend and frontend depend on the common package with
 `workspace:^`; the dev shell depends on the product packages for local wiring.
 
-The local configuration includes `examples/`, `dynamic-plugins.yaml`,
-`app-config.dynamic.yaml`, and a transitional `docker-compose.yaml`. See
+The local configuration is `examples/` and `dynamic-plugins.yaml`, which registers
+those fixtures and the Kong instance in the runner. See
 [workspace layout](../../CONTRIBUTING.md#workspace-layout) and
 [CONTEXT.md](../../CONTEXT.md) for the dev shell/Product boundary.
 
@@ -52,13 +52,9 @@ and a common library. Proof 1 uses the dev shell, package tests, and the Playwri
 suite; the suite includes the permissions test under
 `plugins/kong-service-manager/e2e-tests`.
 
-For proof 2, `make build-dynamic` exports the three dynamic packages. The current
-compose file is transitional and defaults to the digest-pinned `veecode/devportal`
-image, overridable with `DEVPORTAL_IMAGE`. The installer receives each
-`dist-dynamic` directory at `/opt/app-root/src/dynamic-plugins/dist/<pkg>`, copies
-the exports into the named `dynamic-plugins-root` volume, and the portal reads that
-volume at `/opt/app-root/src/dynamic-plugins-root`. The dynamic configuration mounts
-the service-manager entity tab/card and the scaffolder field extension.
+For proof 2, `yarn dev:dynamic` exports the three dynamic packages and prints the
+exact `devportal-local` command. The dynamic configuration mounts the service-manager
+entity tab/card and the scaffolder field extension.
 
 The backend and scaffolder module role evidence is the backend health and scaffolder
 action checks in the [role matrix](../../CONTRIBUTING.md#which-proofs-apply-to-which-backstagerole);

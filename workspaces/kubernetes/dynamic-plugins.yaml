@@ -1,0 +1,38 @@
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  # The module extends the kubernetes backend, which the portal image ships
+  # disabled.
+  - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-backend-dynamic
+    disabled: false
+    pluginConfig:
+      kubernetes:
+        serviceLocatorMethod:
+          type: singleTenant
+        clusterLocatorMethods:
+          - type: config
+            clusters:
+              - name: local-cluster
+                url: https://kubernetes.default.svc
+                authProvider: serviceAccount
+                skipTLSVerify: true
+  - package: ./dynamic-plugins/dist/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic
+    disabled: false
+    pluginConfig:
+      catalog:
+        locations:
+          - type: file
+            target: /opt/app-root/src/examples/entities.yaml
+          - type: file
+            target: /opt/app-root/src/examples/org.yaml
+            rules:
+              - allow: [User, Group]
+          - type: file
+            target: /opt/app-root/src/examples/clusters.yaml
+            rules:
+              - allow: [Resource]
+      veecode:
+        kubernetes:
+          addDefaultKubernetesAuthStrategies: false
+          fetchSecretWithRawHttps: false

@@ -59,5 +59,3 @@ e2e-test-report/
 # Cache
 .cache/
 
-# include this one
-!dynamic/app-config.local.yaml
