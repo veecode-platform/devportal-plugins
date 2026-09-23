@@ -192,6 +192,23 @@ jobs:
           printf '| `%s` | %s | exit %s; report mode |\n' 'backstage-cli config:check --lax' "$verdict" "$status" >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 
+      - name: Gate product independence from dev shell (report mode)
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          report="$(node ../../scripts/ci/check-product-independence.js 2>&1)"
+          status=$?
+          printf '%s\n' "$report"
+          if [ "$status" -eq 0 ]; then
+            verdict=PASS
+          else
+            verdict=FAIL
+          fi
+          details="$(printf '%s\n' "$report" | tail -n 1)"
+          printf '| `%s` | %s | %s; exit %s; report mode |\n' 'product independence' "$verdict" "$details" "$status" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
       - name: Gate tsc:full
         if: ${{ always() && steps.scripts.outputs.tsc_full == 'true' }}
         continue-on-error: true

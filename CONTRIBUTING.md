@@ -57,8 +57,11 @@ workspaces/<name>/
 Use the [dev shell and Product definitions in CONTEXT.md](CONTEXT.md). In structure,
 `packages/app` and `packages/backend` contain only the shell, fixtures, wiring, and
 development configuration; `plugins/` contains what is exported. The dev shell is
-never published. The check is simple: delete `packages/`, and the `dist-dynamic`
-export must still be complete.
+never published. Product packages must remain independent of `packages/`: the
+[`check-product-independence.js`](scripts/ci/check-product-independence.js) CI check
+runs Backstage's `@backstage/no-undeclared-imports` and `@backstage/no-relative-monorepo-imports`
+rules on product source and scans product package metadata for references into the dev
+shell. Proof 2 still verifies the actual dynamic export in the local runner.
 
 Static plugins are imported into the dev shell at build time. Dynamic plugins are
 exported by the Red Hat Developer Hub CLI into a plugin's `dist-dynamic/` directory

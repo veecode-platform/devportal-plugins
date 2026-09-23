@@ -5,7 +5,7 @@
   "scripts": {
     "create-workspace": "node scripts/create-workspace.js",
     "test:create-workspace": "node --test scripts/create-workspace.test.js",
-    "test": "node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js scripts/ci/verify-changesets.test.js scripts/ci/check-dynamic-plugin-config.test.js",
+    "test": "node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js scripts/ci/verify-changesets.test.js scripts/ci/check-dynamic-plugin-config.test.js scripts/ci/check-product-independence.test.js",
     "check:workspace-harnesses": "node scripts/ci/check-workspace-harnesses.js"
   },
   "packageManager": "yarn@4.12.0"
