@@ -25,8 +25,8 @@ The common library and scaffolder backend module remain static packages. The
 service-manager backend and frontend depend on the common package with
 `workspace:^`; the dev shell depends on the product packages for local wiring.
 
-The local configuration includes `examples/`, `dynamic-plugins.yaml`, and
-`app-config.dynamic.yaml`. See
+The local configuration is `examples/` and `dynamic-plugins.yaml`, which registers
+those fixtures and the Kong instance in the runner. See
 [workspace layout](../../CONTRIBUTING.md#workspace-layout) and
 [CONTEXT.md](../../CONTEXT.md) for the dev shell/Product boundary.
 

@@ -8,3 +8,17 @@ spec:
   #owner: guests
   owner: admins
 ---
+# https://backstage.io/docs/features/software-catalog/descriptor-format#kind-component
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: example-github-service
+  description: Example component with the annotations the GitHub Workflows plugins read.
+  annotations:
+    github.com/project-slug: veecode-platform/devportal-plugins
+    github.com/workflows: ci.yml
+spec:
+  type: service
+  lifecycle: experimental
+  owner: admins
+  system: examples

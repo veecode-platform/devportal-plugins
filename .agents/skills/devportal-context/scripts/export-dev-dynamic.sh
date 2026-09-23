@@ -240,5 +240,11 @@ services:
       - ./dynamic-plugins-src-dev:/opt/app-root/src/dynamic-plugins-src
 YAML
 
+# The catalog fixtures a workspace's dynamic-plugins.yaml registers live in its
+# examples/; the portal reads them at the path the per-workspace composes used.
+if [[ -d "$workspace_root/examples" ]]; then
+  printf '  devportal:\n    volumes:\n      - "%s:/opt/app-root/src/examples:ro"\n' "$workspace_root/examples" >> "$local_compose_override"
+fi
+
 printf '\nRun in devportal-local:\n'
 printf 'cd %q && docker compose -f docker-compose.yml -f docker-compose.dynamic-plugins-root.yml -f dynamic-plugins-root-dev/docker-compose.dynamic-plugins-root.local.yml up -d\n' "$devportal_local_dir"

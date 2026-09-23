@@ -4,6 +4,23 @@ includes:
 plugins:
   - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-backend-dynamic
     disabled: false
+    pluginConfig:
+      catalog:
+        locations:
+          - type: file
+            target: /opt/app-root/src/examples/entities.yaml
+          - type: file
+            target: /opt/app-root/src/examples/org.yaml
+            rules:
+              - allow: [User, Group]
+          - type: file
+            target: /opt/app-root/src/examples/template/template.yaml
+            rules:
+              - allow: [Template]
+      kong:
+        instances:
+          - id: default
+            apiBaseUrl: http://manager.localdomain:8000
   - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-kong-service-manager-dynamic
     disabled: false
     pluginConfig:

@@ -4,6 +4,11 @@ includes:
 plugins:
   - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-backend-dynamic
     disabled: false
+    pluginConfig:
+      catalog:
+        locations:
+          - type: file
+            target: /opt/app-root/src/examples/entities.yaml
   - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-dynamic
     disabled: false
     pluginConfig:
