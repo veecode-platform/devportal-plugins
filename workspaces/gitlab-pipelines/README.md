@@ -89,9 +89,11 @@ feature is disabled.
 Proof 2 runs in `devportal-local`. From this workspace, `yarn dev:dynamic`
 exports the frontend and backend (embedding the private common package),
 writes the runner's local plugin config and prints the exact `devportal-local`
-command to run. That run proves both dynamic plugins load; it makes no live
-GitLab call. Exercising pipeline data and actions needs a test GitLab host and
-token in the portal's configuration.
+command to run. The runner registers the example entity from `examples/`, so
+its CI tab renders. The tab shows the plugin's empty state there, because the
+runner passes no GitLab host or token to the portal, and the backend refuses
+the guest, who does not own the example entity. Exercising pipeline data and actions needs
+a test GitLab host and token in the portal's configuration.
 
 ## Development
 
