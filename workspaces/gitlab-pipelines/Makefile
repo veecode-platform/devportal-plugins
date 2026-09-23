@@ -97,14 +97,14 @@ clean-dynamic:
 	rm -rf $(BACKEND_DIR)/dist-dynamic
 	@echo "Cleaned. Run build-dynamic to rebuild."
 
-# Internal: Replace workspace:* references with versioned refs before publish
+# Internal: Prepare workspace:* references for legacy package packing
 replace-workspace:
 	@echo "Replacing workspace: references with version $(VERSION)..."
 	@$(SED_INPLACE) 's/"@veecode-platform\/gitlab-pipelines-common": "workspace:\*"/"@veecode-platform\/gitlab-pipelines-common": "^$(VERSION)"/' $(FRONTEND_DIR)/package.json
 	@$(SED_INPLACE) 's/"@veecode-platform\/gitlab-pipelines-common": "workspace:\*"/"@veecode-platform\/gitlab-pipelines-common": "^$(VERSION)"/' $(BACKEND_DIR)/package.json
 	@echo "Workspace references replaced with ^$(VERSION)"
 
-# Internal: Restore workspace:* references after publish
+# Internal: Restore workspace:* references after legacy package packing
 restore-workspace:
 	@echo "Restoring workspace: references..."
 	@$(SED_INPLACE) 's/"@veecode-platform\/gitlab-pipelines-common": "\^$(VERSION)"/"@veecode-platform\/gitlab-pipelines-common": "workspace:*"/' $(FRONTEND_DIR)/package.json

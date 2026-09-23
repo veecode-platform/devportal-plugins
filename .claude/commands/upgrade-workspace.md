@@ -28,9 +28,8 @@ checkpoints.
 
 3. **Capture current Backstage version**:
 
-   Record the current `@backstage/core-plugin-api` version (or another
-   `@backstage/*` package) from `package.json` or `yarn.lock` so the
-   report can show the before/after delta.
+   Record the workspace's current Backstage release from its root `backstage.json`
+   so the report can show the before/after delta.
 
 4. **Run the upgrade**:
 

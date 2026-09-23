@@ -54,7 +54,7 @@ set-version:
 build:
 	YARN_ENABLE_IMMUTABLE_INSTALLS=false yarn install && yarn tsc && yarn build:all
 
-# Build all dynamic plugins (requires common to be published first)
+# Build dynamic exports for the frontend and backend plugins
 build-dynamic: build
 	cd $(FRONTEND_DIR) && rm -f dist/remoteEntry.js dist/remoteEntry.js.map dist/mf-manifest.json dist/mf-stats.json && rm -rf dist/@mf-types dist/compiled-types && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
 	cd $(BACKEND_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@latest plugin export
@@ -96,14 +96,14 @@ clean-dynamic:
 	rm -rf $(BACKEND_DIR)/dist-dynamic
 	@echo "Cleaned. Run build-dynamic to rebuild."
 
-# Internal: Replace workspace:* references with versioned refs before publish
+# Internal: Prepare workspace:* references for legacy package packing
 replace-workspace:
 	@echo "Replacing workspace: references with version $(VERSION)..."
 	@$(SED_INPLACE) 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(FRONTEND_DIR)/package.json
 	@$(SED_INPLACE) 's/"@veecode-platform\/github-workflows-common": "workspace:\*"/"@veecode-platform\/github-workflows-common": "^$(VERSION)"/' $(BACKEND_DIR)/package.json
 	@echo "Workspace references replaced with ^$(VERSION)"
 
-# Internal: Restore workspace:* references after publish
+# Internal: Restore workspace:* references after legacy package packing
 restore-workspace:
 	@echo "Restoring workspace: references..."
 	@$(SED_INPLACE) 's/"@veecode-platform\/github-workflows-common": "\^$(VERSION)"/"@veecode-platform\/github-workflows-common": "workspace:*"/' $(FRONTEND_DIR)/package.json

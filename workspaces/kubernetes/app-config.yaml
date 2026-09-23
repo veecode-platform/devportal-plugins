@@ -2,7 +2,7 @@ app:
   title: Scaffolded Backstage App
   baseUrl: http://localhost:3000
   
-  # Enable experimental feature discovery - auto-discovers plugins from package.json:
+  # Discover plugins from package.json:
   packages: all
     
   # New Frontend System - Extension Configuration

@@ -54,18 +54,11 @@ plugins:
     disabled: false
 ```
 
-#### Red Hat Developer Hub (RHDH)
+#### OCI Distribution
 
-RHDH can **download the plugin at runtime** using NPM. Add it to `dynamic-plugins.yaml`:
-
-```yaml
-plugins:
-  - package: '@veecode-platform/backstage-plugin-github-workflows-backend-dynamic@^1.0.0'
-    disabled: false
-    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-```
-
-> 💡 **Tip**: Check the [npm registry](https://www.npmjs.com/package/@veecode-platform/backstage-plugin-github-workflows-backend-dynamic) for the latest version and integrity hash.
+This plugin ships as an OCI artifact through `devportal-plugin-export-overlays`.
+DevPortal installs it from `quay.io/veecode`; see the [root README](../../../../README.md)
+for the distribution flow.
 
 ## Configuration
 
@@ -228,9 +221,9 @@ If you want to run the entire project, including the frontend, run `yarn start` 
 
 This backend plugin is a critical component of the GitHub Workflows integration:
 
-- **Static Installation**: Install via yarn and add to `packages/backend/src/index.ts`
+- **Static Wiring**: Add the backend plugin registration to `packages/backend/src/index.ts`
 - **Dynamic Installation**:
   - **VeeCode DevPortal**: Bundled in file system, enable in `dynamic-plugins.yaml`
-  - **RHDH**: Downloaded at runtime via NPM, configure in `dynamic-plugins.yaml`
+  - **OCI distribution**: The plugin ships through `devportal-plugin-export-overlays`; DevPortal installs it from `quay.io/veecode`. See the [root README](../../../../README.md) for the distribution flow.
 - **Configuration**: GitHub App (recommended) or Personal Access Token in `app-config.yaml`
 - **Frontend**: Works with the [GitHub Workflows frontend plugin](../github-workflows/README.md)

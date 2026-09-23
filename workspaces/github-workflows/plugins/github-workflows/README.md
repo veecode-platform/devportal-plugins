@@ -31,54 +31,10 @@ Before installing the plugin, ensure you have:
 
 ## Installation
 
-This plugin supports both **static linking** (traditional Backstage) and **dynamic plugin loading** (VeeCode DevPortal and Red Hat Developer Hub).
-
-> ⚠️ **Backend Plugin Required**: Before installing the frontend plugin, ensure the GitHub Workflows backend plugin is installed. See the [backend plugin documentation](../github-workflow-backend/README.md) for installation instructions.
-
-### Static Installation
-
-Add the frontend plugin package to your Backstage app:
-
-```bash
-yarn workspace app add @veecode-platform/backstage-plugin-github-workflows
-```
-
-> ⚠️ **Note**: The new Backstage frontend system is not yet supported (Work in Progress). The plugin currently uses the legacy frontend system.
-
-### Dynamic Installation
-
-Dynamic plugin installation is available for both **VeeCode DevPortal** and **Red Hat Developer Hub (RHDH)**.
-
-#### VeeCode DevPortal
-
-The plugin is **bundled in the file system** and ready to use. Enable it in `dynamic-plugins.yaml`:
-
-```yaml
-plugins:
-  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-github-workflows-dynamic
-    disabled: false
-```
-
-#### Red Hat Developer Hub (RHDH)
-
-RHDH can **download the plugin at runtime** using NPM. Add it to `dynamic-plugins.yaml`:
-
-```yaml
-plugins:
-  - package: '@veecode-platform/backstage-plugin-github-workflows-dynamic@^1.0.0'
-    disabled: false
-    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-    pluginConfig:
-      dynamicPlugins:
-        frontend:
-          veecode-platform.backstage-plugin-github-workflows:
-            appIcons:
-              - name: githubWorkflowsIcon
-                module: GithubWorkflowsPlugin
-                importName: GithubWorkflowsIcon
-```
-
-> 💡 **Tip**: Check the [npm registry](https://www.npmjs.com/package/@veecode-platform/backstage-plugin-github-workflows-dynamic) for the latest version and integrity hash.
+This plugin ships as an OCI artifact through `devportal-plugin-export-overlays`.
+DevPortal installs it from `quay.io/veecode`; see the [root README](../../../../README.md)
+for the distribution flow. The backend plugin is also required; see the
+[backend plugin README](../github-workflow-backend/README.md).
 
 ## Configuration
 
@@ -194,9 +150,9 @@ RHDH may require additional mountpoint configuration:
 
 ```yaml
 plugins:
-  - package: '@veecode-platform/backstage-plugin-github-workflows-dynamic@^1.0.0'
+  # Tag from the overlay metadata: bs_<backstage>__<version>
+  - package: oci://quay.io/veecode/veecode-platform-backstage-plugin-github-workflows:bs_<backstage>__<version>!veecode-platform-backstage-plugin-github-workflows
     disabled: false
-    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     pluginConfig:
       dynamicPlugins:
         frontend:

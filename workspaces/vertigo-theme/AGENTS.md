@@ -22,8 +22,8 @@ expresses the equivalent themes and mount-point contract.
 ## How to test
 
 The app and Playwright smoke test prove the static harness. `yarn tsc:full` and
-`yarn dev:dynamic` cover source and export evidence. Runtime dynamic loading is
-separate and must use the `devportal-local` flow in `../../CONTRIBUTING.md`.
+`yarn dev:dynamic` cover source and export evidence. See the [four proofs and
+official flow](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
 
 ## Pull requests and changesets
 

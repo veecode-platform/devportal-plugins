@@ -14,7 +14,7 @@ workspaces/dummy/
 │   └── dummy-backend/    # Backend plugin (@veecode-platform/backstage-plugin-dummy-backend)
 ├── dynamic-plugins.yaml  # Dynamic plugin configuration
 ├── app-config.yaml       # Backstage config for local development
-└── Makefile              # Build, publish, and utility targets
+└── Makefile              # Build, packaging, and utility targets
 ```
 
 ## Quick Start
@@ -44,9 +44,8 @@ Both plugins are available as static "normal" plugins and as a dynamic plugins. 
 
 See the [Makefile](Makefile) for more details on the build/package process.
 
-- There are targets for building, packing, and publishing both static and dynamic versions of the plugins.
-- There are targets for getting the latest version in npm registry and unpublishing all packages (they work well with local registries).
-- There are targets for cleaning up builds - just the `dist-dynamic` directories (to force fresh export with latest dependencies), or all build artifacts (like `dist` and `dist-dynamic` and even `node_modules`).
+- The Makefile provides `build`, `build-dynamic`, `pack`, `pack-dynamic`, and `set-version` targets.
+- `make clean-dynamic` removes the `dist-dynamic` directories; `make clean` removes build artifacts and local dependencies.
 
 ## Testing
 

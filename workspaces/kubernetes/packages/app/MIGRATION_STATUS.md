@@ -13,8 +13,7 @@ The plugin is automatically discovered and loaded through:
 ```yaml
 # app-config.yaml
 app:
-  experimental:
-    packages: all  # Auto-discovers all plugins with /alpha exports
+  packages: all  # Auto-discovers all plugins with /alpha exports
 ```
 
 This means `@backstage/plugin-kubernetes/alpha` is automatically loaded from `package.json` without explicit imports.
@@ -71,7 +70,7 @@ That's it! Clean and minimal. 🎉
 
 To verify the Kubernetes plugin is working:
 
-1. Start the app: `yarn dev`
+1. Start the app: `yarn start`
 2. Navigate to an entity with Kubernetes annotations
 3. Look for the "KUBERNETES" tab on the entity page
 4. The tab appears for entities with `kind:component` or `kind:resource`

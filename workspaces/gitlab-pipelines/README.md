@@ -74,7 +74,7 @@ The directive is the first of three layers: the scaffolder templates
 additionally gate the deploy job on the catalog file still existing and
 re-check the default branch at deploy time, because `[skip ci]` does not cover a human
 retrying an older deploy job or a project whose CI policy ignores skip
-directives. See [ADR-001](DECISIONS.md).
+directives. See [PDR-001](DECISIONS.md#pdr-001-unregister-commit-skips-ci).
 
 The CI/CD tab (`GitlabPipelineList`) surfaces these operations in a
 "Teardown Operations" card below the pipelines table: state (pending,

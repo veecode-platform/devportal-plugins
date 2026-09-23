@@ -27,7 +27,7 @@ export default defineConfig({
     timeout: 5_000,
   },
 
-  // Run your local dev server before starting the tests
+  // The webServer block starts the app and backend for local runs.
   webServer: process.env.CI
     ? []
     : [

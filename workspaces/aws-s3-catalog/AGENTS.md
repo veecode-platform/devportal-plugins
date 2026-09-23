@@ -24,8 +24,8 @@ not call AWS or prove remote S3 discovery.
 
 The backend-module role is covered by the backend harness, package gates, and
 the dynamic export. The local fixture only covers catalog file wiring; it does
-not prove AWS access or remote ingestion. Use the four proofs and official flow
-in `../../CONTRIBUTING.md`; do not treat an export as runtime proof by itself.
+not prove AWS access or remote ingestion. Use the
+[four proofs and official flow](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
 
 ## Pull requests and changesets
 
