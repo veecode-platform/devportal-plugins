@@ -30,6 +30,10 @@ function decidePermission(role: Role, permissionName: string): 'ALLOW' | 'DENY' 
   return 'DENY';
 }
 
+// The example entity in examples/entities.yaml carries the Kong annotations; the
+// plugin's Service, Plugins and Routes tabs live under its /kong entity tab.
+const ENTITY_KONG_TAB = '/catalog/default/component/example-kong-service/kong';
+
 // ---------------------------------------------------------------------------
 // Mock Kong backend data
 // ---------------------------------------------------------------------------
@@ -129,7 +133,7 @@ async function mockPermissionsForRole(page: Page, role: Role) {
 
 async function mockKongBackend(page: Page) {
   // Service info
-  await page.route('**/api/kong-service-manager/*/services/*', async (route: PwRoute) => {
+  await page.route('**/api/kong-service-manager-backend/*/services/**', async (route: PwRoute) => {
     if (route.request().method() !== 'GET') {
       await route.continue();
       return;
@@ -169,7 +173,7 @@ async function mockKongBackend(page: Page) {
   });
 
   // Available plugins
-  await page.route('**/api/kong-service-manager/*/plugins', async (route: PwRoute) => {
+  await page.route('**/api/kong-service-manager-backend/*/plugins', async (route: PwRoute) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -178,7 +182,7 @@ async function mockKongBackend(page: Page) {
   });
 
   // Route associated plugins
-  await page.route('**/api/kong-service-manager/*/routes/*/plugins/associated', async (route: PwRoute) => {
+  await page.route('**/api/kong-service-manager-backend/*/routes/*/plugins/associated', async (route: PwRoute) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -208,7 +212,7 @@ test.describe('Permission visibility — Admin', () => {
 
     // Navigate to the entity page with kong-service-manager
     // The exact URL depends on the catalog entity; use a known test entity
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     // Click the Plugins tab
     await page.getByRole('tab', { name: 'Plugins' }).click();
@@ -220,7 +224,7 @@ test.describe('Permission visibility — Admin', () => {
   });
 
   test('Routes tab: Create Route, Edit, Delete visible', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -242,7 +246,7 @@ test.describe('Permission visibility — Operator', () => {
   });
 
   test('Plugins tab: Enable and the enabled toggle visible', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -257,7 +261,7 @@ test.describe('Permission visibility — Operator', () => {
   });
 
   test('Routes tab: Create Route NOT visible, Edit/Delete NOT visible', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -283,7 +287,7 @@ test.describe('Permission visibility — Viewer', () => {
   });
 
   test('Plugins tab: no mutation controls (toggle/Enable), data still shows', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -301,7 +305,7 @@ test.describe('Permission visibility — Viewer', () => {
   });
 
   test('Routes tab: data visible, no mutation buttons', async ({ page }) => {
-    await page.goto('/catalog/default/component/my-service');
+    await page.goto(ENTITY_KONG_TAB);
 
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
