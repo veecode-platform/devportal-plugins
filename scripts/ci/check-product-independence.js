@@ -153,42 +153,49 @@ function sourceFiles(directory) {
   return files.sort();
 }
 
-// Product code is what the package ships: src/ plus any source its manifest
-// lists in `files`, such as migrations/ or config.d.ts. Build output is not.
+// Product code is what the package ships: src/ plus whatever else npm would
+// pack from source, such as migrations/ or config.d.ts. npm resolves the
+// `files` globs and negations itself. Build output is not source.
 function shippedSourceFiles(pluginRoot) {
   const sourceRoot = path.join(pluginRoot, 'src');
   if (!fs.existsSync(sourceRoot)) return sourceFiles(pluginRoot);
 
-  const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'package.json'), 'utf8'));
-  const listed = (manifest.files ?? [])
-    .filter(entry => typeof entry === 'string')
-    .map(entry => path.resolve(pluginRoot, entry))
-    .filter(target => {
-      const name = path.basename(target);
-      return isWithin(pluginRoot, target) && !isWithin(sourceRoot, target) &&
-        !IGNORED_DIRECTORIES.has(name) && !name.startsWith('dist-') && fs.existsSync(target);
-    });
-  const files = [sourceRoot, ...listed].flatMap(target => {
-    if (fs.statSync(target).isDirectory()) return sourceFiles(target);
-    return SOURCE_EXTENSIONS.has(path.extname(target)) ? [target] : [];
+  const packed = spawnSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
+    cwd: pluginRoot,
+    encoding: 'utf8',
   });
-  return [...new Set(files)].sort();
+  if (packed.error) throw packed.error;
+  if (packed.status !== 0) {
+    throw new Error(`npm pack --dry-run failed in ${pluginRoot}: ${packed.stderr.trim()}`);
+  }
+  const listed = JSON.parse(packed.stdout)[0].files
+    .map(file => path.join(pluginRoot, file.path))
+    .filter(file => SOURCE_EXTENSIONS.has(path.extname(file)) && !isWithin(sourceRoot, file) &&
+      !path.relative(pluginRoot, file).split(path.sep)
+        .some(part => IGNORED_DIRECTORIES.has(part) || part.startsWith('dist-')));
+  return [...new Set([...sourceFiles(sourceRoot), ...listed])].sort();
 }
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\u002F');
 }
 
-// One selector per dev shell package covers every import form: static and
-// dynamic imports, re-exports and require(). The name is anchored, so
-// `@scope/backend` or `x/backend` do not match `backend`.
+// One selector set per dev shell package covers every import form with a
+// literal specifier: static and dynamic imports, re-exports, require() and
+// require.resolve(), with a string or a template literal. A template is
+// matched on its leading text, so `backend/${x}` still counts. The name is
+// anchored, so `@scope/backend` or `x/backend` do not match `backend`.
 function devShellSelectors(names) {
   return names.flatMap(name => {
     const pattern = `/^${escapeRegExp(name)}(\\u002F|$)/`;
     const message = `${DEV_SHELL_IMPORT} (${name})`;
     return [
       { selector: `:matches(ImportDeclaration, ExportAllDeclaration, ExportNamedDeclaration, ImportExpression)[source.value=${pattern}]`, message },
-      { selector: `CallExpression[callee.name='require'][arguments.0.value=${pattern}]`, message },
+      { selector: `ImportExpression[source.quasis.0.value.cooked=${pattern}]`, message },
+      {
+        selector: `CallExpression:matches([callee.name='require'], [callee.object.name='require'][callee.property.name='resolve']):matches([arguments.0.value=${pattern}], [arguments.0.quasis.0.value.cooked=${pattern}])`,
+        message,
+      },
     ];
   });
 }

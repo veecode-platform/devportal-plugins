@@ -108,14 +108,16 @@ test('keeps the Backstage import rules and dev shell restrictions, nothing else'
   ]);
 });
 
-test('lints what the package ships: src and listed source, not build output', () => {
+test('lints what the package ships: src and packed source, not build output', () => {
   const root = makeWorkspace({
     'plugins/example/package.json': JSON.stringify({
       name: '@example/plugin',
-      files: ['dist', 'dist-dynamic', 'migrations', 'config.d.ts', 'README.md'],
+      version: '0.0.0',
+      files: ['dist', 'dist-dynamic', 'migrations/*.js', '!migrations/excluded.js', 'config.d.ts', 'README.md'],
     }),
     'plugins/example/src/index.ts': '',
     'plugins/example/migrations/001_init.js': '',
+    'plugins/example/migrations/excluded.js': '',
     'plugins/example/config.d.ts': '',
     'plugins/example/dist/index.cjs.js': '',
     'plugins/example/dist-dynamic/index.js': '',

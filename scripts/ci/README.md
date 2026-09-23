@@ -18,12 +18,14 @@ file; it is invoked after the workspace install and remains report-mode in CI.
 
 `check-product-independence.js` runs from a workspace root after `yarn install`.
 It runs the installed ESLint against what each product package ships from source
-(`src/` plus any source its `files` lists, such as `migrations/` or `config.d.ts`) with
-the Backstage ESLint factory, reads JSON output, and reports only
+(`src/` plus any other source `npm pack --dry-run` lists, such as `migrations/` or
+`config.d.ts`) with the Backstage ESLint factory, reads JSON output, and reports only
 `@backstage/no-undeclared-imports` and `@backstage/no-relative-monorepo-imports`
-findings, plus imports of a `packages/` package by name in any form (static or dynamic
-import, re-export, `require`), which it restricts with `no-restricted-syntax` because
-`no-undeclared-imports` skips a package Node cannot resolve. It also scans product package
+findings, plus imports of a `packages/` package by name with a literal specifier in any
+form (static or dynamic import, re-export, `require`, `require.resolve`), which it
+restricts with `no-restricted-syntax` because `no-undeclared-imports` skips a package
+Node cannot resolve. A specifier computed at runtime, such as `import(name)`, cannot be
+checked statically. It also scans product package
 metadata (`backstage.pluginPackages`, `scalprum.exposedModules`, `files`) for references
 into `packages/`. It returns 1 when either check finds a reference. CI records the
 result in report mode.
