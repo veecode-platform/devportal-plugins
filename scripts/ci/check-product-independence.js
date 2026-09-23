@@ -153,6 +153,46 @@ function sourceFiles(directory) {
   return files.sort();
 }
 
+// Product code is what the package ships: src/ plus any source its manifest
+// lists in `files`, such as migrations/ or config.d.ts. Build output is not.
+function shippedSourceFiles(pluginRoot) {
+  const sourceRoot = path.join(pluginRoot, 'src');
+  if (!fs.existsSync(sourceRoot)) return sourceFiles(pluginRoot);
+
+  const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'package.json'), 'utf8'));
+  const listed = (manifest.files ?? [])
+    .filter(entry => typeof entry === 'string')
+    .map(entry => path.resolve(pluginRoot, entry))
+    .filter(target => {
+      const name = path.basename(target);
+      return isWithin(pluginRoot, target) && !isWithin(sourceRoot, target) &&
+        !IGNORED_DIRECTORIES.has(name) && !name.startsWith('dist-') && fs.existsSync(target);
+    });
+  const files = [sourceRoot, ...listed].flatMap(target => {
+    if (fs.statSync(target).isDirectory()) return sourceFiles(target);
+    return SOURCE_EXTENSIONS.has(path.extname(target)) ? [target] : [];
+  });
+  return [...new Set(files)].sort();
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\u002F');
+}
+
+// One selector per dev shell package covers every import form: static and
+// dynamic imports, re-exports and require(). The name is anchored, so
+// `@scope/backend` or `x/backend` do not match `backend`.
+function devShellSelectors(names) {
+  return names.flatMap(name => {
+    const pattern = `/^${escapeRegExp(name)}(\\u002F|$)/`;
+    const message = `${DEV_SHELL_IMPORT} (${name})`;
+    return [
+      { selector: `:matches(ImportDeclaration, ExportAllDeclaration, ExportNamedDeclaration, ImportExpression)[source.value=${pattern}]`, message },
+      { selector: `CallExpression[callee.name='require'][arguments.0.value=${pattern}]`, message },
+    ];
+  });
+}
+
 function extractLintFindings(jsonOutput, workspaceRoot) {
   const output = jsonOutput.trim();
   let results;
@@ -176,7 +216,7 @@ function extractLintFindings(jsonOutput, workspaceRoot) {
 
   return results.flatMap(result => result.messages
     .filter(message => RULE_IDS.has(message.ruleId) || (
-      message.ruleId === 'no-restricted-imports' && message.message.includes(DEV_SHELL_IMPORT)
+      message.ruleId === 'no-restricted-syntax' && message.message.includes(DEV_SHELL_IMPORT)
     ))
     .map(message => ({
       file: relativePath(workspaceRoot, result.filePath),
@@ -208,20 +248,13 @@ function runLint(workspaceRoot) {
   // the factory's test-file override would otherwise match every file and
   // replace this rule.
   const devShellRule = devShellNames.length === 0 ? [] : ['--rule', JSON.stringify({
-    'no-restricted-imports': [2, {
-      patterns: [{ group: devShellNames.map(name => `/${name}`), message: DEV_SHELL_IMPORT }],
-    }],
+    'no-restricted-syntax': [2, ...devShellSelectors(devShellNames)],
   })];
 
   const findings = [];
   try {
     for (const [index, pluginRoot] of plugins.entries()) {
-      // Product code is what the package builds from; dev/, migrations/ and
-      // similar folders are outside it and may carry no ESLint config.
-      const sourceRoot = path.join(pluginRoot, 'src');
-      const sourcePaths = sourceFiles(pluginRoot).filter(file =>
-        !fs.existsSync(sourceRoot) || isWithin(sourceRoot, file),
-      );
+      const sourcePaths = shippedSourceFiles(pluginRoot);
       if (sourcePaths.length === 0) continue;
 
       const configPath = path.join(tempConfigRoot, `eslint-${index}.cjs`);
@@ -290,4 +323,5 @@ if (require.main === module) {
 module.exports = {
   extractLintFindings,
   scanWorkspace,
+  shippedSourceFiles,
 };

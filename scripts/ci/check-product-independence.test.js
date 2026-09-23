@@ -7,6 +7,7 @@ const test = require('node:test');
 const {
   extractLintFindings,
   scanWorkspace,
+  shippedSourceFiles,
 } = require('./check-product-independence.js');
 
 function makeWorkspace(files) {
@@ -67,14 +68,14 @@ test('keeps the Backstage import rules and dev shell restrictions, nothing else'
           message: "Relative imports of monorepo packages are forbidden, use 'app/src/App' instead",
         },
         {
-          ruleId: 'no-restricted-imports',
+          ruleId: 'no-restricted-syntax',
           line: 5,
-          message: "'backend' import is restricted from being used by a pattern. imports a dev shell package from packages/",
+          message: 'imports a dev shell package from packages/ (backend)',
         },
         {
-          ruleId: 'no-restricted-imports',
+          ruleId: 'no-restricted-syntax',
           line: 6,
-          message: "'lodash' import is restricted from being used.",
+          message: 'Using a labeled statement is not allowed.',
         },
         { ruleId: 'prettier/prettier', line: 9, message: 'formatting issue' },
       ],
@@ -95,8 +96,8 @@ test('keeps the Backstage import rules and dev shell restrictions, nothing else'
     {
       file: 'plugins/example/src/index.ts',
       line: 5,
-      rule: 'no-restricted-imports',
-      message: "'backend' import is restricted from being used by a pattern. imports a dev shell package from packages/",
+      rule: 'no-restricted-syntax',
+      message: 'imports a dev shell package from packages/ (backend)',
     },
     {
       file: 'plugins/example/src/index.ts',
@@ -105,4 +106,26 @@ test('keeps the Backstage import rules and dev shell restrictions, nothing else'
       message: '@backstage/errors must be declared in dependencies of plugins/example/package.json',
     },
   ]);
+});
+
+test('lints what the package ships: src and listed source, not build output', () => {
+  const root = makeWorkspace({
+    'plugins/example/package.json': JSON.stringify({
+      name: '@example/plugin',
+      files: ['dist', 'dist-dynamic', 'migrations', 'config.d.ts', 'README.md'],
+    }),
+    'plugins/example/src/index.ts': '',
+    'plugins/example/migrations/001_init.js': '',
+    'plugins/example/config.d.ts': '',
+    'plugins/example/dist/index.cjs.js': '',
+    'plugins/example/dist-dynamic/index.js': '',
+    'plugins/example/dev/index.tsx': '',
+    'plugins/example/README.md': '',
+  });
+  const pluginRoot = path.join(root, 'plugins/example');
+
+  assert.deepEqual(
+    shippedSourceFiles(pluginRoot).map(file => path.relative(pluginRoot, file)),
+    ['config.d.ts', 'migrations/001_init.js', 'src/index.ts'],
+  );
 });
