@@ -147,24 +147,23 @@ Dynamic plugin installation is available for both **VeeCode DevPortal** and **Re
 
 This is a module of the Kubernetes backend plugin, so that plugin must be enabled too. The dynamic build carries its own copy of `@backstage/plugin-kubernetes-backend`, `-node` and `-common`, because the portal has them only inside the Kubernetes backend plugin's directory, which other plugins cannot read.
 
-**Note**: The versions published on npm so far were built without that copy and fail to load on DevPortal 3.x (see [Troubleshooting](#cannot-find-module-backstageplugin-kubernetes-node-on-a-dynamic-install)). Until a release that bundles the libraries is published, export the module from this repository with `yarn export-dynamic` and load its `dist-dynamic` directory as a local dynamic plugin.
+**Note**: The versions published on npm so far (up to `1.1.0`) were built without that copy and fail to load on DevPortal 3.x (see [Troubleshooting](#cannot-find-module-backstageplugin-kubernetes-node-on-a-dynamic-install)). Until a release that bundles the libraries is published, load a local export as shown below.
 
 #### VeeCode DevPortal
 
-The DevPortal image ships the Kubernetes backend plugin, but not this module. Enable the plugin and add the module in `dynamic-plugins.yaml`:
+The DevPortal image ships the Kubernetes backend plugin, but not this module. Build the module with `yarn export-dynamic` in this directory, then mount its `dist-dynamic` directory into the portal container, for example at `/opt/app-root/src/dynamic-plugins-src/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic`. Local paths in `dynamic-plugins.yaml` resolve from `/opt/app-root/src`. Enable the plugin and add the module:
 
 ```yaml
 plugins:
   - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-backend-dynamic
     disabled: false
-  - package: '@veecode-platform/plugin-kubernetes-backend-module-getsecret-dynamic@<version>'
+  - package: ./dynamic-plugins-src/veecode-platform-plugin-kubernetes-backend-module-getsecret-dynamic
     disabled: false
-    integrity: sha512-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
 #### Red Hat Developer Hub (RHDH)
 
-RHDH can **download the plugin at runtime** using NPM. With the Kubernetes backend plugin enabled, add it to `dynamic-plugins.yaml`:
+RHDH can **download the plugin at runtime** using NPM, once a release that bundles the Kubernetes libraries is published (see the note above). With the Kubernetes backend plugin enabled, add it to `dynamic-plugins.yaml`:
 
 ```yaml
 plugins:
