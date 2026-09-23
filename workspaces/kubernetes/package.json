@@ -51,7 +51,8 @@
     "rollup": "4.9.0",
     "@rollup/rollup": "4.9.0",
     "@backstage/plugin-kubernetes-backend": "0.21.5",
-    "@backstage/plugin-kubernetes-node": "0.4.5"
+    "@backstage/plugin-kubernetes-node": "0.4.5",
+    "@backstage/plugin-kubernetes-common": "0.9.12"
   },
   "prettier": "@backstage/cli/config/prettier",
   "lint-staged": {
