@@ -118,10 +118,11 @@ async function mockPermissionsForRole(page: Page, role: Role) {
     const postData = request.postDataJSON();
     const items = postData?.items ?? [];
 
-    const results = items.map((item: { permission: { name: string } }) => {
-      const result = decidePermission(role, item.permission.name);
-      return { result };
-    });
+    // PermissionClient rejects a response whose ids do not match the request's.
+    const results = items.map((item: { id: string; permission: { name: string } }) => ({
+      id: item.id,
+      result: decidePermission(role, item.permission.name),
+    }));
 
     await route.fulfill({
       status: 200,
@@ -202,17 +203,12 @@ test.describe('Permission visibility — Admin', () => {
   });
 
   test('Plugins tab: Enable and the enabled toggle visible', async ({ page }) => {
-    await page.goto('/');
+    await page.goto(ENTITY_KONG_TAB);
 
-    // Sign in if guest provider shows Enter button
     const enterButton = page.getByRole('button', { name: 'Enter' });
     if (await enterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
       await enterButton.click();
     }
-
-    // Navigate to the entity page with kong-service-manager
-    // The exact URL depends on the catalog entity; use a known test entity
-    await page.goto(ENTITY_KONG_TAB);
 
     // Click the Plugins tab
     await page.getByRole('tab', { name: 'Plugins' }).click();
@@ -297,7 +293,7 @@ test.describe('Permission visibility — Viewer', () => {
     await page.getByRole('tab', { name: 'Plugins' }).click();
 
     // Plugin cards should still be visible (data is readable)
-    await expect(page.getByText('rate-limiting')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'rate-limiting' })).toBeVisible();
 
     // Mutation controls should NOT be visible for a viewer.
     await expect(page.getByRole('button', { name: 'Enable' })).toHaveCount(0);
