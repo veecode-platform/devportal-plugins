@@ -52,7 +52,9 @@ From the `devportal-plugins` workspace (read-only, never edited):
   is more than one candidate — same policy as
   [`devportal-context`](../devportal-context/SKILL.md)'s resolver.
 - `workspaces/<ws>/backstage.json` — the workspace's own Backstage pin, used
-  only for `spec.backstage.supportedVersions` in the generated metadata.
+  for `source.json`'s `repo-backstage-version` and for
+  `spec.backstage.supportedVersions`, both in new metadata and when bumping an
+  existing entry.
 - `workspaces/<ws>/dynamic-plugins.yaml` — cross-checked, report-only, to
   flag if the plugin folder doesn't look wired into the workspace's dev
   shell.
