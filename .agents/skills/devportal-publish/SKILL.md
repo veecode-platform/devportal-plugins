@@ -32,8 +32,7 @@ metadata agree with each other and with the source they claim to describe.
 The registry tag `spec.dynamicArtifact` writes to is immutable. If a content
 change ships under a version that already has a tag, the push is skipped, CI
 stays green, and the catalog index keeps pointing at the old digest — nobody
-gets an error. The local agent
-The `plugin-releaser` agent (a user-level Claude Code agent, when installed) drives
+gets an error. The `plugin-releaser` agent (a user-level Claude Code agent, when installed) drives
 the release cycle end to end and names the exact failure mode; this skill
 automates the part of its job that is mechanical (generating/updating the
 overlay files) and, more importantly, the part that is easy to get wrong by
@@ -132,8 +131,7 @@ vs. bundle tag-form table:
    contains a `package.json` at this same version — catches a stale ref that
    would make the overlay publish an older commit under today's version
    string
-4. a fifth check beyond the brief's four, because the data proved it
-   necessary: the tag's `bs_<version>` segment matches `versions.json`
+4. the tag's `bs_<version>` segment matches `versions.json`
    `.backstage`, **not** the workspace's own `backstage.json` /
    `source.json repo-backstage-version`. Evidence:
    `workspaces/mcp-integrations/source.json` declares
@@ -141,8 +139,7 @@ vs. bundle tag-form table:
    are `bs_1.52.0`, matching `versions.json`'s `1.52.0` — the workspace pin
    and the registry-wide publish line are different numbers, and minting a
    tag from the wrong one is exactly "a stale Backstage segment publishes to
-   a line nobody resolves" (`plugin-releaser`, step 2). This is a hard gate
-   like the other four, not a bonus.
+   a line nobody resolves" (`plugin-releaser`, step 2).
 
 A `FAIL` on any check exits non-zero and the run stops before `--open-pr` is
 even considered. Newly generated files also get a printed reminder about
