@@ -359,6 +359,7 @@ def render_new_metadata(facts: PluginFacts, flattened: str, repo_url: str, dynam
 
 VERSION_LINE_RE = re.compile(r"^(\s*version:\s*)(\S+)\s*$", re.MULTILINE)
 DYNAMIC_ARTIFACT_LINE_RE = re.compile(r"^(\s*dynamicArtifact:\s*)(\S+)\s*$", re.MULTILINE)
+SUPPORTED_VERSIONS_LINE_RE = re.compile(r"^(\s*supportedVersions:\s*)(\S+)\s*$", re.MULTILINE)
 
 
 def bump_existing_metadata(text: str, new_version: str, migrate_to_per_plugin: bool,
@@ -376,6 +377,11 @@ def bump_existing_metadata(text: str, new_version: str, migrate_to_per_plugin: b
     info = parse_dynamic_artifact(tag)
 
     new_text = VERSION_LINE_RE.sub(lambda mm: f"{mm.group(1)}{new_version}", text, count=1)
+
+    sv = SUPPORTED_VERSIONS_LINE_RE.search(new_text)
+    if sv and sv.group(2) != backstage_version:
+        new_text = SUPPORTED_VERSIONS_LINE_RE.sub(lambda mm: f"{mm.group(1)}{backstage_version}", new_text, count=1)
+        notes.append(f"set spec.backstage.supportedVersions from {sv.group(2)} to {backstage_version}")
 
     if info.form == "per-plugin":
         new_tag = f"oci://quay.io/veecode/{flattened}:bs_{info.backstage_segment}__{new_version}"

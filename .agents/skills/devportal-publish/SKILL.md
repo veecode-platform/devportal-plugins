@@ -51,7 +51,9 @@ From the `devportal-plugins` workspace (read-only, never edited):
   is more than one candidate — same policy as
   [`devportal-context`](../devportal-context/SKILL.md)'s resolver.
 - `workspaces/<ws>/backstage.json` — the workspace's own Backstage pin, used
-  only for `spec.backstage.supportedVersions` in the generated metadata.
+  for `source.json`'s `repo-backstage-version` and for
+  `spec.backstage.supportedVersions`, both in new metadata and when bumping an
+  existing entry.
 - `workspaces/<ws>/dynamic-plugins.yaml` — cross-checked, report-only, to
   flag if the plugin folder doesn't look wired into the workspace's dev
   shell.
@@ -85,7 +87,7 @@ Under `devportal-plugin-export-overlays/workspaces/<ws>/`:
 |---|---|---|
 | `source.json` | created (`repo`, `repo-ref`, `repo-flat: false`, `repo-backstage-version`) | rewritten only if any field differs |
 | `plugins-list.yaml` | `plugins/<plugin-dir>:` appended | appended only if the key is missing |
-| `metadata/<flattened-name>.yaml` | created from a `kind: Package` template, with `TODO(devportal-publish)` markers on the prose fields (title, links, support, `appConfigExamples`) that need a human | only `version:` and, for per-plugin-form tags, the `dynamicArtifact:` version segment are rewritten in place — everything else, including hand-written comments, is left untouched |
+| `metadata/<flattened-name>.yaml` | created from a `kind: Package` template, with `TODO(devportal-publish)` markers on the prose fields (title, links, support, `appConfigExamples`) that need a human | only `version:`, `supportedVersions:` and, for per-plugin-form tags, the `dynamicArtifact:` version segment are rewritten in place — everything else, including hand-written comments, is left untouched |
 
 `<flattened-name>` is `package.json .name` with the leading `@` stripped and
 `/` replaced by `-` — the same transform
