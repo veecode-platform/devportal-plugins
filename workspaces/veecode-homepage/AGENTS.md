@@ -6,6 +6,8 @@ Run commands from `workspaces/veecode-homepage/`.
 
 - `yarn install`, `yarn start`, `yarn tsc:full`, `yarn build:all`, `yarn test:all`, `yarn test:e2e`, `yarn lint:all`, and `yarn prettier:check` are the workspace gates.
 - Product package commands are available under `plugins/`.
+- `yarn dev:dynamic` exports the homepage product and prints the official `devportal-local`
+  proof command.
 
 ## Layout
 
