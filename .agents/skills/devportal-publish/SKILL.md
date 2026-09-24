@@ -88,7 +88,7 @@ Under `devportal-plugin-export-overlays/workspaces/<ws>/`:
 |---|---|---|
 | `source.json` | created (`repo`, `repo-ref`, `repo-flat: false`, `repo-backstage-version`) | rewritten only if any field differs |
 | `plugins-list.yaml` | `plugins/<plugin-dir>:` appended | appended only if the key is missing |
-| `metadata/<flattened-name>.yaml` | created from a `kind: Package` template, with `TODO(devportal-publish)` markers on the prose fields (title, links, support, `appConfigExamples`) that need a human | only `version:` and, for per-plugin-form tags, the `dynamicArtifact:` version segment are rewritten in place — everything else, including hand-written comments, is left untouched |
+| `metadata/<flattened-name>.yaml` | created from a `kind: Package` template, with `TODO(devportal-publish)` markers on the prose fields (title, links, support, `appConfigExamples`) that need a human | only `version:`, `supportedVersions:` and, for per-plugin-form tags, the `dynamicArtifact:` version segment are rewritten in place — everything else, including hand-written comments, is left untouched |
 
 `<flattened-name>` is `package.json .name` with the leading `@` stripped and
 `/` replaced by `-` — the same transform
