@@ -18,11 +18,11 @@ import { rootRouteRef } from './routes';
 import { homepageTranslationRef } from './translations';
 
 // Secure-context fallback: `crypto.randomUUID()` only exists on HTTPS/localhost
-// origins. On plain-HTTP deployments (local mirrors, air-gapped, tailnet IPs)
-// it is undefined and the upstream visits storage (`@backstage/plugin-home`
-// VisitsStorageApi.save) throws, so "Recently/Top visited" never records. Add a
-// small RFC-4122 v4 fallback (crypto.getRandomValues IS available on HTTP) at
-// plugin init so the plugin works on any origin.
+// origins. On a plain-HTTP deployment it is undefined and the upstream visits
+// storage (`@backstage/plugin-home` VisitsStorageApi.save) throws, so
+// "Recently/Top visited" never records. Add a small RFC-4122 v4 fallback
+// (crypto.getRandomValues IS available on HTTP) at plugin init so the plugin
+// works on any origin.
 if (
   typeof window !== 'undefined' &&
   window.crypto &&
