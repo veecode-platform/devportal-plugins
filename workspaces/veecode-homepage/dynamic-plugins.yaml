@@ -1,0 +1,23 @@
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-plugin-veecode-homepage-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.plugin-veecode-homepage:
+            translationResources:
+              - importName: homepageTranslations
+                ref: homepageTranslationRef
+            dynamicRoutes:
+              - path: /
+                importName: VeecodeHomepagePage
+                config:
+                  props:
+                    width: 1500
+                    height: 800
+            # The v3 shell mounts no VisitListener of its own, so without this
+            # entry visitsApi.save() is never called and the visited cards stay
+            # empty.
+            mountPoints:
+              - mountPoint: application/listener
+                importName: VisitListener
