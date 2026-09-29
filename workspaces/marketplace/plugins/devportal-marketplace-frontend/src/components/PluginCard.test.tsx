@@ -16,7 +16,9 @@
 
 import { BrowserRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
-import { TestApiProvider } from '@backstage/test-utils';
+import { mockApis, TestApiProvider } from '@backstage/test-utils';
+import { discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
+import { QueryClientProvider } from '@tanstack/react-query';
 
 import {
   ExtensionsPlugin,
@@ -24,7 +26,10 @@ import {
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
 
 import { PluginCard } from './PluginCard';
+import { dynamicPluginsInfoApiRef, extensionsApiRef } from '../api';
+import { queryClient } from '../queryclient';
 import { rootRouteRef, pluginRouteRef } from '../routes';
+import { Permission } from '../types';
 
 // Mock the route refs
 jest.mock('@backstage/core-plugin-api', () => ({
@@ -55,17 +60,62 @@ const mockPlugin: ExtensionsPlugin = {
   },
 };
 
-const renderPluginCard = (plugin: ExtensionsPlugin) => {
+const noPendingChanges = {
+  count: 0,
+  pendingInstalls: [],
+  pendingRemovals: [],
+  failedInstalls: [],
+};
+
+const renderPluginCard = (
+  plugin: ExtensionsPlugin,
+  pendingChanges: object = noPendingChanges,
+) => {
+  const apis = [
+    [
+      dynamicPluginsInfoApiRef,
+      { listLoadedPlugins: jest.fn().mockResolvedValue([]) },
+    ],
+    [discoveryApiRef, mockApis.discovery()],
+    [
+      fetchApiRef,
+      {
+        fetch: jest
+          .fn()
+          .mockResolvedValue({ ok: true, json: async () => pendingChanges }),
+      },
+    ],
+    [
+      extensionsApiRef,
+      {
+        getPluginConfigAuthorization: jest.fn().mockResolvedValue({
+          read: Permission.ALLOW,
+          write: Permission.ALLOW,
+        }),
+      },
+    ],
+  ] as const;
+
   return render(
-    <TestApiProvider apis={[]}>
-      <BrowserRouter>
-        <PluginCard plugin={plugin} />
-      </BrowserRouter>
+    <TestApiProvider apis={apis}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <PluginCard plugin={plugin} />
+        </BrowserRouter>
+      </QueryClientProvider>
     </TestApiProvider>,
   );
 };
 
+const statusChip = (label: string) =>
+  screen.getByText(label).closest('[class*="MuiChip-root"]');
+
 describe('PluginCard', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    queryClient.setDefaultOptions({ queries: { retry: false } });
+  });
+
   describe('Install Status Indicators', () => {
     it('should show "Installed" status for Installed plugin', () => {
       const pluginWithStatus = {
@@ -78,8 +128,9 @@ describe('PluginCard', () => {
 
       renderPluginCard(pluginWithStatus);
 
-      expect(screen.getByText('Installed')).toBeInTheDocument();
-      expect(screen.getByTestId('CheckCircleOutlineIcon')).toBeInTheDocument();
+      expect(statusChip('Installed')?.className).toContain(
+        'MuiChip-colorSuccess',
+      );
     });
 
     it('should show "Installed" status for UpdateAvailable plugin', () => {
@@ -93,8 +144,9 @@ describe('PluginCard', () => {
 
       renderPluginCard(pluginWithStatus);
 
-      expect(screen.getByText('Installed')).toBeInTheDocument();
-      expect(screen.getByTestId('CheckCircleOutlineIcon')).toBeInTheDocument();
+      expect(statusChip('Installed')?.className).toContain(
+        'MuiChip-colorSuccess',
+      );
     });
 
     it('should show "Disabled" status for Disabled plugin', () => {
@@ -108,8 +160,7 @@ describe('PluginCard', () => {
 
       renderPluginCard(pluginWithStatus);
 
-      expect(screen.getByText('Disabled')).toBeInTheDocument();
-      expect(screen.getByText('--')).toBeInTheDocument();
+      expect(statusChip('Disabled')?.className).toContain('MuiChip-colorError');
     });
 
     it('should not show any status for NotInstalled plugin', () => {
@@ -125,8 +176,6 @@ describe('PluginCard', () => {
 
       expect(screen.queryByText('Installed')).not.toBeInTheDocument();
       expect(screen.queryByText('Disabled')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('CheckCircleIcon')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('BlockIcon')).not.toBeInTheDocument();
     });
 
     it('should not show any status when installStatus is undefined', () => {
@@ -134,8 +183,6 @@ describe('PluginCard', () => {
 
       expect(screen.queryByText('Installed')).not.toBeInTheDocument();
       expect(screen.queryByText('Disabled')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('CheckCircleIcon')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('BlockIcon')).not.toBeInTheDocument();
     });
   });
 
