@@ -85,12 +85,12 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     const hasPendingRemoval = pendingChanges?.pendingRemovals?.some(
       pkg => extractName(pkg).includes(pluginName),
     ) ?? false;
-    const failedNames = new Set(
-      pendingChanges?.failedInstalls.map(extractName),
+    const failedRefs = new Set(
+      pendingChanges?.failedInstalls.map(normalizeRef),
     );
     const hasFailedInstall = (pluginPackages ?? []).some(pkg => {
       const artifact = pkg.spec?.dynamicArtifact;
-      return artifact !== undefined && failedNames.has(extractName(artifact));
+      return artifact !== undefined && failedRefs.has(normalizeRef(artifact));
     });
 
     if (hasPendingInstall) return 'pending-install';
@@ -119,10 +119,23 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
 const extractName = (pkg: string): string => {
   const ociIdx = pkg.indexOf('!');
   if (ociIdx !== -1) return pkg.substring(ociIdx + 1);
-  if (pkg.startsWith('oci://')) {
-    return pkg.substring(pkg.lastIndexOf('/') + 1).split(/[:@]/)[0];
-  }
   const lastSlash = pkg.lastIndexOf('/');
   if (lastSlash !== -1) return pkg.substring(lastSlash + 1);
   return pkg;
+};
+
+// A stored ref and the catalog ref of the same image may differ in tag or
+// digest, so those are dropped. The registry (with its port), the image path
+// and the selector stay, since they tell two packages apart.
+const normalizeRef = (ref: string): string => {
+  if (!ref.startsWith('oci://')) return ref;
+  const selectorIdx = ref.indexOf('!');
+  const image = selectorIdx === -1 ? ref : ref.substring(0, selectorIdx);
+  const selector = selectorIdx === -1 ? '' : ref.substring(selectorIdx);
+  const nameIdx = image.lastIndexOf('/') + 1;
+  return (
+    image.substring(0, nameIdx) +
+    image.substring(nameIdx).split(/[:@]/)[0] +
+    selector
+  );
 };
