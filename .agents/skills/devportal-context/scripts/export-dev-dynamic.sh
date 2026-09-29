@@ -17,6 +17,11 @@ dynamic_plugins_root="$devportal_local_dir/dynamic-plugins-root-dev"
 # plugin then dies with "Plugin '<id>' is already registered".
 export_source_root="$devportal_local_dir/dynamic-plugins-src-dev"
 workspace_dynamic_config="$workspace_root/dynamic-plugins.yaml"
+# Keep the default equal to `cli` in versions.json of devportal-plugin-export-overlays,
+# the CLI the published artifacts are built with. An unpinned `latest` broke this
+# export when 2.1.2 came out: its frontend export has no dist-scalprum, which the
+# runner needs.
+rhdh_cli_version=${RHDH_CLI_VERSION:-1.11.2}
 
 if [[ ! -f "$workspace_dynamic_config" ]]; then
   printf 'Workspace dynamic plugin config not found: %s\n' "$workspace_dynamic_config" >&2
@@ -78,11 +83,11 @@ export_one() {
       .filter((name) => !passed.includes(name));
     if (embedded.length > 0) console.log(["--embed-package", ...embedded].join("\n"));
   ' "$plugin_path/package.json" "${export_options[@]}")
-  printf 'Exporting %s to %s\n' "$plugin_dir" "$export_source_root"
+  printf 'Exporting %s to %s with @red-hat-developer-hub/cli@%s\n' "$plugin_dir" "$export_source_root" "$rhdh_cli_version"
   (
     cd -- "$plugin_path"
     YARN_ENABLE_IMMUTABLE_INSTALLS=false \
-      npx @red-hat-developer-hub/cli@latest plugin export \
+      npx "@red-hat-developer-hub/cli@$rhdh_cli_version" plugin export \
       --dev \
       --dynamic-plugins-root "$export_source_root" \
       "${embed_args[@]}" \
