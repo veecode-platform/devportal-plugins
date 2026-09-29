@@ -21,6 +21,7 @@ import { discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { QueryClientProvider } from '@tanstack/react-query';
 
 import {
+  ExtensionsPackage,
   ExtensionsPlugin,
   ExtensionsPluginInstallStatus,
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
@@ -67,9 +68,22 @@ const noPendingChanges = {
   failedInstalls: [],
 };
 
+const pluginPackage = (
+  name: string,
+  dynamicArtifact: string,
+): ExtensionsPackage => ({
+  apiVersion: 'extensions.backstage.io/v1alpha1',
+  kind: 'Package',
+  metadata: { name, namespace: 'default' },
+  spec: { dynamicArtifact },
+});
+
 const renderPluginCard = (
   plugin: ExtensionsPlugin,
-  pendingChanges: object = noPendingChanges,
+  {
+    pendingChanges = noPendingChanges,
+    packages = [],
+  }: { pendingChanges?: object; packages?: ExtensionsPackage[] } = {},
 ) => {
   const apis = [
     [
@@ -92,6 +106,7 @@ const renderPluginCard = (
           read: Permission.ALLOW,
           write: Permission.ALLOW,
         }),
+        getPluginPackages: jest.fn().mockResolvedValue(packages),
       },
     ],
   ] as const;
@@ -186,9 +201,10 @@ describe('PluginCard', () => {
     });
 
     it('should show "Failed to load" and keep Uninstall for a failed install', async () => {
+      const artifact = 'oci://quay.io/example/test-plugin:1.0.0!test-plugin';
       renderPluginCard(mockPlugin, {
-        ...noPendingChanges,
-        failedInstalls: ['oci://quay.io/example/test-plugin:1.0.0!test-plugin'],
+        pendingChanges: { ...noPendingChanges, failedInstalls: [artifact] },
+        packages: [pluginPackage('test-plugin', artifact)],
       });
 
       await screen.findByText('Failed to load');
@@ -198,6 +214,47 @@ describe('PluginCard', () => {
       expect(
         await screen.findByRole('button', { name: 'Uninstall' }),
       ).toBeInTheDocument();
+    });
+
+    it('should show "Failed to load" for a selector-less ref of one of its packages', async () => {
+      const argocdPlugin = {
+        ...mockPlugin,
+        metadata: { ...mockPlugin.metadata, name: 'redhat-argocd' },
+      };
+      const image = 'oci://quay.io/example/backstage-community-plugin-argocd';
+      renderPluginCard(argocdPlugin, {
+        pendingChanges: {
+          ...noPendingChanges,
+          failedInstalls: [`${image}@sha256:${'a'.repeat(64)}`],
+        },
+        packages: [
+          pluginPackage(
+            'backstage-community-plugin-redhat-argocd',
+            `${image}@sha256:${'b'.repeat(64)}`,
+          ),
+        ],
+      });
+
+      expect(await screen.findByText('Failed to load')).toBeInTheDocument();
+    });
+
+    it('should not show "Failed to load" for a failed package of another plugin', async () => {
+      renderPluginCard(mockPlugin, {
+        pendingChanges: {
+          ...noPendingChanges,
+          failedInstalls: [
+            `oci://quay.io/example/test-plugin-email@sha256:${'c'.repeat(64)}`,
+          ],
+        },
+        packages: [
+          pluginPackage(
+            'test-plugin',
+            'oci://quay.io/example/test-plugin:1.0.0!test-plugin',
+          ),
+        ],
+      });
+
+      await expect(screen.findByText('Failed to load')).rejects.toThrow();
     });
   });
 
