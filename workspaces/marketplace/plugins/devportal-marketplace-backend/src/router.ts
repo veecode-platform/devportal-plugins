@@ -595,6 +595,59 @@ export async function createRouter(
     return pkg;
   };
 
+  /**
+   * A stored ref does not name its loaded plugin: a ref without a !selector
+   * carries only the image, and the loaded name is the package.json name of
+   * the extracted folder, which the selector does not reproduce either.
+   * Upstream's DynamicPackageInstallStatusProcessor (catalog-backend-module-
+   * extensions) matches a Package entity's spec.packageName against the loaded
+   * names, with the scope and the "-dynamic" suffix optional. Same rule here.
+   */
+  const pluginKey = (name: string): string =>
+    name
+      .replace('@', '')
+      .replace(/\//g, '-')
+      .replace(/(-dynamic)+$/, '');
+  const loadedPluginKeys = new Set(dynamicPlugins.map(p => pluginKey(p.name)));
+  // A ref's packageName never changes, so a resolved ref is looked up once.
+  // A ref with no entity is looked up again: the catalog may still be loading.
+  const packageNameByRef = new Map<string, string>();
+
+  /**
+   * Of the enabled refs that are not loaded and were not changed in this
+   * session, the ones whose Package entity says which plugin should have
+   * loaded and none did. A ref with no entity, or a catalog that does not
+   * answer, is left out: a false "failed" costs more than a missed one.
+   */
+  const findFailedInstalls = async (refs: string[]): Promise<string[]> => {
+    const unresolved = refs.filter(ref => !packageNameByRef.has(ref));
+    if (unresolved.length > 0) {
+      try {
+        const { items } = await extensionsApi.getPackages({
+          filter: { 'spec.dynamicArtifact': unresolved },
+          fields: ['spec.packageName', 'spec.dynamicArtifact'],
+          limit: unresolved.length,
+        });
+        for (const { spec } of items) {
+          if (spec?.dynamicArtifact && spec.packageName) {
+            packageNameByRef.set(spec.dynamicArtifact, spec.packageName);
+          }
+        }
+      } catch (e) {
+        logger.warn(
+          `Could not look up ${unresolved.length} stored package(s) in the catalog, so failedInstalls leaves them out: ${e}`,
+        );
+      }
+    }
+    return refs.filter(ref => {
+      const packageName = packageNameByRef.get(ref);
+      return (
+        packageName !== undefined &&
+        !loadedPluginKeys.has(pluginKey(packageName))
+      );
+    });
+  };
+
   // Track packages changed during THIS session (after startup).
   // Only these are truly "pending" — they haven't had a chance to load/unload yet.
   const changedThisSession = new Set<string>();
@@ -674,7 +727,7 @@ export async function createRouter(
 
       const pendingInstalls: string[] = [];
       const pendingRemovals: string[] = [];
-      const failedInstalls: string[] = [];
+      const notLoaded: string[] = [];
 
       for (const entry of installedPackages) {
         const name = extractPluginName(entry.package);
@@ -682,7 +735,7 @@ export async function createRouter(
           if (changedThisSession.has(entry.package)) {
             pendingInstalls.push(entry.package);
           } else {
-            failedInstalls.push(entry.package);
+            notLoaded.push(entry.package);
           }
         }
         if (entry.disabled && loadedNames.has(name)) {
@@ -704,7 +757,7 @@ export async function createRouter(
         count: pendingInstalls.length + pendingRemovals.length,
         pendingInstalls,
         pendingRemovals,
-        failedInstalls,
+        failedInstalls: await findFailedInstalls(notLoaded),
       });
     },
   );
