@@ -20,6 +20,7 @@ const BROKEN = 'oci://quay.io/example/broken:1.0.0!example-broken';
 const DISABLED = 'oci://quay.io/example/disabled:1.0.0!example-disabled';
 const INSTALLED_NOW = 'oci://quay.io/example/fresh:1.0.0!example-fresh';
 const UNKNOWN = 'oci://quay.io/example/unknown:1.0.0';
+const SHARED = 'oci://quay.io/example/shared:1.0.0!example-shared';
 
 // A ref names its plugin only when it carries a !selector, and even then the
 // loaded plugin's name is the package.json name of the extracted folder, which
@@ -50,6 +51,8 @@ const catalogPackages = [
   catalogPackage(WITH_SELECTOR, '@example/with-selector'),
   catalogPackage(WITHOUT_SELECTOR_TAG, '@example/plain-tag'),
   catalogPackage(WITHOUT_SELECTOR_DIGEST, '@example/plain-digest'),
+  catalogPackage(SHARED, '@example/shared-a'),
+  catalogPackage(SHARED, '@example/shared-b'),
 ];
 
 let catalogFails = false;
@@ -215,6 +218,18 @@ describe('GET /pending-changes', () => {
       });
     },
   );
+
+  it('never lists a ref shared by two catalog entities when one of their plugins loaded', async () => {
+    const app = await bootPortal({
+      loaded: ['example-shared-a-dynamic'],
+      storedBeforeBoot: [{ package: SHARED, disabled: false }],
+    });
+
+    const response = await request(app).get('/pending-changes');
+
+    expect(response.status).toBe(200);
+    expect(response.body.failedInstalls).toEqual([]);
+  });
 
   it('does not list a package it cannot tie to a catalog entity', async () => {
     const app = await bootPortal({
