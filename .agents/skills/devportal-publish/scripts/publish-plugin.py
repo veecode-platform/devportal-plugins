@@ -300,7 +300,8 @@ def update_plugins_list(path: Path, plugin_dir: str, write: bool) -> str:
     else:
         text = ""
         lines = []
-    if any(l.strip() == key for l in lines):
+    # An entry can carry export arguments after its key (`--embed-package ...`).
+    if any(l.split(None, 1)[0] == key for l in lines):
         return f"unchanged: {path} already lists {key}"
     lines.append(key)
     new_text = "\n".join(lines) + "\n"
