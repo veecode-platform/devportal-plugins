@@ -608,6 +608,7 @@ export async function createRouter(
       .replace('@', '')
       .replace(/\//g, '-')
       .replace(/(-dynamic)+$/, '');
+  const loadedNames = new Set(dynamicPlugins.map(p => p.name));
   const loadedPluginKeys = new Set(dynamicPlugins.map(p => pluginKey(p.name)));
   // A ref's packageNames never change, so a resolved ref is looked up once.
   // A ref with no entity is looked up again: the catalog may still be loading.
@@ -615,49 +616,53 @@ export async function createRouter(
   const packageNamesByRef = new Map<string, Set<string>>();
 
   /**
-   * Of the enabled refs that are not loaded and were not changed in this
-   * session, the ones whose Package entities say which plugin should have
-   * loaded and none did. A ref with no entity, or a catalog that does not
-   * answer in full, is left out: a false "failed" costs more than a missed one.
+   * Fills packageNamesByRef for the refs the catalog can identify. A ref with
+   * no entity, or a catalog that does not answer in full, stays unresolved.
    */
-  const findFailedInstalls = async (refs: string[]): Promise<string[]> => {
+  const resolvePackageNames = async (refs: string[]): Promise<void> => {
     const unresolved = refs.filter(ref => !packageNamesByRef.has(ref));
-    if (unresolved.length > 0) {
-      try {
-        // Well above the whole index (175 packages), so no ref can push
-        // another one off the page.
-        const { items, totalItems } = await extensionsApi.getPackages({
-          filter: { 'spec.dynamicArtifact': unresolved },
-          fields: ['spec.packageName', 'spec.dynamicArtifact'],
-          limit: 500,
-        });
-        if (totalItems > items.length) {
-          throw new Error(`got ${items.length} of ${totalItems} packages`);
-        }
-        for (const { spec } of items) {
-          if (spec?.dynamicArtifact && spec.packageName) {
-            const names =
-              packageNamesByRef.get(spec.dynamicArtifact) ?? new Set<string>();
-            packageNamesByRef.set(
-              spec.dynamicArtifact,
-              names.add(spec.packageName),
-            );
-          }
-        }
-      } catch (e) {
-        logger.warn(
-          `Could not look up ${unresolved.length} stored package(s) in the catalog, so failedInstalls leaves them out: ${e}`,
-        );
-      }
+    if (unresolved.length === 0) {
+      return;
     }
-    return refs.filter(ref => {
-      const packageNames = packageNamesByRef.get(ref);
-      return (
-        packageNames !== undefined &&
-        [...packageNames].every(name => !loadedPluginKeys.has(pluginKey(name)))
+    try {
+      // Well above the whole index (175 packages), so no ref can push
+      // another one off the page.
+      const { items, totalItems } = await extensionsApi.getPackages({
+        filter: { 'spec.dynamicArtifact': unresolved },
+        fields: ['spec.packageName', 'spec.dynamicArtifact'],
+        limit: 500,
+      });
+      if (totalItems > items.length) {
+        throw new Error(`got ${items.length} of ${totalItems} packages`);
+      }
+      for (const { spec } of items) {
+        if (spec?.dynamicArtifact && spec.packageName) {
+          const names =
+            packageNamesByRef.get(spec.dynamicArtifact) ?? new Set<string>();
+          packageNamesByRef.set(
+            spec.dynamicArtifact,
+            names.add(spec.packageName),
+          );
+        }
+      }
+    } catch (e) {
+      logger.warn(
+        `Could not look up ${unresolved.length} stored package(s) in the catalog, so their loaded state comes from the name in the ref: ${e}`,
       );
-    });
+    }
   };
+
+  /**
+   * Whether the plugin of a stored ref is loaded. A ref the catalog resolved is
+   * loaded when a loaded plugin matches one of its entities' packageNames;
+   * either way the name in the ref still counts, so a ref that matched before
+   * still does, and an unresolved ref is decided by that name alone.
+   */
+  const isLoaded = (ref: string): boolean =>
+    loadedNames.has(extractPluginName(ref)) ||
+    [...(packageNamesByRef.get(ref) ?? [])].some(name =>
+      loadedPluginKeys.has(pluginKey(name)),
+    );
 
   // Track packages changed during THIS session (after startup).
   // Only these are truly "pending" — they haven't had a chance to load/unload yet.
@@ -732,24 +737,37 @@ export async function createRouter(
     '/pending-changes',
     requireInitializedInstallationDataService,
     async (_req, response) => {
-      const loadedNames = new Set(dynamicPlugins.map(p => p.name));
       const installedPackages =
         await installationDataService.getAllInstalledPackages();
 
+      // Only a row that can land in a list needs its plugin looked up: an
+      // enabled one, or a disabled one changed in this session.
+      await resolvePackageNames(
+        installedPackages
+          .filter(
+            entry =>
+              (!entry.disabled || changedThisSession.has(entry.package)) &&
+              !loadedNames.has(extractPluginName(entry.package)),
+          )
+          .map(entry => entry.package),
+      );
+
       const pendingInstalls: string[] = [];
       const pendingRemovals: string[] = [];
-      const notLoaded: string[] = [];
+      const failedInstalls: string[] = [];
 
       for (const entry of installedPackages) {
-        const name = extractPluginName(entry.package);
-        if (!entry.disabled && !loadedNames.has(name)) {
+        const loaded = isLoaded(entry.package);
+        if (!entry.disabled && !loaded) {
           if (changedThisSession.has(entry.package)) {
             pendingInstalls.push(entry.package);
-          } else {
-            notLoaded.push(entry.package);
+          } else if (packageNamesByRef.has(entry.package)) {
+            // Left out when the catalog cannot say which plugin the ref
+            // should have loaded: a false "failed" costs more than a missed one.
+            failedInstalls.push(entry.package);
           }
         }
-        if (entry.disabled && loadedNames.has(name)) {
+        if (entry.disabled && loaded) {
           if (changedThisSession.has(entry.package)) {
             pendingRemovals.push(entry.package);
           }
@@ -768,7 +786,7 @@ export async function createRouter(
         count: pendingInstalls.length + pendingRemovals.length,
         pendingInstalls,
         pendingRemovals,
-        failedInstalls: await findFailedInstalls(notLoaded),
+        failedInstalls,
       });
     },
   );
