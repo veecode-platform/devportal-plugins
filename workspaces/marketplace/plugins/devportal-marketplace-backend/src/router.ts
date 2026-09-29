@@ -609,28 +609,39 @@ export async function createRouter(
       .replace(/\//g, '-')
       .replace(/(-dynamic)+$/, '');
   const loadedPluginKeys = new Set(dynamicPlugins.map(p => pluginKey(p.name)));
-  // A ref's packageName never changes, so a resolved ref is looked up once.
+  // A ref's packageNames never change, so a resolved ref is looked up once.
   // A ref with no entity is looked up again: the catalog may still be loading.
-  const packageNameByRef = new Map<string, string>();
+  // Several entities can share one ref, so it maps to every packageName seen.
+  const packageNamesByRef = new Map<string, Set<string>>();
 
   /**
    * Of the enabled refs that are not loaded and were not changed in this
-   * session, the ones whose Package entity says which plugin should have
+   * session, the ones whose Package entities say which plugin should have
    * loaded and none did. A ref with no entity, or a catalog that does not
-   * answer, is left out: a false "failed" costs more than a missed one.
+   * answer in full, is left out: a false "failed" costs more than a missed one.
    */
   const findFailedInstalls = async (refs: string[]): Promise<string[]> => {
-    const unresolved = refs.filter(ref => !packageNameByRef.has(ref));
+    const unresolved = refs.filter(ref => !packageNamesByRef.has(ref));
     if (unresolved.length > 0) {
       try {
-        const { items } = await extensionsApi.getPackages({
+        // Well above the whole index (175 packages), so no ref can push
+        // another one off the page.
+        const { items, totalItems } = await extensionsApi.getPackages({
           filter: { 'spec.dynamicArtifact': unresolved },
           fields: ['spec.packageName', 'spec.dynamicArtifact'],
-          limit: unresolved.length,
+          limit: 500,
         });
+        if (totalItems > items.length) {
+          throw new Error(`got ${items.length} of ${totalItems} packages`);
+        }
         for (const { spec } of items) {
           if (spec?.dynamicArtifact && spec.packageName) {
-            packageNameByRef.set(spec.dynamicArtifact, spec.packageName);
+            const names =
+              packageNamesByRef.get(spec.dynamicArtifact) ?? new Set<string>();
+            packageNamesByRef.set(
+              spec.dynamicArtifact,
+              names.add(spec.packageName),
+            );
           }
         }
       } catch (e) {
@@ -640,10 +651,10 @@ export async function createRouter(
       }
     }
     return refs.filter(ref => {
-      const packageName = packageNameByRef.get(ref);
+      const packageNames = packageNamesByRef.get(ref);
       return (
-        packageName !== undefined &&
-        !loadedPluginKeys.has(pluginKey(packageName))
+        packageNames !== undefined &&
+        [...packageNames].every(name => !loadedPluginKeys.has(pluginKey(name)))
       );
     });
   };
