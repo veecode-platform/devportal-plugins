@@ -61,16 +61,23 @@ export_one() {
   # A backend export resolves its dependencies from npm, where a workspace-only
   # library such as a -common package does not exist. The CLI embeds a sibling
   # library by itself only when its name is the plugin's with -backend swapped
-  # for -common; the overlay passes --embed-package for the rest, and so does this.
+  # for -common; the overlay passes --embed-package for the rest, and so does this,
+  # from the plugin's workspace: dependencies and from the --embed-package its own
+  # export-dynamic script declares, unless the caller already passed that one.
   local -a embed_args=()
   mapfile -t embed_args < <(node -e '
     const pkg = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
     if (!["backend-plugin", "backend-plugin-module"].includes(pkg.backstage?.role)) process.exit(0);
-    const embedded = Object.entries(pkg.dependencies ?? {})
+    const workspaceDependencies = Object.entries(pkg.dependencies ?? {})
       .filter(([, spec]) => spec.startsWith("workspace:"))
       .map(([name]) => name);
+    const declared = [...(pkg.scripts?.["export-dynamic"] ?? "").matchAll(/--embed-package\s+(\S+)/g)]
+      .map(([, name]) => name);
+    const passed = process.argv.slice(2);
+    const embedded = [...new Set([...workspaceDependencies, ...declared])]
+      .filter((name) => !passed.includes(name));
     if (embedded.length > 0) console.log(["--embed-package", ...embedded].join("\n"));
-  ' "$plugin_path/package.json")
+  ' "$plugin_path/package.json" "${export_options[@]}")
   printf 'Exporting %s to %s\n' "$plugin_dir" "$export_source_root"
   (
     cd -- "$plugin_path"
@@ -108,6 +115,15 @@ export_one() {
       "$export_source_root/$source_package_base" \
       "$export_source_root/${source_package_base%-dynamic}" >&2
     exit 1
+  fi
+
+  # The CLI names the export <package>-dynamic, so a wrapper whose package name
+  # already ends in -dynamic comes out with a second suffix that the workspace
+  # config does not carry. Fall back to the name without it only when the first
+  # lookup finds nothing, so a workspace that matches as before is unchanged.
+  if ! grep -Fq "./dynamic-plugins/dist/$source_package_base" "$workspace_dynamic_config" &&
+    grep -Fq "./dynamic-plugins/dist/${source_package_base%-dynamic}" "$workspace_dynamic_config"; then
+    source_package_base=${source_package_base%-dynamic}
   fi
 
   if ! grep -Fq "./dynamic-plugins/dist/$source_package_base" "$workspace_dynamic_config"; then
