@@ -47,6 +47,7 @@ function catalogPackage(
 const freshPackage = catalogPackage(INSTALLED_NOW, '@example/fresh');
 const catalogPackages = [
   freshPackage,
+  catalogPackage(LOADED, '@example/loaded'),
   catalogPackage(BROKEN, '@example/broken'),
   catalogPackage(WITH_SELECTOR, '@example/with-selector'),
   catalogPackage(WITHOUT_SELECTOR_TAG, '@example/plain-tag'),
@@ -55,13 +56,42 @@ const catalogPackages = [
   catalogPackage(SHARED, '@example/shared-b'),
 ];
 
+// The three shapes of a stored ref, each with the catalog entity that
+// describes it and the name its plugin has once loaded.
+const loadedShapes: Array<[string, string, string, string]> = [
+  [
+    'a ref with a !selector',
+    WITH_SELECTOR,
+    'example-with-selector',
+    'example-with-selector-dynamic',
+  ],
+  [
+    'a ref without a selector, by tag',
+    WITHOUT_SELECTOR_TAG,
+    'example-plain-tag',
+    '@example/plain-tag-dynamic',
+  ],
+  [
+    'a ref without a selector, by digest',
+    WITHOUT_SELECTOR_DIGEST,
+    'example-plain-digest',
+    'example-plain-digest',
+  ],
+];
+
 let catalogFails = false;
 
 const extensionsApi: Pick<
   ExtensionsApi,
   'getPackageByName' | 'getPackagePlugins' | 'getPackages'
 > = {
-  getPackageByName: async () => freshPackage,
+  getPackageByName: async (_namespace, name) => {
+    const found = catalogPackages.find(pkg => pkg.metadata.name === name);
+    if (!found) {
+      throw new Error(`no package ${name} in the test catalog`);
+    }
+    return found;
+  },
   getPackagePlugins: async () => [],
   getPackages: async request => {
     if (catalogFails) {
@@ -184,21 +214,9 @@ describe('GET /pending-changes', () => {
     });
   });
 
-  it.each([
-    ['a ref with a !selector', WITH_SELECTOR, 'example-with-selector-dynamic'],
-    [
-      'a ref without a selector, by tag',
-      WITHOUT_SELECTOR_TAG,
-      '@example/plain-tag-dynamic',
-    ],
-    [
-      'a ref without a selector, by digest',
-      WITHOUT_SELECTOR_DIGEST,
-      'example-plain-digest',
-    ],
-  ])(
+  it.each(loadedShapes)(
     'never lists %s whose plugin loaded under failedInstalls',
-    async (_shape, ref, loadedName) => {
+    async (_shape, ref, _entity, loadedName) => {
       const app = await bootPortal({
         loaded: [loadedName],
         storedBeforeBoot: [
@@ -218,6 +236,94 @@ describe('GET /pending-changes', () => {
       });
     },
   );
+
+  it.each(loadedShapes)(
+    'lists %s under pendingRemovals when it is disabled in this session while its plugin is loaded',
+    async (_shape, ref, entityName, loadedName) => {
+      const app = await bootPortal({
+        loaded: [loadedName],
+        storedBeforeBoot: [{ package: ref, disabled: false }],
+      });
+
+      await request(app)
+        .patch(`/package/default/${entityName}/configuration/disable`)
+        .send({ disabled: true })
+        .expect(200);
+      const response = await request(app).get('/pending-changes');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        count: 1,
+        pendingInstalls: [],
+        pendingRemovals: [ref],
+        failedInstalls: [],
+      });
+    },
+  );
+
+  it.each(loadedShapes)(
+    'does not list %s under pendingInstalls when it is enabled in this session while its plugin is loaded',
+    async (_shape, ref, entityName, loadedName) => {
+      const app = await bootPortal({
+        loaded: [loadedName],
+        storedBeforeBoot: [{ package: ref, disabled: false }],
+      });
+
+      await request(app)
+        .patch(`/package/default/${entityName}/configuration/disable`)
+        .send({ disabled: false })
+        .expect(200);
+      const response = await request(app).get('/pending-changes');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        count: 0,
+        pendingInstalls: [],
+        pendingRemovals: [],
+        failedInstalls: [],
+      });
+    },
+  );
+
+  it('lists a ref without a selector under pendingInstalls when it is enabled in this session and not loaded', async () => {
+    const app = await bootPortal({ loaded: [], storedBeforeBoot: [] });
+
+    await request(app)
+      .patch('/package/default/example-plain-tag/configuration/disable')
+      .send({ disabled: false })
+      .expect(200);
+    const response = await request(app).get('/pending-changes');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      count: 1,
+      pendingInstalls: [WITHOUT_SELECTOR_TAG],
+      pendingRemovals: [],
+      failedInstalls: [],
+    });
+  });
+
+  it('falls back to the name in the ref for pendingRemovals when the catalog does not answer', async () => {
+    const app = await bootPortal({
+      loaded: ['example-loaded'],
+      storedBeforeBoot: [{ package: LOADED, disabled: false }],
+    });
+    catalogFails = true;
+
+    await request(app)
+      .patch('/package/default/example-loaded/configuration/disable')
+      .send({ disabled: true })
+      .expect(200);
+    const response = await request(app).get('/pending-changes');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      count: 1,
+      pendingInstalls: [],
+      pendingRemovals: [LOADED],
+      failedInstalls: [],
+    });
+  });
 
   it('never lists a ref shared by two catalog entities when one of their plugins loaded', async () => {
     const app = await bootPortal({
