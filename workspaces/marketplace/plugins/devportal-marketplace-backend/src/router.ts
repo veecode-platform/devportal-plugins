@@ -674,15 +674,16 @@ export async function createRouter(
 
       const pendingInstalls: string[] = [];
       const pendingRemovals: string[] = [];
+      const failedInstalls: string[] = [];
 
       for (const entry of installedPackages) {
         const name = extractPluginName(entry.package);
         if (!entry.disabled && !loadedNames.has(name)) {
           if (changedThisSession.has(entry.package)) {
             pendingInstalls.push(entry.package);
+          } else {
+            failedInstalls.push(entry.package);
           }
-          // Entries from previous sessions that didn't load are ignored
-          // (not pending, not stale-removed — they stay in YAML for next restart)
         }
         if (entry.disabled && loadedNames.has(name)) {
           if (changedThisSession.has(entry.package)) {
@@ -703,6 +704,7 @@ export async function createRouter(
         count: pendingInstalls.length + pendingRemovals.length,
         pendingInstalls,
         pendingRemovals,
+        failedInstalls,
       });
     },
   );
