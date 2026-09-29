@@ -5,7 +5,7 @@ import {
   ExtensionsPlugin,
   ExtensionsPluginInstallStatus,
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
-import { dynamicPluginsInfoApiRef } from '../api';
+import { dynamicPluginsInfoApiRef, extensionsApiRef } from '../api';
 
 export type MarketplaceStatus =
   | 'available'
@@ -27,6 +27,7 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
   const dynamicPluginsInfoApi = useApi(dynamicPluginsInfoApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const extensionsApi = useApi(extensionsApiRef);
 
   const { data: loadedPlugins } = useQuery({
     queryKey: ['loaded-plugins'],
@@ -53,6 +54,21 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     staleTime: 10_000,
   });
 
+  const { data: pluginPackages } = useQuery({
+    queryKey: [
+      'extensionsApi',
+      'getPluginPackages',
+      plugin.metadata.namespace,
+      plugin.metadata.name,
+    ],
+    queryFn: () =>
+      extensionsApi.getPluginPackages(
+        plugin.metadata.namespace!,
+        plugin.metadata.name,
+      ),
+    enabled: (pendingChanges?.failedInstalls.length ?? 0) > 0,
+  });
+
   return useMemo(() => {
     const installStatus = plugin.spec?.installStatus;
     const pluginName = plugin.metadata.name;
@@ -61,17 +77,21 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
       (loadedPlugins ?? []).map((p: { name: string }) => p.name),
     );
 
-    // Check the pending and failed lists for a name containing the plugin's
-    // catalog name. This heuristic covers OCI and local paths.
+    // Check pending changes by scanning all pending lists for a name containing
+    // the plugin's catalog name. This heuristic covers OCI and local paths.
     const hasPendingInstall = pendingChanges?.pendingInstalls?.some(
       pkg => extractName(pkg).includes(pluginName),
     ) ?? false;
     const hasPendingRemoval = pendingChanges?.pendingRemovals?.some(
       pkg => extractName(pkg).includes(pluginName),
     ) ?? false;
-    const hasFailedInstall = pendingChanges?.failedInstalls.some(
-      pkg => extractName(pkg).includes(pluginName),
-    ) ?? false;
+    const failedNames = new Set(
+      pendingChanges?.failedInstalls.map(extractName),
+    );
+    const hasFailedInstall = (pluginPackages ?? []).some(pkg => {
+      const artifact = pkg.spec?.dynamicArtifact;
+      return artifact !== undefined && failedNames.has(extractName(artifact));
+    });
 
     if (hasPendingInstall) return 'pending-install';
     if (hasPendingRemoval) return 'pending-removal';
@@ -93,12 +113,15 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     if (isInstalledByUser) return 'installed';
 
     return 'available';
-  }, [plugin, loadedPlugins, pendingChanges]);
+  }, [plugin, loadedPlugins, pendingChanges, pluginPackages]);
 };
 
 const extractName = (pkg: string): string => {
   const ociIdx = pkg.indexOf('!');
   if (ociIdx !== -1) return pkg.substring(ociIdx + 1);
+  if (pkg.startsWith('oci://')) {
+    return pkg.substring(pkg.lastIndexOf('/') + 1).split(/[:@]/)[0];
+  }
   const lastSlash = pkg.lastIndexOf('/');
   if (lastSlash !== -1) return pkg.substring(lastSlash + 1);
   return pkg;
