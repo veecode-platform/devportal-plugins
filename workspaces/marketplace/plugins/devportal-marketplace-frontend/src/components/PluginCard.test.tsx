@@ -184,6 +184,21 @@ describe('PluginCard', () => {
       expect(screen.queryByText('Installed')).not.toBeInTheDocument();
       expect(screen.queryByText('Disabled')).not.toBeInTheDocument();
     });
+
+    it('should show "Failed to load" and keep Uninstall for a failed install', async () => {
+      renderPluginCard(mockPlugin, {
+        ...noPendingChanges,
+        failedInstalls: ['oci://quay.io/example/test-plugin:1.0.0!test-plugin'],
+      });
+
+      await screen.findByText('Failed to load');
+      expect(statusChip('Failed to load')?.className).toContain(
+        'MuiChip-colorError',
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Uninstall' }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('Plugin Card Layout', () => {
