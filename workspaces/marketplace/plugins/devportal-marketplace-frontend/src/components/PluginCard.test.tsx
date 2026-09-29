@@ -61,6 +61,11 @@ const mockPlugin: ExtensionsPlugin = {
   },
 };
 
+const argocdPlugin: ExtensionsPlugin = {
+  ...mockPlugin,
+  metadata: { ...mockPlugin.metadata, name: 'redhat-argocd' },
+};
+
 const noPendingChanges = {
   count: 0,
   pendingInstalls: [],
@@ -216,11 +221,7 @@ describe('PluginCard', () => {
       ).toBeInTheDocument();
     });
 
-    it('should show "Failed to load" for a selector-less ref of one of its packages', async () => {
-      const argocdPlugin = {
-        ...mockPlugin,
-        metadata: { ...mockPlugin.metadata, name: 'redhat-argocd' },
-      };
+    it('should show "Failed to load" for a selector-less digest ref of one of its packages', async () => {
       const image = 'oci://quay.io/example/backstage-community-plugin-argocd';
       renderPluginCard(argocdPlugin, {
         pendingChanges: {
@@ -238,7 +239,20 @@ describe('PluginCard', () => {
       expect(await screen.findByText('Failed to load')).toBeInTheDocument();
     });
 
-    it('should not show "Failed to load" for a failed package of another plugin', async () => {
+    it('should show "Failed to load" for a selector-less tag ref of one of its packages', async () => {
+      const ref =
+        'oci://quay.io/example/backstage-community-plugin-argocd:bs_1.52.0__0.1.0';
+      renderPluginCard(argocdPlugin, {
+        pendingChanges: { ...noPendingChanges, failedInstalls: [ref] },
+        packages: [
+          pluginPackage('backstage-community-plugin-redhat-argocd', ref),
+        ],
+      });
+
+      expect(await screen.findByText('Failed to load')).toBeInTheDocument();
+    });
+
+    it('should not show "Failed to load" for a failed digest ref of another plugin', async () => {
       renderPluginCard(mockPlugin, {
         pendingChanges: {
           ...noPendingChanges,
@@ -250,6 +264,25 @@ describe('PluginCard', () => {
           pluginPackage(
             'test-plugin',
             'oci://quay.io/example/test-plugin:1.0.0!test-plugin',
+          ),
+        ],
+      });
+
+      await expect(screen.findByText('Failed to load')).rejects.toThrow();
+    });
+
+    it('should not show "Failed to load" for a failed tag ref of another plugin', async () => {
+      renderPluginCard(mockPlugin, {
+        pendingChanges: {
+          ...noPendingChanges,
+          failedInstalls: [
+            'oci://quay.io/example/test-plugin-email:bs_1.52.0__0.1.0',
+          ],
+        },
+        packages: [
+          pluginPackage(
+            'test-plugin',
+            'oci://quay.io/example/test-plugin:bs_1.52.0__0.1.0',
           ),
         ],
       });
