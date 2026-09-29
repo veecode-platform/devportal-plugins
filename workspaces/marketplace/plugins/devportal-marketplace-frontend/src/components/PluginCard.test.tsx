@@ -291,6 +291,79 @@ describe('PluginCard', () => {
     });
   });
 
+  describe('Failed install matching', () => {
+    it.each([
+      [
+        'a selector ref whose tag changed',
+        'oci://quay.io/example/test-plugin:1.0.0!test-plugin',
+        'oci://quay.io/example/test-plugin:2.0.0!test-plugin',
+      ],
+      [
+        'a selector-less ref whose tag changed',
+        'oci://quay.io/example/test-plugin:1.0.0',
+        'oci://quay.io/example/test-plugin:2.0.0',
+      ],
+      [
+        'a tag ref that the catalog now pins by digest',
+        'oci://quay.io/example/test-plugin:1.0.0',
+        `oci://quay.io/example/test-plugin@sha256:${'d'.repeat(64)}`,
+      ],
+      [
+        'a registry with a port whose tag changed',
+        'oci://localhost:5000/example/test-plugin:1.0.0',
+        'oci://localhost:5000/example/test-plugin:2.0.0',
+      ],
+      [
+        'an identical local path',
+        './dynamic-plugins/dist/test-plugin',
+        './dynamic-plugins/dist/test-plugin',
+      ],
+    ])(
+      'should show "Failed to load" for %s',
+      async (_case, storedRef, catalogRef) => {
+        renderPluginCard(mockPlugin, {
+          pendingChanges: { ...noPendingChanges, failedInstalls: [storedRef] },
+          packages: [pluginPackage('test-plugin', catalogRef)],
+        });
+
+        expect(await screen.findByText('Failed to load')).toBeInTheDocument();
+      },
+    );
+
+    it.each([
+      [
+        'a selector shared by images in two repositories',
+        'oci://quay.io/team-a/foo:1!frontend',
+        'oci://quay.io/team-b/bar:2!frontend',
+      ],
+      [
+        'an image name shared by two repositories',
+        'oci://quay.io/team-a/shared-image:1.0.0',
+        'oci://quay.io/team-b/shared-image:1.0.0',
+      ],
+      [
+        'an image path shared by two registry ports',
+        'oci://localhost:5000/example/test-plugin:1.0.0',
+        'oci://localhost:5001/example/test-plugin:1.0.0',
+      ],
+      [
+        'a file name shared by two local directories',
+        './dynamic-plugins/dist/test-plugin',
+        './other/dist/test-plugin',
+      ],
+    ])(
+      'should not show "Failed to load" for %s',
+      async (_case, storedRef, catalogRef) => {
+        renderPluginCard(mockPlugin, {
+          pendingChanges: { ...noPendingChanges, failedInstalls: [storedRef] },
+          packages: [pluginPackage('test-plugin', catalogRef)],
+        });
+
+        await expect(screen.findByText('Failed to load')).rejects.toThrow();
+      },
+    );
+  });
+
   describe('Plugin Card Layout', () => {
     it('should render plugin title', () => {
       renderPluginCard(mockPlugin);
