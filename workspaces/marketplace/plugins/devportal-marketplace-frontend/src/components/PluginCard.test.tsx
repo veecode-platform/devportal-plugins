@@ -16,15 +16,21 @@
 
 import { BrowserRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
-import { TestApiProvider } from '@backstage/test-utils';
+import { mockApis, TestApiProvider } from '@backstage/test-utils';
+import { discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
+import { QueryClientProvider } from '@tanstack/react-query';
 
 import {
+  ExtensionsPackage,
   ExtensionsPlugin,
   ExtensionsPluginInstallStatus,
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
 
 import { PluginCard } from './PluginCard';
+import { dynamicPluginsInfoApiRef, extensionsApiRef } from '../api';
+import { queryClient } from '../queryclient';
 import { rootRouteRef, pluginRouteRef } from '../routes';
+import { Permission } from '../types';
 
 // Mock the route refs
 jest.mock('@backstage/core-plugin-api', () => ({
@@ -55,17 +61,81 @@ const mockPlugin: ExtensionsPlugin = {
   },
 };
 
-const renderPluginCard = (plugin: ExtensionsPlugin) => {
+const argocdPlugin: ExtensionsPlugin = {
+  ...mockPlugin,
+  metadata: { ...mockPlugin.metadata, name: 'redhat-argocd' },
+};
+
+const noPendingChanges = {
+  count: 0,
+  pendingInstalls: [],
+  pendingRemovals: [],
+  failedInstalls: [],
+};
+
+const pluginPackage = (
+  name: string,
+  dynamicArtifact: string,
+): ExtensionsPackage => ({
+  apiVersion: 'extensions.backstage.io/v1alpha1',
+  kind: 'Package',
+  metadata: { name, namespace: 'default' },
+  spec: { dynamicArtifact },
+});
+
+const renderPluginCard = (
+  plugin: ExtensionsPlugin,
+  {
+    pendingChanges = noPendingChanges,
+    packages = [],
+  }: { pendingChanges?: object; packages?: ExtensionsPackage[] } = {},
+) => {
+  const apis = [
+    [
+      dynamicPluginsInfoApiRef,
+      { listLoadedPlugins: jest.fn().mockResolvedValue([]) },
+    ],
+    [discoveryApiRef, mockApis.discovery()],
+    [
+      fetchApiRef,
+      {
+        fetch: jest
+          .fn()
+          .mockResolvedValue({ ok: true, json: async () => pendingChanges }),
+      },
+    ],
+    [
+      extensionsApiRef,
+      {
+        getPluginConfigAuthorization: jest.fn().mockResolvedValue({
+          read: Permission.ALLOW,
+          write: Permission.ALLOW,
+        }),
+        getPluginPackages: jest.fn().mockResolvedValue(packages),
+      },
+    ],
+  ] as const;
+
   return render(
-    <TestApiProvider apis={[]}>
-      <BrowserRouter>
-        <PluginCard plugin={plugin} />
-      </BrowserRouter>
+    <TestApiProvider apis={apis}>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <PluginCard plugin={plugin} />
+        </BrowserRouter>
+      </QueryClientProvider>
     </TestApiProvider>,
   );
 };
 
+const statusChip = (label: string) =>
+  screen.getByText(label).closest('[class*="MuiChip-root"]');
+
 describe('PluginCard', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    queryClient.setDefaultOptions({ queries: { retry: false } });
+  });
+
   describe('Install Status Indicators', () => {
     it('should show "Installed" status for Installed plugin', () => {
       const pluginWithStatus = {
@@ -78,8 +148,9 @@ describe('PluginCard', () => {
 
       renderPluginCard(pluginWithStatus);
 
-      expect(screen.getByText('Installed')).toBeInTheDocument();
-      expect(screen.getByTestId('CheckCircleOutlineIcon')).toBeInTheDocument();
+      expect(statusChip('Installed')?.className).toContain(
+        'MuiChip-colorSuccess',
+      );
     });
 
     it('should show "Installed" status for UpdateAvailable plugin', () => {
@@ -93,8 +164,9 @@ describe('PluginCard', () => {
 
       renderPluginCard(pluginWithStatus);
 
-      expect(screen.getByText('Installed')).toBeInTheDocument();
-      expect(screen.getByTestId('CheckCircleOutlineIcon')).toBeInTheDocument();
+      expect(statusChip('Installed')?.className).toContain(
+        'MuiChip-colorSuccess',
+      );
     });
 
     it('should show "Disabled" status for Disabled plugin', () => {
@@ -108,8 +180,7 @@ describe('PluginCard', () => {
 
       renderPluginCard(pluginWithStatus);
 
-      expect(screen.getByText('Disabled')).toBeInTheDocument();
-      expect(screen.getByText('--')).toBeInTheDocument();
+      expect(statusChip('Disabled')?.className).toContain('MuiChip-colorError');
     });
 
     it('should not show any status for NotInstalled plugin', () => {
@@ -125,8 +196,6 @@ describe('PluginCard', () => {
 
       expect(screen.queryByText('Installed')).not.toBeInTheDocument();
       expect(screen.queryByText('Disabled')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('CheckCircleIcon')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('BlockIcon')).not.toBeInTheDocument();
     });
 
     it('should not show any status when installStatus is undefined', () => {
@@ -134,9 +203,165 @@ describe('PluginCard', () => {
 
       expect(screen.queryByText('Installed')).not.toBeInTheDocument();
       expect(screen.queryByText('Disabled')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('CheckCircleIcon')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('BlockIcon')).not.toBeInTheDocument();
     });
+
+    it('should show "Failed to load" and keep Uninstall for a failed install', async () => {
+      const artifact = 'oci://quay.io/example/test-plugin:1.0.0!test-plugin';
+      renderPluginCard(mockPlugin, {
+        pendingChanges: { ...noPendingChanges, failedInstalls: [artifact] },
+        packages: [pluginPackage('test-plugin', artifact)],
+      });
+
+      await screen.findByText('Failed to load');
+      expect(statusChip('Failed to load')?.className).toContain(
+        'MuiChip-colorError',
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Uninstall' }),
+      ).toBeInTheDocument();
+    });
+
+    it('should show "Failed to load" for a selector-less digest ref of one of its packages', async () => {
+      const image = 'oci://quay.io/example/backstage-community-plugin-argocd';
+      renderPluginCard(argocdPlugin, {
+        pendingChanges: {
+          ...noPendingChanges,
+          failedInstalls: [`${image}@sha256:${'a'.repeat(64)}`],
+        },
+        packages: [
+          pluginPackage(
+            'backstage-community-plugin-redhat-argocd',
+            `${image}@sha256:${'b'.repeat(64)}`,
+          ),
+        ],
+      });
+
+      expect(await screen.findByText('Failed to load')).toBeInTheDocument();
+    });
+
+    it('should show "Failed to load" for a selector-less tag ref of one of its packages', async () => {
+      const ref =
+        'oci://quay.io/example/backstage-community-plugin-argocd:bs_1.52.0__0.1.0';
+      renderPluginCard(argocdPlugin, {
+        pendingChanges: { ...noPendingChanges, failedInstalls: [ref] },
+        packages: [
+          pluginPackage('backstage-community-plugin-redhat-argocd', ref),
+        ],
+      });
+
+      expect(await screen.findByText('Failed to load')).toBeInTheDocument();
+    });
+
+    it('should not show "Failed to load" for a failed digest ref of another plugin', async () => {
+      renderPluginCard(mockPlugin, {
+        pendingChanges: {
+          ...noPendingChanges,
+          failedInstalls: [
+            `oci://quay.io/example/test-plugin-email@sha256:${'c'.repeat(64)}`,
+          ],
+        },
+        packages: [
+          pluginPackage(
+            'test-plugin',
+            'oci://quay.io/example/test-plugin:1.0.0!test-plugin',
+          ),
+        ],
+      });
+
+      await expect(screen.findByText('Failed to load')).rejects.toThrow();
+    });
+
+    it('should not show "Failed to load" for a failed tag ref of another plugin', async () => {
+      renderPluginCard(mockPlugin, {
+        pendingChanges: {
+          ...noPendingChanges,
+          failedInstalls: [
+            'oci://quay.io/example/test-plugin-email:bs_1.52.0__0.1.0',
+          ],
+        },
+        packages: [
+          pluginPackage(
+            'test-plugin',
+            'oci://quay.io/example/test-plugin:bs_1.52.0__0.1.0',
+          ),
+        ],
+      });
+
+      await expect(screen.findByText('Failed to load')).rejects.toThrow();
+    });
+  });
+
+  describe('Failed install matching', () => {
+    it.each([
+      [
+        'a selector ref whose tag changed',
+        'oci://quay.io/example/test-plugin:1.0.0!test-plugin',
+        'oci://quay.io/example/test-plugin:2.0.0!test-plugin',
+      ],
+      [
+        'a selector-less ref whose tag changed',
+        'oci://quay.io/example/test-plugin:1.0.0',
+        'oci://quay.io/example/test-plugin:2.0.0',
+      ],
+      [
+        'a tag ref that the catalog now pins by digest',
+        'oci://quay.io/example/test-plugin:1.0.0',
+        `oci://quay.io/example/test-plugin@sha256:${'d'.repeat(64)}`,
+      ],
+      [
+        'a registry with a port whose tag changed',
+        'oci://localhost:5000/example/test-plugin:1.0.0',
+        'oci://localhost:5000/example/test-plugin:2.0.0',
+      ],
+      [
+        'an identical local path',
+        './dynamic-plugins/dist/test-plugin',
+        './dynamic-plugins/dist/test-plugin',
+      ],
+    ])(
+      'should show "Failed to load" for %s',
+      async (_case, storedRef, catalogRef) => {
+        renderPluginCard(mockPlugin, {
+          pendingChanges: { ...noPendingChanges, failedInstalls: [storedRef] },
+          packages: [pluginPackage('test-plugin', catalogRef)],
+        });
+
+        expect(await screen.findByText('Failed to load')).toBeInTheDocument();
+      },
+    );
+
+    it.each([
+      [
+        'a selector shared by images in two repositories',
+        'oci://quay.io/team-a/foo:1!frontend',
+        'oci://quay.io/team-b/bar:2!frontend',
+      ],
+      [
+        'an image name shared by two repositories',
+        'oci://quay.io/team-a/shared-image:1.0.0',
+        'oci://quay.io/team-b/shared-image:1.0.0',
+      ],
+      [
+        'an image path shared by two registry ports',
+        'oci://localhost:5000/example/test-plugin:1.0.0',
+        'oci://localhost:5001/example/test-plugin:1.0.0',
+      ],
+      [
+        'a file name shared by two local directories',
+        './dynamic-plugins/dist/test-plugin',
+        './other/dist/test-plugin',
+      ],
+    ])(
+      'should not show "Failed to load" for %s',
+      async (_case, storedRef, catalogRef) => {
+        renderPluginCard(mockPlugin, {
+          pendingChanges: { ...noPendingChanges, failedInstalls: [storedRef] },
+          packages: [pluginPackage('test-plugin', catalogRef)],
+        });
+
+        await expect(screen.findByText('Failed to load')).rejects.toThrow();
+      },
+    );
   });
 
   describe('Plugin Card Layout', () => {

@@ -23,9 +23,15 @@ export class PendingChangesClient implements PendingChangesApi {
     );
 
     if (!response.ok) {
-      return { count: 0, pendingInstalls: [], pendingRemovals: [] };
+      return {
+        count: 0,
+        pendingInstalls: [],
+        pendingRemovals: [],
+        failedInstalls: [],
+      };
     }
 
-    return response.json();
+    const body = await response.json();
+    return { ...body, failedInstalls: body.failedInstalls ?? [] };
   }
 }

@@ -5,7 +5,7 @@ import {
   ExtensionsPlugin,
   ExtensionsPluginInstallStatus,
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
-import { dynamicPluginsInfoApiRef } from '../api';
+import { dynamicPluginsInfoApiRef, extensionsApiRef } from '../api';
 
 export type MarketplaceStatus =
   | 'available'
@@ -13,18 +13,21 @@ export type MarketplaceStatus =
   | 'installed'
   | 'disabled'
   | 'pending-install'
-  | 'pending-removal';
+  | 'pending-removal'
+  | 'failed';
 
 interface PendingChangesResponse {
   count: number;
   pendingInstalls: string[];
   pendingRemovals: string[];
+  failedInstalls: string[];
 }
 
 export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => {
   const dynamicPluginsInfoApi = useApi(dynamicPluginsInfoApiRef);
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const extensionsApi = useApi(extensionsApiRef);
 
   const { data: loadedPlugins } = useQuery({
     queryKey: ['loaded-plugins'],
@@ -37,10 +40,33 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     queryFn: async () => {
       const baseUrl = await discoveryApi.getBaseUrl('extensions');
       const res = await fetchApi.fetch(`${baseUrl}/pending-changes`);
-      if (!res.ok) return { count: 0, pendingInstalls: [], pendingRemovals: [] };
-      return res.json();
+      if (!res.ok) {
+        return {
+          count: 0,
+          pendingInstalls: [],
+          pendingRemovals: [],
+          failedInstalls: [],
+        };
+      }
+      const body = await res.json();
+      return { ...body, failedInstalls: body.failedInstalls ?? [] };
     },
     staleTime: 10_000,
+  });
+
+  const { data: pluginPackages } = useQuery({
+    queryKey: [
+      'extensionsApi',
+      'getPluginPackages',
+      plugin.metadata.namespace,
+      plugin.metadata.name,
+    ],
+    queryFn: () =>
+      extensionsApi.getPluginPackages(
+        plugin.metadata.namespace!,
+        plugin.metadata.name,
+      ),
+    enabled: (pendingChanges?.failedInstalls.length ?? 0) > 0,
   });
 
   return useMemo(() => {
@@ -59,9 +85,17 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     const hasPendingRemoval = pendingChanges?.pendingRemovals?.some(
       pkg => extractName(pkg).includes(pluginName),
     ) ?? false;
+    const failedRefs = new Set(
+      pendingChanges?.failedInstalls.map(normalizeRef),
+    );
+    const hasFailedInstall = (pluginPackages ?? []).some(pkg => {
+      const artifact = pkg.spec?.dynamicArtifact;
+      return artifact !== undefined && failedRefs.has(normalizeRef(artifact));
+    });
 
     if (hasPendingInstall) return 'pending-install';
     if (hasPendingRemoval) return 'pending-removal';
+    if (hasFailedInstall) return 'failed';
 
     // Check if loaded but not user-installed → built-in
     const isLoaded = loadedNames.size > 0 && Array.from(loadedNames).some(
@@ -79,7 +113,7 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     if (isInstalledByUser) return 'installed';
 
     return 'available';
-  }, [plugin, loadedPlugins, pendingChanges]);
+  }, [plugin, loadedPlugins, pendingChanges, pluginPackages]);
 };
 
 const extractName = (pkg: string): string => {
@@ -88,4 +122,20 @@ const extractName = (pkg: string): string => {
   const lastSlash = pkg.lastIndexOf('/');
   if (lastSlash !== -1) return pkg.substring(lastSlash + 1);
   return pkg;
+};
+
+// A stored ref and the catalog ref of the same image may differ in tag or
+// digest, so those are dropped. The registry (with its port), the image path
+// and the selector stay, since they tell two packages apart.
+const normalizeRef = (ref: string): string => {
+  if (!ref.startsWith('oci://')) return ref;
+  const selectorIdx = ref.indexOf('!');
+  const image = selectorIdx === -1 ? ref : ref.substring(0, selectorIdx);
+  const selector = selectorIdx === -1 ? '' : ref.substring(selectorIdx);
+  const nameIdx = image.lastIndexOf('/') + 1;
+  return (
+    image.substring(0, nameIdx) +
+    image.substring(nameIdx).split(/[:@]/)[0] +
+    selector
+  );
 };
