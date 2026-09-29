@@ -13,12 +13,14 @@ export type MarketplaceStatus =
   | 'installed'
   | 'disabled'
   | 'pending-install'
-  | 'pending-removal';
+  | 'pending-removal'
+  | 'failed';
 
 interface PendingChangesResponse {
   count: number;
   pendingInstalls: string[];
   pendingRemovals: string[];
+  failedInstalls: string[];
 }
 
 export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => {
@@ -37,8 +39,16 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     queryFn: async () => {
       const baseUrl = await discoveryApi.getBaseUrl('extensions');
       const res = await fetchApi.fetch(`${baseUrl}/pending-changes`);
-      if (!res.ok) return { count: 0, pendingInstalls: [], pendingRemovals: [] };
-      return res.json();
+      if (!res.ok) {
+        return {
+          count: 0,
+          pendingInstalls: [],
+          pendingRemovals: [],
+          failedInstalls: [],
+        };
+      }
+      const body = await res.json();
+      return { ...body, failedInstalls: body.failedInstalls ?? [] };
     },
     staleTime: 10_000,
   });
@@ -51,17 +61,21 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
       (loadedPlugins ?? []).map((p: { name: string }) => p.name),
     );
 
-    // Check pending changes by scanning all pending lists for a name containing
-    // the plugin's catalog name. This heuristic covers OCI and local paths.
+    // Check the pending and failed lists for a name containing the plugin's
+    // catalog name. This heuristic covers OCI and local paths.
     const hasPendingInstall = pendingChanges?.pendingInstalls?.some(
       pkg => extractName(pkg).includes(pluginName),
     ) ?? false;
     const hasPendingRemoval = pendingChanges?.pendingRemovals?.some(
       pkg => extractName(pkg).includes(pluginName),
     ) ?? false;
+    const hasFailedInstall = pendingChanges?.failedInstalls.some(
+      pkg => extractName(pkg).includes(pluginName),
+    ) ?? false;
 
     if (hasPendingInstall) return 'pending-install';
     if (hasPendingRemoval) return 'pending-removal';
+    if (hasFailedInstall) return 'failed';
 
     // Check if loaded but not user-installed → built-in
     const isLoaded = loadedNames.size > 0 && Array.from(loadedNames).some(

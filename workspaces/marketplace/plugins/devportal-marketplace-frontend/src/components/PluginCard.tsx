@@ -60,6 +60,7 @@ const statusConfig: Record<MarketplaceStatus, {
   'disabled': { label: 'Disabled', color: 'error' },
   'pending-install': { label: 'Pending install', color: 'warning' },
   'pending-removal': { label: 'Pending removal', color: 'warning' },
+  'failed': { label: 'Failed to load', color: 'error' },
 };
 
 const PluginStatusBadge = ({ status }: { status: MarketplaceStatus }) => {
@@ -298,7 +299,7 @@ export const PluginCard = ({ plugin }: { plugin: ExtensionsPlugin }) => {
               Install
             </Button>
           )}
-          {canWrite && status === 'installed' && (
+          {canWrite && (status === 'installed' || status === 'failed') && (
             <Button size="small" color="error" onClick={handleUninstall}>
               Uninstall
             </Button>

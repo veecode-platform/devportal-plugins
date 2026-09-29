@@ -4,6 +4,7 @@ export interface PendingChangesResponse {
   count: number;
   pendingInstalls: string[];
   pendingRemovals: string[];
+  failedInstalls: string[];
 }
 
 export interface PendingChangesApi {
