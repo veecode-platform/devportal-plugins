@@ -29,6 +29,12 @@ local operator config under `dynamic-plugins-root-dev/`, and prints the exact
 `docker compose -f ... -f ... -f ... up -d` command to run in `devportal-local`. It
 does not start the portal, and no tracked runner config is edited.
 
+The CLI version defaults to 1.11.2, the `cli` value in `versions.json` of
+`devportal-plugin-export-overlays`, so the export is built the way the published
+artifact is. Set `RHDH_CLI_VERSION` to export with another version. Do not use
+`latest`: a CLI release can change the frontend export format, and the runner then
+serves no dynamic frontend.
+
 When the product face already ships the plugin being proven (the face is baked into
 the runner image as `/opt/app-root/src/dynamic-plugins.veecode.yaml`), the generated
 config disables that face entry with its exact ref and `disabled: true`, the override
