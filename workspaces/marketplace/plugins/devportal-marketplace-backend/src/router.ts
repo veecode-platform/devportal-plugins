@@ -771,8 +771,8 @@ export async function createRouter(
           if (changedThisSession.has(entry.package)) {
             pendingRemovals.push(entry.package);
           }
-          // Entries disabled before startup but still loaded (from defaults)
-          // are ignored — can't unload without image change
+          // Disabled before startup but still loaded: the deploy configuration
+          // enables it and wins over the marketplace row, so nothing is pending.
         }
       }
 

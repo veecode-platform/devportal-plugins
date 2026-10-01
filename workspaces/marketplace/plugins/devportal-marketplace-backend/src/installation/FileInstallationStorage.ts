@@ -13,6 +13,7 @@ import {
 import { toBlockStyle } from '../utils/yamlFormat';
 import type { JsonValue } from '@backstage/types';
 import type { InstallationStorage, PackageEntry } from './InstallationStorage';
+import { hasAmbiguousPluginMatch, samePlugin } from './pluginKey';
 
 export class FileInstallationStorage implements InstallationStorage {
   private readonly configFile: string;
@@ -37,12 +38,87 @@ export class FileInstallationStorage implements InstallationStorage {
     return this.serializeYaml(tempDoc);
   }
 
+  // The entry stored for the reference, or else the entry of an older
+  // reference of the same plugin.
   private getPackageYamlMap(
     packageName: string,
   ): YAMLMap<string, JsonValue> | undefined {
-    return this.packages.items.find(
-      p => isMap(p) && p.get('package') === packageName,
+    return (
+      this.packages.items.find(
+        p => isMap(p) && p.get('package') === packageName,
+      ) ??
+      this.packages.items.find(
+        p => isMap(p) && samePlugin(p.get('package') as string, packageName),
+      )
     );
+  }
+
+  private underReference(
+    entry: YAMLMap<string, JsonValue>,
+    ref: string,
+  ): YAMLMap<string, JsonValue> {
+    if (entry.get('package') === ref) return entry;
+    const copy = entry.clone() as YAMLMap<string, JsonValue>;
+    copy.set('package', ref);
+    return copy;
+  }
+
+  private removeReplaced(refs: string[]): Map<string, YAMLMap<string, JsonValue>[]> {
+    const rows = this.packages.items.filter(isMap);
+    const refOf = (item: YAMLMap<string, JsonValue>) =>
+      item.get('package') as string;
+    const ambiguousRows = new Set<string>();
+
+    for (const row of rows) {
+      const rowRef = refOf(row);
+      const matchingRows = rows
+        .filter(candidate => samePlugin(rowRef, refOf(candidate)))
+        .map(refOf);
+      const matchingWrites = refs.filter(ref => samePlugin(rowRef, ref));
+      if (
+        hasAmbiguousPluginMatch(rowRef, matchingRows) ||
+        hasAmbiguousPluginMatch(rowRef, matchingWrites)
+      ) {
+        ambiguousRows.add(rowRef);
+      }
+    }
+
+    const replacedByRef = new Map<string, YAMLMap<string, JsonValue>[]>();
+    for (const ref of refs) {
+      const matches = rows.filter(row => samePlugin(refOf(row), ref));
+      if (hasAmbiguousPluginMatch(ref, matches.map(refOf))) {
+        replacedByRef.set(ref, []);
+        continue;
+      }
+      replacedByRef.set(
+        ref,
+        matches.filter(
+          row => refOf(row) !== ref && !ambiguousRows.has(refOf(row)),
+        ),
+      );
+    }
+
+    const replaced = new Set([...replacedByRef.values()].flat());
+    this.packages.items = this.packages.items.filter(
+      item => !replaced.has(item),
+    );
+    return replacedByRef;
+  }
+
+  private carryPluginConfig(
+    entry: YAMLMap<string, JsonValue>,
+    replaced: YAMLMap<string, JsonValue>[],
+  ) {
+    if (entry.has('pluginConfig')) return;
+    const ref = entry.get('package') as string;
+    const source = replaced.find(
+      item =>
+        item.has('pluginConfig') &&
+        samePlugin(item.get('package') as string, ref),
+    );
+    if (source) {
+      entry.set('pluginConfig', source.get('pluginConfig') as JsonValue);
+    }
   }
 
   private save() {
@@ -77,15 +153,19 @@ export class FileInstallationStorage implements InstallationStorage {
 
   async getPackage(packageName: string): Promise<string | undefined> {
     const res = this.getPackageYamlMap(packageName);
-    return res ? this.toStringYaml([res]) : res;
+    return res
+      ? this.toStringYaml([this.underReference(res, packageName)])
+      : res;
   }
 
   async getPackages(packageNames: Set<string>): Promise<string | undefined> {
     const res = [];
+    const seen = new Set<YAMLMap<string, JsonValue>>();
     for (const packageName of packageNames) {
       const packageMap = this.getPackageYamlMap(packageName);
-      if (packageMap) {
-        res.push(packageMap);
+      if (packageMap && !seen.has(packageMap)) {
+        seen.add(packageMap);
+        res.push(this.underReference(packageMap, packageName));
       }
     }
     return res.length === 0 ? undefined : this.toStringYaml(res);
@@ -94,6 +174,9 @@ export class FileInstallationStorage implements InstallationStorage {
   async updatePackage(packageName: string, newConfig: string): Promise<void> {
     const newNode = parseDocument(newConfig).contents;
     validatePackageFormat(newNode, packageName);
+
+    const replacedByRef = this.removeReplaced([packageName]);
+    this.carryPluginConfig(newNode, replacedByRef.get(packageName) ?? []);
 
     const existingPackage = this.packages.items.find(
       item => item.get('package') === packageName,
@@ -110,6 +193,14 @@ export class FileInstallationStorage implements InstallationStorage {
     const newNodes = parseDocument(newConfig);
     validatePluginFormat(newNodes, packageNames);
 
+    const replacedByRef = this.removeReplaced(
+      newNodes.contents.items.map(item => item.get('package') as string),
+    );
+    newNodes.contents.items.forEach(item => {
+      const ref = item.get('package') as string;
+      this.carryPluginConfig(item, replacedByRef.get(ref) ?? []);
+    });
+
     const updatedPackages = new YAMLSeq<YAMLMap<string, JsonValue>>();
     for (const item of this.packages.items) {
       const name = item.get('package') as string;
@@ -124,14 +215,7 @@ export class FileInstallationStorage implements InstallationStorage {
   }
 
   async setPackageDisabled(packageName: string, disabled: boolean): Promise<void> {
-    let pkg = this.getPackageYamlMap(packageName);
-    if (!pkg) {
-      pkg = new YAMLMap<string, JsonValue>();
-      pkg.set('package', packageName);
-      this.packages.add(pkg);
-    }
-    pkg.set('disabled', disabled);
-    this.save();
+    await this.setPackagesDisabled(new Set([packageName]), disabled);
   }
 
   async getAllPackageEntries(): Promise<PackageEntry[]> {
@@ -158,6 +242,7 @@ export class FileInstallationStorage implements InstallationStorage {
   }
 
   async setPackagesDisabled(packageNames: Set<string>, disabled: boolean): Promise<void> {
+    const replacedByRef = this.removeReplaced([...packageNames]);
     const packages = this.config.get('plugins') as YAMLSeq<
       YAMLMap<string, JsonValue>
     >;
@@ -166,13 +251,19 @@ export class FileInstallationStorage implements InstallationStorage {
       new Map<string, YAMLMap<string, JsonValue>>(),
     );
     for (const packageName of packageNames) {
-      let item = packageMap.get(packageName);
-      if (!item) {
-        item = new YAMLMap<string, JsonValue>();
+      const existing = packageMap.get(packageName);
+      if (existing) {
+        existing.set('disabled', disabled);
+      } else {
+        const item = new YAMLMap<string, JsonValue>();
         item.set('package', packageName);
+        item.set('disabled', disabled);
+        this.carryPluginConfig(
+          item,
+          replacedByRef.get(packageName) ?? [],
+        );
         packages.add(item);
       }
-      item.set('disabled', disabled);
     }
 
     this.save();

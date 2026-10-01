@@ -10,6 +10,7 @@ import {
 } from '../validation/configValidation';
 import type { Knex } from 'knex';
 import type { InstallationStorage, PackageEntry } from './InstallationStorage';
+import { hasAmbiguousPluginMatch, samePlugin } from './pluginKey';
 
 const TABLE = 'marketplace_installations';
 
@@ -20,12 +21,57 @@ interface DbRow {
   updated_at: Date;
 }
 
+const pluginConfigOf = (row: DbRow): unknown => {
+  if (!row.config_yaml) return undefined;
+  try {
+    return parseDocument(row.config_yaml).toJSON()?.pluginConfig;
+  } catch {
+    return undefined;
+  }
+};
+
+const withCarriedPluginConfig = (
+  entry: Record<string, unknown>,
+  replaced: DbRow[],
+): Record<string, unknown> => {
+  if ('pluginConfig' in entry) return entry;
+  const carried = replaced
+    .filter(row => samePlugin(row.package_name, entry.package as string))
+    .map(pluginConfigOf)
+    .find(config => config !== undefined);
+  return carried === undefined ? entry : { ...entry, pluginConfig: carried };
+};
+
+const toConfigYaml = (entry: Record<string, unknown>): string => {
+  const doc = new Document(entry);
+  toBlockStyle(doc.contents);
+  return doc.toString({ lineWidth: 120 });
+};
+
+// The row stored for the reference, or else the row of an older reference of
+// the same plugin.
+const resolveRow = (rows: DbRow[], ref: string): DbRow | undefined =>
+  rows.find(row => row.package_name === ref) ??
+  rows.find(row => samePlugin(row.package_name, ref));
+
 export class DatabaseInstallationStorage implements InstallationStorage {
   constructor(
     private readonly db: Knex,
     private readonly yamlFilePath: string | undefined,
     private readonly logger: LoggerService,
   ) {}
+
+  private async transactionForWrite(
+    operation: (trx: Knex.Transaction) => Promise<void>,
+  ): Promise<void> {
+    await this.db.transaction(async trx => {
+      if (trx.client.config.client === 'pg') {
+        // PostgreSQL permits concurrent writers; lock before reading replacements.
+        await trx.raw(`LOCK TABLE ${TABLE} IN SHARE ROW EXCLUSIVE MODE`);
+      }
+      await operation(trx);
+    });
+  }
 
   async initialize(): Promise<void> {
     // __dirname points to dist/installation/ at runtime;
@@ -136,19 +182,84 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     }
   }
 
+  private allRows(db: Knex): Promise<DbRow[]> {
+    return db(TABLE)
+      .select('package_name', 'disabled', 'config_yaml', 'updated_at')
+      .orderBy('package_name');
+  }
+
+  private async dropReplacedRows(
+    trx: Knex,
+    refs: string[],
+  ): Promise<Map<string, DbRow[]>> {
+    const rows = await this.allRows(trx);
+    const ambiguousRows = new Set<string>();
+
+    for (const row of rows) {
+      const matchingRows = rows.filter(candidate =>
+        samePlugin(row.package_name, candidate.package_name),
+      );
+      const matchingWrites = refs.filter(ref =>
+        samePlugin(row.package_name, ref),
+      );
+      if (
+        hasAmbiguousPluginMatch(
+          row.package_name,
+          matchingRows.map(candidate => candidate.package_name),
+        ) ||
+        hasAmbiguousPluginMatch(row.package_name, matchingWrites)
+      ) {
+        ambiguousRows.add(row.package_name);
+      }
+    }
+
+    const replacedByRef = new Map<string, DbRow[]>();
+    for (const ref of refs) {
+      const matches = rows.filter(row => samePlugin(row.package_name, ref));
+      if (
+        hasAmbiguousPluginMatch(
+          ref,
+          matches.map(row => row.package_name),
+        )
+      ) {
+        replacedByRef.set(ref, []);
+        continue;
+      }
+      replacedByRef.set(
+        ref,
+        matches.filter(
+          row => row.package_name !== ref && !ambiguousRows.has(row.package_name),
+        ),
+      );
+    }
+
+    const replaced = [...new Set([...replacedByRef.values()].flat())];
+    if (replaced.length > 0) {
+      await trx(TABLE)
+        .whereIn(
+          'package_name',
+          replaced.map(row => row.package_name),
+        )
+        .delete();
+    }
+    return replacedByRef;
+  }
+
   async getPackage(packageName: string): Promise<string | undefined> {
-    const row = await this.db(TABLE)
-      .where('package_name', packageName)
-      .first();
+    const row = resolveRow(await this.allRows(this.db), packageName);
     if (!row) return undefined;
-    return this.rowToYamlSequence(row);
+    return this.rowToYamlSequence(row, packageName);
   }
 
   async getPackages(packageNames: Set<string>): Promise<string | undefined> {
-    const rows = await this.db(TABLE)
-      .whereIn('package_name', [...packageNames]);
-    if (rows.length === 0) return undefined;
-    return this.rowsToYamlSequence(rows);
+    const rows = await this.allRows(this.db);
+    const found = new Map<DbRow, string>();
+    for (const packageName of packageNames) {
+      const row = resolveRow(rows, packageName);
+      if (row && !found.has(row)) found.set(row, packageName);
+    }
+    if (found.size === 0) return undefined;
+    return this.rowsToYamlSequence([...found]);
   }
 
   async updatePackage(
@@ -158,23 +269,32 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     const newNode = parseDocument(newConfig).contents;
     validatePackageFormat(newNode, packageName);
 
-    const configYaml = newConfig;
     const disabled =
       (newNode as YAMLMap).get('disabled') as boolean ?? false;
 
-    await this.db(TABLE)
-      .insert({
-        package_name: packageName,
-        disabled,
-        config_yaml: configYaml,
-        updated_at: this.db.fn.now(),
-      })
-      .onConflict('package_name')
-      .merge({
-        disabled,
-        config_yaml: configYaml,
-        updated_at: this.db.fn.now(),
-      });
+    await this.transactionForWrite(async trx => {
+      const replacedByRef = await this.dropReplacedRows(trx, [packageName]);
+      const entry = (newNode as YAMLMap).toJSON();
+      const carried = withCarriedPluginConfig(
+        entry,
+        replacedByRef.get(packageName) ?? [],
+      );
+      const configYaml = carried === entry ? newConfig : toConfigYaml(carried);
+
+      await trx(TABLE)
+        .insert({
+          package_name: packageName,
+          disabled,
+          config_yaml: configYaml,
+          updated_at: trx.fn.now(),
+        })
+        .onConflict('package_name')
+        .merge({
+          disabled,
+          config_yaml: configYaml,
+          updated_at: trx.fn.now(),
+        });
+    });
 
     await this.syncToYamlFile();
   }
@@ -186,15 +306,23 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     const newNodes = parseDocument(newConfig);
     validatePluginFormat(newNodes, packageNames);
 
-    await this.db.transaction(async trx => {
-      for (const item of (newNodes.contents as YAMLSeq).items) {
-        const map = item as YAMLMap;
+    const items = (newNodes.contents as YAMLSeq).items as YAMLMap[];
+
+    await this.transactionForWrite(async trx => {
+      const replacedByRef = await this.dropReplacedRows(
+        trx,
+        items.map(item => item.get('package') as string),
+      );
+      for (const map of items) {
         const pkgName = map.get('package') as string;
         const disabled = (map.get('disabled') as boolean) ?? false;
 
-        const entryDoc = new Document(map.toJSON());
-        toBlockStyle(entryDoc.contents);
-        const configYaml = entryDoc.toString({ lineWidth: 120 });
+        const configYaml = toConfigYaml(
+          withCarriedPluginConfig(
+            map.toJSON(),
+            replacedByRef.get(pkgName) ?? [],
+          ),
+        );
 
         await trx(TABLE)
           .insert({
@@ -219,48 +347,15 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     packageName: string,
     disabled: boolean,
   ): Promise<void> {
-    const existing = await this.db(TABLE)
-      .where('package_name', packageName)
-      .first();
-
-    if (existing) {
-      // Update disabled flag in both the row and the stored YAML
-      let configYaml = existing.config_yaml;
-      if (configYaml) {
-        try {
-          const doc = parseDocument(configYaml);
-          (doc.contents as YAMLMap).set('disabled', disabled);
-          toBlockStyle(doc.contents);
-          configYaml = doc.toString({ lineWidth: 120 });
-        } catch {
-          // If YAML parsing fails, just update the column
-        }
-      }
-      await this.db(TABLE).where('package_name', packageName).update({
-        disabled,
-        config_yaml: configYaml,
-        updated_at: this.db.fn.now(),
-      });
-    } else {
-      const entry = { package: packageName, disabled };
-      const doc = new Document(entry);
-      toBlockStyle(doc.contents);
-      await this.db(TABLE).insert({
-        package_name: packageName,
-        disabled,
-        config_yaml: doc.toString({ lineWidth: 120 }),
-        updated_at: this.db.fn.now(),
-      });
-    }
-
-    await this.syncToYamlFile();
+    await this.setPackagesDisabled(new Set([packageName]), disabled);
   }
 
   async setPackagesDisabled(
     packageNames: Set<string>,
     disabled: boolean,
   ): Promise<void> {
-    await this.db.transaction(async trx => {
+    await this.transactionForWrite(async trx => {
+      const replacedByRef = await this.dropReplacedRows(trx, [...packageNames]);
       for (const packageName of packageNames) {
         const existing = await trx(TABLE)
           .where('package_name', packageName)
@@ -282,13 +377,14 @@ export class DatabaseInstallationStorage implements InstallationStorage {
             updated_at: trx.fn.now(),
           });
         } else {
-          const entry = { package: packageName, disabled };
-          const doc = new Document(entry);
-          toBlockStyle(doc.contents);
+          const entry = withCarriedPluginConfig(
+            { package: packageName, disabled },
+            replacedByRef.get(packageName) ?? [],
+          );
           await trx(TABLE).insert({
             package_name: packageName,
             disabled,
-            config_yaml: doc.toString({ lineWidth: 120 }),
+            config_yaml: toConfigYaml(entry),
             updated_at: trx.fn.now(),
           });
         }
@@ -316,38 +412,33 @@ export class DatabaseInstallationStorage implements InstallationStorage {
 
   /**
    * Convert a single DB row to a YAML sequence string (matching
-   * FileInstallationStorage.getPackage() output format).
+   * FileInstallationStorage.getPackage() output format), under the reference
+   * it was asked for.
    */
-  private rowToYamlSequence(row: DbRow): string {
-    if (row.config_yaml) {
-      try {
-        const entryDoc = parseDocument(row.config_yaml);
-        const seqDoc = new Document([entryDoc.toJSON()]);
-        toBlockStyle(seqDoc.contents);
-        return seqDoc.toString({ lineWidth: 120 });
-      } catch { /* fall through */ }
-    }
-    const seqDoc = new Document([
-      { package: row.package_name, disabled: row.disabled },
-    ]);
-    toBlockStyle(seqDoc.contents);
-    return seqDoc.toString({ lineWidth: 120 });
+  private rowToYamlSequence(row: DbRow, ref: string): string {
+    return this.rowsToYamlSequence([[row, ref]]);
   }
 
   /**
-   * Convert multiple DB rows to a YAML sequence string (matching
-   * FileInstallationStorage.getPackages() output format).
+   * Convert DB rows to a YAML sequence string (matching
+   * FileInstallationStorage.getPackages() output format). Each row is shown
+   * under the reference it was asked for, which differs from its own when
+   * the row is that of an older reference of the same plugin.
    */
-  private rowsToYamlSequence(rows: DbRow[]): string {
-    const items: unknown[] = rows.map(row => {
+  private rowsToYamlSequence(items: Array<[DbRow, string]>): string {
+    const entries = items.map(([row, ref]) => {
+      let entry: Record<string, unknown> = {
+        package: row.package_name,
+        disabled: row.disabled,
+      };
       if (row.config_yaml) {
         try {
-          return parseDocument(row.config_yaml).toJSON();
+          entry = parseDocument(row.config_yaml).toJSON();
         } catch { /* fall through */ }
       }
-      return { package: row.package_name, disabled: row.disabled };
+      return ref === row.package_name ? entry : { ...entry, package: ref };
     });
-    const seqDoc = new Document(items);
+    const seqDoc = new Document(entries);
     toBlockStyle(seqDoc.contents);
     return seqDoc.toString({ lineWidth: 120 });
   }
