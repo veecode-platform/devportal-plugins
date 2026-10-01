@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useApi, discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import {
+  ExtensionsPackage,
+  ExtensionsPackageInstallStatus,
   ExtensionsPlugin,
   ExtensionsPluginInstallStatus,
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
@@ -22,6 +24,36 @@ interface PendingChangesResponse {
   pendingRemovals: string[];
   failedInstalls: string[];
 }
+
+// The Plugin entity's installStatus lags the Package statuses after a restart,
+// so the card aggregates the Package statuses itself, with the rules of
+// upstream's PluginInstallStatusProcessor.
+const installStatusFromPackages = (
+  packages: ExtensionsPackage[] | undefined,
+): ExtensionsPluginInstallStatus | undefined => {
+  if (!packages || packages.length === 0) return undefined;
+  const statuses = packages.map(pkg => pkg.spec?.installStatus);
+  if (statuses.includes(undefined)) return undefined;
+
+  const count = (wanted: ExtensionsPackageInstallStatus) =>
+    statuses.filter(status => status === wanted).length;
+  if (count(ExtensionsPackageInstallStatus.Disabled) > 0) {
+    return ExtensionsPluginInstallStatus.Disabled;
+  }
+  if (count(ExtensionsPackageInstallStatus.NotInstalled) === statuses.length) {
+    return ExtensionsPluginInstallStatus.NotInstalled;
+  }
+  if (count(ExtensionsPackageInstallStatus.Installed) === statuses.length) {
+    return ExtensionsPluginInstallStatus.Installed;
+  }
+  if (
+    count(ExtensionsPackageInstallStatus.UpdateAvailable) > 0 &&
+    count(ExtensionsPackageInstallStatus.NotInstalled) === 0
+  ) {
+    return ExtensionsPluginInstallStatus.UpdateAvailable;
+  }
+  return ExtensionsPluginInstallStatus.PartiallyInstalled;
+};
 
 export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => {
   const dynamicPluginsInfoApi = useApi(dynamicPluginsInfoApiRef);
@@ -66,11 +98,12 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
         plugin.metadata.namespace!,
         plugin.metadata.name,
       ),
-    enabled: (pendingChanges?.failedInstalls.length ?? 0) > 0,
   });
 
   return useMemo(() => {
-    const installStatus = plugin.spec?.installStatus;
+    const installStatus =
+      installStatusFromPackages(pluginPackages) ?? plugin.spec?.installStatus;
+    const hasPackages = (pluginPackages ?? []).length > 0;
     const pluginName = plugin.metadata.name;
 
     const loadedNames = new Set(
@@ -97,7 +130,8 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
     if (hasPendingRemoval) return 'pending-removal';
     if (hasFailedInstall) return 'failed';
 
-    // Check if loaded but not user-installed → built-in
+    // A plugin with packages is installed or not by its packages. Only one
+    // without packages can be loaded without being installed, as built-in.
     const isLoaded = loadedNames.size > 0 && Array.from(loadedNames).some(
       name => name.includes(pluginName),
     );
@@ -106,7 +140,7 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
       installStatus === ExtensionsPluginInstallStatus.PartiallyInstalled ||
       installStatus === ExtensionsPluginInstallStatus.UpdateAvailable;
 
-    if (isLoaded && !isInstalledByUser) return 'built-in';
+    if (isLoaded && !isInstalledByUser && !hasPackages) return 'built-in';
 
     // Fall back to catalog install status
     if (installStatus === ExtensionsPluginInstallStatus.Disabled) return 'disabled';
