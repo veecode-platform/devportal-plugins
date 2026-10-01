@@ -50,6 +50,25 @@ function samePlugin(a, b) {
   return normalizePluginKey(a) === normalizePluginKey(b);
 }
 
+function hasAmbiguousPluginMatch(reference, candidates) {
+  const target = splitOciRef(reference);
+  if (!target) return false;
+
+  const repository = ociRepository(target.image);
+  const selectors = new Set();
+  for (const candidateRef of candidates) {
+    const candidate = splitOciRef(candidateRef);
+    if (
+      candidate &&
+      ociRepository(candidate.image) === repository &&
+      candidate.selector !== undefined
+    ) {
+      selectors.add(candidate.selector);
+    }
+  }
+  return selectors.size > 1;
+}
+
 const writtenAt = row =>
   row.updated_at ? new Date(row.updated_at).getTime() : 0;
 
@@ -74,8 +93,26 @@ exports.up = async function up(knex) {
       'disabled',
       'updated_at',
     );
-    const losers = rows.filter(row =>
-      rows.some(
+    const ambiguous = new Set();
+    for (const row of rows) {
+      const matches = rows.filter(other =>
+        samePlugin(row.package_name, other.package_name),
+      );
+      if (
+        hasAmbiguousPluginMatch(
+          row.package_name,
+          matches.map(match => match.package_name),
+        )
+      ) {
+        matches.forEach(match => ambiguous.add(match.package_name));
+      }
+    }
+
+    const unambiguousRows = rows.filter(
+      row => !ambiguous.has(row.package_name),
+    );
+    const losers = unambiguousRows.filter(row =>
+      unambiguousRows.some(
         other =>
           samePlugin(row.package_name, other.package_name) &&
           isPreferred(other, row),

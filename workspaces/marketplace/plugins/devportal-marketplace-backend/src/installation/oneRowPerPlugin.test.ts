@@ -148,9 +148,9 @@ describe.each(storages)('%s keeps one row per plugin', (_name, create) => {
       expect((await rowsOf(storage)).map(row => row.package).sort()).toEqual(
         [SELECTOR_X_OLD_REF, SELECTOR_Y_REF, SELECTORLESS_REF].sort(),
       );
-      expect(
-        parse((await storage.getPackage(SELECTORLESS_REF)) ?? ''),
-      ).toEqual([entry(SELECTORLESS_REF)]);
+      expect(parse((await storage.getPackage(SELECTORLESS_REF)) ?? '')).toEqual(
+        [entry(SELECTORLESS_REF)],
+      );
     });
 
     it('replaces only the row with the matching selector', async () => {

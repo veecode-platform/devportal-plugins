@@ -27,6 +27,28 @@ function ociRepository(image: string): string {
   return lastColon > lastSlash ? noDigest.slice(0, lastColon) : noDigest;
 }
 
+export function hasAmbiguousPluginMatch(
+  reference: string,
+  candidates: readonly string[],
+): boolean {
+  const target = splitOciRef(reference);
+  if (!target) return false;
+
+  const repository = ociRepository(target.image);
+  const selectors = new Set<string>();
+  for (const candidateRef of candidates) {
+    const candidate = splitOciRef(candidateRef);
+    if (
+      candidate &&
+      ociRepository(candidate.image) === repository &&
+      candidate.selector !== undefined
+    ) {
+      selectors.add(candidate.selector);
+    }
+  }
+  return selectors.size > 1;
+}
+
 // Local paths stay as they are and npm names lose the trailing @version.
 function normalizePluginKey(ref: string): string {
   if (ref.startsWith('./')) {

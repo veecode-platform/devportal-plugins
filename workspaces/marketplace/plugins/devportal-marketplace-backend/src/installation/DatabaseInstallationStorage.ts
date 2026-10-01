@@ -10,7 +10,7 @@ import {
 } from '../validation/configValidation';
 import type { Knex } from 'knex';
 import type { InstallationStorage, PackageEntry } from './InstallationStorage';
-import { samePlugin } from './pluginKey';
+import { hasAmbiguousPluginMatch, samePlugin } from './pluginKey';
 
 const TABLE = 'marketplace_installations';
 
@@ -30,8 +30,6 @@ const pluginConfigOf = (row: DbRow): unknown => {
   }
 };
 
-// A row replaced by a newer reference hands its pluginConfig on, unless the
-// new entry brings its own.
 const withCarriedPluginConfig = (
   entry: Record<string, unknown>,
   replaced: DbRow[],
@@ -62,6 +60,18 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     private readonly yamlFilePath: string | undefined,
     private readonly logger: LoggerService,
   ) {}
+
+  private async transactionForWrite(
+    operation: (trx: Knex.Transaction) => Promise<void>,
+  ): Promise<void> {
+    await this.db.transaction(async trx => {
+      if (trx.client.config.client === 'pg') {
+        // PostgreSQL permits concurrent writers; lock before reading replacements.
+        await trx.raw(`LOCK TABLE ${TABLE} IN SHARE ROW EXCLUSIVE MODE`);
+      }
+      await operation(trx);
+    });
+  }
 
   async initialize(): Promise<void> {
     // __dirname points to dist/installation/ at runtime;
@@ -178,16 +188,52 @@ export class DatabaseInstallationStorage implements InstallationStorage {
       .orderBy('package_name');
   }
 
-  /**
-   * Deletes the rows that name the same plugin as one of the references being
-   * written under a different reference, and returns them.
-   */
-  private async dropReplacedRows(trx: Knex, refs: string[]): Promise<DbRow[]> {
-    const replaced = (await this.allRows(trx)).filter(
-      row =>
-        !refs.includes(row.package_name) &&
-        refs.some(ref => samePlugin(row.package_name, ref)),
-    );
+  private async dropReplacedRows(
+    trx: Knex,
+    refs: string[],
+  ): Promise<Map<string, DbRow[]>> {
+    const rows = await this.allRows(trx);
+    const ambiguousRows = new Set<string>();
+
+    for (const row of rows) {
+      const matchingRows = rows.filter(candidate =>
+        samePlugin(row.package_name, candidate.package_name),
+      );
+      const matchingWrites = refs.filter(ref =>
+        samePlugin(row.package_name, ref),
+      );
+      if (
+        hasAmbiguousPluginMatch(
+          row.package_name,
+          matchingRows.map(candidate => candidate.package_name),
+        ) ||
+        hasAmbiguousPluginMatch(row.package_name, matchingWrites)
+      ) {
+        ambiguousRows.add(row.package_name);
+      }
+    }
+
+    const replacedByRef = new Map<string, DbRow[]>();
+    for (const ref of refs) {
+      const matches = rows.filter(row => samePlugin(row.package_name, ref));
+      if (
+        hasAmbiguousPluginMatch(
+          ref,
+          matches.map(row => row.package_name),
+        )
+      ) {
+        replacedByRef.set(ref, []);
+        continue;
+      }
+      replacedByRef.set(
+        ref,
+        matches.filter(
+          row => row.package_name !== ref && !ambiguousRows.has(row.package_name),
+        ),
+      );
+    }
+
+    const replaced = [...new Set([...replacedByRef.values()].flat())];
     if (replaced.length > 0) {
       await trx(TABLE)
         .whereIn(
@@ -196,7 +242,7 @@ export class DatabaseInstallationStorage implements InstallationStorage {
         )
         .delete();
     }
-    return replaced;
+    return replacedByRef;
   }
 
   async getPackage(packageName: string): Promise<string | undefined> {
@@ -226,10 +272,13 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     const disabled =
       (newNode as YAMLMap).get('disabled') as boolean ?? false;
 
-    await this.db.transaction(async trx => {
-      const replaced = await this.dropReplacedRows(trx, [packageName]);
+    await this.transactionForWrite(async trx => {
+      const replacedByRef = await this.dropReplacedRows(trx, [packageName]);
       const entry = (newNode as YAMLMap).toJSON();
-      const carried = withCarriedPluginConfig(entry, replaced);
+      const carried = withCarriedPluginConfig(
+        entry,
+        replacedByRef.get(packageName) ?? [],
+      );
       const configYaml = carried === entry ? newConfig : toConfigYaml(carried);
 
       await trx(TABLE)
@@ -259,8 +308,8 @@ export class DatabaseInstallationStorage implements InstallationStorage {
 
     const items = (newNodes.contents as YAMLSeq).items as YAMLMap[];
 
-    await this.db.transaction(async trx => {
-      const replaced = await this.dropReplacedRows(
+    await this.transactionForWrite(async trx => {
+      const replacedByRef = await this.dropReplacedRows(
         trx,
         items.map(item => item.get('package') as string),
       );
@@ -269,7 +318,10 @@ export class DatabaseInstallationStorage implements InstallationStorage {
         const disabled = (map.get('disabled') as boolean) ?? false;
 
         const configYaml = toConfigYaml(
-          withCarriedPluginConfig(map.toJSON(), replaced),
+          withCarriedPluginConfig(
+            map.toJSON(),
+            replacedByRef.get(pkgName) ?? [],
+          ),
         );
 
         await trx(TABLE)
@@ -302,8 +354,8 @@ export class DatabaseInstallationStorage implements InstallationStorage {
     packageNames: Set<string>,
     disabled: boolean,
   ): Promise<void> {
-    await this.db.transaction(async trx => {
-      const replaced = await this.dropReplacedRows(trx, [...packageNames]);
+    await this.transactionForWrite(async trx => {
+      const replacedByRef = await this.dropReplacedRows(trx, [...packageNames]);
       for (const packageName of packageNames) {
         const existing = await trx(TABLE)
           .where('package_name', packageName)
@@ -327,7 +379,7 @@ export class DatabaseInstallationStorage implements InstallationStorage {
         } else {
           const entry = withCarriedPluginConfig(
             { package: packageName, disabled },
-            replaced,
+            replacedByRef.get(packageName) ?? [],
           );
           await trx(TABLE).insert({
             package_name: packageName,

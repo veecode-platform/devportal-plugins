@@ -13,7 +13,7 @@ import {
 import { toBlockStyle } from '../utils/yamlFormat';
 import type { JsonValue } from '@backstage/types';
 import type { InstallationStorage, PackageEntry } from './InstallationStorage';
-import { samePlugin } from './pluginKey';
+import { hasAmbiguousPluginMatch, samePlugin } from './pluginKey';
 
 export class FileInstallationStorage implements InstallationStorage {
   private readonly configFile: string;
@@ -63,25 +63,48 @@ export class FileInstallationStorage implements InstallationStorage {
     return copy;
   }
 
-  /**
-   * Removes the entries that name the same plugin as one of the references
-   * being written under a different reference, and returns them.
-   */
-  private removeReplaced(refs: string[]): YAMLMap<string, JsonValue>[] {
-    const replaced = this.packages.items.filter(
-      item =>
-        isMap(item) &&
-        !refs.includes(item.get('package') as string) &&
-        refs.some(ref => samePlugin(item.get('package') as string, ref)),
-    );
+  private removeReplaced(refs: string[]): Map<string, YAMLMap<string, JsonValue>[]> {
+    const rows = this.packages.items.filter(isMap);
+    const refOf = (item: YAMLMap<string, JsonValue>) =>
+      item.get('package') as string;
+    const ambiguousRows = new Set<string>();
+
+    for (const row of rows) {
+      const rowRef = refOf(row);
+      const matchingRows = rows
+        .filter(candidate => samePlugin(rowRef, refOf(candidate)))
+        .map(refOf);
+      const matchingWrites = refs.filter(ref => samePlugin(rowRef, ref));
+      if (
+        hasAmbiguousPluginMatch(rowRef, matchingRows) ||
+        hasAmbiguousPluginMatch(rowRef, matchingWrites)
+      ) {
+        ambiguousRows.add(rowRef);
+      }
+    }
+
+    const replacedByRef = new Map<string, YAMLMap<string, JsonValue>[]>();
+    for (const ref of refs) {
+      const matches = rows.filter(row => samePlugin(refOf(row), ref));
+      if (hasAmbiguousPluginMatch(ref, matches.map(refOf))) {
+        replacedByRef.set(ref, []);
+        continue;
+      }
+      replacedByRef.set(
+        ref,
+        matches.filter(
+          row => refOf(row) !== ref && !ambiguousRows.has(refOf(row)),
+        ),
+      );
+    }
+
+    const replaced = new Set([...replacedByRef.values()].flat());
     this.packages.items = this.packages.items.filter(
-      item => !replaced.includes(item),
+      item => !replaced.has(item),
     );
-    return replaced;
+    return replacedByRef;
   }
 
-  // An entry that replaces another reference of its plugin hands the
-  // pluginConfig on, unless it brings its own.
   private carryPluginConfig(
     entry: YAMLMap<string, JsonValue>,
     replaced: YAMLMap<string, JsonValue>[],
@@ -152,7 +175,8 @@ export class FileInstallationStorage implements InstallationStorage {
     const newNode = parseDocument(newConfig).contents;
     validatePackageFormat(newNode, packageName);
 
-    this.carryPluginConfig(newNode, this.removeReplaced([packageName]));
+    const replacedByRef = this.removeReplaced([packageName]);
+    this.carryPluginConfig(newNode, replacedByRef.get(packageName) ?? []);
 
     const existingPackage = this.packages.items.find(
       item => item.get('package') === packageName,
@@ -169,12 +193,13 @@ export class FileInstallationStorage implements InstallationStorage {
     const newNodes = parseDocument(newConfig);
     validatePluginFormat(newNodes, packageNames);
 
-    const replaced = this.removeReplaced(
+    const replacedByRef = this.removeReplaced(
       newNodes.contents.items.map(item => item.get('package') as string),
     );
-    newNodes.contents.items.forEach(item =>
-      this.carryPluginConfig(item, replaced),
-    );
+    newNodes.contents.items.forEach(item => {
+      const ref = item.get('package') as string;
+      this.carryPluginConfig(item, replacedByRef.get(ref) ?? []);
+    });
 
     const updatedPackages = new YAMLSeq<YAMLMap<string, JsonValue>>();
     for (const item of this.packages.items) {
@@ -217,7 +242,7 @@ export class FileInstallationStorage implements InstallationStorage {
   }
 
   async setPackagesDisabled(packageNames: Set<string>, disabled: boolean): Promise<void> {
-    const replaced = this.removeReplaced([...packageNames]);
+    const replacedByRef = this.removeReplaced([...packageNames]);
     const packages = this.config.get('plugins') as YAMLSeq<
       YAMLMap<string, JsonValue>
     >;
@@ -233,7 +258,10 @@ export class FileInstallationStorage implements InstallationStorage {
         const item = new YAMLMap<string, JsonValue>();
         item.set('package', packageName);
         item.set('disabled', disabled);
-        this.carryPluginConfig(item, replaced);
+        this.carryPluginConfig(
+          item,
+          replacedByRef.get(packageName) ?? [],
+        );
         packages.add(item);
       }
     }
