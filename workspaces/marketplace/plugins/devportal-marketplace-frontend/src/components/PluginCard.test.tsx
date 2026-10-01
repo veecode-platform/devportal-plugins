@@ -15,13 +15,14 @@
  */
 
 import { BrowserRouter } from 'react-router-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { mockApis, TestApiProvider } from '@backstage/test-utils';
 import { discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { QueryClientProvider } from '@tanstack/react-query';
 
 import {
   ExtensionsPackage,
+  ExtensionsPackageInstallStatus,
   ExtensionsPlugin,
   ExtensionsPluginInstallStatus,
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
@@ -76,11 +77,19 @@ const noPendingChanges = {
 const pluginPackage = (
   name: string,
   dynamicArtifact: string,
+  installStatus?: ExtensionsPackageInstallStatus,
 ): ExtensionsPackage => ({
   apiVersion: 'extensions.backstage.io/v1alpha1',
   kind: 'Package',
   metadata: { name, namespace: 'default' },
-  spec: { dynamicArtifact },
+  spec: { dynamicArtifact, installStatus },
+});
+
+const loadedPlugin = (name: string) => ({
+  name,
+  version: '1.0.0',
+  role: 'frontend-plugin',
+  platform: 'web',
 });
 
 const renderPluginCard = (
@@ -88,12 +97,17 @@ const renderPluginCard = (
   {
     pendingChanges = noPendingChanges,
     packages = [],
-  }: { pendingChanges?: object; packages?: ExtensionsPackage[] } = {},
+    loadedPlugins = [],
+  }: {
+    pendingChanges?: object;
+    packages?: ExtensionsPackage[];
+    loadedPlugins?: ReturnType<typeof loadedPlugin>[];
+  } = {},
 ) => {
   const apis = [
     [
       dynamicPluginsInfoApiRef,
-      { listLoadedPlugins: jest.fn().mockResolvedValue([]) },
+      { listLoadedPlugins: jest.fn().mockResolvedValue(loadedPlugins) },
     ],
     [discoveryApiRef, mockApis.discovery()],
     [
@@ -362,6 +376,96 @@ describe('PluginCard', () => {
         await expect(screen.findByText('Failed to load')).rejects.toThrow();
       },
     );
+  });
+
+  describe('Install state from the packages', () => {
+    const artifact = (name: string) =>
+      `oci://quay.io/example/${name}@sha256:${'e'.repeat(64)}`;
+    const loadedPlugins = [
+      loadedPlugin('test-plugin-module-addons'),
+      loadedPlugin('backstage-plugin-test-plugin-backend'),
+    ];
+    const slow = { timeout: 3000 };
+    const withPluginStatus = (
+      installStatus: ExtensionsPluginInstallStatus,
+    ) => ({
+      ...mockPlugin,
+      spec: { ...mockPlugin.spec, installStatus },
+    });
+
+    it.each([
+      ['NotInstalled', ExtensionsPluginInstallStatus.NotInstalled],
+      [
+        'Installed, as it still does after a restart',
+        ExtensionsPluginInstallStatus.Installed,
+      ],
+    ])(
+      'should offer "Install" and show no chip when its packages are not installed and the Plugin entity says %s',
+      async (_case, pluginStatus) => {
+        renderPluginCard(withPluginStatus(pluginStatus), {
+          loadedPlugins,
+          packages: [
+            pluginPackage(
+              'test-plugin',
+              artifact('test-plugin'),
+              ExtensionsPackageInstallStatus.NotInstalled,
+            ),
+            pluginPackage(
+              'test-plugin-backend',
+              artifact('test-plugin-backend'),
+              ExtensionsPackageInstallStatus.NotInstalled,
+            ),
+          ],
+        });
+
+        expect(
+          await screen.findByRole('button', { name: 'Install' }, slow),
+        ).toBeInTheDocument();
+        expect(screen.queryByText('Built-in')).not.toBeInTheDocument();
+        expect(screen.queryByText('Installed')).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: 'Uninstall' }),
+        ).not.toBeInTheDocument();
+      },
+    );
+
+    it('should show "Installed" and offer "Uninstall" when its packages are installed and the Plugin entity says NotInstalled', async () => {
+      renderPluginCard(
+        withPluginStatus(ExtensionsPluginInstallStatus.NotInstalled),
+        {
+          loadedPlugins,
+          packages: [
+            pluginPackage(
+              'test-plugin',
+              artifact('test-plugin'),
+              ExtensionsPackageInstallStatus.Installed,
+            ),
+            pluginPackage(
+              'test-plugin-backend',
+              artifact('test-plugin-backend'),
+              ExtensionsPackageInstallStatus.Installed,
+            ),
+          ],
+        },
+      );
+
+      expect(
+        await screen.findByRole('button', { name: 'Uninstall' }, slow),
+      ).toBeInTheDocument();
+      expect(statusChip('Installed')?.className).toContain(
+        'MuiChip-colorSuccess',
+      );
+    });
+
+    it('should show "Built-in" for a loaded plugin that has no packages', async () => {
+      renderPluginCard(mockPlugin, { loadedPlugins, packages: [] });
+
+      await waitFor(() => expect(queryClient.isFetching()).toBe(0), slow);
+      expect(screen.getByText('Built-in')).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: 'Disable' }, slow),
+      ).toBeInTheDocument();
+    });
   });
 
   describe('Plugin Card Layout', () => {

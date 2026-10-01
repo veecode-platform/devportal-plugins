@@ -70,7 +70,10 @@ describe('DatabaseInstallationStorage', () => {
       expect(await knex.schema.hasColumn(TABLE, 'resolved_digest')).toBe(true);
       await storage.setPackageDisabled(PACKAGE, false);
 
-      await knex.migrate.down({ directory: migrationsDir });
+      await knex.migrate.down({
+        directory: migrationsDir,
+        name: '20260929000000_digest_columns.js',
+      });
 
       expect(await knex.schema.hasColumn(TABLE, 'requested_ref')).toBe(false);
       expect(await knex.schema.hasColumn(TABLE, 'resolved_digest')).toBe(false);
