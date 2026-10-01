@@ -14,6 +14,10 @@ const databases = TestDatabases.create({ ids: ['SQLITE_3'] });
 const IMAGE = 'oci://quay.io/example/plugin';
 const OLD_REF = `${IMAGE}@sha256:${'a'.repeat(64)}`;
 const NEW_REF = `${IMAGE}@sha256:${'b'.repeat(64)}`;
+const SELECTOR_X_OLD_REF = `${IMAGE}@sha256:${'d'.repeat(64)}!x`;
+const SELECTOR_X_NEW_REF = `${IMAGE}@sha256:${'e'.repeat(64)}!x`;
+const SELECTOR_Y_REF = `${IMAGE}@sha256:${'f'.repeat(64)}!y`;
+const SELECTORLESS_REF = `${IMAGE}:latest`;
 const OTHER_REF = `oci://quay.io/example/other@sha256:${'c'.repeat(64)}`;
 const PLUGIN_CONFIG = { app: { example: { enabled: true } } };
 
@@ -132,6 +136,33 @@ describe.each(storages)('%s keeps one row per plugin', (_name, create) => {
       expect(parse((await storage.getPackage(NEW_REF)) ?? '')).toEqual([
         entry(NEW_REF, PLUGIN_CONFIG),
       ]);
+    });
+
+    it('keeps both selector rows when a selector-less reference is written', async () => {
+      const storage = await create();
+      await write.install(storage, SELECTOR_X_OLD_REF, PLUGIN_CONFIG);
+      await write.install(storage, SELECTOR_Y_REF, PLUGIN_CONFIG);
+
+      await write.install(storage, SELECTORLESS_REF);
+
+      expect((await rowsOf(storage)).map(row => row.package).sort()).toEqual(
+        [SELECTOR_X_OLD_REF, SELECTOR_Y_REF, SELECTORLESS_REF].sort(),
+      );
+      expect(
+        parse((await storage.getPackage(SELECTORLESS_REF)) ?? ''),
+      ).toEqual([entry(SELECTORLESS_REF)]);
+    });
+
+    it('replaces only the row with the matching selector', async () => {
+      const storage = await create();
+      await write.install(storage, SELECTOR_X_OLD_REF);
+      await write.install(storage, SELECTOR_Y_REF);
+
+      await write.install(storage, SELECTOR_X_NEW_REF);
+
+      expect((await rowsOf(storage)).map(row => row.package).sort()).toEqual(
+        [SELECTOR_X_NEW_REF, SELECTOR_Y_REF].sort(),
+      );
     });
 
     it('leaves the rows of other plugins alone', async () => {

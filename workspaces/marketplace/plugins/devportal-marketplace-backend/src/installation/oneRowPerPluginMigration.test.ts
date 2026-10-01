@@ -14,6 +14,9 @@ const TABLE = 'marketplace_installations';
 const IMAGE = 'oci://quay.io/example/plugin';
 const REF_A = `${IMAGE}@sha256:${'a'.repeat(64)}`;
 const REF_B = `${IMAGE}@sha256:${'b'.repeat(64)}`;
+const SELECTOR_X_REF = `${IMAGE}@sha256:${'d'.repeat(64)}!x`;
+const SELECTOR_Y_REF = `${IMAGE}@sha256:${'e'.repeat(64)}!y`;
+const SELECTORLESS_REF = `${IMAGE}:latest`;
 const OTHER_REF = `oci://quay.io/example/other@sha256:${'c'.repeat(64)}`;
 
 const row = (ref: string, disabled: boolean, minute: number) => ({
@@ -64,6 +67,21 @@ describe('migration one_row_per_plugin', () => {
     await migrate(knex);
 
     expect(await remaining(knex)).toEqual([REF_B]);
+  });
+
+  it('keeps selector rows bridged by a newer selector-less row', async () => {
+    const knex = await createDatabase();
+    await knex(TABLE).insert([
+      row(SELECTOR_X_REF, false, 0),
+      row(SELECTOR_Y_REF, false, 1),
+      row(SELECTORLESS_REF, false, 10),
+    ]);
+
+    await migrate(knex);
+
+    expect(await remaining(knex)).toEqual(
+      [SELECTOR_X_REF, SELECTOR_Y_REF, SELECTORLESS_REF].sort(),
+    );
   });
 
   it('keeps the rows of other plugins', async () => {
