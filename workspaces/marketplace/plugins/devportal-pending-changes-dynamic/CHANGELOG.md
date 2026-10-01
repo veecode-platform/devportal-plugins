@@ -1,5 +1,11 @@
 # devportal-pending-changes-dynamic
 
+## 0.3.0
+
+### Minor Changes
+
+- 9ec789d: Publish the dynamic wrapper at 0.3.0 together with the marketplace backend and the marketplace frontend wrapper. The wrapper has no code change.
+
 ## 0.2.0
 
 ### Minor Changes
