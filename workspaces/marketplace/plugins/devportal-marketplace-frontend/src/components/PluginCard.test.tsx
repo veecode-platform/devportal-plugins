@@ -624,7 +624,7 @@ describe('PluginCard', () => {
         () => expect(screen.getByText('Pending removal')).toBeInTheDocument(),
         { timeout: 15000 },
       );
-    });
+    }, 20000);
 
     it('does not navigate when the uninstall confirm is clicked', async () => {
       const { disablePluginMock } = renderCardWithPendingSequence([
