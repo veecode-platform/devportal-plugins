@@ -22,7 +22,13 @@ export const ConfirmActionDialog = ({
   onConfirm,
   onCancel,
 }: ConfirmActionDialogProps) => (
-  <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
+  <Dialog
+    open={open}
+    onClose={onCancel}
+    onClick={event => event.stopPropagation()}
+    maxWidth="xs"
+    fullWidth
+  >
     <DialogTitle>{title}</DialogTitle>
     <DialogContent>
       <DialogContentText>{message}</DialogContentText>
