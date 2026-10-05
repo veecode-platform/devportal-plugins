@@ -15,7 +15,7 @@
  */
 
 import { BrowserRouter } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { mockApis, TestApiProvider } from '@backstage/test-utils';
 import { discoveryApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -45,6 +45,12 @@ jest.mock('@backstage/core-plugin-api', () => ({
     }
     return () => '/';
   }),
+}));
+
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
 }));
 
 const mockPlugin: ExtensionsPlugin = {
@@ -148,6 +154,7 @@ describe('PluginCard', () => {
   beforeEach(() => {
     queryClient.clear();
     queryClient.setDefaultOptions({ queries: { retry: false } });
+    mockNavigate.mockClear();
   });
 
   describe('Install Status Indicators', () => {
@@ -537,6 +544,105 @@ describe('PluginCard', () => {
     it('should render "Read more" link', () => {
       renderPluginCard(mockPlugin);
       expect(screen.getByText('Read more')).toBeInTheDocument();
+    });
+  });
+
+  describe('Marketplace card live defects', () => {
+    const techdocsPlugin: ExtensionsPlugin = {
+      ...mockPlugin,
+      metadata: { ...mockPlugin.metadata, name: 'techdocs', namespace: 'rhdh' },
+      spec: {
+        ...mockPlugin.spec,
+        installStatus: ExtensionsPluginInstallStatus.Installed,
+      },
+    };
+
+    const renderCardWithPendingSequence = (
+      pendingSequence: object[],
+      disablePluginMock = jest.fn().mockResolvedValue({}),
+    ) => {
+      let call = 0;
+      const fetchMock = jest.fn().mockImplementation(() => {
+        const body =
+          pendingSequence[Math.min(call, pendingSequence.length - 1)];
+        call += 1;
+        return Promise.resolve({ ok: true, json: async () => body });
+      });
+      const apis = [
+        [
+          dynamicPluginsInfoApiRef,
+          { listLoadedPlugins: jest.fn().mockResolvedValue([]) },
+        ],
+        [discoveryApiRef, mockApis.discovery()],
+        [fetchApiRef, { fetch: fetchMock }],
+        [
+          extensionsApiRef,
+          {
+            getPluginConfigAuthorization: jest.fn().mockResolvedValue({
+              read: Permission.ALLOW,
+              write: Permission.ALLOW,
+            }),
+            getPluginPackages: jest.fn().mockResolvedValue([]),
+            disablePlugin: disablePluginMock,
+          },
+        ],
+      ] as const;
+      render(
+        <TestApiProvider apis={apis}>
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <PluginCard plugin={techdocsPlugin} />
+            </BrowserRouter>
+          </QueryClientProvider>
+        </TestApiProvider>,
+      );
+      return { fetchMock, disablePluginMock };
+    };
+
+    it('shows Pending removal once the backend exposes it after uninstall', async () => {
+      const empty = { ...noPendingChanges };
+      const pending = {
+        ...noPendingChanges,
+        count: 2,
+        pendingRemovals: [
+          'oci://quay.io/veecode/backstage-plugin-techdocs:bs_1.52.0__1.17.7!backstage-plugin-techdocs',
+          'oci://quay.io/veecode/backstage-plugin-techdocs-backend:bs_1.52.0__2.2.1!backstage-plugin-techdocs-backend',
+        ],
+      };
+      renderCardWithPendingSequence([empty, empty, pending]);
+
+      expect(await screen.findByText('Installed')).toBeInTheDocument();
+      fireEvent.click(await screen.findByRole('button', { name: 'Uninstall' }));
+      const dialog = await screen.findByRole('dialog');
+      const buttons = Array.from(dialog.querySelectorAll('button'));
+      const confirm = buttons.find(button =>
+        /^(uninstall|confirm)$/i.test(button.textContent?.trim() ?? ''),
+      );
+      expect(confirm).toBeDefined();
+      fireEvent.click(confirm!);
+
+      await waitFor(
+        () => expect(screen.getByText('Pending removal')).toBeInTheDocument(),
+        { timeout: 15000 },
+      );
+    }, 20000);
+
+    it('does not navigate when the uninstall confirm is clicked', async () => {
+      const { disablePluginMock } = renderCardWithPendingSequence([
+        { ...noPendingChanges },
+      ]);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Uninstall' }));
+      const dialog = await screen.findByRole('dialog');
+      const buttons = Array.from(dialog.querySelectorAll('button'));
+      const confirm = buttons.find(button =>
+        /^(uninstall|confirm)$/i.test(button.textContent?.trim() ?? ''),
+      );
+      expect(confirm).toBeDefined();
+      fireEvent.click(confirm!);
+
+      await waitFor(() => expect(disablePluginMock).toHaveBeenCalled());
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
 });

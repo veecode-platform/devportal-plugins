@@ -84,6 +84,7 @@ export const usePluginStatus = (plugin: ExtensionsPlugin): MarketplaceStatus => 
       return { ...body, failedInstalls: body.failedInstalls ?? [] };
     },
     staleTime: 10_000,
+    refetchInterval: 3_000,
   });
 
   const { data: pluginPackages } = useQuery({
