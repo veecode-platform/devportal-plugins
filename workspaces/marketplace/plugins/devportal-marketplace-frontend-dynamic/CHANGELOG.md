@@ -1,5 +1,13 @@
 # devportal-marketplace-frontend-dynamic
 
+## 0.3.1
+
+### Patch Changes
+
+- Align the dynamic wrapper with `devportal-marketplace-frontend` at 0.3.1, so the Marketplace card artifact ships the pending-chip and confirm-click fixes under the same version as its base package.
+- Updated dependencies [2b2c521]
+  - devportal-marketplace-frontend@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes
