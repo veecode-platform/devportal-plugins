@@ -563,7 +563,8 @@ describe('PluginCard', () => {
     ) => {
       let call = 0;
       const fetchMock = jest.fn().mockImplementation(() => {
-        const body = pendingSequence[Math.min(call, pendingSequence.length - 1)];
+        const body =
+          pendingSequence[Math.min(call, pendingSequence.length - 1)];
         call += 1;
         return Promise.resolve({ ok: true, json: async () => body });
       });
