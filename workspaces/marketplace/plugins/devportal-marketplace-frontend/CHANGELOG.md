@@ -1,5 +1,11 @@
 # devportal-marketplace-frontend
 
+## 0.3.1
+
+### Patch Changes
+
+- 2b2c521: Poll the pending-changes query while Marketplace cards are mounted so the Pending install and Pending removal chips appear once the backend exposes the new row. Stop confirm-dialog clicks from bubbling to the card so confirming an install or uninstall no longer opens the plugin details drawer.
+
 ## 0.3.0
 
 ### Minor Changes
