@@ -8,6 +8,7 @@ export interface MergeReport {
   deleted: string[];
   mergedClean: string[];
   mergedWithConflict: string[];
+  binaryConflicts: string[];
   projectDeleted: string[];
   projectOnly: string[];
   changed: boolean;
@@ -24,6 +25,7 @@ export function mergeTrees(
     deleted: [],
     mergedClean: [],
     mergedWithConflict: [],
+    binaryConflicts: [],
     projectDeleted: [],
     projectOnly: [],
     changed: false,
@@ -59,7 +61,7 @@ export function mergeTrees(
         report.mergedClean.push(filePath);
       } else {
         files[filePath] = projectFile;
-        report.mergedWithConflict.push(filePath);
+        report.binaryConflicts.push(filePath);
       }
       continue;
     }
@@ -74,7 +76,11 @@ export function mergeTrees(
         report.deleted.push(filePath);
       } else {
         files[filePath] = projectFile;
-        report.mergedWithConflict.push(filePath);
+        if (isText(baseFile) && isText(projectFile)) {
+          report.mergedWithConflict.push(filePath);
+        } else {
+          report.binaryConflicts.push(filePath);
+        }
       }
       continue;
     }
@@ -89,8 +95,17 @@ export function mergeTrees(
       files[filePath] = projectFile;
       if (projectFile.equals(incomingFile)) {
         report.added.push(filePath);
-      } else {
+      } else if (isText(projectFile) && isText(incomingFile)) {
+        files[filePath] = Buffer.from(
+          formatConflict(
+            splitLines(projectFile.toString('utf8')),
+            [],
+            splitLines(incomingFile.toString('utf8')),
+          ),
+        );
         report.mergedWithConflict.push(filePath);
+      } else {
+        report.binaryConflicts.push(filePath);
       }
       continue;
     }
@@ -111,6 +126,7 @@ export function mergeTrees(
 export function assertTemplateVersion(
   rendered: FileTree,
   result: FileTree,
+  targetVersion: string,
 ): void {
   const renderedRecord = parseYamlFile(rendered, '.template/record.yaml') as
     | { version?: unknown }
@@ -119,29 +135,34 @@ export function assertTemplateVersion(
   if (typeof renderedVersion !== 'string' || renderedVersion.length === 0) {
     throw new Error('The rendered .template/record.yaml has no target version');
   }
+  if (renderedVersion !== targetVersion) {
+    throw new Error(
+      `The rendered .template/record.yaml version ${renderedVersion} does not match requested target version ${targetVersion}`,
+    );
+  }
 
   const renderedAnnotation = readTemplateVersionAnnotation(rendered);
-  if (renderedAnnotation !== renderedVersion) {
+  if (renderedAnnotation !== targetVersion) {
     throw new Error(
       `The rendered catalog annotation version ${
         renderedAnnotation ?? '(missing)'
-      } does not match record version ${renderedVersion}`,
+      } does not match requested target version ${targetVersion}`,
     );
   }
 
   const resultRecord = parseYamlFile(result, '.template/record.yaml') as
     | { version?: unknown }
     | undefined;
-  if (resultRecord?.version !== renderedVersion) {
+  if (resultRecord?.version !== targetVersion) {
     throw new Error(
-      `The merged .template/record.yaml must have target version ${renderedVersion}`,
+      `The merged .template/record.yaml must have target version ${targetVersion}`,
     );
   }
 
   const resultAnnotation = readTemplateVersionAnnotation(result);
-  if (resultAnnotation !== renderedVersion) {
+  if (resultAnnotation !== targetVersion) {
     throw new Error(
-      `The merged catalog-info.yaml annotation must have target version ${renderedVersion}`,
+      `The merged catalog-info.yaml annotation must have target version ${targetVersion}`,
     );
   }
 }
@@ -165,18 +186,22 @@ function mergeText(
       if (!conflict)
         throw new Error('Three-way merge returned an invalid conflict block');
       conflicted = true;
-      return [
-        '<<<<<<< project\n',
-        withTrailingNewline(conflict.a),
-        '||||||| base\n',
-        withTrailingNewline(conflict.o),
-        '=======\n',
-        withTrailingNewline(conflict.b),
-        '>>>>>>> template\n',
-      ].join('');
+      return formatConflict(conflict.a, conflict.o, conflict.b);
     })
     .join('');
   return { content, conflicted };
+}
+
+function formatConflict(project: string[], base: string[], template: string[]) {
+  return [
+    '<<<<<<< project\n',
+    withTrailingNewline(project),
+    '||||||| base\n',
+    withTrailingNewline(base),
+    '=======\n',
+    withTrailingNewline(template),
+    '>>>>>>> template\n',
+  ].join('');
 }
 
 function splitLines(value: string): string[] {

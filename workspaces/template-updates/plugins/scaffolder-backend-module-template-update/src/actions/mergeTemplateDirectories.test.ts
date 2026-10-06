@@ -36,6 +36,7 @@ describe('mergeTemplateDirectories', () => {
           oldTemplatePath: '.template-update/old',
           newTemplatePath: '.template-update/new',
           projectPath: '.template-update/project',
+          targetVersion: '2.0.0',
         },
         workspacePath,
       );

@@ -1,4 +1,12 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { InputError } from '@backstage/errors';
 import type { FileTree } from './merge/mergeTrees';
@@ -7,7 +15,7 @@ export async function readWorkspaceTree(
   workspacePath: string,
   relativePath: string,
 ): Promise<FileTree> {
-  const root = resolveWorkspacePath(workspacePath, relativePath);
+  const root = await resolveWorkspacePath(workspacePath, relativePath);
   const files: FileTree = {};
 
   async function visit(directory: string, prefix: string): Promise<void> {
@@ -52,7 +60,7 @@ export async function writeWorkspaceTree(
   relativePath: string,
   files: FileTree,
 ): Promise<void> {
-  const root = resolveWorkspacePath(workspacePath, relativePath);
+  const root = await resolveWorkspacePath(workspacePath, relativePath);
   await rm(root, { recursive: true, force: true });
   await mkdir(root, { recursive: true });
 
@@ -76,14 +84,14 @@ export async function writeWorkspaceTree(
   }
 }
 
-function resolveWorkspacePath(
+async function resolveWorkspacePath(
   workspacePath: string,
   relativePath: string,
-): string {
+): Promise<string> {
   if (relativePath.length === 0 || isAbsolute(relativePath)) {
     throw new InputError('A workspace-relative directory is required');
   }
-  const root = resolve(workspacePath);
+  const root = await realpath(resolve(workspacePath));
   const target = resolve(root, relativePath);
   const pathFromRoot = relative(root, target);
   if (
@@ -95,5 +103,42 @@ function resolveWorkspacePath(
       `Template update path must stay inside the workspace: ${relativePath}`,
     );
   }
-  return target;
+
+  let candidate: string | undefined = target;
+  while (candidate !== undefined) {
+    const current: string = candidate;
+    try {
+      await lstat(current);
+      let resolvedCandidate: string;
+      try {
+        resolvedCandidate = await realpath(current);
+      } catch (error) {
+        if ((error as { code?: string }).code === 'ENOENT') {
+          throw new InputError(
+            `Template update path contains an unresolved symbolic link: ${relativePath}`,
+          );
+        }
+        throw error;
+      }
+      const resolvedFromRoot = relative(root, resolvedCandidate);
+      if (
+        resolvedFromRoot === '..' ||
+        resolvedFromRoot.startsWith(`..${sep}`) ||
+        resolvedFromRoot.startsWith(sep)
+      ) {
+        throw new InputError(
+          `Template update path resolves outside the workspace: ${relativePath}`,
+        );
+      }
+      return current === target ? resolvedCandidate : target;
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'ENOENT') throw error;
+      const parent = dirname(current);
+      if (parent === current) throw error;
+      candidate = parent;
+    }
+  }
+  throw new InputError(
+    `Template update path could not be resolved inside the workspace: ${relativePath}`,
+  );
 }

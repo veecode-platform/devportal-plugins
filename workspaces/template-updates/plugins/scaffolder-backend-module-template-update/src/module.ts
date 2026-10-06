@@ -16,18 +16,21 @@ export const scaffolderTemplateUpdateModule = createBackendModule({
   register(env) {
     env.registerInit({
       deps: {
-        auth: coreServices.auth,
         catalog: catalogServiceRef,
         config: coreServices.rootConfig,
         scaffolderActions: scaffolderActionsExtensionPoint,
         urlReader: coreServices.urlReader,
       },
-      async init({ auth, catalog, config, scaffolderActions, urlReader }) {
-        const credentials = await auth.getOwnServiceCredentials();
+      async init({ catalog, config, scaffolderActions, urlReader }) {
         const gitlab = new GitlabClient(ScmIntegrations.fromConfig(config));
+        type CatalogCredentials = NonNullable<
+          Parameters<typeof catalog.getEntityByRef>[1]
+        >['credentials'];
         const catalogAdapter = {
-          getEntityByRef: (entityRef: string) =>
-            catalog.getEntityByRef(entityRef, { credentials }),
+          getEntityByRef: (entityRef: string, credentials?: unknown) =>
+            catalog.getEntityByRef(entityRef, {
+              credentials: credentials as CatalogCredentials,
+            }),
         };
 
         scaffolderActions.addActions(

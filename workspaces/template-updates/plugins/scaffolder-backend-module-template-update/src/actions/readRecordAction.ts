@@ -20,6 +20,7 @@ export function createReadRecordAction(
         templateName: z => z.string(),
         oldSha: z => z.string(),
         newSha: z => z.string(),
+        projectSha: z => z.string(),
         oldValues: z => z.record(z.unknown()),
         newValues: z => z.record(z.unknown()),
         projectUrl: z => z.string(),
@@ -29,12 +30,18 @@ export function createReadRecordAction(
       },
     },
     async handler(ctx) {
-      const result = await readTemplateRecord(ctx.input, dependencies);
+      const credentials = await ctx.getInitiatorCredentials();
+      const result = await readTemplateRecord(
+        ctx.input,
+        dependencies,
+        credentials,
+      );
       ctx.output('templateRepoUrl', result.templateRepoUrl);
       ctx.output('templatePath', result.templatePath);
       ctx.output('templateName', result.templateName);
       ctx.output('oldSha', result.oldSha);
       ctx.output('newSha', result.newSha);
+      ctx.output('projectSha', result.projectSha);
       ctx.output('oldValues', result.oldValues);
       ctx.output('newValues', result.newValues);
       ctx.output('projectUrl', result.projectUrl);

@@ -5,6 +5,7 @@ import type { MergeReport } from '../merge/mergeTrees';
 
 export interface PublishTemplateUpdateInput {
   projectUrl: string;
+  projectSha: string;
   resultFiles: Record<string, Buffer>;
   report: MergeReport;
   templateName: string;
@@ -21,8 +22,6 @@ export interface PublishTemplateUpdateDependencies {
     GitlabClient,
     | 'getProject'
     | 'readRepositoryFiles'
-    | 'deleteBranch'
-    | 'createBranch'
     | 'createCommit'
     | 'findOpenMergeRequest'
     | 'updateMergeRequest'
@@ -45,7 +44,7 @@ export async function publishTemplateUpdate(
   const project = await dependencies.gitlab.getProject(input.projectUrl);
   const currentFiles = await dependencies.gitlab.readRepositoryFiles(
     project,
-    project.defaultBranch,
+    input.projectSha,
   );
   const actions = createCommitActions(currentFiles, input.resultFiles);
   if (actions.length === 0) return { status: 'none' };
@@ -58,13 +57,13 @@ export async function publishTemplateUpdate(
     input.targetVersion,
   );
 
-  await dependencies.gitlab.deleteBranch(project, branch);
-  await dependencies.gitlab.createBranch(
+  await dependencies.gitlab.createCommit(
     project,
     branch,
-    project.defaultBranch,
+    input.projectSha,
+    title,
+    actions,
   );
-  await dependencies.gitlab.createCommit(project, branch, title, actions);
 
   const existing = await dependencies.gitlab.findOpenMergeRequest(
     project,
@@ -144,6 +143,7 @@ function createMergeRequestDescription(
 ): string {
   return [
     `Template update to ${targetVersion}.`,
+    'Each re-run regenerates this branch from the fetched project snapshot and discards edits made directly on the update branch.',
     '',
     `Catalog owner: ${catalogOwner}.`,
     'GitLab assignee mapping from catalog groups is out of scope for U1; this merge request is not assigned automatically.',
@@ -152,6 +152,10 @@ function createMergeRequestDescription(
     section('Deleted', report.deleted),
     section('Merged cleanly', report.mergedClean),
     section('Merged with conflicts', report.mergedWithConflict),
+    section(
+      'Binary conflicts (template version not applied)',
+      report.binaryConflicts,
+    ),
     section('Project-deleted (kept absent)', report.projectDeleted),
     section('Project-only (untouched)', report.projectOnly),
     section('Resolved by AI', []),

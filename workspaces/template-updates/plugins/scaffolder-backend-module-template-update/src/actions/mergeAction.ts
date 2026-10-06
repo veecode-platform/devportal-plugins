@@ -10,6 +10,7 @@ export function createMergeAction() {
         oldTemplatePath: z => z.string(),
         newTemplatePath: z => z.string(),
         projectPath: z => z.string(),
+        targetVersion: z => z.string(),
       },
       output: {
         resultPath: z => z.string(),
@@ -19,6 +20,7 @@ export function createMergeAction() {
             deleted: z.array(z.string()),
             mergedClean: z.array(z.string()),
             mergedWithConflict: z.array(z.string()),
+            binaryConflicts: z.array(z.string()),
             projectDeleted: z.array(z.string()),
             projectOnly: z.array(z.string()),
             changed: z.boolean(),

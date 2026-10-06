@@ -10,6 +10,7 @@ const report: MergeReport = {
   deleted: ['removed.txt'],
   mergedClean: ['README.md'],
   mergedWithConflict: ['config.yaml'],
+  binaryConflicts: ['logo.png'],
   projectDeleted: ['local.txt'],
   projectOnly: ['notes.md'],
   changed: true,
@@ -17,6 +18,7 @@ const report: MergeReport = {
 
 const options = {
   projectUrl: 'https://gitlab.example.com/group/payments/-/tree/main',
+  projectSha: 'project-head-sha',
   resultFiles: {
     'new.txt': Buffer.from('new\n'),
     'README.md': Buffer.from('updated\n'),
@@ -39,8 +41,6 @@ const project: GitlabProject = {
 const makeGitlab = (files: Record<string, Buffer>) => ({
   getProject: jest.fn(async () => project),
   readRepositoryFiles: jest.fn(async () => files),
-  deleteBranch: jest.fn(async () => undefined),
-  createBranch: jest.fn(async () => undefined),
   createCommit: jest.fn(async () => ({ sha: 'commit-sha' })),
   findOpenMergeRequest: jest.fn(
     async (): Promise<{ iid: number; webUrl: string } | undefined> => undefined,
@@ -59,7 +59,7 @@ const makeGitlab = (files: Record<string, Buffer>) => ({
 });
 
 describe('publishTemplateUpdate', () => {
-  it('opens no branch, commit, or MR when the result equals the default branch', async () => {
+  it('opens no commit or MR when the result equals the fetched snapshot', async () => {
     const files = { 'same.txt': Buffer.from('same\n') };
     const gitlab = makeGitlab(files);
 
@@ -69,13 +69,17 @@ describe('publishTemplateUpdate', () => {
     );
 
     expect(result).toEqual({ status: 'none' });
-    expect(gitlab.deleteBranch).not.toHaveBeenCalled();
-    expect(gitlab.createBranch).not.toHaveBeenCalled();
+    expect(gitlab.readRepositoryFiles).toHaveBeenCalledWith(
+      project,
+      options.projectSha,
+    );
+    expect('deleteBranch' in gitlab).toBe(false);
+    expect('createBranch' in gitlab).toBe(false);
     expect(gitlab.createCommit).not.toHaveBeenCalled();
     expect(gitlab.createMergeRequest).not.toHaveBeenCalled();
   });
 
-  it('recreates an existing branch, commits changes, and updates the open MR', async () => {
+  it('uses the fetched snapshot, regenerates the branch commit, and updates the open MR', async () => {
     const gitlab = makeGitlab({
       'README.md': Buffer.from('old\n'),
       'removed.txt': Buffer.from('old\n'),
@@ -93,18 +97,14 @@ describe('publishTemplateUpdate', () => {
       mergeRequestUrl:
         'https://gitlab.example.com/group/payments/-/merge_requests/7',
     });
-    expect(gitlab.deleteBranch).toHaveBeenCalledWith(
+    expect(gitlab.readRepositoryFiles).toHaveBeenCalledWith(
       project,
-      'chore/template-update-service',
-    );
-    expect(gitlab.createBranch).toHaveBeenCalledWith(
-      project,
-      'chore/template-update-service',
-      'main',
+      options.projectSha,
     );
     expect(gitlab.createCommit).toHaveBeenCalledWith(
       project,
       'chore/template-update-service',
+      options.projectSha,
       'chore(template): update to 2.0.0',
       expect.arrayContaining([
         expect.objectContaining({ action: 'create', file_path: 'new.txt' }),
@@ -128,8 +128,11 @@ describe('publishTemplateUpdate', () => {
       '## Deleted',
       '## Merged cleanly',
       '## Merged with conflicts',
+      '## Binary conflicts (template version not applied)',
+      '- logo.png',
       '## Project-deleted (kept absent)',
       '## Project-only (untouched)',
+      'Each re-run regenerates this branch from the fetched project snapshot and discards edits made directly on the update branch.',
       'AI conflict resolution is out of scope for U1',
     ]) {
       expect(description).toContain(section);

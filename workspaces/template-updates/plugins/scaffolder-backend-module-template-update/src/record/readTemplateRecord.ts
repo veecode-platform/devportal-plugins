@@ -32,6 +32,7 @@ export interface ReadTemplateRecordResult {
   templateName: string;
   oldSha: string;
   newSha: string;
+  projectSha: string;
   oldValues: TemplateUpdateValues;
   newValues: TemplateUpdateValues;
   projectUrl: string;
@@ -42,7 +43,10 @@ export interface ReadTemplateRecordResult {
 
 export interface ReadTemplateRecordDependencies {
   catalog: {
-    getEntityByRef(entityRef: string): Promise<CatalogEntity | undefined>;
+    getEntityByRef(
+      entityRef: string,
+      credentials?: unknown,
+    ): Promise<CatalogEntity | undefined>;
   };
   urlReader: {
     readUrl(url: string): Promise<{ buffer(): Promise<Buffer> }>;
@@ -52,17 +56,28 @@ export interface ReadTemplateRecordDependencies {
       id: number;
       projectSlug: string;
       host: string;
+      repoUrl: string;
       defaultBranch: string;
     }>;
     resolveCommitSha(repoUrl: string, ref: string): Promise<string>;
+    readRepositoryFile(
+      repoUrl: string,
+      filePath: string,
+      ref: string,
+    ): Promise<Buffer>;
   };
 }
 
 export async function readTemplateRecord(
   input: { entityRef: string; targetVersion?: string },
   dependencies: ReadTemplateRecordDependencies,
+  credentials?: unknown,
 ): Promise<ReadTemplateRecordResult> {
-  const component = await getEntity(dependencies.catalog, input.entityRef);
+  const component = await getEntity(
+    dependencies.catalog,
+    input.entityRef,
+    credentials,
+  );
   if (component.kind.toLocaleLowerCase('en-US') !== 'component') {
     throw new InputError(`Entity ${input.entityRef} must be a Component`);
   }
@@ -83,8 +98,12 @@ export async function readTemplateRecord(
   }
   const projectRepoUrl = parseGitlabLocation(projectLocation).repoUrl;
   const project = await dependencies.gitlab.getProject(projectRepoUrl);
-  const recordUrl = `${projectRepoUrl}/-/raw/${encodeURIComponent(
+  const projectSha = await dependencies.gitlab.resolveCommitSha(
+    projectRepoUrl,
     project.defaultBranch,
+  );
+  const recordUrl = `${projectRepoUrl}/-/raw/${encodeURIComponent(
+    projectSha,
   )}/.template/record.yaml`;
 
   let recordText: string;
@@ -140,7 +159,11 @@ export async function readTemplateRecord(
     );
   }
 
-  const template = await getEntity(dependencies.catalog, sourceTemplate);
+  const template = await getEntity(
+    dependencies.catalog,
+    sourceTemplate,
+    credentials,
+  );
   if (template.kind.toLocaleLowerCase('en-US') !== 'template') {
     throw new InputError(
       `${SOURCE_TEMPLATE} ${sourceTemplate} is not a Template entity`,
@@ -149,10 +172,20 @@ export async function readTemplateRecord(
 
   const templateAnnotations = template.metadata.annotations ?? {};
   const annotatedVersion = templateAnnotations[TEMPLATE_VERSION];
-  const targetVersion = input.targetVersion?.trim() || annotatedVersion;
-  if (!targetVersion) {
+  const requestedVersion = input.targetVersion?.trim() || annotatedVersion;
+  if (!requestedVersion) {
     throw new InputError(
       `Template ${sourceTemplate} has no ${TEMPLATE_VERSION} annotation`,
+    );
+  }
+  const target = parseSemver(requestedVersion, 'requested target');
+  const recorded = parseSemver(record.version, 'recorded template');
+  const catalogVersion = annotatedVersion
+    ? parseSemver(annotatedVersion, 'catalog template')
+    : undefined;
+  if (compareSemver(target, recorded) < 0) {
+    throw new InputError(
+      `Cannot downgrade template version: recorded version ${record.version} is newer than requested version ${requestedVersion}`,
     );
   }
 
@@ -170,6 +203,7 @@ export async function readTemplateRecord(
     parsedLocations.find(location => location.path.length > 0) ??
     parsedLocations[0];
   const templatePath = resolveSkeletonPath(parsedTemplateLocation.path);
+  const templateFilePath = resolveTemplateFilePath(parsedTemplateLocation.path);
   const templateName = templatePath.split('/').filter(Boolean).at(-2);
   if (!templateName) {
     throw new InputError(
@@ -179,13 +213,30 @@ export async function readTemplateRecord(
     );
   }
 
-  const oldValues = { ...record.values, templateVersion: record.version };
-  const newValues = { ...record.values, templateVersion: targetVersion };
-  const fields = validateParameters(template.spec?.parameters, newValues);
+  const oldValues = { ...record.values, templateVersion: recorded.normalized };
+  const newValues = { ...record.values, templateVersion: target.normalized };
+  const newTag = `${templateName}/v${target.normalized}`;
+  const newSha = await dependencies.gitlab.resolveCommitSha(
+    parsedTemplateLocation.repoUrl,
+    newTag,
+  );
+  let targetParameters = template.spec?.parameters;
+  if (!catalogVersion || compareSemver(target, catalogVersion) !== 0) {
+    const targetTemplateText = await dependencies.gitlab.readRepositoryFile(
+      parsedTemplateLocation.repoUrl,
+      templateFilePath,
+      newSha,
+    );
+    targetParameters = parseTargetParameters(
+      targetTemplateText.toString('utf8'),
+      templateFilePath,
+    );
+  }
+  const fields = validateParameters(targetParameters, newValues);
   if (record.reconstructed === true || fields.length > 0) {
     const requestedFields =
       record.reconstructed === true
-        ? collectParameterFields(template.spec?.parameters, record.values)
+        ? collectParameterFields(targetParameters, record.values)
         : fields;
     throw new InputError(
       `Template update needs input for fields: ${
@@ -194,18 +245,11 @@ export async function readTemplateRecord(
     );
   }
 
-  const oldTag = `${templateName}/v${record.version}`;
-  const newTag = `${templateName}/v${targetVersion}`;
-  const [oldSha, newSha] = await Promise.all([
-    dependencies.gitlab.resolveCommitSha(
-      parsedTemplateLocation.repoUrl,
-      oldTag,
-    ),
-    dependencies.gitlab.resolveCommitSha(
-      parsedTemplateLocation.repoUrl,
-      newTag,
-    ),
-  ]);
+  const oldTag = `${templateName}/v${recorded.normalized}`;
+  const oldSha = await dependencies.gitlab.resolveCommitSha(
+    parsedTemplateLocation.repoUrl,
+    oldTag,
+  );
 
   return {
     templateRepoUrl: parsedTemplateLocation.repoUrl,
@@ -213,14 +257,13 @@ export async function readTemplateRecord(
     templateName,
     oldSha,
     newSha,
+    projectSha,
     oldValues,
     newValues,
-    projectUrl: `${projectRepoUrl}/-/tree/${encodeURIComponent(
-      project.defaultBranch,
-    )}`,
+    projectUrl: `${projectRepoUrl}/-/tree/${encodeURIComponent(projectSha)}`,
     catalogOwner: component.spec?.owner ?? 'unknown',
-    targetVersion,
-    upToDate: record.version === targetVersion,
+    targetVersion: target.normalized,
+    upToDate: compareSemver(recorded, target) === 0,
   };
 }
 
@@ -236,11 +279,101 @@ function resolveSkeletonPath(locationPath: string): string {
   return parts.join('/');
 }
 
+function resolveTemplateFilePath(locationPath: string): string {
+  const parts = locationPath.split('/').filter(Boolean);
+  if (parts.at(-1) === 'catalog-info.yaml' || parts.at(-1) === 'skeleton') {
+    parts.pop();
+  }
+  if (parts.at(-1) !== 'template.yaml') parts.push('template.yaml');
+  return parts.join('/');
+}
+
+interface ParsedSemver {
+  normalized: string;
+  major: bigint;
+  minor: bigint;
+  patch: bigint;
+  prerelease?: Array<string | bigint>;
+}
+
+function parseSemver(version: string, label: string): ParsedSemver {
+  const normalized = version.startsWith('v') ? version.slice(1) : version;
+  const match =
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(
+      normalized,
+    );
+  if (!match) {
+    throw new InputError(
+      `Invalid ${label} version ${version}; expected a semantic version`,
+    );
+  }
+  const prerelease = match[4]?.split('.').map(identifier => {
+    if (/^\d+$/.test(identifier)) {
+      if (identifier.length > 1 && identifier.startsWith('0')) {
+        throw new InputError(
+          `Invalid ${label} version ${version}; numeric prerelease identifiers cannot have leading zeroes`,
+        );
+      }
+      return BigInt(identifier);
+    }
+    return identifier;
+  });
+  return {
+    normalized,
+    major: BigInt(match[1]),
+    minor: BigInt(match[2]),
+    patch: BigInt(match[3]),
+    prerelease,
+  };
+}
+
+function compareSemver(left: ParsedSemver, right: ParsedSemver): number {
+  for (const key of ['major', 'minor', 'patch'] as const) {
+    if (left[key] !== right[key]) return left[key] < right[key] ? -1 : 1;
+  }
+  if (!left.prerelease && !right.prerelease) return 0;
+  if (!left.prerelease) return 1;
+  if (!right.prerelease) return -1;
+  const length = Math.max(left.prerelease.length, right.prerelease.length);
+  for (let index = 0; index < length; index++) {
+    const leftPart = left.prerelease[index];
+    const rightPart = right.prerelease[index];
+    if (leftPart === undefined) return -1;
+    if (rightPart === undefined) return 1;
+    if (leftPart === rightPart) continue;
+    if (typeof leftPart === 'bigint' && typeof rightPart !== 'bigint')
+      return -1;
+    if (typeof leftPart !== 'bigint' && typeof rightPart === 'bigint') return 1;
+    return leftPart < rightPart ? -1 : 1;
+  }
+  return 0;
+}
+
+function parseTargetParameters(text: string, filePath: string): unknown {
+  let document: unknown;
+  try {
+    document = parse(text);
+  } catch (error) {
+    throw new InputError(
+      `Target template ${filePath} is invalid YAML: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+  if (!isRecord(document) || !isRecord(document.spec)) {
+    throw new InputError(
+      `Target template ${filePath} must define a spec mapping`,
+    );
+  }
+  return document.spec.parameters;
+}
+
 async function getEntity(
   catalog: ReadTemplateRecordDependencies['catalog'],
   entityRef: string,
+  credentials?: unknown,
 ): Promise<CatalogEntity> {
-  const entity = await catalog.getEntityByRef(entityRef);
+  const entity = await catalog.getEntityByRef(entityRef, credentials);
   if (!entity)
     throw new NotFoundError(`Catalog entity ${entityRef} was not found`);
   return entity;

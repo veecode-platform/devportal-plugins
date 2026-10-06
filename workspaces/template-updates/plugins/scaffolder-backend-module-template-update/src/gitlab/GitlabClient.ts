@@ -128,37 +128,20 @@ export class GitlabClient {
     return files;
   }
 
-  async deleteBranch(project: GitlabProject, branch: string): Promise<void> {
-    const target = this.target(project.host, project.projectSlug);
-    try {
-      await this.call(
-        target,
-        `${target.projectPath}/repository/branches/${encodeURIComponent(
-          branch,
-        )}`,
-        { method: 'DELETE' },
-      );
-    } catch (error) {
-      if ((error as GitlabApiError).status === 404) return;
-      throw error;
-    }
-  }
-
-  async createBranch(
-    project: GitlabProject,
-    branch: string,
+  async readRepositoryFile(
+    repoUrl: string,
+    filePath: string,
     ref: string,
-  ): Promise<void> {
-    const target = this.target(project.host, project.projectSlug);
-    await this.call(target, `${target.projectPath}/repository/branches`, {
-      method: 'POST',
-      body: { branch, ref },
-    });
+  ): Promise<Buffer> {
+    const location = parseGitlabLocation(repoUrl);
+    const target = this.target(location.host, location.projectSlug);
+    return this.readRawFile(target, filePath, ref);
   }
 
   async createCommit(
     project: GitlabProject,
     branch: string,
+    startSha: string,
     message: string,
     actions: GitlabCommitAction[],
   ): Promise<{ sha: string }> {
@@ -168,7 +151,13 @@ export class GitlabClient {
       `${target.projectPath}/repository/commits`,
       {
         method: 'POST',
-        body: { branch, commit_message: message, actions },
+        body: {
+          branch,
+          start_sha: startSha,
+          force: true,
+          commit_message: message,
+          actions,
+        },
       },
     );
     return { sha: commit.id };
@@ -219,7 +208,6 @@ export class GitlabClient {
           target_branch: project.defaultBranch,
           title: details.title,
           description: details.description,
-          remove_source_branch: true,
         },
       },
     );

@@ -35,4 +35,33 @@ describe('Update from template example', () => {
       "${{ steps.readRecord.output.upToDate === false && steps.publishMr.output.status !== 'none' }}",
     );
   });
+
+  it('fetches and publishes against the project snapshot and checks the requested render version', () => {
+    const template = parse(
+      readFileSync(
+        resolve(
+          __dirname,
+          '../../../examples/update-from-template/template.yaml',
+        ),
+        'utf8',
+      ),
+    ) as {
+      spec: {
+        steps: Array<{ id: string; input?: Record<string, string> }>;
+      };
+    };
+    const steps = Object.fromEntries(
+      template.spec.steps.map(step => [step.id, step]),
+    );
+
+    expect(steps.fetchProject?.input?.url).toBe(
+      '${{ steps.readRecord.output.projectUrl }}',
+    );
+    expect(steps.merge?.input?.targetVersion).toBe(
+      '${{ steps.readRecord.output.targetVersion }}',
+    );
+    expect(steps.publishMr?.input?.projectSha).toBe(
+      '${{ steps.readRecord.output.projectSha }}',
+    );
+  });
 });

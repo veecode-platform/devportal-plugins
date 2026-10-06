@@ -1,3 +1,4 @@
+import { InputError } from '@backstage/errors';
 import { readTemplateRecord } from './readTemplateRecord';
 import type { CatalogEntity } from './readTemplateRecord';
 
@@ -62,11 +63,15 @@ const makeDependencies = (record: string) => {
           ? 'group/payments'
           : 'group/catalog',
         host: 'gitlab.example.com',
+        repoUrl,
         defaultBranch: 'main',
       })),
-      resolveCommitSha: jest.fn(async (_repoUrl: string, ref: string) =>
-        ref.endsWith('v1.0.0') ? 'old-commit-sha' : 'new-commit-sha',
-      ),
+      resolveCommitSha: jest.fn(async (_repoUrl: string, ref: string) => {
+        if (ref === 'main') return 'project-head-sha';
+        if (ref.endsWith('v1.0.0')) return 'old-commit-sha';
+        return 'new-commit-sha';
+      }),
+      readRepositoryFile: jest.fn(async () => Buffer.from('spec: {}\n')),
     },
   };
 };
@@ -89,6 +94,7 @@ describe('readTemplateRecord', () => {
     expect(result.templateName).toBe('service');
     expect(result.oldSha).toBe('old-commit-sha');
     expect(result.newSha).toBe('new-commit-sha');
+    expect(result.projectSha).toBe('project-head-sha');
     expect(result.oldValues).toEqual({
       serviceName: 'payments',
       owner: 'group:default/platform',
@@ -100,10 +106,13 @@ describe('readTemplateRecord', () => {
       templateVersion: '2.0.0',
     });
     expect(result.projectUrl).toBe(
-      'https://gitlab.example.com/group/payments/-/tree/main',
+      'https://gitlab.example.com/group/payments/-/tree/project-head-sha',
     );
     expect(result.catalogOwner).toBe('group:default/platform');
     expect(result.upToDate).toBe(false);
+    expect(dependencies.urlReader.readUrl).toHaveBeenCalledWith(
+      'https://gitlab.example.com/group/payments/-/raw/project-head-sha/.template/record.yaml',
+    );
   });
 
   it('reports a missing K1 record as an input requirement', async () => {
@@ -170,7 +179,7 @@ describe('readTemplateRecord', () => {
 
   it('marks a second run at the recorded target version as up to date', async () => {
     const dependencies = makeDependencies(
-      'template: template:default/service\nversion: 2.0.0\nvalues:\n  serviceName: payments\n  owner: group:default/platform\n',
+      'template: template:default/service\nversion: v2.0.0\nvalues:\n  serviceName: payments\n  owner: group:default/platform\n',
     );
     const result = await readTemplateRecord(
       { entityRef: 'component:default/payments' },
@@ -179,5 +188,67 @@ describe('readTemplateRecord', () => {
 
     expect(result.upToDate).toBe(true);
     expect(result.newValues.templateVersion).toBe('2.0.0');
+    expect(dependencies.gitlab.resolveCommitSha).toHaveBeenCalledWith(
+      'https://gitlab.example.com/group/catalog',
+      'service/v2.0.0',
+    );
+  });
+
+  it('normalizes one leading v in a requested version before resolving its tag', async () => {
+    const dependencies = makeDependencies(validRecord);
+    const result = await readTemplateRecord(
+      { entityRef: 'component:default/payments', targetVersion: 'v2.0.0' },
+      dependencies,
+    );
+
+    expect(result.targetVersion).toBe('2.0.0');
+    expect(dependencies.gitlab.resolveCommitSha).toHaveBeenCalledWith(
+      'https://gitlab.example.com/group/catalog',
+      'service/v2.0.0',
+    );
+    expect(dependencies.gitlab.resolveCommitSha).not.toHaveBeenCalledWith(
+      'https://gitlab.example.com/group/catalog',
+      'service/vv2.0.0',
+    );
+  });
+
+  it('refuses a downgrade and names the recorded and requested versions', async () => {
+    const dependencies = makeDependencies(
+      'template: template:default/service\nversion: 2.0.0\nvalues:\n  serviceName: payments\n  owner: group:default/platform\n',
+    );
+
+    await expect(
+      readTemplateRecord(
+        { entityRef: 'component:default/payments', targetVersion: '1.5.0' },
+        dependencies,
+      ),
+    ).rejects.toThrow(InputError);
+    await expect(
+      readTemplateRecord(
+        { entityRef: 'component:default/payments', targetVersion: '1.5.0' },
+        dependencies,
+      ),
+    ).rejects.toThrow(/recorded version 2\.0\.0.*requested version 1\.5\.0/i);
+  });
+
+  it('validates values against the target revision schema when the target differs from catalog', async () => {
+    const dependencies = makeDependencies(validRecord);
+    dependencies.gitlab.readRepositoryFile.mockResolvedValue(
+      Buffer.from(
+        'apiVersion: scaffolder.backstage.io/v1beta3\nkind: Template\nspec:\n  parameters:\n    - type: object\n      required: [serviceName, owner, targetOnly]\n      properties:\n        serviceName: { type: string }\n        owner: { type: string }\n        targetOnly: { type: string }\n',
+      ),
+    );
+
+    await expect(
+      readTemplateRecord(
+        { entityRef: 'component:default/payments', targetVersion: '3.0.0' },
+        dependencies,
+      ),
+    ).rejects.toThrow(/needs input.*targetOnly/i);
+    expect(dependencies.gitlab.readRepositoryFile).toHaveBeenCalledWith(
+      'https://gitlab.example.com/group/catalog',
+      'templates/service/template.yaml',
+      'new-commit-sha',
+    );
   });
 });

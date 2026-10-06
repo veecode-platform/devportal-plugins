@@ -6,6 +6,7 @@ export interface MergeTemplateDirectoriesInput {
   oldTemplatePath: string;
   newTemplatePath: string;
   projectPath: string;
+  targetVersion: string;
 }
 
 export interface MergeTemplateDirectoriesResult {
@@ -23,7 +24,7 @@ export async function mergeTemplateDirectories(
     readWorkspaceTree(workspacePath, input.projectPath),
   ]);
   const result = mergeTrees(base, incoming, project);
-  assertTemplateVersion(incoming, result.files);
+  assertTemplateVersion(incoming, result.files, input.targetVersion);
 
   const resultPath = '.template-update/result';
   await writeWorkspaceTree(workspacePath, resultPath, result.files);

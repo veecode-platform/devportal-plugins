@@ -46,14 +46,19 @@ describe('mergeTrees', () => {
     expect(result.report.added).toEqual(['new.txt']);
   });
 
-  it('keeps a different project file when a template-added path collides', () => {
+  it('marks different text content in an add/add conflict against an empty base', () => {
     const result = mergeTrees(
       {},
       { 'new.txt': file('template\n') },
       { 'new.txt': file('project\n') },
     );
 
-    expect(result.files['new.txt'].toString()).toBe('project\n');
+    expect(result.files['new.txt'].toString()).toContain('<<<<<<< project');
+    expect(result.files['new.txt'].toString()).toContain(
+      '||||||| base\n=======\n',
+    );
+    expect(result.files['new.txt'].toString()).toContain('project\n');
+    expect(result.files['new.txt'].toString()).toContain('template\n');
     expect(result.report.mergedWithConflict).toContain('new.txt');
   });
 
@@ -108,7 +113,32 @@ describe('mergeTrees', () => {
     );
 
     expect(result.files['image.bin']).toEqual(projectFile);
-    expect(result.report.mergedWithConflict).toContain('image.bin');
+    expect(result.report.binaryConflicts).toContain('image.bin');
+    expect(result.report.mergedWithConflict).not.toContain('image.bin');
+  });
+
+  it('keeps the project bytes for a binary add/add conflict', () => {
+    const projectFile = file([0, 1, 2]);
+    const result = mergeTrees(
+      {},
+      { 'image.bin': file([0, 2, 0]) },
+      { 'image.bin': projectFile },
+    );
+
+    expect(result.files['image.bin']).toEqual(projectFile);
+    expect(result.report.binaryConflicts).toEqual(['image.bin']);
+  });
+
+  it('reports a project binary edit separately when the template deletes it', () => {
+    const projectFile = file([0, 1, 2]);
+    const result = mergeTrees(
+      { 'image.bin': file([0, 1, 0]) },
+      {},
+      { 'image.bin': projectFile },
+    );
+
+    expect(result.files['image.bin']).toEqual(projectFile);
+    expect(result.report.binaryConflicts).toEqual(['image.bin']);
   });
 });
 
@@ -124,22 +154,47 @@ describe('assertTemplateVersion', () => {
     };
     const result = { ...rendered };
 
-    expect(() => assertTemplateVersion(rendered, result)).not.toThrow();
     expect(() =>
-      assertTemplateVersion(rendered, {
-        ...result,
-        '.template/record.yaml': file(
-          'template: template:default/service\nversion: 1.0.0\nvalues: {}\n',
-        ),
-      }),
+      assertTemplateVersion(rendered, result, '2.0.0'),
+    ).not.toThrow();
+    expect(() => assertTemplateVersion(rendered, result, '3.0.0')).toThrow(
+      /rendered.*version 2\.0\.0.*requested target version 3\.0\.0/i,
+    );
+    expect(() =>
+      assertTemplateVersion(
+        {
+          ...rendered,
+          'catalog-info.yaml': file(
+            'apiVersion: backstage.io/v1alpha1\nkind: Component\nmetadata:\n  name: service\n  annotations:\n    backstage.io/template-version: 1.0.0\n',
+          ),
+        },
+        result,
+        '2.0.0',
+      ),
+    ).toThrow(/rendered catalog annotation.*requested target version 2\.0\.0/i);
+    expect(() =>
+      assertTemplateVersion(
+        rendered,
+        {
+          ...result,
+          '.template/record.yaml': file(
+            'template: template:default/service\nversion: 1.0.0\nvalues: {}\n',
+          ),
+        },
+        '2.0.0',
+      ),
     ).toThrow(/record.*2\.0\.0/i);
     expect(() =>
-      assertTemplateVersion(rendered, {
-        ...result,
-        'catalog-info.yaml': file(
-          'apiVersion: backstage.io/v1alpha1\nkind: Component\nmetadata:\n  name: service\n  annotations:\n    backstage.io/template-version: 1.0.0\n',
-        ),
-      }),
+      assertTemplateVersion(
+        rendered,
+        {
+          ...result,
+          'catalog-info.yaml': file(
+            'apiVersion: backstage.io/v1alpha1\nkind: Component\nmetadata:\n  name: service\n  annotations:\n    backstage.io/template-version: 1.0.0\n',
+          ),
+        },
+        '2.0.0',
+      ),
     ).toThrow(/catalog-info\.yaml annotation.*2\.0\.0/i);
   });
 });

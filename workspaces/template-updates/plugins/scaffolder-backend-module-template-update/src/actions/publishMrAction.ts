@@ -12,6 +12,7 @@ export function createPublishMrAction(dependencies: { gitlab: GitlabClient }) {
     schema: {
       input: {
         projectUrl: z => z.string(),
+        projectSha: z => z.string(),
         resultPath: z => z.string(),
         report: z =>
           z.object({
@@ -19,6 +20,7 @@ export function createPublishMrAction(dependencies: { gitlab: GitlabClient }) {
             deleted: z.array(z.string()),
             mergedClean: z.array(z.string()),
             mergedWithConflict: z.array(z.string()),
+            binaryConflicts: z.array(z.string()),
             projectDeleted: z.array(z.string()),
             projectOnly: z.array(z.string()),
             changed: z.boolean(),
@@ -40,6 +42,7 @@ export function createPublishMrAction(dependencies: { gitlab: GitlabClient }) {
       const result = await publishTemplateUpdate(
         {
           projectUrl: ctx.input.projectUrl,
+          projectSha: ctx.input.projectSha,
           resultFiles,
           report: ctx.input.report as MergeReport,
           templateName: ctx.input.templateName,

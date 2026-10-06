@@ -64,12 +64,14 @@ spec:
         oldTemplatePath: .template-update/old
         newTemplatePath: .template-update/new
         projectPath: .template-update/project
+        targetVersion: ${{ steps.readRecord.output.targetVersion }}
     - id: publishMr
       name: Open or update the template merge request
       if: ${{ steps.readRecord.output.upToDate === false }}
       action: veecode:template:publish-mr
       input:
         projectUrl: ${{ steps.readRecord.output.projectUrl }}
+        projectSha: ${{ steps.readRecord.output.projectSha }}
         resultPath: ${{ steps.merge.output.resultPath }}
         report: ${{ steps.merge.output.report }}
         templateName: ${{ steps.readRecord.output.templateName }}
