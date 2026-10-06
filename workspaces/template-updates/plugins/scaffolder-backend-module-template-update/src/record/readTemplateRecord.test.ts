@@ -42,6 +42,27 @@ const template = {
   },
 };
 
+const fetchTemplateStep = (
+  id: string,
+  url = './skeleton',
+  options: Record<string, unknown> = {},
+) => ({
+  id,
+  action: 'fetch:template',
+  input: { url, ...options },
+});
+
+const templateYaml = (
+  steps = [fetchTemplateStep('renderSkeleton')],
+  parameters: unknown[] = template.spec.parameters,
+) =>
+  JSON.stringify({
+    spec: {
+      parameters,
+      steps,
+    },
+  });
+
 const makeDependencies = (record: string) => {
   const entities: Record<string, CatalogEntity> = {
     'component:default/payments': component,
@@ -71,7 +92,10 @@ const makeDependencies = (record: string) => {
         if (ref.endsWith('v1.0.0')) return 'old-commit-sha';
         return 'new-commit-sha';
       }),
-      readRepositoryFile: jest.fn(async () => Buffer.from('spec: {}\n')),
+      readRepositoryFile: jest.fn(
+        async (_repoUrl: string, _filePath: string, _ref: string) =>
+          Buffer.from(templateYaml()),
+      ),
     },
   };
 };
@@ -109,9 +133,165 @@ describe('readTemplateRecord', () => {
       'https://gitlab.example.com/group/payments/-/tree/project-head-sha',
     );
     expect(result.catalogOwner).toBe('group:default/platform');
+    expect(result.oldFetchOptions).toEqual({});
     expect(result.upToDate).toBe(false);
     expect(dependencies.urlReader.readUrl).toHaveBeenCalledWith(
       'https://gitlab.example.com/group/payments/-/raw/project-head-sha/.template/record.yaml',
+    );
+  });
+
+  it('extracts each revision render options and never copies the fetch token', async () => {
+    const dependencies = makeDependencies(validRecord);
+    dependencies.gitlab.readRepositoryFile.mockImplementation(
+      async (_repoUrl: string, _filePath: string, ref: string) =>
+        Buffer.from(
+          ref === 'old-commit-sha'
+            ? templateYaml([
+                fetchTemplateStep('renderSkeleton', './skeleton', {
+                  copyWithoutTemplating: ['**/*.yaml'],
+                  copyWithoutRender: ['legacy/*.txt'],
+                  cookiecutterCompat: true,
+                  replace: true,
+                  trimBlocks: true,
+                  lstripBlocks: true,
+                }),
+              ])
+            : templateYaml([
+                fetchTemplateStep('renderSkeleton', './skeleton', {
+                  templateFileExtension: true,
+                  replace: true,
+                  trimBlocks: true,
+                  lstripBlocks: true,
+                  token: 'discarded-fixture-value',
+                }),
+              ]),
+        ),
+    );
+
+    const result = await readTemplateRecord(
+      { entityRef: 'component:default/payments' },
+      dependencies,
+    );
+
+    expect(dependencies.gitlab.readRepositoryFile).toHaveBeenNthCalledWith(
+      1,
+      'https://gitlab.example.com/group/catalog',
+      'templates/service/template.yaml',
+      'old-commit-sha',
+    );
+    expect(dependencies.gitlab.readRepositoryFile).toHaveBeenNthCalledWith(
+      2,
+      'https://gitlab.example.com/group/catalog',
+      'templates/service/template.yaml',
+      'new-commit-sha',
+    );
+    expect(result.oldFetchOptions).toEqual({
+      copyWithoutTemplating: ['**/*.yaml'],
+      copyWithoutRender: ['legacy/*.txt'],
+      cookiecutterCompat: true,
+      replace: true,
+      trimBlocks: true,
+      lstripBlocks: true,
+    });
+    expect(result.newFetchOptions).toEqual({
+      templateFileExtension: true,
+      replace: true,
+      trimBlocks: true,
+      lstripBlocks: true,
+    });
+    expect(result.newFetchOptions).not.toHaveProperty('token');
+  });
+
+  it('rejects dynamic fetch:template rendering options', async () => {
+    const dependencies = makeDependencies(validRecord);
+    dependencies.gitlab.readRepositoryFile.mockImplementation(
+      async (_repoUrl: string, _filePath: string, ref: string) =>
+        Buffer.from(
+          templateYaml([
+            fetchTemplateStep('renderSkeleton', './skeleton', {
+              templateFileExtension:
+                ref === 'new-commit-sha'
+                  ? '${{ parameters.extension }}'
+                  : false,
+            }),
+          ]),
+        ),
+    );
+
+    const result = readTemplateRecord(
+      { entityRef: 'component:default/payments' },
+      dependencies,
+    );
+    await expect(result).rejects.toThrow(InputError);
+    await expect(result).rejects.toThrow(
+      /Template service has dynamic fetch:template option templateFileExtension.*cannot be reproduced/i,
+    );
+  });
+
+  it('matches the fetch:template step that points at the recorded skeleton', async () => {
+    const dependencies = makeDependencies(validRecord);
+    const definition = templateYaml([
+      fetchTemplateStep('renderDocs', './docs', {
+        templateFileExtension: false,
+      }),
+      fetchTemplateStep(
+        'renderService',
+        '${{ parameters.repositoryUrl }}/skeleton',
+        { templateFileExtension: true },
+      ),
+    ]);
+    dependencies.gitlab.readRepositoryFile.mockResolvedValue(
+      Buffer.from(definition),
+    );
+
+    const result = await readTemplateRecord(
+      { entityRef: 'component:default/payments' },
+      dependencies,
+    );
+
+    expect(result.oldFetchOptions.templateFileExtension).toBe(true);
+    expect(result.newFetchOptions.templateFileExtension).toBe(true);
+  });
+
+  it('rejects multiple fetch:template steps when none points at the recorded skeleton', async () => {
+    const dependencies = makeDependencies(validRecord);
+    dependencies.gitlab.readRepositoryFile.mockResolvedValue(
+      Buffer.from(
+        templateYaml([
+          fetchTemplateStep('renderDocs', './docs'),
+          fetchTemplateStep('renderAssets', './assets'),
+        ]),
+      ),
+    );
+
+    const result = readTemplateRecord(
+      { entityRef: 'component:default/payments' },
+      dependencies,
+    );
+    await expect(result).rejects.toThrow(InputError);
+    await expect(result).rejects.toThrow(
+      /Template service has multiple fetch:template steps \(renderDocs, renderAssets\).*templates\/service\/skeleton/i,
+    );
+  });
+
+  it('rejects multiple fetch:template steps that both match the recorded skeleton', async () => {
+    const dependencies = makeDependencies(validRecord);
+    dependencies.gitlab.readRepositoryFile.mockResolvedValue(
+      Buffer.from(
+        templateYaml([
+          fetchTemplateStep('renderServiceA', './skeleton'),
+          fetchTemplateStep('renderServiceB', 'templates/service/skeleton'),
+        ]),
+      ),
+    );
+
+    const result = readTemplateRecord(
+      { entityRef: 'component:default/payments' },
+      dependencies,
+    );
+    await expect(result).rejects.toThrow(InputError);
+    await expect(result).rejects.toThrow(
+      /Template service has multiple fetch:template steps \(renderServiceA, renderServiceB\).*cannot uniquely match/i,
     );
   });
 
@@ -235,7 +415,20 @@ describe('readTemplateRecord', () => {
     const dependencies = makeDependencies(validRecord);
     dependencies.gitlab.readRepositoryFile.mockResolvedValue(
       Buffer.from(
-        'apiVersion: scaffolder.backstage.io/v1beta3\nkind: Template\nspec:\n  parameters:\n    - type: object\n      required: [serviceName, owner, targetOnly]\n      properties:\n        serviceName: { type: string }\n        owner: { type: string }\n        targetOnly: { type: string }\n',
+        templateYaml(
+          [fetchTemplateStep('renderSkeleton')],
+          [
+            {
+              type: 'object',
+              required: ['serviceName', 'owner', 'targetOnly'],
+              properties: {
+                serviceName: { type: 'string' },
+                owner: { type: 'string' },
+                targetOnly: { type: 'string' },
+              },
+            },
+          ],
+        ),
       ),
     );
 

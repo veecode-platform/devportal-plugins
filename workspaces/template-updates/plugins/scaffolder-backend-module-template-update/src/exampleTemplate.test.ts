@@ -47,7 +47,7 @@ describe('Update from template example', () => {
       ),
     ) as {
       spec: {
-        steps: Array<{ id: string; input?: Record<string, string> }>;
+        steps: Array<{ id: string; input?: Record<string, unknown> }>;
       };
     };
     const steps = Object.fromEntries(
@@ -63,5 +63,25 @@ describe('Update from template example', () => {
     expect(steps.publishMr?.input?.projectSha).toBe(
       '${{ steps.readRecord.output.projectSha }}',
     );
+
+    const renderOptions = [
+      'templateFileExtension',
+      'copyWithoutTemplating',
+      'copyWithoutRender',
+      'cookiecutterCompat',
+      'replace',
+      'trimBlocks',
+      'lstripBlocks',
+    ];
+    for (const revision of ['old', 'new']) {
+      for (const option of renderOptions) {
+        expect(
+          steps[`render${revision[0].toUpperCase()}${revision.slice(1)}`]
+            ?.input?.[option],
+        ).toBe(
+          `\${{ steps.readRecord.output.${revision}FetchOptions.${option} }}`,
+        );
+      }
+    }
   });
 });

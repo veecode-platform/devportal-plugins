@@ -41,6 +41,13 @@ spec:
         url: ${{ steps.readRecord.output.templateRepoUrl }}/-/tree/${{ steps.readRecord.output.oldSha }}/${{ steps.readRecord.output.templatePath }}
         values: ${{ steps.readRecord.output.oldValues }}
         targetPath: .template-update/old
+        templateFileExtension: ${{ steps.readRecord.output.oldFetchOptions.templateFileExtension }}
+        copyWithoutTemplating: ${{ steps.readRecord.output.oldFetchOptions.copyWithoutTemplating }}
+        copyWithoutRender: ${{ steps.readRecord.output.oldFetchOptions.copyWithoutRender }}
+        cookiecutterCompat: ${{ steps.readRecord.output.oldFetchOptions.cookiecutterCompat }}
+        replace: ${{ steps.readRecord.output.oldFetchOptions.replace }}
+        trimBlocks: ${{ steps.readRecord.output.oldFetchOptions.trimBlocks }}
+        lstripBlocks: ${{ steps.readRecord.output.oldFetchOptions.lstripBlocks }}
     - id: renderNew
       name: Render target template version
       if: ${{ steps.readRecord.output.upToDate === false }}
@@ -49,6 +56,13 @@ spec:
         url: ${{ steps.readRecord.output.templateRepoUrl }}/-/tree/${{ steps.readRecord.output.newSha }}/${{ steps.readRecord.output.templatePath }}
         values: ${{ steps.readRecord.output.newValues }}
         targetPath: .template-update/new
+        templateFileExtension: ${{ steps.readRecord.output.newFetchOptions.templateFileExtension }}
+        copyWithoutTemplating: ${{ steps.readRecord.output.newFetchOptions.copyWithoutTemplating }}
+        copyWithoutRender: ${{ steps.readRecord.output.newFetchOptions.copyWithoutRender }}
+        cookiecutterCompat: ${{ steps.readRecord.output.newFetchOptions.cookiecutterCompat }}
+        replace: ${{ steps.readRecord.output.newFetchOptions.replace }}
+        trimBlocks: ${{ steps.readRecord.output.newFetchOptions.trimBlocks }}
+        lstripBlocks: ${{ steps.readRecord.output.newFetchOptions.lstripBlocks }}
     - id: fetchProject
       name: Fetch project default branch
       if: ${{ steps.readRecord.output.upToDate === false }}

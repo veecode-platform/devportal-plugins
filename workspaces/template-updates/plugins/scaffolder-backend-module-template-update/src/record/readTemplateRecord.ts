@@ -35,6 +35,8 @@ export interface ReadTemplateRecordResult {
   projectSha: string;
   oldValues: TemplateUpdateValues;
   newValues: TemplateUpdateValues;
+  oldFetchOptions: Record<string, unknown>;
+  newFetchOptions: Record<string, unknown>;
   projectUrl: string;
   catalogOwner: string;
   targetVersion: string;
@@ -180,9 +182,7 @@ export async function readTemplateRecord(
   }
   const target = parseSemver(requestedVersion, 'requested target');
   const recorded = parseSemver(record.version, 'recorded template');
-  const catalogVersion = annotatedVersion
-    ? parseSemver(annotatedVersion, 'catalog template')
-    : undefined;
+  if (annotatedVersion) parseSemver(annotatedVersion, 'catalog template');
   if (compareSemver(target, recorded) < 0) {
     throw new InputError(
       `Cannot downgrade template version: recorded version ${record.version} is newer than requested version ${requestedVersion}`,
@@ -220,18 +220,32 @@ export async function readTemplateRecord(
     parsedTemplateLocation.repoUrl,
     newTag,
   );
-  let targetParameters = template.spec?.parameters;
-  if (!catalogVersion || compareSemver(target, catalogVersion) !== 0) {
-    const targetTemplateText = await dependencies.gitlab.readRepositoryFile(
+  const oldTag = `${templateName}/v${recorded.normalized}`;
+  const oldSha = await dependencies.gitlab.resolveCommitSha(
+    parsedTemplateLocation.repoUrl,
+    oldTag,
+  );
+  const [oldTemplateText, newTemplateText] = await Promise.all([
+    dependencies.gitlab.readRepositoryFile(
+      parsedTemplateLocation.repoUrl,
+      templateFilePath,
+      oldSha,
+    ),
+    dependencies.gitlab.readRepositoryFile(
       parsedTemplateLocation.repoUrl,
       templateFilePath,
       newSha,
-    );
-    targetParameters = parseTargetParameters(
-      targetTemplateText.toString('utf8'),
-      templateFilePath,
-    );
-  }
+    ),
+  ]);
+  const oldTemplate = parseTemplateDefinition(
+    oldTemplateText.toString('utf8'),
+    templateFilePath,
+  );
+  const newTemplate = parseTemplateDefinition(
+    newTemplateText.toString('utf8'),
+    templateFilePath,
+  );
+  const targetParameters = parseTargetParameters(newTemplate, templateFilePath);
   const fields = validateParameters(targetParameters, newValues);
   if (record.reconstructed === true || fields.length > 0) {
     const requestedFields =
@@ -245,10 +259,17 @@ export async function readTemplateRecord(
     );
   }
 
-  const oldTag = `${templateName}/v${recorded.normalized}`;
-  const oldSha = await dependencies.gitlab.resolveCommitSha(
-    parsedTemplateLocation.repoUrl,
-    oldTag,
+  const oldFetchOptions = fetchTemplateOptions(
+    oldTemplate,
+    templatePath,
+    templateFilePath,
+    templateName,
+  );
+  const newFetchOptions = fetchTemplateOptions(
+    newTemplate,
+    templatePath,
+    templateFilePath,
+    templateName,
   );
 
   return {
@@ -260,6 +281,8 @@ export async function readTemplateRecord(
     projectSha,
     oldValues,
     newValues,
+    oldFetchOptions,
+    newFetchOptions,
     projectUrl: `${projectRepoUrl}/-/tree/${encodeURIComponent(projectSha)}`,
     catalogOwner: component.spec?.owner ?? 'unknown',
     targetVersion: target.normalized,
@@ -349,23 +372,155 @@ function compareSemver(left: ParsedSemver, right: ParsedSemver): number {
   return 0;
 }
 
-function parseTargetParameters(text: string, filePath: string): unknown {
+function parseTemplateDefinition(
+  text: string,
+  filePath: string,
+): Record<string, unknown> {
   let document: unknown;
   try {
     document = parse(text);
   } catch (error) {
     throw new InputError(
-      `Target template ${filePath} is invalid YAML: ${
+      `Template file ${filePath} is invalid YAML: ${
         error instanceof Error ? error.message : String(error)
       }`,
     );
   }
-  if (!isRecord(document) || !isRecord(document.spec)) {
+  if (!isRecord(document)) {
+    throw new InputError(`Template ${filePath} must be a mapping`);
+  }
+  return document;
+}
+
+function parseTargetParameters(
+  document: Record<string, unknown>,
+  filePath: string,
+): unknown {
+  if (!isRecord(document.spec)) {
     throw new InputError(
       `Target template ${filePath} must define a spec mapping`,
     );
   }
   return document.spec.parameters;
+}
+
+const FETCH_TEMPLATE_RENDERING_OPTIONS = [
+  'templateFileExtension',
+  'copyWithoutTemplating',
+  'copyWithoutRender',
+  'cookiecutterCompat',
+  'replace',
+  'trimBlocks',
+  'lstripBlocks',
+] as const;
+
+function fetchTemplateOptions(
+  template: Record<string, unknown>,
+  templatePath: string,
+  templateFilePath: string,
+  templateName: string,
+): Record<string, unknown> {
+  const spec = isRecord(template.spec) ? template.spec : {};
+  const steps = Array.isArray(spec.steps) ? spec.steps.filter(isRecord) : [];
+  const candidates = steps.filter(step => step.action === 'fetch:template');
+  if (candidates.length === 0) {
+    throw new InputError(
+      `Template ${templateName} has no fetch:template step for skeleton ${templatePath}`,
+    );
+  }
+
+  let selected: Record<string, unknown>;
+  if (candidates.length === 1) {
+    selected = candidates[0];
+  } else {
+    const matched = candidates.filter(step => {
+      const stepInput = isRecord(step.input) ? step.input : {};
+      return (
+        typeof stepInput.url === 'string' &&
+        urlReferencesSkeleton(stepInput.url, templatePath, templateFilePath)
+      );
+    });
+    if (matched.length !== 1) {
+      const candidateIds = candidates
+        .map(step => (typeof step.id === 'string' ? step.id : '<unnamed>'))
+        .join(', ');
+      throw new InputError(
+        `Template ${templateName} has multiple fetch:template steps (${candidateIds}) and cannot uniquely match skeleton ${templatePath}`,
+      );
+    }
+    selected = matched[0];
+  }
+
+  const stepInput = isRecord(selected.input) ? selected.input : {};
+  const options: Record<string, unknown> = {};
+  for (const option of FETCH_TEMPLATE_RENDERING_OPTIONS) {
+    if (!Object.hasOwn(stepInput, option)) continue;
+    const value = stepInput[option];
+    if (containsTemplateExpression(value)) {
+      throw new InputError(
+        `Template ${templateName} has dynamic fetch:template option ${option}; dynamic options cannot be reproduced`,
+      );
+    }
+    options[option] = value;
+  }
+  return options;
+}
+
+function urlReferencesSkeleton(
+  url: string,
+  templatePath: string,
+  templateFilePath: string,
+): boolean {
+  const staticUrl = url
+    .replace(/\$\{\{[\s\S]*?\}\}/g, '')
+    .split(/[?#]/, 1)[0]
+    .replaceAll('\\', '/')
+    .replace(/\/{2,}/g, '/');
+  const normalize = (value: string) =>
+    value
+      .split('/')
+      .filter(part => part.length > 0 && part !== '.')
+      .join('/');
+  const normalizedUrl = normalize(staticUrl);
+  const normalizedPaths = [
+    templatePath,
+    relativeSkeletonPath(templatePath, templateFilePath),
+  ].map(normalize);
+  return normalizedPaths.some(
+    path => normalizedUrl === path || normalizedUrl.endsWith(`/${path}`),
+  );
+}
+
+function relativeSkeletonPath(
+  templatePath: string,
+  templateFilePath: string,
+): string {
+  const templateDirectory = templateFilePath.slice(
+    0,
+    Math.max(0, templateFilePath.lastIndexOf('/')),
+  );
+  const templateParts = templateDirectory.split('/').filter(Boolean);
+  const skeletonParts = templatePath.split('/').filter(Boolean);
+  let shared = 0;
+  while (
+    shared < templateParts.length &&
+    shared < skeletonParts.length &&
+    templateParts[shared] === skeletonParts[shared]
+  ) {
+    shared++;
+  }
+  return [
+    ...templateParts.slice(shared).map(() => '..'),
+    ...skeletonParts.slice(shared),
+  ].join('/');
+}
+
+function containsTemplateExpression(value: unknown): boolean {
+  if (typeof value === 'string') return /\$\{\{[\s\S]*?\}\}/.test(value);
+  if (Array.isArray(value)) return value.some(containsTemplateExpression);
+  if (isRecord(value))
+    return Object.values(value).some(containsTemplateExpression);
+  return false;
 }
 
 async function getEntity(

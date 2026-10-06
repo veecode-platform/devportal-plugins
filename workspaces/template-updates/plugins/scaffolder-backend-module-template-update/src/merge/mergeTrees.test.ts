@@ -46,6 +46,21 @@ describe('mergeTrees', () => {
     expect(result.report.added).toEqual(['new.txt']);
   });
 
+  it('merges the rendered file names produced by templateFileExtension', () => {
+    const result = mergeTrees(
+      { 'catalog-info.yaml': file('version: 1.0.0\n') },
+      { 'catalog-info.yaml': file('version: 2.0.0\n') },
+      { 'catalog-info.yaml': file('version: 1.0.0\n') },
+    );
+
+    expect(Object.keys(result.files)).toEqual(['catalog-info.yaml']);
+    expect(result.files['catalog-info.yaml'].toString()).toBe(
+      'version: 2.0.0\n',
+    );
+    expect(result.files['catalog-info.yaml.njk']).toBeUndefined();
+    expect(result.report.mergedClean).toContain('catalog-info.yaml');
+  });
+
   it('marks different text content in an add/add conflict against an empty base', () => {
     const result = mergeTrees(
       {},

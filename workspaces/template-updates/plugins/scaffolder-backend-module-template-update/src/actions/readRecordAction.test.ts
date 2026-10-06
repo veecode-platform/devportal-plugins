@@ -59,7 +59,11 @@ describe('createReadRecordAction', () => {
           if (ref.endsWith('v1.0.0')) return 'old-commit-sha';
           return 'new-commit-sha';
         }),
-        readRepositoryFile: jest.fn(async () => Buffer.from('spec: {}\n')),
+        readRepositoryFile: jest.fn(async () =>
+          Buffer.from(
+            'spec:\n  parameters: []\n  steps:\n    - id: renderSkeleton\n      action: fetch:template\n      input:\n        url: ./skeleton\n',
+          ),
+        ),
       },
     };
     const action = createReadRecordAction(dependencies);
@@ -82,5 +86,7 @@ describe('createReadRecordAction', () => {
       'template:default/service',
       credentials,
     );
+    expect(context.output).toHaveBeenCalledWith('oldFetchOptions', {});
+    expect(context.output).toHaveBeenCalledWith('newFetchOptions', {});
   });
 });
