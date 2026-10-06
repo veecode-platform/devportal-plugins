@@ -1,5 +1,5 @@
 import { diff3Merge } from 'node-diff3';
-import { parse } from 'yaml';
+import { parse, parseAllDocuments } from 'yaml';
 
 export type FileTree = Record<string, Buffer>;
 
@@ -47,9 +47,10 @@ export function mergeTrees(
       if (isText(baseFile) && isText(incomingFile) && isText(projectFile)) {
         const merged = mergeText(projectFile, baseFile, incomingFile);
         files[filePath] = Buffer.from(merged.content);
-        report[merged.conflicted ? 'mergedWithConflict' : 'mergedClean'].push(
-          filePath,
-        );
+        // A clean merge that leaves the project's bytes as they were is not news to the reviewer.
+        if (merged.conflicted) report.mergedWithConflict.push(filePath);
+        else if (!files[filePath].equals(projectFile))
+          report.mergedClean.push(filePath);
       } else if (
         projectFile.equals(baseFile) ||
         incomingFile.equals(baseFile) ||
@@ -58,7 +59,8 @@ export function mergeTrees(
         files[filePath] = projectFile.equals(baseFile)
           ? incomingFile
           : projectFile;
-        report.mergedClean.push(filePath);
+        if (!files[filePath].equals(projectFile))
+          report.mergedClean.push(filePath);
       } else {
         files[filePath] = projectFile;
         report.binaryConflicts.push(filePath);
@@ -123,6 +125,16 @@ export function mergeTrees(
   };
 }
 
+const CONFLICT_START = /^<{7} project$/m;
+
+function annotationLine(version: string): RegExp {
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(
+    `^\\s*backstage\\.io/template-version:\\s*["']?${escaped}["']?\\s*$`,
+    'm',
+  );
+}
+
 export function assertTemplateVersion(
   rendered: FileTree,
   result: FileTree,
@@ -141,11 +153,14 @@ export function assertTemplateVersion(
     );
   }
 
-  const renderedAnnotation = readTemplateVersionAnnotation(rendered);
-  if (renderedAnnotation !== targetVersion) {
+  const renderedAnnotations = readTemplateVersionAnnotations(rendered);
+  if (
+    renderedAnnotations.length === 0 ||
+    renderedAnnotations.some(version => version !== targetVersion)
+  ) {
     throw new Error(
       `The rendered catalog annotation version ${
-        renderedAnnotation ?? '(missing)'
+        renderedAnnotations.join(', ') || '(missing)'
       } does not match requested target version ${targetVersion}`,
     );
   }
@@ -159,8 +174,22 @@ export function assertTemplateVersion(
     );
   }
 
-  const resultAnnotation = readTemplateVersionAnnotation(result);
-  if (resultAnnotation !== targetVersion) {
+  const resultCatalog = result['catalog-info.yaml']?.toString('utf8');
+  if (resultCatalog !== undefined && CONFLICT_START.test(resultCatalog)) {
+    // A conflicted catalog-info.yaml is not valid YAML; the owner resolves it in the merge
+    // request, which lists it under the conflicts. The template side must still carry the target.
+    if (!annotationLine(targetVersion).test(resultCatalog)) {
+      throw new Error(
+        `The conflicted catalog-info.yaml does not offer the target version ${targetVersion} in its annotation`,
+      );
+    }
+    return;
+  }
+  const resultAnnotations = readTemplateVersionAnnotations(result);
+  if (
+    resultAnnotations.length === 0 ||
+    resultAnnotations.some(version => version !== targetVersion)
+  ) {
     throw new Error(
       `The merged catalog-info.yaml annotation must have target version ${targetVersion}`,
     );
@@ -251,13 +280,28 @@ function parseYamlFile(tree: FileTree, filePath: string): unknown {
   }
 }
 
-function readTemplateVersionAnnotation(tree: FileTree): string | undefined {
-  const entity = parseYamlFile(tree, 'catalog-info.yaml') as
-    | {
-        metadata?: { annotations?: Record<string, unknown> };
-      }
-    | undefined;
-  const version =
-    entity?.metadata?.annotations?.['backstage.io/template-version'];
-  return typeof version === 'string' ? version : undefined;
+// catalog-info.yaml may hold several entities (a System and its Components, for example);
+// collect the annotation from every document that carries it.
+function readTemplateVersionAnnotations(tree: FileTree): string[] {
+  const content = tree['catalog-info.yaml'];
+  if (!content)
+    throw new Error(
+      'Cannot verify target version: catalog-info.yaml is missing',
+    );
+  const versions: string[] = [];
+  for (const document of parseAllDocuments(content.toString('utf8'))) {
+    if (document.errors.length > 0) {
+      throw new Error(
+        `Cannot verify target version in catalog-info.yaml: ${document.errors[0].message}`,
+      );
+    }
+    const entity = document.toJS() as
+      | { metadata?: { annotations?: Record<string, unknown> } }
+      | null
+      | undefined;
+    const version =
+      entity?.metadata?.annotations?.['backstage.io/template-version'];
+    if (typeof version === 'string') versions.push(version);
+  }
+  return versions;
 }

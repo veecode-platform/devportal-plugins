@@ -166,6 +166,8 @@ function createMergeRequestDescription(
 function section(title: string, paths: string[]): string {
   return [
     `## ${title}`,
+    '',
     ...(paths.length > 0 ? paths.map(filePath => `- ${filePath}`) : ['- None']),
+    '',
   ].join('\n');
 }

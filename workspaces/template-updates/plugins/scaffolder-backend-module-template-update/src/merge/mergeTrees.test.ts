@@ -39,6 +39,18 @@ describe('mergeTrees', () => {
     expect(result.report.mergedWithConflict).toContain('README.md');
   });
 
+  it('does not list a cleanly merged file whose project bytes did not change', () => {
+    const { files, report } = mergeTrees(
+      { 'README.md': file('base\n'), 'app.ts': file('one\n') },
+      { 'README.md': file('base\n'), 'app.ts': file('one\n') },
+      { 'README.md': file('project\n'), 'app.ts': file('one\n') },
+    );
+
+    expect(files['README.md'].toString()).toBe('project\n');
+    expect(report.mergedClean).toEqual([]);
+    expect(report.changed).toBe(false);
+  });
+
   it('adds a template file absent from the project', () => {
     const result = mergeTrees({}, { 'new.txt': file('template\n') }, {});
 
@@ -211,5 +223,50 @@ describe('assertTemplateVersion', () => {
         '2.0.0',
       ),
     ).toThrow(/catalog-info\.yaml annotation.*2\.0\.0/i);
+  });
+
+  it('reads the annotation from a multi-document catalog-info.yaml', () => {
+    const tree = {
+      '.template/record.yaml': file(
+        'template: template:default/service\nversion: 2.0.0\nvalues: {}\n',
+      ),
+      'catalog-info.yaml': file(
+        'apiVersion: backstage.io/v1alpha1\nkind: System\nmetadata:\n  name: suite\n---\napiVersion: backstage.io/v1alpha1\nkind: Component\nmetadata:\n  name: service\n  annotations:\n    backstage.io/template-version: "2.0.0"\n',
+      ),
+    };
+
+    expect(() => assertTemplateVersion(tree, tree, '2.0.0')).not.toThrow();
+  });
+
+  it('leaves a conflicted catalog-info.yaml to the owner when the template side carries the target', () => {
+    const rendered = {
+      '.template/record.yaml': file(
+        'template: template:default/service\nversion: 2.0.0\nvalues: {}\n',
+      ),
+      'catalog-info.yaml': file(
+        'kind: Component\nmetadata:\n  annotations:\n    backstage.io/template-version: "2.0.0"\n',
+      ),
+    };
+    const conflicted = (templateSide: string) => ({
+      ...rendered,
+      'catalog-info.yaml': file(
+        `kind: Component\nmetadata:\n  annotations:\n<<<<<<< project\n    backstage.io/template-version: "1.0.0"\n    example.com/slug: copy\n||||||| base\n    backstage.io/template-version: "1.0.0"\n    example.com/slug: origin\n=======\n${templateSide}    example.com/slug: origin\n>>>>>>> template\n`,
+      ),
+    });
+
+    expect(() =>
+      assertTemplateVersion(
+        rendered,
+        conflicted('    backstage.io/template-version: "2.0.0"\n'),
+        '2.0.0',
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertTemplateVersion(
+        rendered,
+        conflicted('    backstage.io/template-version: "1.5.0"\n'),
+        '2.0.0',
+      ),
+    ).toThrow(/conflicted catalog-info\.yaml.*2\.0\.0/i);
   });
 });
