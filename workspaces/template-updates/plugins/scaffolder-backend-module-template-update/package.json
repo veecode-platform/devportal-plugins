@@ -1,0 +1,71 @@
+{
+  "name": "@veecode-platform/plugin-scaffolder-backend-module-template-update",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "description": "Scaffolder actions for carrying template updates into existing projects",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "backstage": {
+    "role": "backend-plugin-module",
+    "pluginId": "scaffolder",
+    "pluginPackage": "@backstage/plugin-scaffolder-backend",
+    "pluginPackages": [
+      "@veecode-platform/plugin-scaffolder-backend-module-template-update"
+    ],
+    "features": {
+      ".": "@backstage/BackendFeature"
+    }
+  },
+  "scripts": {
+    "build": "backstage-cli package build",
+    "clean": "backstage-cli package clean",
+    "export-dynamic": "npx @red-hat-developer-hub/cli@2.0.0 plugin export",
+    "lint": "backstage-cli package lint",
+    "prepack": "backstage-cli package prepack",
+    "postpack": "backstage-cli package postpack",
+    "start": "backstage-cli package start",
+    "test": "backstage-cli package test"
+  },
+  "peerDependencies": {
+    "@backstage/backend-plugin-api": "^1.9.2",
+    "@backstage/errors": "^1.3.1",
+    "@backstage/integration": "^2.0.3",
+    "@backstage/plugin-catalog-node": "^2.2.2",
+    "@backstage/plugin-scaffolder-node": "^0.13.4"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "node-diff3": "^3.2.1",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@backstage/backend-plugin-api": "^1.9.2",
+    "@backstage/cli": "^0.36.3",
+    "@backstage/config": "^1.3.8",
+    "@backstage/errors": "^1.3.1",
+    "@backstage/integration": "^2.0.3",
+    "@backstage/plugin-catalog-node": "^2.2.2",
+    "@backstage/plugin-scaffolder-node": "^0.13.4",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "dist/index.cjs.js",
+    "types": "dist/index.d.ts"
+  },
+  "typesVersions": {
+    "*": {
+      "package.json": [
+        "package.json"
+      ]
+    }
+  }
+}
