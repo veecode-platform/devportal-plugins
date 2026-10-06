@@ -104,7 +104,9 @@ export async function readTemplateRecord(
     projectRepoUrl,
     project.defaultBranch,
   );
-  const recordUrl = `${projectRepoUrl}/-/raw/${encodeURIComponent(
+  // The GitLab UrlReader only resolves /blob/ URLs (it splits the path on "/blob/" to find
+  // the ref), so a /-/raw/ URL reaches the API with an empty ref and file path.
+  const recordUrl = `${projectRepoUrl}/-/blob/${encodeURIComponent(
     projectSha,
   )}/.template/record.yaml`;
 

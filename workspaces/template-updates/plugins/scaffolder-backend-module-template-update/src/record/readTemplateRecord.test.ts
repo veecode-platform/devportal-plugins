@@ -136,7 +136,7 @@ describe('readTemplateRecord', () => {
     expect(result.oldFetchOptions).toEqual({});
     expect(result.upToDate).toBe(false);
     expect(dependencies.urlReader.readUrl).toHaveBeenCalledWith(
-      'https://gitlab.example.com/group/payments/-/raw/project-head-sha/.template/record.yaml',
+      'https://gitlab.example.com/group/payments/-/blob/project-head-sha/.template/record.yaml',
     );
   });
 
