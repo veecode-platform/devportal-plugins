@@ -40,5 +40,8 @@
     "typescript": "~5.8.0"
   },
   "prettier": "@backstage/cli/config/prettier",
-  "packageManager": "yarn@4.12.0"
+  "packageManager": "yarn@4.12.0",
+  "resolutions": {
+    "@yarnpkg/core": "4.9.1"
+  }
 }
