@@ -3,7 +3,7 @@ import { getEntityValue, parseEntityPath, toFieldValue } from './entityPath';
 const entity = {
   metadata: {
     description: 'A description',
-    annotations: { 'example.com/client': 'acme', plain: 'x' },
+    annotations: { 'example.com/client': 'client-a', plain: 'x' },
   },
   spec: { tags: ['a', 'b'], count: 3, items: [{ name: 'first' }] },
 };
@@ -28,7 +28,7 @@ describe('entity paths', () => {
     );
     expect(
       getEntityValue(entity, "metadata.annotations['example.com/client']"),
-    ).toBe('acme');
+    ).toBe('client-a');
     expect(getEntityValue(entity, 'spec.items[0].name')).toBe('first');
     expect(getEntityValue(entity, 'spec.nothing.here')).toBeUndefined();
   });
