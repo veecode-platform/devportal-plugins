@@ -1,4 +1,6 @@
+export { CatalogEntityPrefillExtension } from './plugin';
 export {
-  scaffolderFieldCatalogPrefillPlugin,
-  ScaffolderFieldCatalogPrefillPage,
-} from './plugin';
+  catalogEntityPrefillTranslations,
+  catalogEntityPrefillTranslationRef,
+} from './translations';
+export type { CatalogEntityPrefillOptions } from './lib/options';

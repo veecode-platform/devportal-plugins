@@ -19,7 +19,7 @@
     "lint:all": "backstage-cli repo lint",
     "prettier:check": "prettier --check .",
     "prettier:fix": "prettier --write .",
-    "dev:dynamic": "bash ../../.agents/skills/devportal-context/scripts/export-dev-dynamic.sh plugins/scaffolder-fields",
+    "dev:dynamic": "bash ../../.agents/skills/devportal-context/scripts/export-dev-dynamic.sh plugins/scaffolder-field-catalog-prefill",
     "new": "backstage-cli new"
   },
   "workspaces": [

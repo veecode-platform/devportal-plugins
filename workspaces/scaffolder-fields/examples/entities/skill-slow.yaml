@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: skill-slow
+  title: Slow skill
+  description: A skill whose catalog response arrives late.
+  annotations:
+    example.com/client: client-b
+spec:
+  type: skill
+  owner: team-a
+  instructions: Answers two seconds after it is requested, to show a stale response being dropped.

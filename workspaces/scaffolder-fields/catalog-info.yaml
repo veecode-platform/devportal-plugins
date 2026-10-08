@@ -2,7 +2,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: scaffolder-fields
-  description: A scaffolded VeeCode plugin workspace.
+  description: Generic scaffolder field extensions for the VeeCode DevPortal.
 spec:
   type: library
   owner: platform

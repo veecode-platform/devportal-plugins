@@ -1,4 +1,4 @@
-PLUGIN_DIR ?= plugins/scaffolder-fields
+PLUGIN_DIR ?= plugins/scaffolder-field-catalog-prefill
 
 .PHONY: build build-dynamic clean
 

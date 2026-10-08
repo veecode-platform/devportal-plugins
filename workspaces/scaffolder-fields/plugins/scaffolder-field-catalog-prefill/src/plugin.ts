@@ -1,23 +1,13 @@
-import {
-  createPlugin,
-  createRoutableExtension,
-} from '@backstage/core-plugin-api';
+import { scaffolderPlugin } from '@backstage/plugin-scaffolder';
+import { createScaffolderFieldExtension } from '@backstage/plugin-scaffolder-react';
+import { CatalogEntityPrefill } from './components/CatalogEntityPrefill';
+import { CatalogEntityPrefillOptions, StepData } from './lib/options';
+import { catalogEntityPrefillValidation } from './lib/pendingLoads';
 
-import { rootRouteRef } from './routes';
-
-export const scaffolderFieldCatalogPrefillPlugin = createPlugin({
-  id: 'scaffolder-field-catalog-prefill',
-  routes: {
-    root: rootRouteRef,
-  },
-});
-
-export const ScaffolderFieldCatalogPrefillPage =
-  scaffolderFieldCatalogPrefillPlugin.provide(
-    createRoutableExtension({
-      name: 'ScaffolderFieldCatalogPrefillPage',
-      component: () =>
-        import('./components/ExampleComponent').then(m => m.ExampleComponent),
-      mountPoint: rootRouteRef,
-    }),
-  );
+export const CatalogEntityPrefillExtension = scaffolderPlugin.provide(
+  createScaffolderFieldExtension<StepData, CatalogEntityPrefillOptions>({
+    name: 'CatalogEntityPrefill',
+    component: CatalogEntityPrefill,
+    validation: catalogEntityPrefillValidation,
+  }),
+);

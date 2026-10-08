@@ -1,0 +1,1 @@
+export { CatalogEntityPrefill } from './CatalogEntityPrefill';
