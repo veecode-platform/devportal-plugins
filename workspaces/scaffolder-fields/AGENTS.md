@@ -20,7 +20,7 @@ Run commands from `workspaces/scaffolder-fields/`.
 
 `CatalogEntityPrefill` is a `ui:field` for the root object of a template step. It renders the step through RJSF's own `ObjectField` and fills form properties from a catalog entity, so the template's parameters stay flat strings. The decisions behind it are in [`DECISIONS.md`](DECISIONS.md); the options and an example template are in the [package README](plugins/scaffolder-field-catalog-prefill/README.md).
 
-`createAsyncValidators` in `@backstage/plugin-scaffolder-react` never visits the root object of a step, so the field's `validation` hook does not run when the field is placed there (see PDR-004). `CatalogEntityPrefill.stepper.test.tsx` runs the real `Stepper` and fails when that changes.
+`createAsyncValidators` in `@backstage/plugin-scaffolder-react` never visits the root object of a step, so the field registers no `validation` hook and holds the step with an invalid hidden input instead (see PDR-004). `CatalogEntityPrefill.stepper.test.tsx` runs the real `Stepper` to prove the step stays put while the entity loads.
 
 ## How to test
 

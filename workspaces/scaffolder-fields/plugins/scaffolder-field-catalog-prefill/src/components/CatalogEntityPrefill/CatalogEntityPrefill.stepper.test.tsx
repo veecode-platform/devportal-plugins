@@ -2,7 +2,7 @@ import { Entity } from '@backstage/catalog-model';
 import { renderInTestApp, TestApiProvider } from '@backstage/test-utils';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { Stepper } from '@backstage/plugin-scaffolder-react/alpha';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CatalogEntityPrefill } from './CatalogEntityPrefill';
 
@@ -60,26 +60,25 @@ const skill: Entity = {
   spec: { type: 'skill', owner: 'team-a' },
 };
 
-async function renderStepper(validation = jest.fn()) {
+async function renderStepper(
+  getEntityByRef: () => Promise<Entity> = async () => skill,
+) {
   const onCreate = jest.fn();
   await renderInTestApp(
-    <TestApiProvider
-      apis={[[catalogApiRef, { getEntityByRef: async () => skill }]]}
-    >
+    <TestApiProvider apis={[[catalogApiRef, { getEntityByRef }]]}>
       <Stepper
         manifest={manifest as never}
         extensions={[
           {
             name: 'CatalogEntityPrefill',
             component: CatalogEntityPrefill as never,
-            validation,
           },
         ]}
         onCreate={onCreate}
       />
     </TestApiProvider>,
   );
-  return { onCreate, validation };
+  return { onCreate };
 }
 
 describe('CatalogEntityPrefill on the scaffolder stepper', () => {
@@ -114,13 +113,28 @@ describe('CatalogEntityPrefill on the scaffolder stepper', () => {
     });
   });
 
-  // createAsyncValidators only visits the properties of a step, never the step
-  // itself, so on this Backstage line the validation hook of a field placed on
-  // the step's root object is not called.
-  it('does not call the validation hook of a root-level field', async () => {
-    const { validation } = await renderStepper();
+  it('stays on the step until the entity has loaded', async () => {
+    let resolve!: (entity: Entity) => void;
+    await renderStepper(() => new Promise(res => (resolve = res)));
+    await userEvent.click(screen.getByRole('button', { name: /operation/i }));
+    await userEvent.click(
+      await screen.findByRole('option', { name: 'update' }),
+    );
+    fireEvent.change(await screen.findByLabelText('Skill'), {
+      target: { value: 'resource:default/skill-a' },
+    });
+
     await userEvent.click(screen.getByRole('button', { name: /review/i }));
-    await screen.findByRole('button', { name: /create/i });
-    expect(validation).not.toHaveBeenCalled();
+    // The stepper validates asynchronously; give it time to advance.
+    await act(() => new Promise(res => setTimeout(res, 100)));
+    expect(
+      screen.queryByRole('button', { name: /create/i }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => resolve(skill));
+    await userEvent.click(screen.getByRole('button', { name: /review/i }));
+    expect(
+      await screen.findByRole('button', { name: /create/i }),
+    ).toBeInTheDocument();
   });
 });

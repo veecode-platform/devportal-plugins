@@ -95,6 +95,25 @@ test('drops the late response of a previous selection', async ({ page }) => {
   await expect(client(page)).toHaveValue('');
 });
 
+test('stays on the step until the entity has loaded', async ({ page }) => {
+  test.skip(
+    !!process.env.PLAYWRIGHT_URL,
+    'relies on the dev shell catalog delay',
+  );
+  await openTemplate(page);
+  await chooseOperation(page, 'update');
+  await chooseSkill(page, 'Slow skill');
+  await expect(page.getByRole('status')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Review' }).click();
+  await page.waitForTimeout(500);
+  await expect(page.getByRole('button', { name: 'Create' })).toHaveCount(0);
+
+  await expect(page.getByRole('status')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Review' }).click();
+  await expect(page.getByRole('button', { name: 'Create' })).toBeVisible();
+});
+
 test('submits the flat values of the step', async ({ page }) => {
   test.skip(!!process.env.PLAYWRIGHT_URL, 'reads a dev shell hook');
   await openTemplate(page);

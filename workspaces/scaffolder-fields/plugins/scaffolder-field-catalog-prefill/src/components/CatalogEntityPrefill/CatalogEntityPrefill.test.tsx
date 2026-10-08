@@ -4,10 +4,8 @@ import validator from '@rjsf/validator-ajv8';
 import { Entity } from '@backstage/catalog-model';
 import { renderInTestApp, TestApiProvider } from '@backstage/test-utils';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { createFieldValidation } from '@backstage/plugin-scaffolder-react/alpha';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { CatalogEntityPrefill } from './CatalogEntityPrefill';
-import { catalogEntityPrefillValidation } from '../../lib/pendingLoads';
 import { CatalogEntityPrefillOptions, StepData } from '../../lib/options';
 import ptBR from '../../translations/pt-BR';
 import { catalogEntityPrefillMessages } from '../../translations';
@@ -312,36 +310,26 @@ describe('CatalogEntityPrefill', () => {
   });
 });
 
-describe('validation and status', () => {
-  const validate = async (data: StepData, options: Options = baseOptions) => {
-    const result = createFieldValidation();
-    await catalogEntityPrefillValidation(data, result, {
-      apiHolder: { get: jest.fn() } as never,
-      formData: data as never,
-      schema: schema as never,
-      uiSchema: { 'ui:options': options } as never,
-    });
-    return result.__errors;
-  };
+describe('holding the step', () => {
+  // The stepper's submit button runs the browser's form validation.
+  const formIsValid = () => document.querySelector('form')!.checkValidity();
 
-  it('reports a validation error while loading and clears it afterwards', async () => {
+  it('keeps the form invalid while loading and releases it afterwards', async () => {
     const pending = deferred<Entity>();
     getEntityByRef.mockReturnValueOnce(pending.promise);
     await renderStep();
     select(REF_A);
 
-    expect(await validate({ operation: 'update', skill: REF_A })).toEqual([
-      catalogEntityPrefillMessages.status.loading,
-    ]);
+    expect(formIsValid()).toBe(false);
 
     await act(async () => pending.resolve(entities[REF_A]));
     await waitFor(() =>
       expect(field('Description')).toHaveValue('Description A'),
     );
-    expect(await validate({ operation: 'update', skill: REF_A })).toEqual([]);
+    expect(formIsValid()).toBe(true);
   });
 
-  it('reports a validation error and an alert after a load error', async () => {
+  it('keeps the form invalid and shows an alert after a load error', async () => {
     getEntityByRef.mockRejectedValueOnce(new Error('catalog is down'));
     await renderStep();
     select(REF_A);
@@ -349,9 +337,7 @@ describe('validation and status', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not load',
     );
-    expect(await validate({ operation: 'update', skill: REF_A })).toEqual([
-      catalogEntityPrefillMessages.status.error,
-    ]);
+    expect(formIsValid()).toBe(false);
     expect(field('Description')).toHaveValue('');
   });
 
@@ -372,11 +358,7 @@ describe('validation and status', () => {
       expect(field('Description')).toHaveValue('Description B'),
     );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(await validate({ operation: 'update', skill: REF_B })).toEqual([]);
-  });
-
-  it('does not validate when the when condition does not match', async () => {
-    expect(await validate({ operation: 'add', skill: REF_A })).toEqual([]);
+    expect(formIsValid()).toBe(true);
   });
 });
 

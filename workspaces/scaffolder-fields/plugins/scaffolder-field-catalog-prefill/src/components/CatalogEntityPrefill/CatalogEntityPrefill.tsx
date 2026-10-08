@@ -10,12 +10,23 @@ import {
   StepData,
 } from '../../lib/options';
 import { applyChange, fillValues } from '../../lib/prefill';
-import { pendingLoadStore } from '../../lib/pendingLoads';
 import { catalogEntityPrefillTranslationRef } from '../../translations';
 
 type LoadState = 'idle' | 'loading' | 'error';
 
 type ChangeHandler = (data: StepData, ...rest: unknown[]) => void;
+
+const VISUALLY_HIDDEN = {
+  position: 'absolute',
+  left: 0,
+  bottom: 0,
+  width: 1,
+  height: 1,
+  padding: 0,
+  border: 0,
+  opacity: 0,
+  overflow: 'hidden',
+} as const;
 
 /**
  * Field for the root object of a template step. It renders the step through
@@ -37,29 +48,20 @@ export function CatalogEntityPrefill(
   const latest = useRef({ data, options, onChange, t });
   latest.current = { data, options, onChange, t };
   const [state, setState] = useState<LoadState>('idle');
-  const request = useRef<{ id: number; ref?: string }>({ id: 0 });
+  const request = useRef(0);
 
   const messageFor = (kind: 'loading' | 'error') =>
     latest.current.options.messages?.[kind] ??
     latest.current.t(`status.${kind}`);
 
   const cancelLoad = useCallback(() => {
-    request.current.id += 1;
-    if (request.current.ref !== undefined) {
-      pendingLoadStore.clear(request.current.ref);
-      request.current.ref = undefined;
-    }
+    request.current += 1;
   }, []);
 
   useEffect(() => cancelLoad, [cancelLoad]);
 
   const load = async (ref: string) => {
-    const { id } = request.current;
-    request.current.ref = ref;
-    pendingLoadStore.set(ref, {
-      kind: 'loading',
-      message: messageFor('loading'),
-    });
+    const id = request.current;
     setState('loading');
 
     let values: StepData | undefined;
@@ -69,18 +71,12 @@ export function CatalogEntityPrefill(
     } catch {
       values = undefined;
     }
-    if (id !== request.current.id) return;
+    if (id !== request.current) return;
 
-    request.current.ref = undefined;
     if (!values) {
-      pendingLoadStore.set(ref, {
-        kind: 'error',
-        message: messageFor('error'),
-      });
       setState('error');
       return;
     }
-    pendingLoadStore.clear(ref);
     const next = { ...latest.current.data, ...values };
     latest.current.data = next;
     latest.current.onChange(next);
@@ -116,8 +112,23 @@ export function CatalogEntityPrefill(
         uiSchema={objectUiSchema}
         onChange={handleChange as never}
       />
-      {state === 'loading' && <p role="status">{messageFor('loading')}</p>}
-      {state === 'error' && <p role="alert">{messageFor('error')}</p>}
+      {state !== 'idle' && (
+        <div style={{ position: 'relative' }}>
+          <p role={state === 'loading' ? 'status' : 'alert'}>
+            {messageFor(state)}
+          </p>
+          {/* The scaffolder does not run a field's validation hook for the
+              root object of a step, so the field holds the step with the
+              browser's own form validation: this invalid input stops the
+              stepper's submit button until the entity has loaded. */}
+          <input
+            ref={input => input?.setCustomValidity(messageFor(state))}
+            aria-label={messageFor(state)}
+            tabIndex={-1}
+            style={VISUALLY_HIDDEN}
+          />
+        </div>
+      )}
     </>
   );
 }

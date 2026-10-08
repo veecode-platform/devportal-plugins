@@ -50,16 +50,22 @@ would leave a mix nobody chose, and asking whether to keep the edits adds a prom
 form that has no place for one. Clearing first also means the form never shows the old
 entity next to the new ref while the request is in flight.
 
-## PDR-004: Blocking the step while the entity loads is open
+## PDR-004: The browser's form validation holds the step while the entity loads
 
 **Date:** 2026-10
-**Status:** Open
+**Status:** Accepted
 
-The field registers a `validation` hook that reports an error while the entity is
-loading or after a load failure, and shows a status or alert line under the form. On
-Backstage 1.52 the hook does not run for a field on the root object of a step:
+While the entity loads, and after a load fails, the field renders a visually hidden
+input marked invalid with `setCustomValidity`, next to the status or alert line. The
+stepper's Next and Review buttons submit the form, the browser refuses an invalid form
+and shows the message on that input, so the user cannot leave the step with the
+targets still empty. Selecting another entity, or changing a `when` property, removes
+the input.
+
+**Rationale:** a field's `validation` hook is the usual way to hold a step, but on
+Backstage 1.52 it does not run for a field on the root object of a step:
 `createAsyncValidators` (`@backstage/plugin-scaffolder-react`) walks the properties of
-the step's data and never inspects the step itself. In the dev shell the Review button
-advances while the status line is still visible. A decision is needed on how the step
-is held: for example a native form-validity guard rendered by the field, or a field
-placed on a nested object property.
+the step's data and never inspects the step itself. Moving the field onto a nested
+object property would make the hook run, but the step's values would stop being flat,
+against PDR-002. The stepper leaves HTML5 validation on, so the native guard works at
+the root without changing the contract.

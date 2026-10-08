@@ -185,12 +185,13 @@ Pass `catalogEntityPrefillTranslations` in `createApp`'s translation resources, 
 The field's own texts are English by default and come through Backstage's translation
 API. A `pt-BR` translation ships with the package. `ui:options.messages` overrides both.
 
-## Known limit
+## Holding the step
 
-On Backstage 1.52 the scaffolder does not run a field's `validation` hook for a field on
-the root object of a step. The field registers the hook and shows the status line, but
-the step can still be submitted while the entity loads. See `PDR-004` in the workspace
-[`DECISIONS.md`](../../DECISIONS.md).
+While the entity loads, and after a load fails, the step cannot be submitted: the field
+marks a hidden input invalid, so the browser stops the Next and Review buttons and shows
+the status message. The scaffolder does not run a field's `validation` hook for the root
+object of a step, which is why the field uses the browser's own form validation. See
+`PDR-004` in the workspace [`DECISIONS.md`](../../DECISIONS.md).
 
 ## Exports
 
