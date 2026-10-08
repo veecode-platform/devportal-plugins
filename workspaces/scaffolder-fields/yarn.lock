@@ -888,7 +888,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/catalog-model@npm:^1.10.1":
+"@backstage/catalog-model@npm:^1.10.1, @backstage/catalog-model@npm:^1.9.0":
   version: 1.10.1
   resolution: "@backstage/catalog-model@npm:1.10.1"
   dependencies:
@@ -5143,7 +5143,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rjsf/core@npm:5.24.13":
+"@rjsf/core@npm:5.24.13, @rjsf/core@npm:^5.24.13":
   version: 5.24.13
   resolution: "@rjsf/core@npm:5.24.13"
   dependencies:
@@ -5186,7 +5186,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rjsf/validator-ajv8@npm:5.24.13":
+"@rjsf/validator-ajv8@npm:5.24.13, @rjsf/validator-ajv8@npm:^5.24.13":
   version: 5.24.13
   resolution: "@rjsf/validator-ajv8@npm:5.24.13"
   dependencies:
@@ -7104,6 +7104,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@veecode-platform/backstage-plugin-scaffolder-field-catalog-prefill@workspace:plugins/scaffolder-field-catalog-prefill"
   dependencies:
+    "@backstage/catalog-model": "npm:^1.9.0"
     "@backstage/cli": "npm:^0.36.3"
     "@backstage/core-app-api": "npm:^1.20.2"
     "@backstage/core-plugin-api": "npm:^1.12.7"
@@ -7111,6 +7112,8 @@ __metadata:
     "@backstage/plugin-scaffolder": "npm:^1.38.0"
     "@backstage/plugin-scaffolder-react": "npm:^2.0.1"
     "@backstage/test-utils": "npm:^1.7.19"
+    "@rjsf/core": "npm:^5.24.13"
+    "@rjsf/validator-ajv8": "npm:^5.24.13"
     "@testing-library/jest-dom": "npm:^6.0.0"
     "@testing-library/react": "npm:^14.0.0"
     "@testing-library/user-event": "npm:^14.0.0"
@@ -8197,6 +8200,7 @@ __metadata:
   dependencies:
     "@backstage/app-defaults": "npm:^1.7.9"
     "@backstage/catalog-client": "npm:^1.16.0"
+    "@backstage/catalog-model": "npm:^1.9.0"
     "@backstage/cli": "npm:^0.36.3"
     "@backstage/core-app-api": "npm:^1.20.2"
     "@backstage/core-components": "npm:^0.18.11"
