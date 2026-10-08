@@ -25,8 +25,12 @@ const client = (page: Page) => page.getByLabel('Client');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  const enter = page.getByRole('button', { name: 'Enter' });
-  if (await enter.isVisible().catch(() => false)) await enter.click();
+  // The local runner asks for a sign-in method; the dev shell has none.
+  if (process.env.PLAYWRIGHT_URL) {
+    const enter = page.getByRole('button', { name: 'Enter' });
+    await enter.click();
+    await expect(enter).toHaveCount(0);
+  }
 });
 
 test('fills the step from the selected entity, keeps edits, refills on a new selection', async ({
