@@ -1,0 +1,13 @@
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-scaffolder-fields-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-scaffolder-fields:
+            dynamicRoutes:
+              - path: /scaffolder-fields
+                importName: ScaffolderFieldsPage
+                menuItem:
+                  text: ScaffolderFields
+                  enabled: true
