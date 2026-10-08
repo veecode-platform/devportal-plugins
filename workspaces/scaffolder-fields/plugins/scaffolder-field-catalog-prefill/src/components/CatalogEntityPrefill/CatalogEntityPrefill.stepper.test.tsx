@@ -83,6 +83,11 @@ async function renderStepper(validation = jest.fn()) {
 }
 
 describe('CatalogEntityPrefill on the scaffolder stepper', () => {
+  beforeAll(() => {
+    // The stepper scrolls to the top on every step; jsdom has no scrollTo.
+    window.scrollTo = jest.fn();
+  });
+
   it('works with dependencies.oneOf and keeps the submitted values flat', async () => {
     const { onCreate } = await renderStepper();
     expect(screen.queryByLabelText('Skill')).not.toBeInTheDocument();

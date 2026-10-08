@@ -118,3 +118,22 @@ test('submits the flat values of the step', async ({ page }) => {
     client: 'client-a',
   });
 });
+
+test('shows the status text in Brazilian Portuguese when the app language is pt-BR', async ({
+  page,
+}) => {
+  test.skip(
+    !!process.env.PLAYWRIGHT_URL,
+    'relies on the dev shell catalog delay',
+  );
+  await page.addInitScript(() =>
+    window.localStorage.setItem('language', 'pt-BR'),
+  );
+  await openTemplate(page);
+  await chooseOperation(page, 'update');
+  await chooseSkill(page, 'Slow skill');
+
+  await expect(page.getByRole('status')).toHaveText(
+    'Carregando dados do catálogo…',
+  );
+});
