@@ -6,6 +6,7 @@ import { mockServices, TestDatabases } from '@backstage/backend-test-utils';
 import type {
   ExtensionsApi,
   ExtensionsPackage,
+  ExtensionsPlugin,
 } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
 import express from 'express';
 import request from 'supertest';
@@ -21,6 +22,7 @@ const DISABLED = 'oci://quay.io/example/disabled:1.0.0!example-disabled';
 const INSTALLED_NOW = 'oci://quay.io/example/fresh:1.0.0!example-fresh';
 const UNKNOWN = 'oci://quay.io/example/unknown:1.0.0';
 const SHARED = 'oci://quay.io/example/shared:1.0.0!example-shared';
+const EDITOR = 'oci://quay.io/example/editor:1.0.0!example-editor';
 
 // A ref names its plugin only when it carries a !selector, and even then the
 // loaded plugin's name is the package.json name of the extracted folder, which
@@ -81,9 +83,29 @@ const loadedShapes: Array<[string, string, string, string]> = [
 
 let catalogFails = false;
 
+const editorPackage: ExtensionsPackage = {
+  apiVersion: 'extensions.backstage.io/v1alpha1',
+  kind: 'Package',
+  metadata: { name: 'example-editor' },
+  spec: {
+    packageName: '@example/editor',
+    dynamicArtifact: EDITOR,
+    appConfigExamples: [
+      {
+        title: 'Default',
+        content: { sonarqube: { baseUrl: '${SONARQUBE_URL}' } },
+      },
+    ],
+  },
+};
+
 const extensionsApi: Pick<
   ExtensionsApi,
-  'getPackageByName' | 'getPackagePlugins' | 'getPackages'
+  | 'getPackageByName'
+  | 'getPackagePlugins'
+  | 'getPackages'
+  | 'getPluginByName'
+  | 'getPluginPackages'
 > = {
   getPackageByName: async (_namespace, name) => {
     const found = catalogPackages.find(pkg => pkg.metadata.name === name);
@@ -93,6 +115,19 @@ const extensionsApi: Pick<
     return found;
   },
   getPackagePlugins: async () => [],
+  getPluginByName: async (namespace, name) => {
+    if (name !== 'example-editor') {
+      throw new Error(`no plugin ${name} in the test catalog`);
+    }
+    const plugin: ExtensionsPlugin = {
+      apiVersion: 'extensions.backstage.io/v1alpha1',
+      kind: 'Plugin',
+      metadata: { name, namespace },
+    };
+    return plugin;
+  },
+  getPluginPackages: async (_namespace, name) =>
+    name === 'example-editor' ? [editorPackage] : [],
   getPackages: async request => {
     if (catalogFails) {
       throw new Error('catalog unavailable');
@@ -360,5 +395,52 @@ describe('GET /pending-changes', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.failedInstalls).toEqual([]);
+  });
+});
+
+describe('POST /plugin/:namespace/:name/configuration', () => {
+  it('persists the pluginConfig typed in the install editor, not the appConfigExamples default', async () => {
+    const app = await bootPortal({ loaded: [], storedBeforeBoot: [] });
+
+    await request(app)
+      .post('/plugin/default/example-editor/configuration')
+      .send({
+        configYaml: [
+          `- package: ${EDITOR}`,
+          '  disabled: false',
+          '  pluginConfig:',
+          '    sonarqube:',
+          '      baseUrl: https://sonar.example.com',
+          '',
+        ].join('\n'),
+      })
+      .expect(200);
+
+    const stored = await request(app)
+      .get('/plugin/default/example-editor/configuration')
+      .expect(200);
+
+    expect(stored.body.configYaml).toContain(
+      'baseUrl: https://sonar.example.com',
+    );
+  });
+
+  it('applies the first appConfigExamples entry when the editor sends no pluginConfig', async () => {
+    const app = await bootPortal({ loaded: [], storedBeforeBoot: [] });
+
+    await request(app)
+      .post('/plugin/default/example-editor/configuration')
+      .send({
+        configYaml: [`- package: ${EDITOR}`, '  disabled: false', ''].join(
+          '\n',
+        ),
+      })
+      .expect(200);
+
+    const stored = await request(app)
+      .get('/plugin/default/example-editor/configuration')
+      .expect(200);
+
+    expect(stored.body.configYaml).toContain('baseUrl: ${SONARQUBE_URL}');
   });
 });
