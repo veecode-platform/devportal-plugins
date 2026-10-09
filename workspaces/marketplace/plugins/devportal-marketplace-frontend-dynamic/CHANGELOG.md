@@ -1,5 +1,13 @@
 # devportal-marketplace-frontend-dynamic
 
+## 0.3.2
+
+### Patch Changes
+
+- Align the dynamic wrapper with `devportal-marketplace-frontend` at 0.3.2, so the Marketplace artifact ships the YAML syntax check on plugin install under the same version as its base package.
+- Updated dependencies [478d087]
+  - devportal-marketplace-frontend@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes
