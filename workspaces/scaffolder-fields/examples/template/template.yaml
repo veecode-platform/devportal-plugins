@@ -1,0 +1,91 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: manage-skill
+  title: Manage a skill
+  description: Add a skill, or update or remove an existing one starting from its catalog entity.
+spec:
+  owner: team-a
+  type: example
+  parameters:
+    - title: Skill
+      required:
+        - operation
+      ui:field: CatalogEntityPrefill
+      ui:options:
+        entityRefField: skill
+        fill:
+          description: metadata.description
+          instructions: spec.instructions
+          client: metadata.annotations['example.com/client']
+        when:
+          operation:
+            - update
+            - remove
+        readonlyWhen:
+          operation: remove
+      properties:
+        operation:
+          title: Operation
+          type: string
+          enum:
+            - add
+            - update
+            - remove
+          default: add
+      dependencies:
+        operation:
+          oneOf:
+            - properties:
+                operation:
+                  enum:
+                    - add
+                name:
+                  title: Name
+                  type: string
+                description:
+                  title: Description
+                  type: string
+                  ui:widget: textarea
+                instructions:
+                  title: Instructions
+                  type: string
+                  ui:widget: textarea
+                client:
+                  title: Client
+                  type: string
+              required:
+                - name
+            - properties:
+                operation:
+                  enum:
+                    - update
+                    - remove
+                skill:
+                  title: Skill
+                  type: string
+                  ui:field: EntityPicker
+                  ui:options:
+                    defaultKind: Resource
+                    catalogFilter:
+                      - kind: Resource
+                        spec.type: skill
+                description:
+                  title: Description
+                  type: string
+                  ui:widget: textarea
+                instructions:
+                  title: Instructions
+                  type: string
+                  ui:widget: textarea
+                client:
+                  title: Client
+                  type: string
+              required:
+                - skill
+  steps:
+    - id: log
+      name: Log the request
+      action: debug:log
+      input:
+        message: '${{ parameters.operation }} ${{ parameters.skill }}'

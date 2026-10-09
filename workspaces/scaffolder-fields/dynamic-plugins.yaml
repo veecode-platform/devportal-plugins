@@ -1,0 +1,24 @@
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-scaffolder-field-catalog-prefill-dynamic
+    disabled: false
+    pluginConfig:
+      catalog:
+        locations:
+          - type: file
+            target: /opt/app-root/src/examples/entities/skill-code-review.yaml
+          - type: file
+            target: /opt/app-root/src/examples/entities/skill-release-notes.yaml
+          - type: file
+            target: /opt/app-root/src/examples/entities/skill-slow.yaml
+          - type: file
+            target: /opt/app-root/src/examples/template/template.yaml
+            rules:
+              - allow: [Template]
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-scaffolder-field-catalog-prefill:
+            scaffolderFieldExtensions:
+              - importName: CatalogEntityPrefillExtension
+            translationResources:
+              - importName: catalogEntityPrefillTranslations
+                ref: catalogEntityPrefillTranslationRef

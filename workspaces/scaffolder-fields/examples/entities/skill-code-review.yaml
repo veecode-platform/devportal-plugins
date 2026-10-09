@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: skill-code-review
+  title: Code review
+  description: Reviews a change set and lists its risks.
+  annotations:
+    example.com/client: client-a
+spec:
+  type: skill
+  owner: team-a
+  instructions: Read the diff, group findings by severity and propose a fix for each one.

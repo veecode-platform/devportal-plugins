@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: skill-release-notes
+  title: Release notes
+  description: Turns merged changes into release notes.
+spec:
+  type: skill
+  owner: team-a
+  instructions: Summarize each merged change in one sentence and group them by area.
