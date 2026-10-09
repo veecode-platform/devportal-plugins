@@ -26,8 +26,6 @@ import { usePluginConfigurationPermissions } from '../hooks/usePluginConfigurati
 import { usePlugin } from '../hooks/usePlugin';
 import { usePluginPackages } from '../hooks/usePluginPackages';
 import { ExtensionsPluginInstallStatus } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
-import { useExtensionsConfiguration } from '../hooks/useExtensionsConfiguration';
-import { useNodeEnvironment } from '../hooks/useNodeEnvironment';
 import { errorApiRef } from '@backstage/core-plugin-api';
 import { translationApiRef } from '@backstage/core-plugin-api/alpha';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -53,24 +51,14 @@ jest.mock('../hooks/usePlugin', () => ({
   usePlugin: jest.fn(),
 }));
 
-jest.mock('../hooks/useExtensionsConfiguration', () => ({
-  useExtensionsConfiguration: jest.fn(),
-}));
-
-jest.mock('../hooks/useNodeEnvironment', () => ({
-  useNodeEnvironment: jest.fn(),
-}));
-
 jest.mock('../hooks/usePluginPackages', () => ({
   usePluginPackages: jest.fn(),
 }));
 
 const usePluginMock = usePlugin as jest.Mock;
-const useNodeEnvironmentMock = useNodeEnvironment as jest.Mock;
 const usePluginPackagesMock = usePluginPackages as jest.Mock;
 const usePluginConfigurationPermissionsMock =
   usePluginConfigurationPermissions as jest.Mock;
-const useExtensionsConfigurationMock = useExtensionsConfiguration as jest.Mock;
 
 queryClient.setDefaultOptions({
   queries: { retry: false },
@@ -85,16 +73,6 @@ beforeEach(() => {
     isLoading: false,
     error: null,
     refetch: jest.fn(),
-  });
-  useExtensionsConfigurationMock.mockReturnValue({
-    data: {
-      enabled: true,
-    },
-  });
-  useNodeEnvironmentMock.mockReturnValue({
-    data: {
-      nodeEnv: 'test',
-    },
   });
   jest.clearAllMocks();
 });
@@ -174,7 +152,7 @@ describe('ExtensionsPluginContent', () => {
     expect(installButton).toBeEnabled();
   });
 
-  it('should have the View button', async () => {
+  it('should have the Install button disabled for read-only access', async () => {
     usePluginConfigurationPermissionsMock.mockReturnValue({
       data: {
         write: 'DENY',
@@ -185,25 +163,10 @@ describe('ExtensionsPluginContent', () => {
       refetch: jest.fn(),
     });
 
-    const { getByText } = renderWithProviders(
-      <QueryClientProvider client={queryClient}>
-        <ExtensionsPluginContent plugin={plugin} />,
-      </QueryClientProvider>,
-    );
-    expect(getByText('View')).toBeInTheDocument();
-  });
-
-  it('should have the View button for production env', async () => {
-    useNodeEnvironmentMock.mockReturnValue({
-      data: {
-        nodeEnv: 'production',
-      },
-    });
-
-    const { getByText } = renderWithProviders(
+    const { getByTestId } = renderWithProviders(
       <ExtensionsPluginContent plugin={plugin} />,
     );
-    expect(getByText('View')).toBeInTheDocument();
+    expect(getByTestId('install-disabled')).toBeDisabled();
   });
 
   it('should have the Install button disabled', async () => {
@@ -250,7 +213,7 @@ describe('ExtensionsPluginContent', () => {
     expect(getByTestId('disable-plugin')).toBeInTheDocument();
   });
 
-  it('should have the View button when user has read only access even when the plugin is installed', async () => {
+  it('should have the Install button disabled for read-only access even when the plugin is installed', async () => {
     usePluginConfigurationPermissionsMock.mockReturnValue({
       data: {
         write: 'DENY',
@@ -268,12 +231,10 @@ describe('ExtensionsPluginContent', () => {
       },
     };
 
-    const { getByText } = renderWithProviders(
-      <QueryClientProvider client={queryClient}>
-        <ExtensionsPluginContent plugin={installedPlugin} />,
-      </QueryClientProvider>,
+    const { getByTestId } = renderWithProviders(
+      <ExtensionsPluginContent plugin={installedPlugin} />,
     );
-    expect(getByText('View')).toBeInTheDocument();
+    expect(getByTestId('install-disabled')).toBeDisabled();
   });
 
   it('should have the View button when package is missing dynamicArtifact', async () => {

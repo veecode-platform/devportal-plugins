@@ -17,23 +17,13 @@ import { renderInTestApp } from '@backstage/test-utils';
 import { ExtensionsCatalogContent } from './ExtensionsCatalogContent';
 import { useFilteredPlugins } from '../hooks/useFilteredPlugins';
 import { useCollections } from '../hooks/useCollections';
-import { useExtensionsConfiguration } from '../hooks/useExtensionsConfiguration';
 import { mockPlugins } from '../__fixtures__/mockPlugins';
 
 const useFilteredPluginsMock = useFilteredPlugins as jest.Mock;
 const useCollectionsMock = useCollections as jest.Mock;
-const useExtensionsConfigurationMock = useExtensionsConfiguration as jest.Mock;
 
 jest.mock('../hooks/useCollections', () => ({
   useCollections: jest.fn(),
-}));
-
-jest.mock('../hooks/useExtensionsConfiguration', () => ({
-  useExtensionsConfiguration: jest.fn(),
-}));
-
-jest.mock('../hooks/useNodeEnvironment', () => ({
-  useNodeEnvironment: jest.fn(),
 }));
 
 jest.mock('../hooks/useFilteredPlugins', () => ({
@@ -70,11 +60,6 @@ afterAll(() => {
 
 describe('ExtensionsCatalogContent', () => {
   it('should show empty state with no plugins', async () => {
-    useExtensionsConfigurationMock.mockReturnValue({
-      data: {
-        enabled: false,
-      },
-    });
     useFilteredPluginsMock.mockReturnValue({
       data: {
         totalItems: 0,
@@ -86,11 +71,6 @@ describe('ExtensionsCatalogContent', () => {
   });
 
   it('should show empty state when filters return no results', async () => {
-    useExtensionsConfigurationMock.mockReturnValue({
-      data: {
-        enabled: false,
-      },
-    });
     useCollectionsMock.mockReturnValue({
       data: {
         featuredCollections: [],

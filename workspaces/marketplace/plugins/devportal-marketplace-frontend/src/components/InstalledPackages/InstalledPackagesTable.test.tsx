@@ -25,19 +25,12 @@ import { queryClient } from '../../queryclient';
 import { extensionsApiRef } from '../../api';
 import { dynamicPluginsInfoApiRef } from '../../api';
 import { InstalledPackagesTable } from './InstalledPackagesTable';
-import { useNodeEnvironment } from '../../hooks/useNodeEnvironment';
 
 jest.mock('@backstage/core-plugin-api', () => ({
   ...jest.requireActual('@backstage/core-plugin-api'),
   useRouteRef: () => (params: any) =>
     `/packages/${params.namespace}/${params.name}`,
 }));
-
-jest.mock('../../hooks/useNodeEnvironment', () => ({
-  useNodeEnvironment: jest.fn(),
-}));
-
-const useNodeEnvironmentMock = useNodeEnvironment as jest.Mock;
 
 describe('InstalledPackagesTable', () => {
   const renderWithProviders = (apis: any) =>
@@ -140,60 +133,6 @@ describe('InstalledPackagesTable', () => {
     ];
 
     const entities = { items: [], totalItems: 0, pageInfo: {} };
-
-    const apis = [
-      [
-        dynamicPluginsInfoApiRef,
-        { listLoadedPlugins: jest.fn().mockResolvedValue(dynamicPlugins) },
-      ],
-      [
-        extensionsApiRef,
-        { getPackages: jest.fn().mockResolvedValue(entities) },
-      ],
-    ] as const;
-
-    renderWithProviders(apis);
-
-    await waitFor(() =>
-      expect(screen.getByText('Installed packages (1)')).toBeInTheDocument(),
-    );
-
-    const disabledButtons = screen.getAllByRole('button', { hidden: true });
-    // There are three disabled action buttons rendered wrapped in span
-    expect(disabledButtons.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it('disables actions in the production env', async () => {
-    useNodeEnvironmentMock.mockReturnValue({
-      data: {
-        nodeEnv: 'production',
-      },
-    });
-    const dynamicPlugins = [
-      {
-        name: '@scope/pkg-a-dynamic',
-        version: '1.0.0',
-        role: 'frontend-plugin',
-        platform: 'fe',
-      },
-    ];
-
-    const entities = {
-      items: [
-        {
-          apiVersion: 'extensions.backstage.io/v1alpha1',
-          kind: 'Package',
-          metadata: {
-            namespace: 'rhdh',
-            name: 'scope-pkg-a',
-            title: 'Package A',
-          },
-          spec: { packageName: '@scope/pkg-a', version: '1.0.0' },
-        },
-      ],
-      totalItems: 1,
-      pageInfo: {},
-    };
 
     const apis = [
       [
