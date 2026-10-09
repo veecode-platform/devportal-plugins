@@ -323,6 +323,8 @@ export const extensionsMessages = {
       missingPackageField:
         "Invalid editor content: 'package' field missing in item",
       failedToSave: 'Failed to save',
+      invalidYaml:
+        'Invalid YAML at line {{line}}, column {{column}}: {{reason}}',
     },
   },
 

@@ -17,6 +17,7 @@ import {
   applyContent,
   getExampleAsMarkdown,
   getCategoryTagDisplayInfo,
+  getYamlSyntaxError,
 } from './utils';
 
 describe('extensions utils', () => {
@@ -233,6 +234,64 @@ key2: value2
         tooltipTitle: '',
         shouldShowTooltip: false,
       });
+    });
+  });
+
+  describe('getYamlSyntaxError', () => {
+    it.each([
+      [
+        'a key indented one column off',
+        [
+          'plugins:',
+          '  - package: ./sonar-backend',
+          '    disabled: false',
+          '    pluginConfig:',
+          '      sonarqube:',
+          '        baseUrl: https://sonar.example.com',
+          '       apiKey: ${SONARQUBE_TOKEN}',
+        ],
+        { line: 7, column: 1 },
+      ],
+      [
+        'an unclosed quote',
+        [
+          'plugins:',
+          '  - package: ./sonar-backend',
+          '    pluginConfig:',
+          '      sonarqube:',
+          '        baseUrl: "https://sonar.example.com',
+          '        apiKey: ${SONARQUBE_TOKEN}',
+        ],
+        { line: 5, column: 18 },
+      ],
+      [
+        'a tab used as indentation',
+        ['plugins:', '  - package: ./sonar-backend', '\t\tdisabled: false'],
+        { line: 3, column: 1 },
+      ],
+      [
+        'a duplicate key',
+        [
+          'plugins:',
+          '  - package: ./sonar-backend',
+          '    pluginConfig:',
+          '      sonarqube:',
+          '        baseUrl: https://a.example.com',
+          '        baseUrl: https://b.example.com',
+        ],
+        { line: 6, column: 9 },
+      ],
+    ])('reports the line and column of %s', (_name, lines, position) => {
+      const error = getYamlSyntaxError(lines.join('\n'));
+
+      expect(error).toEqual({ ...position, reason: expect.any(String) });
+      expect(error?.reason).not.toContain(' at line ');
+    });
+
+    it('returns null for YAML that parses', () => {
+      expect(
+        getYamlSyntaxError('plugins:\n  - package: ./sonar-backend\n'),
+      ).toBeNull();
     });
   });
 });
