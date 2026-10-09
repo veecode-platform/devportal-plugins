@@ -14,10 +14,17 @@
  * limitations under the License.
  */
 
-import { renderInTestApp } from '@backstage/test-utils';
+import type { PropsWithChildren } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 
+import { ExtensionsApi } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
+
+import { renderInTestApp, TestApiProvider } from '@backstage/test-utils';
+
+import { extensionsApiRef } from '../api';
 import { useCollections } from '../hooks/useCollections';
 import { useCollectionPlugins } from '../hooks/useCollectionPlugins';
+import { queryClient } from '../queryclient';
 import { rootRouteRef } from '../routes';
 
 import { mockCollections } from '../__fixtures__/mockCollections';
@@ -35,6 +42,24 @@ jest.mock('../hooks/useCollections', () => ({
 jest.mock('../hooks/useCollectionPlugins', () => ({
   useCollectionPlugins: jest.fn(),
 }));
+
+// Each PluginCard reads its install status from APIs this grid test does not
+// provide.
+jest.mock('../hooks/usePluginStatus', () => ({
+  usePluginStatus: () => 'available',
+}));
+
+const apis = [[extensionsApiRef, {} as ExtensionsApi]] as const;
+
+queryClient.setDefaultOptions({
+  queries: { retry: false },
+});
+
+const Providers = ({ children }: PropsWithChildren<{}>) => (
+  <TestApiProvider apis={apis}>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  </TestApiProvider>
+);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -68,11 +93,16 @@ describe('ExtensionsCollectionsGrid', () => {
       },
     );
 
-    const { getByText } = await renderInTestApp(<ExtensionsCollectionsGrid />, {
-      mountedRoutes: {
-        '/extensions': rootRouteRef,
+    const { getByText } = await renderInTestApp(
+      <Providers>
+        <ExtensionsCollectionsGrid />
+      </Providers>,
+      {
+        mountedRoutes: {
+          '/extensions': rootRouteRef,
+        },
       },
-    });
+    );
     expect(getByText('collection-1')).toBeInTheDocument();
     expect(getByText('plugin-1')).toBeInTheDocument();
     expect(getByText('Collection 2')).toBeInTheDocument();

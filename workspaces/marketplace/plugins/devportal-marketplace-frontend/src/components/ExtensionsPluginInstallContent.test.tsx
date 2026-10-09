@@ -26,10 +26,9 @@ import { extensionsApiRef } from '../api';
 import { alertApiRef } from '@backstage/core-plugin-api';
 import { usePluginConfigurationPermissions } from '../hooks/usePluginConfigurationPermissions';
 import { useInstallPlugin } from '../hooks/useInstallPlugin';
-import { useExtensionsConfiguration } from '../hooks/useExtensionsConfiguration';
+import { ExtensionsStatus } from '../utils';
 
 const usePluginConfigMock = usePluginConfig as jest.Mock;
-const useExtensionsConfigurationMock = useExtensionsConfiguration as jest.Mock;
 
 const usePluginConfigurationPermissionsMock =
   usePluginConfigurationPermissions as jest.Mock;
@@ -37,10 +36,6 @@ const useInstallPluginMock = useInstallPlugin as jest.Mock;
 
 jest.mock('../hooks/usePluginConfig', () => ({
   usePluginConfig: jest.fn(),
-}));
-
-jest.mock('../hooks/useNodeEnvironment', () => ({
-  useNodeEnvironment: jest.fn(),
 }));
 
 jest.mock('../hooks/useInstallPlugin', () => ({
@@ -54,10 +49,6 @@ jest.mock('../hooks/usePluginConfigurationPermissions', () => ({
 jest.mock('./CodeEditorContext', () => ({
   useCodeEditor: jest.fn(),
   CodeEditorContextProvider: ({ children }: any) => children,
-}));
-
-jest.mock('../hooks/useExtensionsConfiguration', () => ({
-  useExtensionsConfiguration: jest.fn(),
 }));
 
 jest.mock('@backstage/core-plugin-api', () => {
@@ -105,12 +96,6 @@ beforeEach(() => {
     isLoading: false,
     error: null,
     refetch: jest.fn(),
-  });
-
-  useExtensionsConfigurationMock.mockReturnValue({
-    data: {
-      enabled: true,
-    },
   });
 });
 
@@ -252,12 +237,10 @@ describe('ExtensionsPluginInstallContent', () => {
     usePluginConfigMock.mockReturnValue({
       isLoading: false,
       data: {
-        configYaml,
-      },
-    });
-    useExtensionsConfigurationMock.mockReturnValue({
-      data: {
-        enabled: false,
+        error: {
+          reason: ExtensionsStatus.INSTALLATION_DISABLED,
+          message: 'Plugin installation is disabled.',
+        },
       },
     });
     const { getByTestId } = render(
@@ -280,11 +263,6 @@ describe('ExtensionsPluginInstallContent', () => {
       isLoading: false,
       data: {
         configYaml,
-      },
-    });
-    useExtensionsConfigurationMock.mockReturnValue({
-      data: {
-        enabled: false,
       },
     });
     const { getByTestId } = render(
