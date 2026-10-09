@@ -443,4 +443,63 @@ describe('POST /plugin/:namespace/:name/configuration', () => {
 
     expect(stored.body.configYaml).toContain('baseUrl: ${SONARQUBE_URL}');
   });
+
+  it.each([
+    [
+      'a key indented one column off',
+      [
+        `- package: ${EDITOR}`,
+        '  pluginConfig:',
+        '    sonarqube:',
+        '      baseUrl: https://sonar.example.com',
+        '     apiKey: ${SONARQUBE_TOKEN}',
+      ],
+      5,
+    ],
+    [
+      'an unclosed quote',
+      [
+        `- package: ${EDITOR}`,
+        '  pluginConfig:',
+        '    sonarqube:',
+        '      baseUrl: "https://sonar.example.com',
+        '      apiKey: ${SONARQUBE_TOKEN}',
+      ],
+      4,
+    ],
+    [
+      'a tab used as indentation',
+      [`- package: ${EDITOR}`, '  pluginConfig:', '\t\tsonarqube: {}'],
+      3,
+    ],
+    [
+      'a duplicate key',
+      [
+        `- package: ${EDITOR}`,
+        '  pluginConfig:',
+        '    sonarqube:',
+        '      baseUrl: https://a.example.com',
+        '      baseUrl: https://b.example.com',
+      ],
+      5,
+    ],
+  ])(
+    'answers 400 naming the line of %s and stores nothing',
+    async (_name, lines, line) => {
+      const app = await bootPortal({ loaded: [], storedBeforeBoot: [] });
+
+      const response = await request(app)
+        .post('/plugin/default/example-editor/configuration')
+        .send({ configYaml: lines.join('\n') });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.message).toMatch(
+        new RegExp(`^Invalid YAML at line ${line}, column \\d+: `),
+      );
+      const stored = await request(app)
+        .get('/plugin/default/example-editor/configuration')
+        .expect(200);
+      expect(stored.body.configYaml ?? '').not.toContain('sonarqube');
+    },
+  );
 });

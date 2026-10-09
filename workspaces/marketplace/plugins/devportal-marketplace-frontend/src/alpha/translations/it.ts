@@ -258,6 +258,8 @@ const extensionsTranslationIt = createTranslationMessages({
     'install.errors.missingPackageField':
       "Contenuto dell'editor non valido: campo 'pacchetto' mancante nell'elemento",
     'install.errors.failedToSave': 'Impossibile salvare',
+    'install.errors.invalidYaml':
+      'YAML non valido alla riga {{line}}, colonna {{column}}: {{reason}}',
     loading: 'Caricamento...',
     error: 'Si è verificato un errore',
     retry: 'Riprovare',

@@ -255,6 +255,8 @@ const extensionsTranslationFr = createTranslationMessages({
     'install.errors.missingPackageField':
       "Contenu de l'éditeur non valide : champ « package » manquant dans l'élément",
     'install.errors.failedToSave': 'Échec de la sauvegarde',
+    'install.errors.invalidYaml':
+      'YAML non valide à la ligne {{line}}, colonne {{column}} : {{reason}}',
     loading: 'Chargement en cours...',
     error: "Une erreur s'est produite",
     retry: 'Réessayer',

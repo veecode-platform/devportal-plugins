@@ -1,4 +1,13 @@
-import { Document, isMap, isSeq, type YAMLMap, type YAMLSeq } from 'yaml';
+import {
+  Document,
+  isMap,
+  isSeq,
+  LineCounter,
+  parseDocument,
+  visit,
+  type YAMLMap,
+  type YAMLSeq,
+} from 'yaml';
 import { ConfigFormatError } from '../errors/ConfigFormatError';
 import type { JsonValue } from '@backstage/types';
 
@@ -91,4 +100,30 @@ export function validatePluginFormat(
       );
     }
   }
+}
+
+/**
+ * Describes the first syntax error in a YAML text with its line and column,
+ * or returns undefined when the text parses. An unclosed quote is reported at
+ * the quote that opened the value: the parser only notices it where the text
+ * runs out, often the end of the document.
+ */
+export function findYamlSyntaxError(text: string): string | undefined {
+  const lineCounter = new LineCounter();
+  const doc = parseDocument(text, { lineCounter });
+  const [error] = doc.errors;
+  if (!error) return undefined;
+  let offset = error.pos[0];
+  if (error.code === 'MISSING_CHAR') {
+    visit(doc, {
+      Scalar(_key, node) {
+        if (node.type?.startsWith('QUOTE_') && node.range?.[1] === offset) {
+          offset = node.range[0];
+        }
+      },
+    });
+  }
+  const { line, col } = lineCounter.linePos(offset);
+  const reason = error.message.split(' at line ')[0];
+  return `Invalid YAML at line ${line}, column ${col}: ${reason}`;
 }

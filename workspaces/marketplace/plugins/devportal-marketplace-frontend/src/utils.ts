@@ -14,7 +14,16 @@
  * limitations under the License.
  */
 
-import { Pair, parse, parseDocument, Scalar, YAMLSeq, stringify } from 'yaml';
+import {
+  LineCounter,
+  Pair,
+  parse,
+  parseDocument,
+  Scalar,
+  YAMLSeq,
+  stringify,
+  visit,
+} from 'yaml';
 import { JsonObject } from '@backstage/types';
 import { ExtensionsPluginInstallStatus } from '@red-hat-developer-hub/backstage-plugin-extensions-common';
 import { TranslationFunction } from '@backstage/core-plugin-api/alpha';
@@ -153,6 +162,39 @@ export const applyContent = (
     }
   }
   return content.toString();
+};
+
+/**
+ * Line, column and reason of the first syntax error in a YAML text, or null
+ * when it parses. An unclosed quote is reported at the quote that opened the
+ * value: the parser only notices it where the text runs out, often the end of
+ * the document.
+ */
+export const getYamlSyntaxError = (
+  text: string,
+): { line: number; column: number; reason: string } | null => {
+  const lineCounter = new LineCounter();
+  const doc = parseDocument(text, { lineCounter });
+  const [error] = doc.errors;
+  if (!error) {
+    return null;
+  }
+  let offset = error.pos[0];
+  if (error.code === 'MISSING_CHAR') {
+    visit(doc, {
+      Scalar(_key, node) {
+        if (node.type?.startsWith('QUOTE_') && node.range?.[1] === offset) {
+          offset = node.range[0];
+        }
+      },
+    });
+  }
+  const { line, col } = lineCounter.linePos(offset);
+  return {
+    line,
+    column: col,
+    reason: error.message.split(' at line ')[0],
+  };
 };
 
 export const getErrorMessage = (

@@ -256,6 +256,8 @@ const extensionsTranslationJa = createTranslationMessages({
     'install.errors.missingPackageField':
       "無効なエディターコンテンツ: 項目に 'package' フィールドがありません",
     'install.errors.failedToSave': '保存に失敗しました',
+    'install.errors.invalidYaml':
+      '{{line}} 行目、{{column}} 列目の YAML が無効です: {{reason}}',
     loading: '読み込み中...',
     error: 'エラーが発生しました',
     retry: '再試行',

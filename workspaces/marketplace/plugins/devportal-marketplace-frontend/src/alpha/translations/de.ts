@@ -255,6 +255,8 @@ const extensionsTranslationDe = createTranslationMessages({
     'install.errors.missingPackageField':
       "Ungültiger Editorinhalt: 'Paket'-Feld fehlt im Element",
     'install.errors.failedToSave': 'Speichern fehlgeschlagen',
+    'install.errors.invalidYaml':
+      'Ungültiges YAML in Zeile {{line}}, Spalte {{column}}: {{reason}}',
     loading: 'Ladevorgang läuft...',
     error: 'Es ist ein Fehler aufgetreten',
     retry: 'Wiederholen',

@@ -56,6 +56,7 @@ import { usePluginPackages } from '../hooks/usePluginPackages';
 import {
   ExtensionsStatus,
   getPluginActionTooltipMessage,
+  getYamlSyntaxError,
   isPluginInstalled,
 } from '../utils';
 import { Permission } from '../types';
@@ -98,6 +99,9 @@ export const ExtensionsPluginInstallContent = ({
   const [installationError, setInstallationError] = useState<string | null>(
     null,
   );
+  // Kept apart from installationError, which disables Install: the user fixes
+  // the YAML in place and clicks Install again.
+  const [yamlSyntaxError, setYamlSyntaxError] = useState<string | null>(null);
   const pluginConfig = usePluginConfig(params.namespace, params.name);
   const pluginConfigPermissions = usePluginConfigurationPermissions(
     params.namespace,
@@ -117,6 +121,7 @@ export const ExtensionsPluginInstallContent = ({
 
   const onLoaded = useCallback(() => {
     setInstallationError(null);
+    setYamlSyntaxError(null);
 
     if (pluginConfig.isLoading) return;
 
@@ -199,8 +204,23 @@ export const ExtensionsPluginInstallContent = ({
   };
 
   const handleInstall = async () => {
+    const editorYaml = codeEditor.getValue() ?? '';
+    // Broken YAML is not sent: re-serializing it below would store a
+    // different configuration than the one typed.
+    const syntaxError = getYamlSyntaxError(editorYaml);
+    if (syntaxError) {
+      setYamlSyntaxError(
+        t('install.errors.invalidYaml' as any, {
+          line: String(syntaxError.line),
+          column: String(syntaxError.column),
+          reason: syntaxError.reason,
+        }),
+      );
+      return;
+    }
+    setYamlSyntaxError(null);
     setIsSubmitting(true);
-    const content = yaml.parseDocument(codeEditor.getValue() ?? '');
+    const content = yaml.parseDocument(editorYaml);
     const pluginsArray = content.get('plugins');
 
     const pluginsYaml = new yaml.Document(pluginsArray);
@@ -285,6 +305,7 @@ export const ExtensionsPluginInstallContent = ({
         <InstallationWarning configData={pluginConfig.data} />
       )}
       {installationError && <Alert severity="error">{installationError}</Alert>}
+      {yamlSyntaxError && <Alert severity="error">{yamlSyntaxError}</Alert>}
       {missingDynamicArtifact && (
         <Alert severity="error">
           <AlertTitle>

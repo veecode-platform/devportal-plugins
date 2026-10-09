@@ -32,6 +32,7 @@ import { rules as extensionRules } from './permissions/rules';
 import { matches } from './utils/permissionUtils';
 import { InstallationDataService } from './installation/InstallationDataService';
 import { ConfigFormatError } from './errors/ConfigFormatError';
+import { findYamlSyntaxError } from './validation/configValidation';
 import { Document, isMap, isSeq, parseDocument } from 'yaml';
 import { toBlockStyle } from './utils/yamlFormat';
 import { DEFAULT_NAMESPACE } from '@backstage/catalog-model';
@@ -443,6 +444,10 @@ export async function createRouter(
       const newConfig = req.body.configYaml;
       if (!newConfig) {
         throw new InputError("'configYaml' object must be present");
+      }
+      const syntaxError = findYamlSyntaxError(newConfig);
+      if (syntaxError) {
+        throw new InputError(syntaxError);
       }
 
       // Store what the editor sent. Only a package entry that comes without
