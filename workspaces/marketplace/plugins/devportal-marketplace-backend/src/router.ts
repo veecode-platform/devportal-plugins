@@ -32,7 +32,7 @@ import { rules as extensionRules } from './permissions/rules';
 import { matches } from './utils/permissionUtils';
 import { InstallationDataService } from './installation/InstallationDataService';
 import { ConfigFormatError } from './errors/ConfigFormatError';
-import { Document, parseDocument } from 'yaml';
+import { Document, isMap, isSeq, parseDocument } from 'yaml';
 import { toBlockStyle } from './utils/yamlFormat';
 import { DEFAULT_NAMESPACE } from '@backstage/catalog-model';
 
@@ -445,40 +445,26 @@ export async function createRouter(
         throw new InputError("'configYaml' object must be present");
       }
 
-      // Auto-config: enrich each package entry with appConfigExamples
-      // if the frontend-provided configYaml doesn't include pluginConfig.
+      // Store what the editor sent. Only a package entry that comes without
+      // pluginConfig gets the Package's appConfigExamples[0].
+      const packages = await extensionsApi.getPluginPackages(
+        plugin.metadata.namespace ?? DEFAULT_NAMESPACE,
+        plugin.metadata.name,
+      );
       try {
-        const packages = await extensionsApi.getPluginPackages(
-          plugin.metadata.namespace ?? DEFAULT_NAMESPACE,
-          plugin.metadata.name,
+        await installationDataService.updatePluginConfig(
+          plugin,
+          withExamplePluginConfig(newConfig, packages),
         );
-        for (const pkg of packages) {
-          const artifact = pkg.spec?.dynamicArtifact;
-          if (!artifact) continue;
-
-          const existingConfig =
-            await installationDataService.getPackageConfig(artifact);
-          const yamlStr = buildPackageYaml(
-            artifact,
-            false,
-            pkg,
-            existingConfig,
-          );
-          await installationDataService.updatePackageConfig(artifact, yamlStr);
-          changedThisSession.add(artifact);
-        }
       } catch (e) {
-        // Fallback: use the frontend-provided configYaml as-is
-        logger.warn(
-          `Auto-config failed for plugin ${plugin.metadata.name}, falling back to frontend config: ${e}`,
-        );
-        try {
-          await installationDataService.updatePluginConfig(plugin, newConfig);
-        } catch (e2) {
-          if (e2 instanceof ConfigFormatError) {
-            throw new InputError(e2.message);
-          }
-          throw e2;
+        if (e instanceof ConfigFormatError) {
+          throw new InputError(e.message);
+        }
+        throw e;
+      }
+      for (const pkg of packages) {
+        if (pkg.spec?.dynamicArtifact) {
+          changedThisSession.add(pkg.spec.dynamicArtifact);
         }
       }
       res.status(200).json({ status: 'OK' });
@@ -729,6 +715,44 @@ export async function createRouter(
     }
 
     const doc = new Document(entry);
+    toBlockStyle(doc.contents);
+    return doc.toString({ lineWidth: 120 });
+  };
+
+  /**
+   * Adds the Package's appConfigExamples[0].content as pluginConfig to each
+   * entry of the editor's YAML that has none. Entries that carry a
+   * pluginConfig are kept as typed. YAML that is not a sequence is returned
+   * unchanged, so updatePluginConfig reports the format error.
+   */
+  const withExamplePluginConfig = (
+    configYaml: string,
+    packages: Array<{
+      spec?: {
+        dynamicArtifact?: string;
+        appConfigExamples?: Array<{ title?: string; content?: unknown }>;
+      };
+    }>,
+  ): string => {
+    const doc = parseDocument(configYaml);
+    if (doc.errors.length > 0 || !isSeq(doc.contents)) {
+      return configYaml;
+    }
+
+    let changed = false;
+    doc.contents.items.forEach((item, index) => {
+      if (!isMap(item) || item.has('pluginConfig')) return;
+      const example = packages.find(
+        pkg => pkg.spec?.dynamicArtifact === item.get('package'),
+      )?.spec?.appConfigExamples?.[0]?.content;
+      if (example && typeof example === 'object') {
+        doc.setIn([index, 'pluginConfig'], doc.createNode(example));
+        changed = true;
+      }
+    });
+    if (!changed) {
+      return configYaml;
+    }
     toBlockStyle(doc.contents);
     return doc.toString({ lineWidth: 120 });
   };
