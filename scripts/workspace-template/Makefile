@@ -7,7 +7,7 @@ build:
 	yarn build:all
 
 build-dynamic: build
-	cd $(PLUGIN_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@2.0.0 plugin export
+	cd $(PLUGIN_DIR) && YARN_ENABLE_IMMUTABLE_INSTALLS=false npx @red-hat-developer-hub/cli@1.11.2 plugin export
 
 clean:
 	yarn clean

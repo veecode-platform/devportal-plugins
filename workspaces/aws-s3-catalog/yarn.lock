@@ -711,7 +711,7 @@ __metadata:
   dependencies:
     "@backstage/cli": "npm:^0.36.3"
     "@backstage/plugin-catalog-backend-module-aws": "npm:^0.4.24"
-    "@red-hat-developer-hub/cli": "npm:latest"
+    "@red-hat-developer-hub/cli": "npm:1.11.2"
   languageName: unknown
   linkType: soft
 
@@ -7560,9 +7560,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@red-hat-developer-hub/cli@npm:latest":
-  version: 2.0.0
-  resolution: "@red-hat-developer-hub/cli@npm:2.0.0"
+"@red-hat-developer-hub/cli@npm:1.11.2":
+  version: 1.11.2
+  resolution: "@red-hat-developer-hub/cli@npm:1.11.2"
   dependencies:
     "@backstage/cli": "npm:0.36.3"
     "@backstage/cli-common": "npm:0.2.2"
@@ -7620,13 +7620,12 @@ __metadata:
     yn: "npm:^4.0.0"
   peerDependencies:
     "@microsoft/api-extractor": ^7.21.2
-    ts-morph: "*"
   peerDependenciesMeta:
     "@microsoft/api-extractor":
       optional: true
   bin:
     rhdh-cli: bin/rhdh-cli
-  checksum: 10c0/e918c4f1356a1bc3f8dd1899f95441687c48f601f85a5933ad8470bb93c6116251b244d3ce364a7ee8ace16f15dcc221a7eb20e68482c75f26c29e41d8d8f94f
+  checksum: 10c0/dd8b755f279a13e5085fc147832c863baf86b221785ac560113d7d57970b37cb7753b22b0633891b2372aa3c0e0e230e658af21a1601209f440012b708ecfddf
   languageName: node
   linkType: hard
 

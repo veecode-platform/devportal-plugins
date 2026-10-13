@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const SUPPORTED_ROLES = new Set(['frontend-plugin', 'backend-plugin']);
 const PACKAGE_SCOPE = 'veecode-platform';
-const RHDH_CLI = '@red-hat-developer-hub/cli@2.0.0';
+const RHDH_CLI = '@red-hat-developer-hub/cli@1.11.2';
 
 function pascalCase(value) {
   return value
