@@ -251,7 +251,9 @@ if [[ -z "$devportal_image" ]]; then
   printf 'Could not find the runner image: set DEVPORTAL_IMAGE or check %s\n' "$devportal_local_dir/docker-compose.yml" >&2
   exit 1
 fi
-if factory_plugins=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/factory-plugins.yaml); then
+# 3.0.x images have no factory list, so its absence is not an error here; the
+# face read below still shows docker's own errors when both reads fail.
+if factory_plugins=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/factory-plugins.yaml 2>/dev/null); then
   factory_plugin_entries=$(printf '%s\n' "$factory_plugins" | awk '
 $1 == "-" && $2 == "repository:" { repository = $3; next }
 $1 == "repository:" { repository = $2; next }

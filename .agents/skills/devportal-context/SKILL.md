@@ -35,8 +35,9 @@ artifact is. Set `RHDH_CLI_VERSION` to export with another version. Do not use
 `latest`: a CLI release can change the frontend export format, and the runner then
 serves no dynamic frontend.
 
-When the runner image already ships the plugin being proven, the generated config
-disables that image's entry with its exact ref and `disabled: true`, the override
+When the runner already loads the plugin being proven (a factory plugin from the
+catalog index on 3.1, a product-face plugin on 3.0.x), the generated config disables
+that entry with its exact ref and `disabled: true`, the override
 described in `devportal-chart` `docs/product-face-overrides.md`, so the export is the
 only copy loaded. The script matches entries by plugin identity, so there is no list
 to maintain.
