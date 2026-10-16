@@ -12,18 +12,21 @@ if [[ -n "${DEVPORTAL_LOCAL_DIR:-}" ]]; then
     printf 'Clone devportal-local and set DEVPORTAL_LOCAL_DIR to that checkout.\n' >&2
     exit 1
   fi
-  cd -- "$DEVPORTAL_LOCAL_DIR"
+  CDPATH='' cd -- "$DEVPORTAL_LOCAL_DIR"
   pwd -P
   exit 0
 fi
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-monorepo_root=$(CDPATH= cd -- "$script_dir/../../../.." && pwd -P)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+monorepo_root=$(CDPATH='' cd -- "$script_dir/../../../.." && pwd -P)
 
 mapfile -t candidates < <(
   find -L "$monorepo_root/.." "$monorepo_root/../.." -maxdepth 3 \
     -type f -name .chart-pin \
     -exec sh -c 'for marker; do candidate=${marker%/.chart-pin}; if [ -f "$candidate/docker-compose.yml" ]; then printf "%s\n" "$candidate"; fi; done' sh {} + |
+    while IFS= read -r candidate; do
+      cd -- "$candidate" && pwd -P
+    done |
     sort -u
 )
 

@@ -28,7 +28,7 @@ jobs:
 
       - name: Check scaffold and role harnesses
         run: |
-          node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js scripts/ci/verify-changesets.test.js scripts/ci/check-dynamic-plugin-config.test.js scripts/ci/check-product-independence.test.js scripts/export-dev-dynamic.test.js
+          node --test scripts/create-workspace.test.js scripts/ci/check-workspace-harnesses.test.js scripts/ci/verify-changesets.test.js scripts/ci/check-dynamic-plugin-config.test.js scripts/ci/check-product-independence.test.js scripts/export-dev-dynamic.test.js scripts/resolve-devportal-local-dir.test.js
           node scripts/ci/check-workspace-harnesses.js
 
   changes:
