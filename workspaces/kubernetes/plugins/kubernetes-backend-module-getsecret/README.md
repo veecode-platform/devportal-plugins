@@ -161,6 +161,13 @@ plugins:
     disabled: false
 ```
 
+On DevPortal 3.1 the image has no `dynamic-plugins/dist`, so take the backend from the catalog index instead. Use this line in place of the first entry, with the digest the index lists:
+
+```yaml
+  - package: oci://quay.io/veecode/backstage-plugin-kubernetes-backend@sha256:4293fe16f7cce4b56b0db2cffb840bfba614328443d2eee778435421d1d57861!backstage-plugin-kubernetes-backend
+    disabled: false
+```
+
 #### Other portals
 
 The module is not published as an OCI artifact through `devportal-plugin-export-overlays`

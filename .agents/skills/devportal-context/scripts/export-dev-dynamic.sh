@@ -342,6 +342,54 @@ else
     exit 1
   fi
 fi
+
+# The installer rejects an oci:// entry without a digest. Pin each one to the digest
+# the catalog index lists for its repository, keeping its path and the rest of the
+# entry as written. The 3.0.x fallback extracts no index, so an entry there stops.
+# shellcheck disable=SC2016
+printf '%s\n' "${catalog_default:-}" | node -e '
+  const fs = require("node:fs");
+  const [configPath] = process.argv.slice(1);
+  const catalog = fs.readFileSync(0, "utf8");
+  const catalogRefs = [...catalog.matchAll(/^\s*-\s*package:\s*(\S+)/gm)]
+    .map(([, ref]) => ref.replace(/^["\x27]|["\x27]$/g, ""))
+    .filter((ref) => ref.startsWith("oci://"));
+  const fail = (message) => {
+    process.stderr.write(`${message}\n`);
+    process.exit(1);
+  };
+  const lines = fs.readFileSync(configPath, "utf8").split("\n").map((line) => {
+    const match = line.match(/^(\s*-\s*package:\s*)(["\x27]?)oci:\/\/([^@!\s"\x27]+)!([^\s"\x27]+)\2$/);
+    if (!match) return line;
+    const [, prefix, quote, repository, pluginPath] = match;
+    const reference = `oci://${repository}!${pluginPath}`;
+    if (catalog.trim() === "") {
+      fail(`Cannot pin ${reference} to a digest: this image has no catalog index (DevPortal 3.0.x). Write the digest in dynamic-plugins.yaml.`);
+    }
+    const digests = [...new Set(catalogRefs
+      .filter((ref) => ref.startsWith(`oci://${repository}@`))
+      .map((ref) => ref.split("!")[0]))];
+    if (digests.length === 0) {
+      fail(`Cannot pin ${reference} to a digest: the catalog index has no entry for ${repository}. Write the digest in dynamic-plugins.yaml.`);
+    }
+    if (digests.length > 1) {
+      fail(`Cannot pin ${reference} to a digest: the catalog index lists ${digests.length} digests for ${repository}. Write the digest in dynamic-plugins.yaml.`);
+    }
+    return `${prefix}${quote}${digests[0]}!${pluginPath}${quote}`;
+  });
+  fs.writeFileSync(configPath, lines.join("\n"));
+' "$temporary_dynamic_config"
+
+# DevPortal 3.1 ships no dynamic-plugins/dist, so a host path that is not a workspace
+# plugin (those stopped above) cannot load there; the catalog-index plugin is named by repository.
+if [[ -n "${catalog_default:-}" ]]; then
+  unshipped_reference=$({ grep -m1 '^[[:space:]]*-[[:space:]]*package:[[:space:]]*\./dynamic-plugins/dist/' "$temporary_dynamic_config" || true; } | sed 's/^[[:space:]]*-[[:space:]]*package:[[:space:]]*//')
+  if [[ -n "$unshipped_reference" ]]; then
+    printf 'Workspace dynamic plugin config references %s, but DevPortal 3.1 ships no dynamic-plugins/dist. Reference the catalog-index plugin as oci://<repository>!<path> instead.\n' "$unshipped_reference" >&2
+    exit 1
+  fi
+fi
+
 package_indent=$({ grep -m1 -o '^[[:space:]]*- package:' "$temporary_dynamic_config" || true; } | sed 's/- package://')
 # shellcheck disable=SC2016
 printf '%s\n' "$product_plugin_references" | node -e '
