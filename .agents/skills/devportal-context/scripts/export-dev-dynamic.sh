@@ -359,9 +359,14 @@ printf '%s\n' "${catalog_default:-}" | node -e '
     process.exit(1);
   };
   const lines = fs.readFileSync(configPath, "utf8").split("\n").map((line) => {
-    const match = line.match(/^(\s*-\s*package:\s*)(["\x27]?)oci:\/\/([^@!\s"\x27]+)!([^\s"\x27]+)\2$/);
-    if (!match) return line;
-    const [, prefix, quote, repository, pluginPath] = match;
+    const match = line.match(/^(\s*-\s*package:\s*)(["\x27]?)oci:\/\/([^@!\s"\x27]+)!([^\s"\x27]+)\2(\s*(?:#.*)?)\r?$/);
+    if (!match) {
+      if (/^\s*-\s*package:\s*["\x27]?oci:\/\/[^@\s"\x27]+!/.test(line)) {
+        fail(`Cannot pin ${line.trim()} to a digest: write it as "- package: oci://<repository>!<path>" or with the digest.`);
+      }
+      return line;
+    }
+    const [, prefix, quote, repository, pluginPath, tail] = match;
     const reference = `oci://${repository}!${pluginPath}`;
     if (catalog.trim() === "") {
       fail(`Cannot pin ${reference} to a digest: this image has no catalog index (DevPortal 3.0.x). Write the digest in dynamic-plugins.yaml.`);
@@ -375,7 +380,7 @@ printf '%s\n' "${catalog_default:-}" | node -e '
     if (digests.length > 1) {
       fail(`Cannot pin ${reference} to a digest: the catalog index lists ${digests.length} digests for ${repository}. Write the digest in dynamic-plugins.yaml.`);
     }
-    return `${prefix}${quote}${digests[0]}!${pluginPath}${quote}`;
+    return `${prefix}${quote}${digests[0]}!${pluginPath}${quote}${tail}`;
   });
   fs.writeFileSync(configPath, lines.join("\n"));
 ' "$temporary_dynamic_config"

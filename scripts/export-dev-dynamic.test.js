@@ -441,6 +441,32 @@ test('pins a digest-less catalog-index reference to the digest the index lists',
   assert.deepEqual(disabledReferences(localConfig), [factoryReference]);
 });
 
+test('pins a digest-less reference that carries a trailing comment and keeps the comment', () => {
+  const fixture = createFixture({
+    factoryConfig,
+    indexConfig: hostIndexConfig,
+    additionalReferences: [
+      'oci://quay.io/veecode/backstage-plugin-host!backstage-plugin-host-dynamic # host backend',
+    ],
+  });
+  const result = fixture.run();
+
+  assert.equal(result.status, 0, result.stderr);
+  const localConfig = fs.readFileSync(
+    path.join(
+      fixture.runnerRoot,
+      'dynamic-plugins-root-dev/dynamic-plugins.local.yaml',
+    ),
+    'utf8',
+  );
+  assert.ok(
+    localConfig.includes(
+      `- package: ${hostIndexReference}!backstage-plugin-host-dynamic # host backend\n`,
+    ),
+  );
+  assert.ok(!localConfig.includes('oci://quay.io/veecode/backstage-plugin-host!'));
+});
+
 test('stops naming the digest-less reference when the catalog index has no entry for its repository', () => {
   const reference =
     'oci://quay.io/veecode/backstage-plugin-missing!backstage-plugin-missing-dynamic';
