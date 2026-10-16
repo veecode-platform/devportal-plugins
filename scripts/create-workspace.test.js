@@ -74,7 +74,12 @@ test('creates a frontend-plugin workspace shell with an app harness', () => {
     'utf8',
   );
   assert.match(dynamicConfig, /path: \/hello/);
-  assert.match(dynamicConfig, /importName: HelloPage/);
+  assert.match(dynamicConfig, /importName: "HelloPage"/);
+  assert.match(
+    dynamicConfig,
+    /package: \.\/dynamic-plugins-src\/veecode-platform-backstage-plugin-hello\n/,
+  );
+  assert.doesNotMatch(dynamicConfig, /\.\/dynamic-plugins\/dist\//);
   const playwrightConfig = fs.readFileSync(
     path.join(workspace, 'playwright.config.ts'),
     'utf8',
@@ -103,6 +108,15 @@ test('creates a backend-plugin workspace shell with a backend harness', () => {
   assert.doesNotMatch(backendIndex, /backstage-plugin-hello/);
   assert.ok(!fs.existsSync(path.join(workspace, 'packages', 'app')));
   assert.ok(fs.existsSync(path.join(workspace, 'dynamic-plugins.yaml')));
+  const dynamicConfig = fs.readFileSync(
+    path.join(workspace, 'dynamic-plugins.yaml'),
+    'utf8',
+  );
+  assert.match(
+    dynamicConfig,
+    /package: \.\/dynamic-plugins-src\/veecode-platform-backstage-plugin-hello-backend-dynamic\n/,
+  );
+  assert.doesNotMatch(dynamicConfig, /\.\/dynamic-plugins\/dist\//);
   assert.ok(fs.existsSync(path.join(workspace, 'AGENTS.md')));
   const agents = fs.readFileSync(path.join(workspace, 'AGENTS.md'), 'utf8');
   assert.match(agents, /harness is `packages\/backend plus backend unit tests`/);

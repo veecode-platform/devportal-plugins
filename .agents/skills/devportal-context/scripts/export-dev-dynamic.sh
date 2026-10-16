@@ -7,7 +7,7 @@ if (( $# == 0 )); then
 fi
 
 workspace_root=$(pwd -P)
-repo_root=$(CDPATH= cd -- "$workspace_root/../.." && pwd -P)
+repo_root=$(CDPATH='' cd -- "$workspace_root/../.." && pwd -P)
 resolver="$repo_root/.agents/skills/devportal-context/scripts/resolve-devportal-local-dir.sh"
 devportal_local_dir=$("$resolver")
 dynamic_plugins_root="$devportal_local_dir/dynamic-plugins-root-dev"
@@ -36,7 +36,7 @@ mkdir -p "$dynamic_plugins_root" "$export_source_root"
 printf 'Building types in %s\n' "$workspace_root"
 (cd -- "$workspace_root" && yarn tsc)
 
-declare -a source_package_bases=()
+declare -a source_package_config_refs=()
 declare -a exported_plugin_dirs=()
 declare -a exported_package_names=()
 
@@ -87,7 +87,8 @@ export_one() {
   (
     cd -- "$plugin_path"
     YARN_ENABLE_IMMUTABLE_INSTALLS=false \
-      npx "@red-hat-developer-hub/cli@$rhdh_cli_version" plugin export \
+      npx --yes --package="@red-hat-developer-hub/cli@$rhdh_cli_version" \
+      rhdh-cli plugin export \
       --dev \
       --dynamic-plugins-root "$export_source_root" \
       "${embed_args[@]}" \
@@ -122,21 +123,34 @@ export_one() {
     exit 1
   fi
 
-  # The CLI names the export <package>-dynamic, so a wrapper whose package name
-  # already ends in -dynamic comes out with a second suffix that the workspace
-  # config does not carry. Fall back to the name without it only when the first
-  # lookup finds nothing, so a workspace that matches as before is unchanged.
-  if ! grep -Fq "./dynamic-plugins/dist/$source_package_base" "$workspace_dynamic_config" &&
-    grep -Fq "./dynamic-plugins/dist/${source_package_base%-dynamic}" "$workspace_dynamic_config"; then
-    source_package_base=${source_package_base%-dynamic}
-  fi
-
-  if ! grep -Fq "./dynamic-plugins/dist/$source_package_base" "$workspace_dynamic_config"; then
+  local source_package_config_ref
+  # shellcheck disable=SC2016
+  if ! source_package_config_ref=$(node -e '
+    const fs = require("node:fs");
+    const [configPath, packageBase] = process.argv.slice(1);
+    const refs = [...fs.readFileSync(configPath, "utf8").matchAll(
+      /^\s*-\s*package:\s*(?:"([^"]+)"|\x27([^\x27]+)\x27|(\S+))/gm,
+    )].map(([, doubleQuoted, singleQuoted, plain]) =>
+      doubleQuoted ?? singleQuoted ?? plain,
+    );
+    const prefixes = ["./dynamic-plugins/dist/", "./dynamic-plugins-src/"];
+    const packageBases = [packageBase];
+    if (packageBase.endsWith("-dynamic")) {
+      packageBases.push(packageBase.slice(0, -"-dynamic".length));
+    } else {
+      packageBases.push(`${packageBase}-dynamic`);
+    }
+    const candidates = prefixes.flatMap((prefix) =>
+      packageBases.map((base) => `${prefix}${base}`),
+    );
+    const match = refs.find((ref) => candidates.includes(ref));
+    if (match) process.stdout.write(match);
+  ' "$workspace_dynamic_config" "$source_package_base"); then
     printf 'Workspace dynamic plugin config has no package entry for %s\n' "$package_name" >&2
     exit 1
   fi
 
-  source_package_bases+=("$source_package_base")
+  source_package_config_refs+=("$source_package_config_ref")
   exported_plugin_dirs+=("$exported_plugin_dir")
   exported_package_names+=("$package_name")
 }
@@ -156,13 +170,24 @@ export_one "${plugin_arguments[@]}"
 
 local_dynamic_config="$dynamic_plugins_root/dynamic-plugins.local.yaml"
 temporary_dynamic_config=$(mktemp "$dynamic_plugins_root/.dynamic-plugins.local.XXXXXX")
-trap 'rm -f "$temporary_dynamic_config"' EXIT
+temporary_catalog_index_dir=""
+catalog_index_container=""
+cleanup_export_temporary_files() {
+  if [[ -n "$catalog_index_container" ]]; then
+    docker rm -f "$catalog_index_container" >/dev/null 2>&1 || true
+  fi
+  rm -f "$temporary_dynamic_config"
+  if [[ -n "$temporary_catalog_index_dir" ]]; then
+    rm -rf "$temporary_catalog_index_dir"
+  fi
+}
+trap cleanup_export_temporary_files EXIT
 
-# Carry the devportal-local operator config's `includes:` (the product face:
-# the catalog-index default plus dynamic-plugins.veecode.yaml) into the generated
-# config. merge-dynamic-plugins.js writes the mounted operator config verbatim and
-# does not re-inject the defaults, so without these includes the portal comes up
-# with only the workspace plugin (no catalog, no product face).
+# Carry the devportal-local operator config's `includes:` (the catalog-index
+# defaults, plus the product face on 3.0.x) into the generated config.
+# merge-dynamic-plugins.js writes the mounted operator config verbatim and does
+# not re-inject defaults, so without these includes the portal comes up with
+# only the workspace plugin and no catalog-index defaults.
 operator_baseline="$devportal_local_dir/dynamic-plugins.yaml"
 if [[ -f "$operator_baseline" ]]; then
   awk '
@@ -182,70 +207,159 @@ if ! grep -q '^plugins:[[:space:]]*$' "$temporary_dynamic_config"; then
   exit 1
 fi
 
-for index in "${!source_package_bases[@]}"; do
+for index in "${!source_package_config_refs[@]}"; do
   sed -i \
-    "s#./dynamic-plugins/dist/${source_package_bases[$index]}#./dynamic-plugins-src/${exported_plugin_dirs[$index]}#g" \
+    "s#${source_package_config_refs[$index]}#./dynamic-plugins-src/${exported_plugin_dirs[$index]}#g" \
     "$temporary_dynamic_config"
 done
 
-# A ./dynamic-plugins/dist/ entry left over is either a plugin the image ships
-# (a host plugin the workspace extends, such as the kubernetes backend) or a
-# workspace plugin that was not exported; only the second is a mistake.
+# A local package reference left after export is either a plugin the image
+# ships (a host plugin the workspace extends, such as the kubernetes backend)
+# or a workspace plugin that was not exported; only the second is a mistake.
 unexported_workspace_plugins=$(node -e '
   const fs = require("node:fs");
   const path = require("node:path");
-  const [config, pluginsRoot] = process.argv.slice(1);
-  const refs = [...fs.readFileSync(config, "utf8").matchAll(/^\s*- package:\s*\.\/dynamic-plugins\/dist\/(\S+)/gm)]
-    .map(([, ref]) => ref);
-  const workspacePackages = fs.readdirSync(pluginsRoot)
+  const [config, pluginsRoot, ...exportedNames] = process.argv.slice(1);
+  const normalize = (name) => name.replace(/^@/, "").replace("/", "-").replace(/-dynamic$/, "");
+  const refs = [...fs.readFileSync(config, "utf8").matchAll(
+    /^\s*-\s*package:\s*(?:\.\/dynamic-plugins\/dist\/|\.\/dynamic-plugins-src\/)(\S+)/gm,
+  )].map(([, ref]) => path.posix.basename(ref));
+  const workspacePackages = new Set(fs.readdirSync(pluginsRoot)
     .filter((dir) => fs.existsSync(path.join(pluginsRoot, dir, "package.json")))
     .map((dir) => JSON.parse(fs.readFileSync(path.join(pluginsRoot, dir, "package.json"), "utf8")).name)
-    .map((name) => name.replace(/^@/, "").replace("/", "-"));
-  console.log(refs.filter((ref) => workspacePackages.includes(ref.replace(/-dynamic$/, ""))).join(" "));
-' "$temporary_dynamic_config" "$workspace_root/plugins")
+    .map(normalize));
+  const exportedPackages = new Set(exportedNames.map(normalize));
+  console.log([...new Set(refs.map(normalize).filter((ref) =>
+    workspacePackages.has(ref) && !exportedPackages.has(ref),
+  ))].join(" "));
+' "$temporary_dynamic_config" "$workspace_root/plugins" "${exported_plugin_dirs[@]}" "${exported_package_names[@]}")
 if [[ -n "$unexported_workspace_plugins" ]]; then
   printf 'Workspace dynamic plugin config references unexported workspace plugins: %s. Pass every plugin directory listed in dynamic-plugins.yaml.\n' "$unexported_workspace_plugins" >&2
   exit 1
 fi
 
-# A plugin the product face already ships would load twice on the runner (the
-# face copy and this export) and the backend refuses the second registration.
-# The face is baked into the runner's image, so read it there and disable the
-# face copy of each exported plugin with a level-1 override, the mechanism in
-# devportal-chart docs/product-face-overrides.md. Matching is by plugin
-# identity, so a plugin added to the face later needs no change here.
+# A factory plugin already enabled from the catalog index would load twice on
+# the runner (the indexed copy and this export), and the backend refuses the
+# second registration. DevPortal 3.1 keeps its factory references in
+# factory-plugins.yaml; 3.0.x keeps the product face in
+# dynamic-plugins.veecode.yaml. Prefer the 3.1 list and fall back to the face
+# file for older images, then disable matching references with a level-1
+# override as described in devportal-chart docs/product-face-overrides.md.
 devportal_image=${DEVPORTAL_IMAGE:-$({ grep -o -m1 'DEVPORTAL_IMAGE:-[^}]*' "$devportal_local_dir/docker-compose.yml" || true; } | sed 's/^DEVPORTAL_IMAGE:-//')}
 if [[ -z "$devportal_image" ]]; then
   printf 'Could not find the runner image: set DEVPORTAL_IMAGE or check %s\n' "$devportal_local_dir/docker-compose.yml" >&2
   exit 1
 fi
-if ! product_face=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/dynamic-plugins.veecode.yaml); then
-  printf 'Could not read the product face from %s; without it face plugins would load twice.\n' "$devportal_image" >&2
-  exit 1
+if factory_plugins=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/factory-plugins.yaml 2>/dev/null); then
+  factory_plugin_entries=$(printf '%s\n' "$factory_plugins" | awk '
+$1 == "-" && $2 == "repository:" { repository = $3; next }
+$1 == "repository:" { repository = $2; next }
+$1 == "-" && $2 == "path:" && repository != "" { print repository "\t" $3; next }
+$1 == "path:" && repository != "" { print repository "\t" $2 }
+')
+  if [[ -z "$factory_plugin_entries" ]]; then
+    printf 'Could not parse factory plugin names from %s; refusing to risk duplicate loads.\n' "$devportal_image" >&2
+    exit 1
+  fi
+  catalog_index_image=$({ awk '
+    /^[[:space:]]*CATALOG_INDEX_IMAGE:[[:space:]]*/ {
+      sub(/^[[:space:]]*CATALOG_INDEX_IMAGE:[[:space:]]*/, "")
+      gsub(/[\047]/, "")
+      gsub(/["]/, "")
+      sub(/^[[:space:]]+/, "")
+      sub(/[[:space:]]+$/, "")
+      print
+      exit
+    }
+  ' "$devportal_local_dir/docker-compose.yml" || true; })
+  if [[ -z "$catalog_index_image" ]]; then
+    printf 'Could not find CATALOG_INDEX_IMAGE in %s; cannot identify factory plugin references.\n' \
+      "$devportal_local_dir/docker-compose.yml" >&2
+    exit 1
+  fi
+  temporary_catalog_index_dir=$(mktemp -d "$dynamic_plugins_root/.catalog-default.XXXXXX")
+  if ! catalog_index_container=$(docker create "$catalog_index_image" /bin/true 2>/dev/null); then
+    printf 'Could not create a read-only container for catalog index %s.\n' \
+      "$catalog_index_image" >&2
+    exit 1
+  fi
+  if ! docker cp "$catalog_index_container:/dynamic-plugins.default.yaml" \
+    "$temporary_catalog_index_dir/dynamic-plugins.default.yaml" >/dev/null 2>&1; then
+    printf 'Could not extract /dynamic-plugins.default.yaml from %s.\n' \
+      "$catalog_index_image" >&2
+    exit 1
+  fi
+  docker rm "$catalog_index_container" >/dev/null
+  catalog_index_container=""
+  catalog_default=$(cat "$temporary_catalog_index_dir/dynamic-plugins.default.yaml")
+  # shellcheck disable=SC2016
+  product_plugin_references=$(printf '%s\n' "$catalog_default" | node -e '
+    const factoryEntries = process.argv.slice(1).join("\n").split(/\r?\n/)
+      .filter(Boolean)
+      .map((entry) => {
+        const [repository, pluginPath] = entry.split("\t");
+        return { repository, pluginPath };
+      });
+    const config = require("node:fs").readFileSync(0, "utf8");
+    const refs = [...config.matchAll(/^\s*-\s*package:\s*(?:"([^"]+)"|\x27([^\x27]+)\x27|(\S+))/gm)]
+      .map(([, doubleQuoted, singleQuoted, plain]) => doubleQuoted ?? singleQuoted ?? plain);
+    const identityOf = (ref) => {
+      if (ref.startsWith("oci://")) {
+        const bang = ref.lastIndexOf("!");
+        const repository = ref.slice("oci://".length, bang === -1 ? undefined : bang).split("@")[0];
+        const factory = factoryEntries.find((entry) => entry.repository === repository);
+        if (!factory) return null;
+        return bang === -1 ? `${ref}!${factory.pluginPath}` : ref;
+      }
+      return null;
+    };
+    const matches = refs.filter((ref) => identityOf(ref) !== null)
+      .map((ref) => identityOf(ref));
+    process.stdout.write([...new Set(matches)].join("\n"));
+  ' "$factory_plugin_entries")
+  if [[ -z "$product_plugin_references" ]]; then
+    printf 'Could not match factory plugin names to %s; refusing to risk duplicate loads.\n' \
+      "$catalog_index_image" >&2
+    exit 1
+  fi
+else
+  if ! product_face=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/dynamic-plugins.veecode.yaml 2>/dev/null); then
+    printf 'Could not read factory plugins or the 3.0.x product face from %s; refusing to risk duplicate loads.\n' "$devportal_image" >&2
+    exit 1
+  fi
+  # shellcheck disable=SC2016
+  product_plugin_references=$(printf '%s\n' "$product_face" | node -e '
+    const face = require("node:fs").readFileSync(0, "utf8");
+    const refs = [...face.matchAll(/^\s*-\s*package:\s*(?:"([^"]+)"|\x27([^\x27]+)\x27|(\S+))/gm)]
+      .map(([, doubleQuoted, singleQuoted, plain]) => doubleQuoted ?? singleQuoted ?? plain);
+    process.stdout.write(refs.join("\n"));
+  ')
+  if [[ -z "$product_plugin_references" ]]; then
+    printf 'Could not parse product-face plugin references from %s; refusing to risk duplicate loads.\n' "$devportal_image" >&2
+    exit 1
+  fi
 fi
 package_indent=$({ grep -m1 -o '^[[:space:]]*- package:' "$temporary_dynamic_config" || true; } | sed 's/- package://')
-printf '%s\n' "$product_face" | node -e '
+# shellcheck disable=SC2016
+printf '%s\n' "$product_plugin_references" | node -e '
   const [indent, ...exported] = process.argv.slice(1);
-  const flatten = (name) => name.replace(/^@/, "").replace("/", "-");
+  const flatten = (name) => name.replace(/^@/, "").replace("/", "-").replace(/-dynamic$/, "");
   const identities = new Set();
   for (const name of exported) {
-    for (const id of [name, flatten(name)]) {
-      identities.add(id);
-      identities.add(id.replace(/-dynamic$/, ""));
-    }
+    identities.add(name);
+    identities.add(flatten(name));
   }
   const identityOf = (ref) => {
-    if (ref.startsWith("oci://")) return ref.slice(ref.indexOf("!") + 1);
+    if (ref.startsWith("oci://")) return ref.slice(ref.lastIndexOf("!") + 1).split("/").pop();
     if (ref.startsWith("./")) return ref.split("/").pop();
     const at = ref.indexOf("@", ref.startsWith("@") ? 1 : 0);
     return at === -1 ? ref : ref.slice(0, at);
   };
-  const face = require("node:fs").readFileSync(0, "utf8");
-  for (const [, raw] of face.matchAll(/^- package:\s*("[^"]+"|\x27[^\x27]+\x27|\S+)/gm)) {
-    const ref = raw.replace(/^["\x27]|["\x27]$/g, "");
+  const references = require("node:fs").readFileSync(0, "utf8").split(/\r?\n/).filter(Boolean);
+  for (const ref of references) {
     const id = identityOf(ref);
-    if (!identities.has(id) && !identities.has(id.replace(/-dynamic$/, ""))) continue;
-    process.stderr.write(`Disabling the face copy of ${ref}\n`);
+    if (!identities.has(id) && !identities.has(flatten(id))) continue;
+    process.stderr.write(`Disabling duplicate plugin entry ${ref}\n`);
     process.stdout.write(`${indent}- package: ${JSON.stringify(ref)}\n${indent}  disabled: true\n`);
   }
 ' "$package_indent" "${exported_package_names[@]}" >> "$temporary_dynamic_config"
