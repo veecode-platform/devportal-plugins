@@ -12,7 +12,7 @@ if [[ -n "${DEVPORTAL_LOCAL_DIR:-}" ]]; then
     printf 'Clone devportal-local and set DEVPORTAL_LOCAL_DIR to that checkout.\n' >&2
     exit 1
   fi
-  cd -- "$DEVPORTAL_LOCAL_DIR"
+  CDPATH='' cd -- "$DEVPORTAL_LOCAL_DIR"
   pwd -P
   exit 0
 fi
