@@ -24,6 +24,9 @@ mapfile -t candidates < <(
   find -L "$monorepo_root/.." "$monorepo_root/../.." -maxdepth 3 \
     -type f -name .chart-pin \
     -exec sh -c 'for marker; do candidate=${marker%/.chart-pin}; if [ -f "$candidate/docker-compose.yml" ]; then printf "%s\n" "$candidate"; fi; done' sh {} + |
+    while IFS= read -r candidate; do
+      cd -- "$candidate" && pwd -P
+    done |
     sort -u
 )
 
