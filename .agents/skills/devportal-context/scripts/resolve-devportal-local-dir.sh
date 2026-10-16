@@ -17,8 +17,8 @@ if [[ -n "${DEVPORTAL_LOCAL_DIR:-}" ]]; then
   exit 0
 fi
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-monorepo_root=$(CDPATH= cd -- "$script_dir/../../../.." && pwd -P)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+monorepo_root=$(CDPATH='' cd -- "$script_dir/../../../.." && pwd -P)
 
 mapfile -t candidates < <(
   find -L "$monorepo_root/.." "$monorepo_root/../.." -maxdepth 3 \
