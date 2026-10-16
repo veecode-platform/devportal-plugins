@@ -51,3 +51,10 @@ the export sits beside the operator file in `dynamic-plugins-root-dev/`. On 3.0.
 where the factory list is missing, the script reads
 `/opt/app-root/src/dynamic-plugins.veecode.yaml` instead. It stops when it can read
 neither file.
+
+A workspace `dynamic-plugins.yaml` entry written as `oci://<repository>!<path>`, with no
+digest, is pinned to the digest the catalog index lists for that repository, keeping its
+path and the rest of the entry. The script stops, naming the entry, when the image has
+no catalog index (3.0.x), when the index has no entry for the repository, or when it has
+more than one digest for it. On 3.1 a `./dynamic-plugins/dist/` entry that is not a
+workspace plugin stops the script too, because that image ships no `dynamic-plugins/dist`.

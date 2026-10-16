@@ -403,3 +403,122 @@ test('stops with the package message when the workspace config has no entry for 
     'Workspace dynamic plugin config has no package entry for @veecode-platform/backstage-plugin-sample-dynamic\n',
   );
 });
+
+const hostIndexReference = `oci://quay.io/veecode/backstage-plugin-host@sha256:${'d'.repeat(64)}`;
+const hostIndexConfig = [
+  'plugins:',
+  `  - package: ${factoryIndexReference}`,
+  '    disabled: false',
+  `  - package: ${hostIndexReference}`,
+  '    disabled: true',
+  '',
+].join('\n');
+
+test('pins a digest-less catalog-index reference to the digest the index lists', () => {
+  const fixture = createFixture({
+    factoryConfig,
+    indexConfig: hostIndexConfig,
+    additionalReferences: [
+      'oci://quay.io/veecode/backstage-plugin-host!backstage-plugin-host-dynamic',
+    ],
+  });
+  const result = fixture.run();
+
+  assert.equal(result.status, 0, result.stderr);
+  const localConfig = fs.readFileSync(
+    path.join(
+      fixture.runnerRoot,
+      'dynamic-plugins-root-dev/dynamic-plugins.local.yaml',
+    ),
+    'utf8',
+  );
+  assert.ok(
+    localConfig.includes(
+      `- package: ${hostIndexReference}!backstage-plugin-host-dynamic\n`,
+    ),
+  );
+  assert.ok(!localConfig.includes('oci://quay.io/veecode/backstage-plugin-host!'));
+  assert.deepEqual(disabledReferences(localConfig), [factoryReference]);
+});
+
+test('pins a digest-less reference that carries a trailing comment and keeps the comment', () => {
+  const fixture = createFixture({
+    factoryConfig,
+    indexConfig: hostIndexConfig,
+    additionalReferences: [
+      'oci://quay.io/veecode/backstage-plugin-host!backstage-plugin-host-dynamic # host backend',
+    ],
+  });
+  const result = fixture.run();
+
+  assert.equal(result.status, 0, result.stderr);
+  const localConfig = fs.readFileSync(
+    path.join(
+      fixture.runnerRoot,
+      'dynamic-plugins-root-dev/dynamic-plugins.local.yaml',
+    ),
+    'utf8',
+  );
+  assert.ok(
+    localConfig.includes(
+      `- package: ${hostIndexReference}!backstage-plugin-host-dynamic # host backend\n`,
+    ),
+  );
+  assert.ok(!localConfig.includes('oci://quay.io/veecode/backstage-plugin-host!'));
+});
+
+test('stops naming the digest-less reference when the catalog index has no entry for its repository', () => {
+  const reference =
+    'oci://quay.io/veecode/backstage-plugin-missing!backstage-plugin-missing-dynamic';
+  const fixture = createFixture({
+    factoryConfig,
+    indexConfig,
+    additionalReferences: [reference],
+  });
+  const result = fixture.run();
+
+  assert.equal(result.status, 1);
+  assert.ok(
+    result.stderr.includes(`Cannot pin ${reference} to a digest`),
+    result.stderr,
+  );
+});
+
+test('stops naming the digest-less reference on a 3.0 image, which has no catalog index', () => {
+  const reference =
+    'oci://quay.io/veecode/backstage-plugin-host!backstage-plugin-host-dynamic';
+  const fixture = createFixture({
+    faceConfig: [
+      'plugins:',
+      '  - package: oci://quay.io/veecode/legacy-plugin!veecode-platform-backstage-plugin-sample-dynamic',
+      '    disabled: false',
+      '',
+    ].join('\n'),
+    additionalReferences: [reference],
+  });
+  const result = fixture.run();
+
+  assert.equal(result.status, 1);
+  assert.ok(
+    result.stderr.includes(`Cannot pin ${reference} to a digest`),
+    result.stderr,
+  );
+});
+
+test('stops on a dist reference that a 3.1 image cannot load', () => {
+  const reference = './dynamic-plugins/dist/backstage-plugin-host-dynamic';
+  const fixture = createFixture({
+    factoryConfig,
+    indexConfig,
+    additionalReferences: [reference],
+  });
+  const result = fixture.run();
+
+  assert.equal(result.status, 1);
+  assert.ok(
+    result.stderr.includes(
+      `references ${reference}, but DevPortal 3.1 ships no dynamic-plugins/dist`,
+    ),
+    result.stderr,
+  );
+});
