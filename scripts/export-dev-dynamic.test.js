@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
@@ -9,14 +10,10 @@ const exportScript = path.join(
   repoRoot,
   '.agents/skills/devportal-context/scripts/export-dev-dynamic.sh',
 );
-const evidenceRoot = path.join(
-  repoRoot,
-  '.p3-evidence',
-  `export-dev-dynamic-tests-${process.pid}`,
+const fixtureRoot = fs.mkdtempSync(
+  path.join(os.tmpdir(), 'export-dev-dynamic-'),
 );
-
-fs.mkdirSync(evidenceRoot, { recursive: true });
-test.after(() => fs.rmSync(evidenceRoot, { recursive: true, force: true }));
+test.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
 
 function writeExecutable(filePath, contents) {
   fs.writeFileSync(filePath, contents);
@@ -27,8 +24,14 @@ function flattenPackageName(name) {
   return name.replace(/^@/, '').replace('/', '-');
 }
 
+function disabledReferences(config) {
+  return [...config.matchAll(/- package: "([^"]+)"\n\s+disabled: true/g)].map(
+    ([, reference]) => reference,
+  );
+}
+
 function createFixture(options = {}) {
-  const caseRoot = fs.mkdtempSync(path.join(evidenceRoot, 'case-'));
+  const caseRoot = fs.mkdtempSync(path.join(fixtureRoot, 'case-'));
   const checkoutRoot = path.join(caseRoot, 'checkout');
   const workspaceRoot = path.join(checkoutRoot, 'workspaces', 'sample');
   const pluginRoot = path.join(workspaceRoot, 'plugins', 'sample');
@@ -193,21 +196,21 @@ const factoryReference =
   'oci://quay.io/veecode/backstage-plugin-sample@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!veecode-platform-backstage-plugin-sample-dynamic';
 const factoryIndexReference =
   'oci://quay.io/veecode/backstage-plugin-sample@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const otherIndexReference =
+  'oci://quay.io/veecode/backstage-plugin-other@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
 const factoryConfig = [
   'factoryPlugins:',
   '  - repository: quay.io/veecode/backstage-plugin-sample',
   '    path: veecode-platform-backstage-plugin-sample-dynamic',
+  '  - repository: quay.io/veecode/backstage-plugin-other',
+  '    path: veecode-platform-backstage-plugin-other-dynamic',
   '',
 ].join('\n');
 const indexConfig = [
   'plugins:',
   `  - package: ${factoryIndexReference}`,
   '    disabled: false',
-  '',
-].join('\n');
-const faceConfig = [
-  'plugins:',
-  `  - package: ${factoryReference}`,
+  `  - package: ${otherIndexReference}`,
   '    disabled: false',
   '',
 ].join('\n');
@@ -238,6 +241,11 @@ test('reads the 3.1 factory list first and disables the matching index plugin', 
   );
   assert.ok(localConfig.includes(factoryReference));
   assert.match(localConfig, /disabled: true/);
+  assert.deepEqual(
+    disabledReferences(localConfig),
+    [factoryReference],
+    'only the exported plugin is disabled',
+  );
   assert.match(
     localConfig,
     /package: \.\/dynamic-plugins-src\/veecode-platform-backstage-plugin-sample\n/,
@@ -266,10 +274,14 @@ test('reads the 3.1 factory list first and disables the matching index plugin', 
 test('falls back to the product-face file when a 3.0 image has no factory list', () => {
   const faceReference =
     'oci://quay.io/veecode/legacy-plugin!veecode-platform-backstage-plugin-sample-dynamic';
+  const otherFaceReference =
+    'oci://quay.io/veecode/legacy-other-plugin!veecode-platform-backstage-plugin-other-dynamic';
   const fixture = createFixture({
     faceConfig: [
       'plugins:',
       `  - package: ${faceReference}`,
+      '    disabled: false',
+      `  - package: ${otherFaceReference}`,
       '    disabled: false',
       '',
     ].join('\n'),
@@ -293,6 +305,11 @@ test('falls back to the product-face file when a 3.0 image has no factory list',
   );
   assert.ok(localConfig.includes(faceReference));
   assert.match(localConfig, /disabled: true/);
+  assert.deepEqual(
+    disabledReferences(localConfig),
+    [faceReference],
+    'only the product-face plugin is disabled',
+  );
 });
 
 test('forwards auto-detected and explicit embed-package safeguards', () => {
@@ -371,4 +388,18 @@ test('rejects a workspace plugin that was not included in the export command', (
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /references unexported workspace plugins/);
+});
+
+test('stops with the package message when the workspace config has no entry for an exported plugin', () => {
+  const fixture = createFixture({
+    workspaceReference:
+      './dynamic-plugins/dist/veecode-platform-backstage-plugin-other-dynamic',
+  });
+  const result = fixture.run();
+
+  assert.equal(result.status, 1);
+  assert.equal(
+    result.stderr,
+    'Workspace dynamic plugin config has no package entry for @veecode-platform/backstage-plugin-sample-dynamic\n',
+  );
 });

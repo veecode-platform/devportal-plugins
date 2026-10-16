@@ -35,10 +35,18 @@ artifact is. Set `RHDH_CLI_VERSION` to export with another version. Do not use
 `latest`: a CLI release can change the frontend export format, and the runner then
 serves no dynamic frontend.
 
-When the product face already ships the plugin being proven (the face is baked into
-the runner image as `/opt/app-root/src/dynamic-plugins.veecode.yaml`), the generated
-config disables that face entry with its exact ref and `disabled: true`, the override
+When the runner image already ships the plugin being proven, the generated config
+disables that image's entry with its exact ref and `disabled: true`, the override
 described in `devportal-chart` `docs/product-face-overrides.md`, so the export is the
-only copy loaded. The script reads the face from the image the runner uses
-(`DEVPORTAL_IMAGE`, else the `devportal-local` compose default) and matches by plugin
-identity, so there is no list to maintain; it fails if it cannot read the face.
+only copy loaded. The script matches entries by plugin identity, so there is no list
+to maintain.
+
+On DevPortal 3.1 the script reads `/opt/app-root/src/factory-plugins.yaml` from the
+runner image (`DEVPORTAL_IMAGE`, else the `devportal-local` compose default). It takes
+each factory plugin's reference from the catalog index's `dynamic-plugins.default.yaml`,
+extracted from the image named by `CATALOG_INDEX_IMAGE` in that compose file, and
+disables it in the `oci://…@sha256:…!<path>` form. The compose override that mounts
+the export sits beside the operator file in `dynamic-plugins-root-dev/`. On 3.0.x,
+where the factory list is missing, the script reads
+`/opt/app-root/src/dynamic-plugins.veecode.yaml` instead. It stops when it can read
+neither file.

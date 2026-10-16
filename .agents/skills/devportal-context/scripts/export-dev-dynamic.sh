@@ -145,6 +145,7 @@ export_one() {
     );
     const match = refs.find((ref) => candidates.includes(ref));
     if (match) process.stdout.write(match);
+    else process.exit(1);
   ' "$workspace_dynamic_config" "$source_package_base"); then
     printf 'Workspace dynamic plugin config has no package entry for %s\n' "$package_name" >&2
     exit 1
@@ -250,7 +251,7 @@ if [[ -z "$devportal_image" ]]; then
   printf 'Could not find the runner image: set DEVPORTAL_IMAGE or check %s\n' "$devportal_local_dir/docker-compose.yml" >&2
   exit 1
 fi
-if factory_plugins=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/factory-plugins.yaml 2>/dev/null); then
+if factory_plugins=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/factory-plugins.yaml); then
   factory_plugin_entries=$(printf '%s\n' "$factory_plugins" | awk '
 $1 == "-" && $2 == "repository:" { repository = $3; next }
 $1 == "repository:" { repository = $2; next }
@@ -277,14 +278,14 @@ $1 == "path:" && repository != "" { print repository "\t" $2 }
       "$devportal_local_dir/docker-compose.yml" >&2
     exit 1
   fi
-  temporary_catalog_index_dir=$(mktemp -d "$dynamic_plugins_root/.catalog-default.XXXXXX")
-  if ! catalog_index_container=$(docker create "$catalog_index_image" /bin/true 2>/dev/null); then
+  temporary_catalog_index_dir=$(mktemp -d)
+  if ! catalog_index_container=$(docker create "$catalog_index_image" /bin/true); then
     printf 'Could not create a read-only container for catalog index %s.\n' \
       "$catalog_index_image" >&2
     exit 1
   fi
   if ! docker cp "$catalog_index_container:/dynamic-plugins.default.yaml" \
-    "$temporary_catalog_index_dir/dynamic-plugins.default.yaml" >/dev/null 2>&1; then
+    "$temporary_catalog_index_dir/dynamic-plugins.default.yaml" >/dev/null; then
     printf 'Could not extract /dynamic-plugins.default.yaml from %s.\n' \
       "$catalog_index_image" >&2
     exit 1
@@ -323,7 +324,7 @@ $1 == "path:" && repository != "" { print repository "\t" $2 }
     exit 1
   fi
 else
-  if ! product_face=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/dynamic-plugins.veecode.yaml 2>/dev/null); then
+  if ! product_face=$(docker run --rm --entrypoint cat "$devportal_image" /opt/app-root/src/dynamic-plugins.veecode.yaml); then
     printf 'Could not read factory plugins or the 3.0.x product face from %s; refusing to risk duplicate loads.\n' "$devportal_image" >&2
     exit 1
   fi
