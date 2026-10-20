@@ -1,0 +1,98 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: update-from-template
+  title: Update from template
+  description: Carry a newer template version into an existing project through a merge request.
+  tags:
+    - template-update
+spec:
+  owner: group:default/backstage-team
+  type: service
+  parameters:
+    - title: Project
+      required:
+        - entityRef
+      properties:
+        entityRef:
+          title: Component
+          type: string
+          description: Catalog Component created from a versioned template.
+          ui:field: EntityPicker
+          ui:options:
+            allowedKinds:
+              - Component
+        targetVersion:
+          title: Target template version
+          type: string
+          description: Leave empty to use the current version from the template entity.
+  steps:
+    - id: readRecord
+      name: Read project template record
+      action: veecode:template:read-record
+      input:
+        entityRef: ${{ parameters.entityRef }}
+        targetVersion: ${{ parameters.targetVersion }}
+    - id: renderOld
+      name: Render recorded template version
+      if: ${{ steps.readRecord.output.upToDate === false }}
+      action: fetch:template
+      input:
+        url: ${{ steps.readRecord.output.templateRepoUrl }}/-/tree/${{ steps.readRecord.output.oldSha }}/${{ steps.readRecord.output.templatePath }}
+        values: ${{ steps.readRecord.output.oldValues }}
+        targetPath: .template-update/old
+        templateFileExtension: ${{ steps.readRecord.output.oldFetchOptions.templateFileExtension }}
+        copyWithoutTemplating: ${{ steps.readRecord.output.oldFetchOptions.copyWithoutTemplating }}
+        copyWithoutRender: ${{ steps.readRecord.output.oldFetchOptions.copyWithoutRender }}
+        cookiecutterCompat: ${{ steps.readRecord.output.oldFetchOptions.cookiecutterCompat }}
+        replace: ${{ steps.readRecord.output.oldFetchOptions.replace }}
+        trimBlocks: ${{ steps.readRecord.output.oldFetchOptions.trimBlocks }}
+        lstripBlocks: ${{ steps.readRecord.output.oldFetchOptions.lstripBlocks }}
+    - id: renderNew
+      name: Render target template version
+      if: ${{ steps.readRecord.output.upToDate === false }}
+      action: fetch:template
+      input:
+        url: ${{ steps.readRecord.output.templateRepoUrl }}/-/tree/${{ steps.readRecord.output.newSha }}/${{ steps.readRecord.output.templatePath }}
+        values: ${{ steps.readRecord.output.newValues }}
+        targetPath: .template-update/new
+        templateFileExtension: ${{ steps.readRecord.output.newFetchOptions.templateFileExtension }}
+        copyWithoutTemplating: ${{ steps.readRecord.output.newFetchOptions.copyWithoutTemplating }}
+        copyWithoutRender: ${{ steps.readRecord.output.newFetchOptions.copyWithoutRender }}
+        cookiecutterCompat: ${{ steps.readRecord.output.newFetchOptions.cookiecutterCompat }}
+        replace: ${{ steps.readRecord.output.newFetchOptions.replace }}
+        trimBlocks: ${{ steps.readRecord.output.newFetchOptions.trimBlocks }}
+        lstripBlocks: ${{ steps.readRecord.output.newFetchOptions.lstripBlocks }}
+    - id: fetchProject
+      name: Fetch project default branch
+      if: ${{ steps.readRecord.output.upToDate === false }}
+      action: fetch:plain
+      input:
+        url: ${{ steps.readRecord.output.projectUrl }}
+        targetPath: .template-update/project
+    - id: merge
+      name: Merge template changes into the project
+      if: ${{ steps.readRecord.output.upToDate === false }}
+      action: veecode:template:merge
+      input:
+        oldTemplatePath: .template-update/old
+        newTemplatePath: .template-update/new
+        projectPath: .template-update/project
+        targetVersion: ${{ steps.readRecord.output.targetVersion }}
+    - id: publishMr
+      name: Open or update the template merge request
+      if: ${{ steps.readRecord.output.upToDate === false }}
+      action: veecode:template:publish-mr
+      input:
+        projectUrl: ${{ steps.readRecord.output.projectUrl }}
+        projectSha: ${{ steps.readRecord.output.projectSha }}
+        resultPath: ${{ steps.merge.output.resultPath }}
+        report: ${{ steps.merge.output.report }}
+        templateName: ${{ steps.readRecord.output.templateName }}
+        targetVersion: ${{ steps.readRecord.output.targetVersion }}
+        catalogOwner: ${{ steps.readRecord.output.catalogOwner }}
+  output:
+    links:
+      - title: Open merge request
+        url: ${{ steps.publishMr.output.mergeRequestUrl }}
+        if: ${{ steps.readRecord.output.upToDate === false && steps.publishMr.output.status !== 'none' }}

@@ -1,0 +1,3 @@
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-plugin-scaffolder-backend-module-template-update-dynamic
+    disabled: false
