@@ -10,12 +10,7 @@ import {
   SearchResult,
   SearchPagination,
 } from '@backstage/plugin-search-react';
-import {
-  CatalogIcon,
-  Content,
-  Header,
-  Page,
-} from '@backstage/core-components';
+import { CatalogIcon, Content, Header, Page } from '@backstage/core-components';
 const useStyles = makeStyles((theme: Theme) => ({
   bar: {
     padding: theme.spacing(1, 0),
@@ -57,7 +52,7 @@ const SearchPage = () => {
               ]}
             />
             <Paper className={classes.filters}>
-<SearchFilter.Select
+              <SearchFilter.Select
                 className={classes.filter}
                 label="Kind"
                 name="kind"

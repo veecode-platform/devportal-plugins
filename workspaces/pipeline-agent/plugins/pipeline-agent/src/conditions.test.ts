@@ -14,7 +14,9 @@ describe('isPipelineAgentAvailable', () => {
   it('is true when the entity names a GitLab project', () => {
     expect(
       isPipelineAgentAvailable(
-        componentWith({ 'gitlab.com/project-slug': 'veecode-demos/pedidos-api' }),
+        componentWith({
+          'gitlab.com/project-slug': 'veecode-demos/pedidos-api',
+        }),
       ),
     ).toBe(true);
   });

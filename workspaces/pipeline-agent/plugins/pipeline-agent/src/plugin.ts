@@ -1,4 +1,7 @@
-import { createComponentExtension, createPlugin } from '@backstage/core-plugin-api';
+import {
+  createComponentExtension,
+  createPlugin,
+} from '@backstage/core-plugin-api';
 import { PIPELINE_AGENT_PLUGIN_ID } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
 
 export const pipelineAgentPlugin = createPlugin({

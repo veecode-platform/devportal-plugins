@@ -13,6 +13,8 @@ backend.add(import('@backstage/plugin-proxy-backend'));
 backend.add(import('@backstage/plugin-scaffolder-backend'));
 backend.add(import('@backstage/plugin-search-backend'));
 
-backend.add(import('@veecode-platform/backstage-plugin-pipeline-agent-backend'));
+backend.add(
+  import('@veecode-platform/backstage-plugin-pipeline-agent-backend'),
+);
 
 backend.start();

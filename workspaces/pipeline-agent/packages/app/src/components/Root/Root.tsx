@@ -84,7 +84,11 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
           />
           <SidebarItem icon={ExtensionIcon} to="api-docs" text="APIs" />
           <SidebarItem icon={LibraryBooks} to="docs" text="Docs" />
-          <SidebarItem icon={CreateComponentIcon} to="create" text="Create..." />
+          <SidebarItem
+            icon={CreateComponentIcon}
+            to="create"
+            text="Create..."
+          />
           {/* End global nav */}
           <SidebarDivider />
           <SidebarScrollWrapper>

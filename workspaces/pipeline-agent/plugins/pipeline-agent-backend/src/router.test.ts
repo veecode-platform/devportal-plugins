@@ -24,12 +24,17 @@ describe('pipeline agent router', () => {
     ['POST', '/investigations/inv-1/orientar'],
     ['GET', '/project'],
     ['GET', '/history'],
-  ])('answers %s %s with 501 until the handler exists', async (method, path) => {
-    const app = appWithRouter();
-    const response =
-      method === 'GET' ? await request(app).get(path) : await request(app).post(path);
+  ])(
+    'answers %s %s with 501 until the handler exists',
+    async (method, path) => {
+      const app = appWithRouter();
+      const response =
+        method === 'GET'
+          ? await request(app).get(path)
+          : await request(app).post(path);
 
-    expect(response.status).toBe(501);
-    expect(response.body).toEqual({ erro: 'not implemented yet' });
-  });
+      expect(response.status).toBe(501);
+      expect(response.body).toEqual({ erro: 'not implemented yet' });
+    },
+  );
 });

@@ -1,4 +1,7 @@
-import { coreServices, createBackendPlugin } from '@backstage/backend-plugin-api';
+import {
+  coreServices,
+  createBackendPlugin,
+} from '@backstage/backend-plugin-api';
 import {
   PIPELINE_AGENT_PLUGIN_ID,
   PIPELINE_AGENT_ROUTES,

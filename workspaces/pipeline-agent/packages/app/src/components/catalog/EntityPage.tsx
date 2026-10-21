@@ -169,7 +169,6 @@ const serviceEntityPage = (
         </Grid>
       </Grid>
     </EntityLayout.Route>
-
   </EntityLayout>
 );
 
@@ -201,7 +200,6 @@ const websiteEntityPage = (
         </Grid>
       </Grid>
     </EntityLayout.Route>
-
   </EntityLayout>
 );
 
@@ -217,7 +215,6 @@ const defaultEntityPage = (
     <EntityLayout.Route path="/" title="Overview">
       {overviewContent}
     </EntityLayout.Route>
-
   </EntityLayout>
 );
 
@@ -333,7 +330,6 @@ const systemPage = (
     </EntityLayout.Route>
     <EntityLayout.Route path="/diagram" title="Diagram">
       <EntityCatalogGraphCard
-       
         direction={Direction.TOP_BOTTOM}
         title="System Diagram"
         height={700}

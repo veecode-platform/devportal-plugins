@@ -49,13 +49,7 @@ const app = createApp({
     });
   },
   components: {
-    SignInPage: props => (
-      <SignInPage
-        {...props}
-        auto
-        providers={['guest']}
-      />
-    ),
+    SignInPage: props => <SignInPage {...props} auto providers={['guest']} />,
   },
 });
 
@@ -69,7 +63,7 @@ const routes = (
     >
       {entityPage}
     </Route>
-<Route path="/create" element={<ScaffolderPage />} />
+    <Route path="/create" element={<ScaffolderPage />} />
     <Route path="/api-docs" element={<ApiExplorerPage />} />
     <Route
       path="/catalog-import"
