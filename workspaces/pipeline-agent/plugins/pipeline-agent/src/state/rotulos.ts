@@ -10,9 +10,9 @@ const ROTULOS_SESSAO = new Map<string, string>([
 
 const ROTULOS_PIPELINE = new Map<string, string>([
   ['created', 'criado'],
-  ['waiting_for_resource', 'esperando um runner (waiting_for_resource)'],
-  ['preparing', 'preparando o runner (preparing)'],
-  ['pending', 'na fila (pending)'],
+  ['waiting_for_resource', 'esperando um runner'],
+  ['preparing', 'preparando o runner'],
+  ['pending', 'na fila'],
   ['running', 'em andamento'],
   ['success', 'passou'],
   ['failed', 'falhou'],

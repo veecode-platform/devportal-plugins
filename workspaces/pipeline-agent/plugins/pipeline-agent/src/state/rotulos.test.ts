@@ -25,10 +25,8 @@ describe('rotuloPipeline', () => {
 
   it('never returns the raw English status for a known value', () => {
     expect(rotuloPipeline('canceled')).toBe('cancelado');
-    expect(rotuloPipeline('pending')).toBe('na fila (pending)');
-    expect(rotuloPipeline('waiting_for_resource')).toBe(
-      'esperando um runner (waiting_for_resource)',
-    );
+    expect(rotuloPipeline('pending')).toBe('na fila');
+    expect(rotuloPipeline('waiting_for_resource')).toBe('esperando um runner');
   });
 
   it('falls back to a generic label for an unknown status, including an object key', () => {

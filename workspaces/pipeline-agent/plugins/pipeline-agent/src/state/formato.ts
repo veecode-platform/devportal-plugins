@@ -11,7 +11,9 @@ export function duracao(segundos: number): string {
 export function tempoAtras(minutos: number): string {
   if (minutos === 0) return 'menos de 1 min';
   if (minutos < 60) return `${minutos} min`;
-  return `${Math.floor(minutos / 60)} h ${minutos % 60} min`;
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
 }
 
 // "build", "build e test", "a, b e c": the list shown in a sentence.

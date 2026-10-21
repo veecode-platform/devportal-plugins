@@ -32,7 +32,7 @@ describe('tempoAtras', () => {
   });
 
   it('writes hours and minutes from sixty minutes on', () => {
-    expect(tempoAtras(60)).toBe('1 h 0 min');
+    expect(tempoAtras(60)).toBe('1 h');
     expect(tempoAtras(75)).toBe('1 h 15 min');
   });
 });
