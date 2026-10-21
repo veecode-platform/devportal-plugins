@@ -6,6 +6,24 @@ export interface Config {
      * @default "fake"
      */
     mode?: 'fake' | 'real';
+    /**
+     * Bindings of a GitLab project to the one entity allowed to use it. The backend
+     * writes only to the project in the entity's gitlab.com/project-slug annotation,
+     * so an entity answers only when its slug is bound to its own entityRef here.
+     * Real mode with no list denies every project. Fake mode defaults to
+     * veecode-demos/pedidos-api bound to component:default/pedidos-api.
+     */
+    allowedProjects?: Array<{
+      /**
+       * GitLab project slug, exactly `group/project`. No patterns.
+       */
+      project: string;
+      /**
+       * Entity reference in the stringifyEntityRef form, for example
+       * `component:default/pedidos-api`.
+       */
+      entityRef: string;
+    }>;
     anthropic?: {
       /**
        * Anthropic API key. Only the backend reads it; the browser never sees it.

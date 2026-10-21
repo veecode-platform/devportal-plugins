@@ -35,8 +35,19 @@ receives either (PDR-001). The frontend never calls Anthropic or GitLab. Every c
 that starts or lists work names a catalog entity, and the backend resolves the GitLab
 project from that entity's annotation; the browser never sends a project.
 
-Only the health route and the placeholder card are implemented. The other routes return
-`501` until their handlers land.
+The backend answers every route of `PIPELINE_AGENT_ROUTES`. Its state lives in memory,
+in the backend process: the investigations, their event logs, and the rule of one running
+investigation per entity. Run one replica of the backend. A second replica does not see
+the investigations of the first.
+
+Real mode needs `pipelineAgent.anthropic.apiKey`, `pipelineAgent.agentId`,
+`pipelineAgent.environmentId` and `pipelineAgent.gitlab.token`. Without them the backend
+starts, logs one warning that names the missing keys, and answers `503` on every route
+except `/health`. An entity is answered only when it carries `veecode.io/pipeline-agent:
+enabled`, and its `gitlab.com/project-slug` is bound to that entity's own `entityRef` in
+`pipelineAgent.allowedProjects` (`{ project, entityRef }`, exact matches). Every route that
+reads or starts an investigation needs `pipeline-agent.investigation.create` on the entity;
+decisions need `pipeline-agent.investigation.approve`.
 
 ## How to test
 
