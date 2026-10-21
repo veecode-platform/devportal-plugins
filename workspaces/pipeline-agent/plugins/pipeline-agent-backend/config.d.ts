@@ -6,6 +6,14 @@ export interface Config {
      * @default "fake"
      */
     mode?: 'fake' | 'real';
+    /**
+     * Projects the agent may touch, as GitLab slugs. Each item is an exact
+     * `group/project`, or a group prefix written `group/*`. An entity whose
+     * gitlab.com/project-slug is not listed answers 403.
+     * Real mode with no list denies every project. Fake mode defaults to
+     * `veecode-demos/pedidos-api`.
+     */
+    allowedProjects?: string[];
     anthropic?: {
       /**
        * Anthropic API key. Only the backend reads it; the browser never sees it.
