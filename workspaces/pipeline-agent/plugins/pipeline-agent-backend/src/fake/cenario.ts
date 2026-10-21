@@ -186,6 +186,16 @@ export const DIFF_COMMIT = `@@ -16,8 +16,8 @@ public class DescontoService {
      private BigDecimal percentualFaixa(BigDecimal valor) {
 `;
 
+// Saída de `ls -R /mnt/session/uploads`: os três arquivos que a sessão recebe.
+export const LISTAGEM_UPLOADS = `/mnt/session/uploads:
+pipeline
+
+/mnt/session/uploads/pipeline:
+commit.diff
+repo.tar.gz
+trace.log
+`;
+
 export const SAIDA_MVN = `[INFO] Scanning for projects...
 [INFO] 
 [INFO] ---------------------< br.com.exemplo:pedidos-api >---------------------

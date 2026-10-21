@@ -26,16 +26,38 @@ function textoDeEntrada(entrada: unknown, chave: string): string {
   return typeof valor === 'string' ? valor : '';
 }
 
-// One short line for the step. The raw output stays in a collapsed block.
+// A command word counts only at the start of a command, so repo.tar.gz is not tar.
+const palavraDeComando = (nome: string): RegExp =>
+  new RegExp(`(^|[\\s;&|(])${nome}(\\s|$)`);
+const MVN = palavraDeComando('mvn');
+const TAR = palavraDeComando('tar');
+const GIT = palavraDeComando('git');
+const LEITURA_DO_LOG = /\b(cat|head|tail|grep|sed)\b[^\n|;&]*\btrace\.log\b/;
+const LEITURA_DO_DIFF = /\b(cat|head|tail|grep|sed)\b[^\n|;&]*\bcommit\.diff\b/;
+const LISTAGEM_DOS_UPLOADS = /\b(ls|find)\b[^\n|;&]*\/mnt\/session\/uploads\b/;
+
+// One short line for the step. The raw output stays in a collapsed block. The
+// order matters: `tar -xzf ... && git init` is an extraction, not a git step.
 export function resumoComando(comando: string): string {
   const c = comando.trim();
-  if (/\bmvn\b/.test(c)) return 'Rodou o teste Maven no sandbox';
-  if (/\bcurl\b|\/api\/v4/.test(c)) return 'Consultou a API do GitLab';
-  if (/\bgit\b/.test(c)) return 'Consultou o histórico do Git';
-  if (/\b(cat|sed|grep|head|tail)\b/.test(c))
-    return 'Leu um arquivo do repositório';
+  if (MVN.test(c)) return 'Rodou os testes com Maven';
+  if (LEITURA_DO_LOG.test(c)) return 'Leu o log do job';
+  if (LEITURA_DO_DIFF.test(c)) return 'Leu o diff do commit';
+  if (TAR.test(c)) return 'Extraiu o código do commit';
+  if (LISTAGEM_DOS_UPLOADS.test(c)) return 'Procurou os arquivos do pipeline';
+  if (GIT.test(c)) return 'Comparou a mudança com o código original';
   const primeira = c.split('\n')[0] ?? '';
   return primeira.length > 80 ? `${primeira.slice(0, 77)}...` : primeira;
+}
+
+// The file read tool's path, without the /tmp/repo/ prefix when the file is in the repo.
+function caminhoLido(nome: string, entrada: unknown): string | null {
+  if (nome !== 'read' && nome !== 'view') return null;
+  const caminho = textoDeEntrada(entrada, 'file_path');
+  if (!caminho) return null;
+  return caminho.startsWith('/tmp/repo/')
+    ? caminho.slice('/tmp/repo/'.length)
+    : caminho;
 }
 
 export function mapSessionEvent(evento: SdkEvent): Sinal[] {
@@ -60,6 +82,20 @@ export function mapSessionEvent(evento: SdkEvent): Sinal[] {
               id: evento.id,
               resumo: resumoComando(comando),
               comando,
+            },
+          },
+        ];
+      }
+      const caminho = caminhoLido(evento.name, evento.input);
+      if (caminho !== null) {
+        return [
+          {
+            tipo: 'ui',
+            evento: {
+              tipo: 'comando',
+              id: evento.id,
+              resumo: `Leu ${caminho}`,
+              comando: caminho,
             },
           },
         ];

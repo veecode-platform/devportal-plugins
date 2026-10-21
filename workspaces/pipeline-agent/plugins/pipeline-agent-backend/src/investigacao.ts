@@ -165,7 +165,7 @@ export class Investigacao {
         this.interrompendo = false;
         return;
       case 'terminou':
-        this.encerrar('sessão terminada');
+        this.encerrar('a sessão foi encerrada antes do fim');
         return;
       default: {
         // A new signal type fails to compile here until it is handled.
@@ -247,7 +247,7 @@ export class Investigacao {
       this.interrompendo = false;
       return;
     }
-    this.encerrar('agente encerrou o turno');
+    this.encerrar('o agente terminou');
   }
 
   private async atualizarUso(): Promise<void> {
@@ -304,7 +304,7 @@ export class Investigacao {
   private exigirPendente(toolUseId: string): Pendente {
     const p = this.pendente;
     if (!p || p.toolUseId !== toolUseId)
-      throw new ErroEstado('não há proposta pendente com este id');
+      throw new ErroEstado('Esta proposta já foi respondida.');
     return p;
   }
 

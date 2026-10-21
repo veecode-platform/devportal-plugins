@@ -13,8 +13,8 @@ import {
   CAMINHO_TESTE,
   DIFF_COMMIT,
   JAVA_DEPOIS,
+  LISTAGEM_UPLOADS,
   SAIDA_MVN,
-  SHA_COMMIT,
   TRACE_TEST,
   TRECHO_TESTE,
 } from './cenario';
@@ -208,13 +208,20 @@ export class AgenteFake implements AgentRuntime {
       processed_at: new Date().toISOString(),
     });
     await this.esperar(PAUSA_CURTA_MS);
+    this.mensagem(sessao, 'Vou ver os arquivos que a sessão recebeu.');
+    await this.ferramentaBash(
+      sessao,
+      'ls -R /mnt/session/uploads',
+      LISTAGEM_UPLOADS,
+    );
+    await this.esperar(PAUSA_CURTA_MS);
     this.mensagem(
       sessao,
       'Vou começar pelo log do job test, que falhou no pipeline 9001 da main.',
     );
     await this.ferramentaBash(
       sessao,
-      `curl -s "$GITLAB_API/projects/$PROJETO/jobs/5531/trace" | tail -n 40`,
+      'cat /mnt/session/uploads/pipeline/trace.log',
       TRACE_TEST,
     );
     await this.esperar(PAUSA_CURTA_MS);
@@ -224,7 +231,7 @@ export class AgenteFake implements AgentRuntime {
     );
     await this.ferramentaBash(
       sessao,
-      `git show ${SHA_COMMIT.slice(0, 8)} -- ${CAMINHO_ALVO}`,
+      'cat /mnt/session/uploads/pipeline/commit.diff',
       DIFF_COMMIT,
     );
     await this.esperar(PAUSA_CURTA_MS);
@@ -232,9 +239,19 @@ export class AgenteFake implements AgentRuntime {
       sessao,
       'O commit calcula o cupom primeiro: comCupom vira 950,00, e a faixa de 5% sai sobre esse valor. O teste espera os dois descontos somados sobre o bruto, 1000,00.',
     );
+    await this.esperar(PAUSA_CURTA_MS);
+    this.mensagem(
+      sessao,
+      'Vou extrair o código em /tmp/repo para reproduzir a falha.',
+    );
     await this.ferramentaBash(
       sessao,
-      'mvn -B test -Dtest=DescontoServiceTest',
+      'mkdir -p /tmp/repo && tar -xzf /mnt/session/uploads/pipeline/repo.tar.gz -C /tmp/repo --strip-components=1 && cd /tmp/repo && git init -q && git add -A && git -c user.name=agente -c user.email=agente@sandbox commit -qm base',
+      '',
+    );
+    await this.ferramentaBash(
+      sessao,
+      'cd /tmp/repo && mvn -B test -Dtest=DescontoServiceTest',
       SAIDA_MVN,
     );
     await this.esperar(PAUSA_CURTA_MS);

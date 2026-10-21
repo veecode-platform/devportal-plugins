@@ -27,12 +27,15 @@ export class ErroNaoEncontrado extends Error {
 export function statusDoErro(erro: unknown): { status: number; erro: string } {
   if (erro instanceof InputError) return { status: 400, erro: erro.message };
   if (erro instanceof AuthenticationError)
-    return { status: 401, erro: 'não autenticado' };
+    return { status: 401, erro: 'Entre no portal para usar o agente.' };
   if (erro instanceof NotAllowedError)
     return { status: 403, erro: erro.message };
   if (erro instanceof NotFoundError || erro instanceof ErroNaoEncontrado)
     return { status: 404, erro: erro.message };
   if (erro instanceof ConflictError || erro instanceof ErroEstado)
     return { status: 409, erro: erro.message };
-  return { status: 502, erro: 'falha ao falar com o agente ou com o GitLab' };
+  return {
+    status: 502,
+    erro: 'O portal não conseguiu falar com o GitLab ou com o agente.',
+  };
 }

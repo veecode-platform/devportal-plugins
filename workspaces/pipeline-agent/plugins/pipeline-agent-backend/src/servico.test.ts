@@ -34,6 +34,27 @@ function runtimeRegistrador() {
 }
 
 describe('criarServico.iniciar', () => {
+  it('refuses to start when the branch has no failed pipeline, naming the project', async () => {
+    const gitlab = new GitLabFake('veecode-demos/pedidos-api', {
+      duracaoPipelineMs: 0,
+    });
+    jest.spyOn(gitlab, 'findLatestFailedPipeline').mockResolvedValue(null);
+    const { runtime, createSession } = runtimeRegistrador();
+
+    const servico = criarServico({
+      runtime,
+      gitlabPara: () => gitlab,
+      gitlabHost: HOST,
+      agentId: 'agent_x',
+      environmentId: 'env_x',
+      ritmo: { intervaloPollMs: 0, prazoPollMs: 1000, dormir: async () => {} },
+    });
+    await expect(servico.iniciar(ENTIDADE)).rejects.toThrow(
+      'Não há pipeline com falha na main de veecode-demos/pedidos-api.',
+    );
+    expect(createSession).not.toHaveBeenCalled();
+  });
+
   it('uploads the sanitized trace and diff, the archive as it is, and mounts them under /pipeline', async () => {
     const gitlab = new GitLabFake('veecode-demos/pedidos-api', {
       duracaoPipelineMs: 0,
@@ -56,7 +77,9 @@ describe('criarServico.iniciar', () => {
 
     const entrada = createSession.mock.calls[0][0] as unknown as {
       arquivos: ArquivoSessao[];
+      title: string;
     };
+    expect(entrada.title).toBe('Pipeline 9001, job test');
     const porNome = Object.fromEntries(entrada.arquivos.map(a => [a.nome, a]));
     expect(Object.keys(porNome).sort()).toEqual([
       'commit.diff',

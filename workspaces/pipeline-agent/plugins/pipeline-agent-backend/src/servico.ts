@@ -55,8 +55,7 @@ function arquivo(
   return { nome, tipo, conteudo, caminho: `${DIRETORIO_MONTAGEM}/${nome}` };
 }
 
-// The job log, the commit diff and the repository archive. The agent never fetches
-// them from GitLab: it reads these files, which carry no GitLab host.
+// The trace and the diff are sanitized; the archive goes as-is because the agent needs the real code.
 async function arquivosDoPipeline(
   gitlab: GitLab,
   pipeline: Pipeline,
@@ -122,7 +121,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
       const anterior = ativaPorProjeto.get(projectSlug);
       if (reservadas.has(projectSlug) || anterior?.ativa) {
         throw new ErroEstado(
-          `já há uma investigação em andamento para o projeto ${projectSlug}`,
+          `Já existe uma investigação em andamento para ${projectSlug}.`,
         );
       }
       reservadas.add(projectSlug);
@@ -132,7 +131,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
         const atual = await falhoAtual(gitlab, REF_PIPELINE);
         if (!atual)
           throw new ErroEstado(
-            `não há pipeline falho na branch ${REF_PIPELINE}`,
+            `Não há pipeline com falha na ${REF_PIPELINE} de ${alvo.projectSlug}.`,
           );
         const projeto = await gitlab.getProject();
         const { pipeline, job, titulo } = atual;
@@ -151,7 +150,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
             projeto: alvo.projectSlug,
             pipeline_id: String(pipeline.id),
           },
-          title: `Pipeline ${pipeline.id} · job ${job.nome}`,
+          title: `Pipeline ${pipeline.id}, job ${job.nome}`,
           arquivos,
         });
         const investigacao = new Investigacao(
