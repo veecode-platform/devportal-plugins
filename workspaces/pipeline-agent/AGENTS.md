@@ -44,7 +44,10 @@ Real mode needs `pipelineAgent.anthropic.apiKey`, `pipelineAgent.agentId`,
 `pipelineAgent.environmentId` and `pipelineAgent.gitlab.token`. Without them the backend
 starts, logs one warning that names the missing keys, and answers `503` on every route
 except `/health`. An entity is answered only when it carries `veecode.io/pipeline-agent:
-enabled` and its `gitlab.com/project-slug` is listed in `pipelineAgent.allowedProjects`.
+enabled`, and its `gitlab.com/project-slug` is bound to that entity's own `entityRef` in
+`pipelineAgent.allowedProjects` (`{ project, entityRef }`, exact matches). Every route that
+reads or starts an investigation needs `pipeline-agent.investigation.create` on the entity;
+decisions need `pipeline-agent.investigation.approve`.
 
 ## How to test
 
