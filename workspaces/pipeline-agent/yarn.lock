@@ -4145,7 +4145,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-catalog-node@npm:^2.2.3, @backstage/plugin-catalog-node@npm:^2.2.4, @backstage/plugin-catalog-node@npm:^2.2.6":
+"@backstage/plugin-catalog-node@npm:^2.2.2, @backstage/plugin-catalog-node@npm:^2.2.3, @backstage/plugin-catalog-node@npm:^2.2.4, @backstage/plugin-catalog-node@npm:^2.2.6":
   version: 2.2.6
   resolution: "@backstage/plugin-catalog-node@npm:2.2.6"
   dependencies:
@@ -4502,7 +4502,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-permission-node@npm:^0.11.3, @backstage/plugin-permission-node@npm:^0.11.5":
+"@backstage/plugin-permission-node@npm:^0.11.1, @backstage/plugin-permission-node@npm:^0.11.3, @backstage/plugin-permission-node@npm:^0.11.5":
   version: 0.11.5
   resolution: "@backstage/plugin-permission-node@npm:0.11.5"
   dependencies:
@@ -13864,7 +13864,12 @@ __metadata:
     "@anthropic-ai/sdk": "npm:^0.113.0"
     "@backstage/backend-plugin-api": "npm:^1.9.2"
     "@backstage/backend-test-utils": "npm:^1.11.4"
+    "@backstage/catalog-model": "npm:^1.9.0"
     "@backstage/cli": "npm:^0.36.3"
+    "@backstage/errors": "npm:^1.3.1"
+    "@backstage/plugin-catalog-node": "npm:^2.2.2"
+    "@backstage/plugin-permission-common": "npm:^0.9.9"
+    "@backstage/plugin-permission-node": "npm:^0.11.1"
     "@red-hat-developer-hub/cli": "npm:1.11.2"
     "@types/express": "npm:^4.17.6"
     "@types/supertest": "npm:^2.0.12"
