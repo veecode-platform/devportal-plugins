@@ -97,6 +97,11 @@ export function createPipelineAgentPlugin(opcoes: OpcoesPlugin = {}) {
               )}`,
             );
           }
+          if (cfg.vinculosInvalidos > 0) {
+            logger.warn(
+              `pipeline-agent: ${cfg.vinculosInvalidos} entrada(s) de pipelineAgent.allowedProjects descartada(s) por formato inválido`,
+            );
+          }
           const servico =
             cfg.faltando.length === 0
               ? montarServico(cfg, instantaneo)
@@ -105,7 +110,7 @@ export function createPipelineAgentPlugin(opcoes: OpcoesPlugin = {}) {
             httpAuth,
             permissions,
             catalog,
-            projetosPermitidos: cfg.projetosPermitidos,
+            vinculos: cfg.vinculos,
           });
 
           httpRouter.use(

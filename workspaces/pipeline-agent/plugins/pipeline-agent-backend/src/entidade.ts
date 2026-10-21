@@ -12,7 +12,7 @@ import {
 
 export type EntidadeResolvida = { entityRef: string; projectSlug: string };
 
-const SLUG_VALIDO = /^[^\s/]+(\/[^\s/]+)+$/;
+const SLUG_VALIDO = /^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)+$/;
 
 export function normalizarEntityRef(valor: unknown): string {
   if (typeof valor !== 'string' || valor.trim() === '')

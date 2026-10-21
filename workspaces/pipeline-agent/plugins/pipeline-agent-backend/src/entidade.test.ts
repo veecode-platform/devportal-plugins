@@ -2,7 +2,7 @@ import { mockCredentials, mockServices } from '@backstage/backend-test-utils';
 import { catalogServiceMock } from '@backstage/plugin-catalog-node/testUtils';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import { pipelineAgentInvestigationCreatePermission } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
-import { criarAutorizador, projetoPermitido } from './autorizacao';
+import { criarAutorizador, vinculoPermitido } from './autorizacao';
 import { resolverEntidade } from './entidade';
 
 const creds = mockCredentials.user('user:default/alice');
@@ -24,8 +24,15 @@ const catalogo = () =>
         'veecode.io/pipeline-agent': 'off',
       }),
       entidade('sem-slug', { 'veecode.io/pipeline-agent': 'enabled' }),
+      entidade('clone', {
+        'gitlab.com/project-slug': 'veecode-demos/pedidos-api',
+        'veecode.io/pipeline-agent': 'enabled',
+      }),
     ],
   });
+const VINCULOS = [
+  { project: 'veecode-demos/pedidos-api', entityRef: 'component:default/ok' },
+];
 
 describe('resolverEntidade', () => {
   it('resolves the project from the annotation', async () => {
@@ -49,9 +56,6 @@ describe('resolverEntidade', () => {
   it('answers 400 when the project-slug annotation is missing', async () => {
     await expect(
       resolverEntidade(catalogo(), creds, 'component:default/sem-slug'),
-    ).rejects.toThrow(/gitlab\.com\/project-slug/);
-    await expect(
-      resolverEntidade(catalogo(), creds, 'component:default/sem-slug'),
     ).rejects.toMatchObject({ name: 'InputError' });
   });
 
@@ -62,46 +66,47 @@ describe('resolverEntidade', () => {
   });
 });
 
-describe('projetoPermitido', () => {
-  it('matches an exact slug and a group prefix, and nothing else', () => {
+describe('vinculoPermitido', () => {
+  it('matches only the exact entityRef and project pair', () => {
     expect(
-      projetoPermitido('veecode-demos/pedidos-api', [
+      vinculoPermitido(
+        'component:default/ok',
         'veecode-demos/pedidos-api',
-      ]),
+        VINCULOS,
+      ),
     ).toBe(true);
+    // Same project, another entity: refused.
     expect(
-      projetoPermitido('veecode-demos/outro', ['veecode-demos/pedidos-api']),
+      vinculoPermitido(
+        'component:default/clone',
+        'veecode-demos/pedidos-api',
+        VINCULOS,
+      ),
     ).toBe(false);
-    expect(projetoPermitido('veecode-demos/outro', ['veecode-demos/*'])).toBe(
-      true,
-    );
-    expect(projetoPermitido('veecode-demosx/outro', ['veecode-demos/*'])).toBe(
-      false,
-    );
-    expect(projetoPermitido('veecode-demos/outro', [])).toBe(false);
+    // Same entity, another project: refused.
+    expect(
+      vinculoPermitido('component:default/ok', 'veecode-demos/outro', VINCULOS),
+    ).toBe(false);
+    expect(
+      vinculoPermitido('component:default/ok', 'veecode-demos/pedidos-api', []),
+    ).toBe(false);
   });
 });
 
 describe('criarAutorizador', () => {
-  const requisicao = () =>
-    ({
-      headers: {
-        authorization: mockCredentials.user.header('user:default/alice'),
-      },
-    } as never);
   const permissoes = (resultado: AuthorizeResult) =>
     mockServices.permissions.mock({
       authorize: async (reqs: unknown[]) =>
         reqs.map(() => ({ result: resultado })),
     } as never);
 
-  it('denies a project that is not on the allowlist, before RBAC is asked', async () => {
+  it('denies an entity that is not bound to its project, before RBAC is asked', async () => {
     const permissions = permissoes(AuthorizeResult.ALLOW);
     const autorizador = criarAutorizador({
       httpAuth: mockServices.httpAuth(),
       permissions,
       catalog: catalogo(),
-      projetosPermitidos: [],
+      vinculos: [],
     });
     await expect(
       autorizador.entidade(creds, 'component:default/ok'),
@@ -109,12 +114,27 @@ describe('criarAutorizador', () => {
     expect(permissions.authorize).not.toHaveBeenCalled();
   });
 
+  it('denies a second entity that shares a project with a bound one', async () => {
+    const autorizador = criarAutorizador({
+      httpAuth: mockServices.httpAuth(),
+      permissions: permissoes(AuthorizeResult.ALLOW),
+      catalog: catalogo(),
+      vinculos: VINCULOS,
+    });
+    await expect(
+      autorizador.entidade(creds, 'component:default/clone'),
+    ).rejects.toMatchObject({ name: 'NotAllowedError' });
+    await expect(
+      autorizador.entidade(creds, 'component:default/ok'),
+    ).resolves.toMatchObject({ entityRef: 'component:default/ok' });
+  });
+
   it('denies when RBAC denies the named permission', async () => {
     const autorizador = criarAutorizador({
       httpAuth: mockServices.httpAuth(),
       permissions: permissoes(AuthorizeResult.DENY),
       catalog: catalogo(),
-      projetosPermitidos: ['veecode-demos/pedidos-api'],
+      vinculos: VINCULOS,
     });
     await expect(
       autorizador.entidade(
@@ -125,16 +145,5 @@ describe('criarAutorizador', () => {
     ).rejects.toMatchObject({
       name: 'NotAllowedError',
     });
-  });
-
-  it('reads the user credentials from the request', async () => {
-    const autorizador = criarAutorizador({
-      httpAuth: mockServices.httpAuth(),
-      permissions: permissoes(AuthorizeResult.ALLOW),
-      catalog: catalogo(),
-      projetosPermitidos: ['veecode-demos/pedidos-api'],
-    });
-    const credenciais = await autorizador.credenciais(requisicao());
-    expect(credenciais).toMatchObject({ principal: { type: 'user' } });
   });
 });

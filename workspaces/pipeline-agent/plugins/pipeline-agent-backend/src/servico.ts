@@ -67,7 +67,8 @@ function mensagemInicial(p: {
 export function criarServico(opcoes: OpcoesServico): Servico {
   const { runtime, ritmo } = opcoes;
   const investigacoes = new Map<string, Investigacao>();
-  const ativaPorEntidade = new Map<string, Investigacao>();
+  // The lock is per project: two entities bound to one project share its one investigation.
+  const ativaPorProjeto = new Map<string, Investigacao>();
   const reservadas = new Set<string>();
   const gitlabs = new Map<string, GitLab>();
 
@@ -84,14 +85,14 @@ export function criarServico(opcoes: OpcoesServico): Servico {
 
   return {
     async iniciar(alvo) {
-      const { entityRef } = alvo;
-      const anterior = ativaPorEntidade.get(entityRef);
-      if (reservadas.has(entityRef) || anterior?.ativa) {
+      const { entityRef, projectSlug } = alvo;
+      const anterior = ativaPorProjeto.get(projectSlug);
+      if (reservadas.has(projectSlug) || anterior?.ativa) {
         throw new ErroEstado(
-          `já há uma investigação em andamento para ${entityRef}`,
+          `já há uma investigação em andamento para o projeto ${projectSlug}`,
         );
       }
-      reservadas.add(entityRef);
+      reservadas.add(projectSlug);
       try {
         const gitlab = gitlabDe(alvo.projectSlug);
         const iniciadoEm = Date.now();
@@ -123,7 +124,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
           },
         );
         investigacoes.set(sessaoId, investigacao);
-        ativaPorEntidade.set(entityRef, investigacao);
+        ativaPorProjeto.set(projectSlug, investigacao);
         const fluxo = await runtime.abrirFluxo(sessaoId);
         await investigacao.comecar(
           fluxo,
@@ -140,7 +141,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
         );
         return investigacao;
       } finally {
-        reservadas.delete(entityRef);
+        reservadas.delete(projectSlug);
       }
     },
 

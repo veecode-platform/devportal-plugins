@@ -17,7 +17,12 @@ const AUTH = {
 const REAL_SEM_CHAVES: DadosConfig = {
   pipelineAgent: {
     mode: 'real',
-    allowedProjects: ['veecode-demos/pedidos-api'],
+    allowedProjects: [
+      {
+        project: 'veecode-demos/pedidos-api',
+        entityRef: 'component:default/pedidos-api',
+      },
+    ],
   },
 };
 

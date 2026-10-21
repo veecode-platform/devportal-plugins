@@ -17,6 +17,10 @@ import type { Servico } from './servico';
 
 // The contract routes of PIPELINE_AGENT_ROUTES. Paths and bodies come from the common
 // package, so the frontend and the backend cannot drift apart.
+//
+// Authorization: starting an investigation, and reading its events, its history and
+// its project banner, all need pipeline-agent.investigation.create on the entity: whoever
+// may use the agent on an entity may watch it. Decisions need the approve permission.
 
 const INTERVALO_BATIMENTO_MS = 15_000;
 const TAMANHO_MAX_TOOL_USE_ID = 200;
@@ -60,8 +64,9 @@ const rota =
     fn(req, res).catch(next);
   };
 
-// Opens the stream: 200 at once, and a first comment line so the proxy sends bytes.
-// No compression: the no-transform directive and X-Accel-Buffering keep it unbuffered.
+// Opens the stream after the caller is authorized: 200, the SSE headers, and a first
+// comment line so the proxy sends bytes at once. No compression: the no-transform
+// directive and X-Accel-Buffering keep it unbuffered.
 function abrirSse(res: express.Response): void {
   res.status(200);
   res.setHeader('Content-Type', 'text/event-stream');
@@ -124,6 +129,12 @@ export function createRouter(deps: DepsRouter): express.Router {
     rota(async (req, res) => {
       const credenciais = await autorizador.credenciais(req);
       const investigacao = servico.investigacao(req.params.id);
+      // Against the investigation's own entity: the caller cannot name another one.
+      await autorizador.entidade(
+        credenciais,
+        investigacao.entityRef,
+        pipelineAgentInvestigationCreatePermission,
+      );
       abrirSse(res);
 
       const ultimo = Number(req.get('last-event-id') ?? '-1');
@@ -143,15 +154,6 @@ export function createRouter(deps: DepsRouter): express.Router {
       };
       res.on('close', fechar);
 
-      try {
-        await autorizador.entidade(credenciais, investigacao.entityRef);
-      } catch (erro) {
-        // The status is already sent, so the denial travels as the stream's last frame.
-        const { erro: mensagem } = statusDoErro(erro);
-        res.write(`data: ${JSON.stringify({ tipo: 'erro', mensagem })}\n\n`);
-        fechar();
-        return;
-      }
       cancelarOuvir = investigacao.ouvir(desde, (indice, evento) => {
         if (!fechada)
           res.write(`id: ${indice}\ndata: ${JSON.stringify(evento)}\n\n`);
@@ -241,6 +243,7 @@ export function createRouter(deps: DepsRouter): express.Router {
       const alvo = await autorizador.entidade(
         credenciais,
         textoDaQuery(req.query.entityRef),
+        pipelineAgentInvestigationCreatePermission,
       );
       res.json(await servico.banner(alvo));
     }),
@@ -253,6 +256,7 @@ export function createRouter(deps: DepsRouter): express.Router {
       const alvo = await autorizador.entidade(
         credenciais,
         textoDaQuery(req.query.entityRef),
+        pipelineAgentInvestigationCreatePermission,
       );
       res.json({ itens: await servico.historico(alvo) });
     }),

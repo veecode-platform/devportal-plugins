@@ -6,6 +6,7 @@ import express from 'express';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { criarAutorizador } from './autorizacao';
+import type { Vinculo } from './configuracao';
 import { AgenteFake } from './fake/agente';
 import { GitLabFake } from './fake/gitlab';
 import { createRouter } from './router';
@@ -26,6 +27,18 @@ const PEDIDOS = {
     },
   },
   spec: { type: 'service', owner: 'user:development/guest' },
+};
+// Same project as PEDIDOS, opted in, and not bound to it: the confused-deputy case.
+const CLONE = {
+  ...PEDIDOS,
+  metadata: {
+    name: 'pedidos-clone',
+    namespace: 'default',
+    annotations: {
+      'gitlab.com/project-slug': 'veecode-demos/pedidos-api',
+      'veecode.io/pipeline-agent': 'enabled',
+    },
+  },
 };
 const SEM_OPT_IN = {
   ...PEDIDOS,
@@ -60,12 +73,24 @@ const AUTH = {
 };
 const JSON_HEADERS = { ...AUTH, 'content-type': 'application/json' };
 const REF_PEDIDOS = 'component:default/pedidos-api';
+const REF_CLONE = 'component:default/pedidos-clone';
+const VINCULO_PEDIDOS: Vinculo = {
+  project: 'veecode-demos/pedidos-api',
+  entityRef: REF_PEDIDOS,
+};
+const VINCULO_CLONE: Vinculo = {
+  project: 'veecode-demos/pedidos-api',
+  entityRef: REF_CLONE,
+};
 
-function criarApp(opcoes: { negar?: string[] } = {}) {
+// The deny set is read at each RBAC call, so a test can deny a permission after an
+// investigation was started.
+function criarApp(opcoes: { vinculos?: Vinculo[] } = {}) {
+  const negados = new Set<string>();
   const permissions = mockServices.permissions.mock({
     authorize: async (reqs: Array<{ permission: { name: string } }>) =>
       reqs.map(r => ({
-        result: opcoes.negar?.includes(r.permission.name)
+        result: negados.has(r.permission.name)
           ? AuthorizeResult.DENY
           : AuthorizeResult.ALLOW,
       })),
@@ -76,9 +101,9 @@ function criarApp(opcoes: { negar?: string[] } = {}) {
     }),
     permissions,
     catalog: catalogServiceMock({
-      entities: [PEDIDOS, SEM_OPT_IN, SEM_SLUG, OUTRO_PROJETO],
+      entities: [PEDIDOS, CLONE, SEM_OPT_IN, SEM_SLUG, OUTRO_PROJETO],
     }),
-    projetosPermitidos: ['veecode-demos/pedidos-api'],
+    vinculos: opcoes.vinculos ?? [VINCULO_PEDIDOS],
   });
   const servico = criarServico({
     runtime: new AgenteFake({ esperar: async () => undefined }),
@@ -101,7 +126,7 @@ function criarApp(opcoes: { negar?: string[] } = {}) {
       chavesFaltando: [],
     }),
   );
-  return app;
+  return { app, negados };
 }
 
 async function escutar(app: express.Express) {
@@ -163,19 +188,24 @@ function leitorSse(resposta: Response) {
 
 const tipos = (quadros: Quadro[]) => quadros.map(q => q.evento.tipo);
 
+async function iniciar(base: string, entityRef: string): Promise<Response> {
+  return fetch(`${base}/investigations`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ entityRef }),
+  });
+}
+
 describe('pipeline agent router, fake mode', () => {
   it('runs the bug-1 story over SSE: diagnosis, approval, MR, green pipeline, end', async () => {
-    const app = await escutar(criarApp());
+    const { app } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const criada = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef: REF_PEDIDOS }),
-      });
+      const criada = await iniciar(servidor.base, REF_PEDIDOS);
       expect(criada.status).toBe(201);
       const { id } = (await criada.json()) as { id: string };
 
-      const sse = await fetch(`${app.base}/investigations/${id}/events`, {
+      const sse = await fetch(`${servidor.base}/investigations/${id}/events`, {
         headers: AUTH,
       });
       expect(sse.status).toBe(200);
@@ -195,11 +225,14 @@ describe('pipeline agent router, fake mode', () => {
       );
       expect(diagnostico.arquivos[0].novo).toBe(false);
 
-      const aprovada = await fetch(`${app.base}/investigations/${id}/aprovar`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ toolUseId: diagnostico.ferramentaId }),
-      });
+      const aprovada = await fetch(
+        `${servidor.base}/investigations/${id}/aprovar`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ toolUseId: diagnostico.ferramentaId }),
+        },
+      );
       expect(aprovada.status).toBe(200);
       expect(await aprovada.json()).toEqual({ fase: 'abrindo_mr' });
 
@@ -234,30 +267,29 @@ describe('pipeline agent router, fake mode', () => {
           'encerrado',
         ]),
       );
-      const mr = quadros.find(q => q.evento.tipo === 'mr_aberto')?.evento;
-      expect(mr).toMatchObject({ tipo: 'mr_aberto', iid: 3 });
-      const verde = quadros.find(q => q.evento.tipo === 'verde')?.evento;
-      expect(verde).toMatchObject({ tipo: 'verde' });
+      expect(
+        quadros.find(q => q.evento.tipo === 'mr_aberto')?.evento,
+      ).toMatchObject({ tipo: 'mr_aberto', iid: 3 });
+      expect(
+        quadros.find(q => q.evento.tipo === 'verde')?.evento,
+      ).toMatchObject({ tipo: 'verde' });
       expect(quadros[quadros.length - 1].evento).toEqual({
         tipo: 'fase',
         fase: 'encerrado',
       });
     } finally {
-      await app.fechar();
+      await servidor.fechar();
     }
   });
 
   it('resumes from Last-Event-ID with the next index and no duplicates', async () => {
-    const app = await escutar(criarApp());
+    const { app } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const criada = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef: REF_PEDIDOS }),
-      });
+      const criada = await iniciar(servidor.base, REF_PEDIDOS);
       const { id } = (await criada.json()) as { id: string };
       const sse = leitorSse(
-        await fetch(`${app.base}/investigations/${id}/events`, {
+        await fetch(`${servidor.base}/investigations/${id}/events`, {
           headers: AUTH,
         }),
       );
@@ -267,7 +299,7 @@ describe('pipeline agent router, fake mode', () => {
       )?.evento;
       if (diagnostico?.tipo !== 'diagnostico')
         throw new Error('sem diagnóstico');
-      await fetch(`${app.base}/investigations/${id}/recusar`, {
+      await fetch(`${servidor.base}/investigations/${id}/recusar`, {
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify({
@@ -283,7 +315,7 @@ describe('pipeline agent router, fake mode', () => {
       const corte = 3;
 
       const retomada = leitorSse(
-        await fetch(`${app.base}/investigations/${id}/events`, {
+        await fetch(`${servidor.base}/investigations/${id}/events`, {
           headers: { ...AUTH, 'last-event-id': String(corte) },
         }),
       );
@@ -293,28 +325,35 @@ describe('pipeline agent router, fake mode', () => {
       );
       expect(retomada.quadros[0].id).toBe(corte + 1);
     } finally {
-      await app.fechar();
+      await servidor.fechar();
     }
   });
 
   it('answers 409 to a second start while the first one is still waiting for approval', async () => {
-    const app = await escutar(criarApp());
+    const { app } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const primeira = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef: REF_PEDIDOS }),
-      });
-      expect(primeira.status).toBe(201);
-      const segunda = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef: REF_PEDIDOS }),
-      });
+      expect((await iniciar(servidor.base, REF_PEDIDOS)).status).toBe(201);
+      const segunda = await iniciar(servidor.base, REF_PEDIDOS);
       expect(segunda.status).toBe(409);
-      expect((await segunda.json()) as { erro: string }).toHaveProperty('erro');
+      expect(await segunda.json()).toHaveProperty('erro');
     } finally {
-      await app.fechar();
+      await servidor.fechar();
+    }
+  });
+
+  it('answers 409 to a second entity bound to the same project while the first investigation runs', async () => {
+    const { app } = criarApp({ vinculos: [VINCULO_PEDIDOS, VINCULO_CLONE] });
+    const servidor = await escutar(app);
+    try {
+      expect((await iniciar(servidor.base, REF_PEDIDOS)).status).toBe(201);
+      const outra = await iniciar(servidor.base, REF_CLONE);
+      expect(outra.status).toBe(409);
+      expect(await outra.json()).toEqual({
+        erro: expect.stringContaining('veecode-demos/pedidos-api'),
+      });
+    } finally {
+      await servidor.fechar();
     }
   });
 });
@@ -332,93 +371,83 @@ describe('pipeline agent router, refusals', () => {
       'component:default/sem-slug',
       400,
     ],
+    ['entity whose project is not bound to it', 'component:default/outro', 403],
     [
-      'entity whose project is not on the allowlist',
-      'component:default/outro',
+      'entity that shares a project with a bound entity but is not bound itself',
+      REF_CLONE,
       403,
     ],
     ['malformed entityRef', 'pedidos-api', 400],
   ])('answers %s with %i', async (_nome, entityRef, status) => {
-    const app = await escutar(criarApp());
+    const { app } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const res = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef }),
-      });
+      const res = await iniciar(servidor.base, entityRef);
       expect(res.status).toBe(status);
       expect(await res.json()).toHaveProperty('erro');
     } finally {
-      await app.fechar();
+      await servidor.fechar();
     }
   });
 
   it('answers 401 without credentials and never starts an investigation', async () => {
-    const app = await escutar(criarApp());
+    const { app } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const res = await fetch(`${app.base}/investigations`, {
+      const res = await fetch(`${servidor.base}/investigations`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ entityRef: REF_PEDIDOS }),
       });
       expect(res.status).toBe(401);
     } finally {
-      await app.fechar();
+      await servidor.fechar();
     }
   });
 
   it('answers 403 when RBAC denies the create permission', async () => {
-    const app = await escutar(
-      criarApp({ negar: ['pipeline-agent.investigation.create'] }),
-    );
+    const { app, negados } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const res = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef: REF_PEDIDOS }),
-      });
+      negados.add('pipeline-agent.investigation.create');
+      const res = await iniciar(servidor.base, REF_PEDIDOS);
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({
         erro: expect.stringContaining('pipeline-agent.investigation.create'),
       });
     } finally {
-      await app.fechar();
+      await servidor.fechar();
     }
   });
 
   it('answers 403 when RBAC denies the approve permission, before the proposal is checked', async () => {
-    const app = await escutar(
-      criarApp({ negar: ['pipeline-agent.investigation.approve'] }),
-    );
+    const { app, negados } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const criada = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef: REF_PEDIDOS }),
-      });
-      const { id } = (await criada.json()) as { id: string };
-      const res = await fetch(`${app.base}/investigations/${id}/aprovar`, {
+      const { id } = (await (
+        await iniciar(servidor.base, REF_PEDIDOS)
+      ).json()) as { id: string };
+      negados.add('pipeline-agent.investigation.approve');
+      const res = await fetch(`${servidor.base}/investigations/${id}/aprovar`, {
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify({ toolUseId: 'nao-existe' }),
       });
       expect(res.status).toBe(403);
     } finally {
-      await app.fechar();
+      await servidor.fechar();
     }
   });
 
   it('answers 409 when approving a proposal that is not pending, and 404 for an unknown investigation', async () => {
-    const app = await escutar(criarApp());
+    const { app } = criarApp();
+    const servidor = await escutar(app);
     try {
-      const criada = await fetch(`${app.base}/investigations`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ entityRef: REF_PEDIDOS }),
-      });
-      const { id } = (await criada.json()) as { id: string };
+      const { id } = (await (
+        await iniciar(servidor.base, REF_PEDIDOS)
+      ).json()) as { id: string };
       const semPendencia = await fetch(
-        `${app.base}/investigations/${id}/aprovar`,
+        `${servidor.base}/investigations/${id}/aprovar`,
         {
           method: 'POST',
           headers: JSON_HEADERS,
@@ -427,12 +456,100 @@ describe('pipeline agent router, refusals', () => {
       );
       expect(semPendencia.status).toBe(409);
       const desconhecida = await fetch(
-        `${app.base}/investigations/nao-existe/events`,
+        `${servidor.base}/investigations/nao-existe/events`,
         { headers: AUTH },
       );
       expect(desconhecida.status).toBe(404);
     } finally {
-      await app.fechar();
+      await servidor.fechar();
+    }
+  });
+});
+
+describe('pipeline agent router, read paths need the create permission', () => {
+  it('answers 403 on the project banner and the history when create is denied', async () => {
+    const { app, negados } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      negados.add('pipeline-agent.investigation.create');
+      const banner = await fetch(
+        `${servidor.base}/project?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(banner.status).toBe(403);
+      expect(await banner.json()).toEqual({
+        erro: expect.stringContaining('pipeline-agent.investigation.create'),
+      });
+      const historico = await fetch(
+        `${servidor.base}/history?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(historico.status).toBe(403);
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers 403 on the events of an existing investigation when create is denied, before the stream opens', async () => {
+    const { app, negados } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const { id } = (await (
+        await iniciar(servidor.base, REF_PEDIDOS)
+      ).json()) as { id: string };
+      negados.add('pipeline-agent.investigation.create');
+      const res = await fetch(`${servidor.base}/investigations/${id}/events`, {
+        headers: AUTH,
+      });
+      expect(res.status).toBe(403);
+      expect(res.headers.get('content-type')).toContain('application/json');
+      expect(await res.json()).toEqual({
+        erro: expect.stringContaining('pipeline-agent.investigation.create'),
+      });
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers 403 on the banner and the history for an entity bound to another project', async () => {
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const banner = await fetch(
+        `${servidor.base}/project?entityRef=${REF_CLONE}`,
+        { headers: AUTH },
+      );
+      expect(banner.status).toBe(403);
+      const historico = await fetch(
+        `${servidor.base}/history?entityRef=${REF_CLONE}`,
+        { headers: AUTH },
+      );
+      expect(historico.status).toBe(403);
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers the project banner and the history for the bound entity', async () => {
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const banner = await fetch(
+        `${servidor.base}/project?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(banner.status).toBe(200);
+      expect(await banner.json()).toMatchObject({
+        projeto: 'veecode-demos/pedidos-api',
+      });
+      const historico = await fetch(
+        `${servidor.base}/history?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(historico.status).toBe(200);
+      expect(await historico.json()).toHaveProperty('itens');
+    } finally {
+      await servidor.fechar();
     }
   });
 });

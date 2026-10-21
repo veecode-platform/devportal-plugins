@@ -1,13 +1,12 @@
-import { lerConfiguracao, type Leitor } from './configuracao';
+import { lerConfiguracao, lerVinculos, type Leitor } from './configuracao';
 
-function leitor(valores: Record<string, string | string[]>): Leitor {
+function leitor(valores: Record<string, unknown>): Leitor {
   return {
     getOptionalString: chave =>
       typeof valores[chave] === 'string'
         ? (valores[chave] as string)
         : undefined,
-    getOptionalStringArray: chave =>
-      Array.isArray(valores[chave]) ? (valores[chave] as string[]) : undefined,
+    getOptional: chave => valores[chave],
   };
 }
 
@@ -18,13 +17,18 @@ const CHAVES_REAIS = {
   'pipelineAgent.environmentId': 'env_teste',
   'pipelineAgent.gitlab.token': 'token-de-teste',
 };
+const VINCULO = {
+  project: 'veecode-demos/pedidos-api',
+  entityRef: 'component:default/pedidos-api',
+};
 
 describe('lerConfiguracao', () => {
-  it('is fake by default and allows the demo project', () => {
+  it('is fake by default and binds the demo project to its entity', () => {
     const cfg = lerConfiguracao(leitor({}));
     expect(cfg).toEqual({
       modo: 'fake',
-      projetosPermitidos: ['veecode-demos/pedidos-api'],
+      vinculos: [VINCULO],
+      vinculosInvalidos: 0,
       faltando: [],
       real: null,
     });
@@ -46,30 +50,59 @@ describe('lerConfiguracao', () => {
     expect(JSON.stringify(cfg)).not.toContain('agent_teste');
   });
 
-  it('denies every project in real mode when the allowlist is missing', () => {
+  it('binds nothing in real mode when the list is missing', () => {
     const cfg = lerConfiguracao(leitor(CHAVES_REAIS));
     expect(cfg.faltando).toEqual([]);
-    expect(cfg.projetosPermitidos).toEqual([]);
+    expect(cfg.vinculos).toEqual([]);
     expect(cfg.real).toMatchObject({
       agentId: 'agent_teste',
       gitlabBaseUrl: 'https://gitlab.com',
     });
   });
 
-  it('uses the configured allowlist and strips a trailing slash from the GitLab base URL', () => {
+  it('uses the configured bindings and strips a trailing slash from the GitLab base URL', () => {
     const cfg = lerConfiguracao(
       leitor({
         ...CHAVES_REAIS,
-        'pipelineAgent.allowedProjects': ['veecode-demos/*'],
+        'pipelineAgent.allowedProjects': [VINCULO],
         'pipelineAgent.gitlab.baseUrl': 'https://gl.example.com/',
       }),
     );
-    expect(cfg.projetosPermitidos).toEqual(['veecode-demos/*']);
+    expect(cfg.vinculos).toEqual([VINCULO]);
     expect(cfg.real?.gitlabBaseUrl).toBe('https://gl.example.com');
   });
 
   it('reports an unknown mode as a missing key instead of throwing', () => {
     const cfg = lerConfiguracao(leitor({ 'pipelineAgent.mode': 'producao' }));
     expect(cfg.faltando).toEqual(['pipelineAgent.mode']);
+  });
+});
+
+describe('lerVinculos', () => {
+  it('canonicalizes the entity ref and drops malformed entries, so a bad entry only removes access', () => {
+    const { vinculos, invalidos } = lerVinculos([
+      {
+        project: 'veecode-demos/pedidos-api',
+        entityRef: 'Component:Default/pedidos-api',
+      },
+      { project: 'veecode-demos/*', entityRef: 'component:default/x' },
+      { project: 'veecode-demos/outro' },
+      { project: 'sem-barra', entityRef: 'component:default/y' },
+      'texto-solto',
+    ]);
+    expect(vinculos).toEqual([
+      {
+        project: 'veecode-demos/pedidos-api',
+        entityRef: 'component:default/pedidos-api',
+      },
+    ]);
+    expect(invalidos).toBe(4);
+  });
+
+  it('treats a value that is not a list as one invalid entry', () => {
+    expect(lerVinculos('veecode-demos/pedidos-api')).toEqual({
+      vinculos: [],
+      invalidos: 1,
+    });
   });
 });
