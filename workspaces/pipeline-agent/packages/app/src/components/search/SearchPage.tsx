@@ -1,5 +1,6 @@
-import { Grid, Paper } from '@mui/material';
-import { Theme } from '@mui/material';
+import Grid from '@mui/material/Grid';
+import Paper from '@mui/material/Paper';
+import type { Theme } from '@mui/material/styles';
 import { makeStyles } from '@mui/styles';
 
 import { CatalogSearchResultListItem } from '@backstage/plugin-catalog';
@@ -11,6 +12,7 @@ import {
   SearchPagination,
 } from '@backstage/plugin-search-react';
 import { CatalogIcon, Content, Header, Page } from '@backstage/core-components';
+
 const useStyles = makeStyles((theme: Theme) => ({
   bar: {
     padding: theme.spacing(1, 0),
