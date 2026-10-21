@@ -5,6 +5,7 @@ metadata:
   description: Example service whose GitLab pipeline the agent card investigates.
   annotations:
     gitlab.com/project-slug: veecode-demos/pedidos-api
+    veecode.io/pipeline-agent: enabled
 spec:
   type: service
   lifecycle: experimental
