@@ -4,7 +4,6 @@ import {
   HomePageToolkit,
   HomePageRecentlyVisited,
 } from '@backstage/plugin-home';
-import Grid from '@mui/material/Grid';
 import { SearchContextProvider } from '@backstage/plugin-search-react';
 import { Content } from '@backstage/core-components';
 import Box from '@mui/material/Box';
@@ -20,7 +19,7 @@ import { useTranslation } from '../../hooks/useTranslation';
 
 export const HomeContent = () => {
   const { t } = useTranslation();
-  
+
   const tools = [
     {
       url: 'https://docs.platform.vee.codes/',
@@ -47,62 +46,58 @@ export const HomeContent = () => {
   return (
     <SearchContextProvider>
       <Content stretch>
-        <Grid container spacing={2} justifyContent="center">
+        {/* Spacing comes from gap, not Grid: Grid spacing pads items through a
+            `.MuiGrid-item` selector, which misses when another plugin changes the
+            class prefix of the MUI copy the host shares. */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* Top & Recently Visited */}
-          <Grid item xs={12}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6} lg={8}>
-                <Grid container spacing={2} justifyContent="center">
-                  <Grid item xs={12} md={12} lg={12}>
-                    <Summary />
-                  </Grid>
-                  <Grid item xs={12} md={12} lg={12}>
-                    <HomePageRecentlyVisited title={t('recentlyVisited.title')} />
-                  </Grid>
-                  <Grid item xs={12} md={12} lg={12}>
-                    <HomePageStarredEntities title={t('starredEntities.title')} />
-                  </Grid>
-                </Grid>
-              </Grid>
-              <Grid item xs={12} md={6} lg={4}>
-                <Grid container spacing={2} justifyContent="center">
-                  <Grid item xs={12} md={12} lg={12}>
-                    <PieAnimation />
-                  </Grid>
-                  <Grid item xs={12} md={12} lg={12}>
-                    <HomePageToolkit tools={tools} />
-                  </Grid>
-                </Grid>
-              </Grid>
-            </Grid>
-          </Grid>
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 2,
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                md: 'repeat(2, minmax(0, 1fr))',
+                lg: 'minmax(0, 2fr) minmax(0, 1fr)',
+              },
+            }}
+          >
+            <Box sx={{ display: 'grid', gap: 2, alignContent: 'start' }}>
+              <Summary />
+              <HomePageRecentlyVisited title={t('recentlyVisited.title')} />
+              <HomePageStarredEntities title={t('starredEntities.title')} />
+            </Box>
+            <Box sx={{ display: 'grid', gap: 2, alignContent: 'start' }}>
+              <PieAnimation />
+              <HomePageToolkit tools={tools} />
+            </Box>
+          </Box>
           {/* Footer */}
-          <Grid item xs={12} sx={{ marginTop: '7rem' }}>
-            <Box
+          <Box
+            sx={{
+              marginTop: '7rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.3em',
+              gap: '10px',
+            }}
+          >
+            <Typography
               sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.3em',
-                gap: '10px',
+                fontSize: '1.2em',
+                fontWeight: 'bold',
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: '1.2em',
-                  fontWeight: 'bold',
-                }}
-              >
-                {t('footer.poweredBy')}
-              </Typography>
-              <img
-                src={BackstageLogo}
-                alt="backstage logo"
-                style={{ width: '7.5em', height: '1.5em' }}
-              />
-            </Box>
-          </Grid>
-        </Grid>
+              {t('footer.poweredBy')}
+            </Typography>
+            <img
+              src={BackstageLogo}
+              alt="backstage logo"
+              style={{ width: '7.5em', height: '1.5em' }}
+            />
+          </Box>
+        </Box>
       </Content>
     </SearchContextProvider>
   );
