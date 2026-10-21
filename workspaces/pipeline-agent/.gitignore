@@ -33,6 +33,7 @@ coverage
 # Build output
 dist
 dist-types
+dist-dynamic
 
 # Temporary change files created by Vim
 *.swp
