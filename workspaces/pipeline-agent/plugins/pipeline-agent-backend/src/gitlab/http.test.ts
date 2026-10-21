@@ -139,24 +139,34 @@ describe('GitLabHttp commit diff and archive (mocked fetch)', () => {
     ).toHaveLength(100);
   });
 
-  it('returns the archive bytes, and throws on a missing commit instead of answering empty', async () => {
-    const bytes = new Uint8Array([0x1f, 0x8b, 0x08]);
+  it('downloads the archive without fetch, with the token header, and throws on a missing commit or a refusal', async () => {
+    const corpo = Buffer.from([0x1f, 0x8b, 0x08]);
+    const baixar = jest.fn(async () => ({ status: 200, corpo }));
+    const buscar = jest.fn();
     const ok = new GitLabHttp({
       base: RAIZ,
       token: TOKEN,
       projeto: 'g/p',
-      buscar: async () => new Response(bytes, { status: 200 }),
+      buscar,
+      baixar,
     });
-    await expect(ok.getArchive(SHA)).resolves.toEqual(Buffer.from(bytes));
-
-    const ausente = new GitLabHttp({
-      base: RAIZ,
-      token: TOKEN,
-      projeto: 'g/p',
-      buscar: async () => respostaJson({}, 404),
-    });
-    await expect(ausente.getArchive(SHA)).rejects.toThrow(
-      'GitLab respondeu 404 em GET /projects/:id/repository/archive.tar.gz',
+    await expect(ok.getArchive(SHA)).resolves.toEqual(corpo);
+    expect(buscar).not.toHaveBeenCalled();
+    expect(baixar).toHaveBeenCalledWith(
+      `${RAIZ}/projects/g%2Fp/repository/archive.tar.gz?sha=${SHA}`,
+      { 'PRIVATE-TOKEN': TOKEN },
     );
+
+    for (const status of [404, 406]) {
+      const recusa = new GitLabHttp({
+        base: RAIZ,
+        token: TOKEN,
+        projeto: 'g/p',
+        baixar: async () => ({ status, corpo: Buffer.from('{}') }),
+      });
+      await expect(recusa.getArchive(SHA)).rejects.toThrow(
+        `GitLab respondeu ${status} em GET /projects/:id/repository/archive.tar.gz`,
+      );
+    }
   });
 });

@@ -13,6 +13,7 @@ import express from 'express';
 import type { Autorizador } from './autorizacao';
 import { normalizarEntityRef } from './entidade';
 import { statusDoErro } from './erros';
+import { GitLabError } from './gitlab/types';
 import type { Servico } from './servico';
 
 // The contract routes of PIPELINE_AGENT_ROUTES. Paths and bodies come from the common
@@ -291,6 +292,8 @@ function errorHandler(logger: LoggerService): express.ErrorRequestHandler {
       logger.warn(`pipeline-agent: ${req.method} ${req.path} falhou`, {
         status,
         causa: nomeDoErro(erro),
+        // Status and route only (see GitLabError): no body, no headers, no token.
+        ...(erro instanceof GitLabError ? { gitlab: erro.message } : {}),
       });
     res.status(status).json({ erro: mensagem });
   };

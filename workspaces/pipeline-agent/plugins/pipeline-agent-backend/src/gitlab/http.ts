@@ -1,3 +1,5 @@
+import http from 'node:http';
+import https from 'node:https';
 import { type ArquivoCommit, renderizarDiffCommit } from '../diff';
 import type {
   AcaoArquivo,
@@ -14,6 +16,34 @@ import { GitLabError } from './types';
 
 type Json = Record<string, unknown>;
 type Buscar = (url: string, init: RequestInit) => Promise<Response>;
+type Baixar = (
+  url: string,
+  cabecalhos: Record<string, string>,
+) => Promise<{ status: number; corpo: Buffer }>;
+
+const ROTA_ARQUIVO = '/projects/:id/repository/archive.tar.gz';
+
+// Node's fetch always sends "Sec-Fetch-Mode: cors", and GitLab answers 406 to an
+// archive download that carries it, so the archive goes through node:http(s).
+const baixarSemFetch: Baixar = (url, cabecalhos) =>
+  new Promise((resolve, reject) => {
+    const modulo = url.startsWith('https:') ? https : http;
+    const pedido = modulo.get(url, { headers: cabecalhos }, resposta => {
+      const partes: Buffer[] = [];
+      resposta.on('data', (parte: Buffer) => partes.push(parte));
+      resposta.on('end', () =>
+        resolve({
+          status: resposta.statusCode ?? 0,
+          corpo: Buffer.concat(partes),
+        }),
+      );
+      resposta.on('error', reject);
+    });
+    pedido.setTimeout(60_000, () =>
+      pedido.destroy(new Error('tempo esgotado ao baixar o arquivo')),
+    );
+    pedido.on('error', reject);
+  });
 
 function texto(valor: unknown): string {
   return typeof valor === 'string' ? valor : '';
@@ -49,17 +79,20 @@ export class GitLabHttp implements GitLab {
   private readonly token: string;
   private readonly projeto: string;
   private readonly buscar: Buscar;
+  private readonly baixar: Baixar;
 
   constructor(opcoes: {
     base: string;
     token: string;
     projeto: string;
     buscar?: Buscar;
+    baixar?: Baixar;
   }) {
     this.base = opcoes.base.replace(/\/$/, '');
     this.token = opcoes.token;
     this.projeto = opcoes.projeto;
     this.buscar = opcoes.buscar ?? ((url, init) => fetch(url, init));
+    this.baixar = opcoes.baixar ?? baixarSemFetch;
   }
 
   private get pid(): string {
@@ -172,19 +205,15 @@ export class GitLabHttp implements GitLab {
 
   // Unlike the trace, a missing commit is an error: there is no empty archive to fall back on.
   async getArchive(sha: string): Promise<Uint8Array> {
-    const r = await this.chamar(
-      'GET',
-      `/projects/${this.pid}/repository/archive.tar.gz?sha=${encodeURIComponent(
-        sha,
-      )}`,
+    const r = await this.baixar(
+      `${this.base}/projects/${
+        this.pid
+      }/repository/archive.tar.gz?sha=${encodeURIComponent(sha)}`,
+      { 'PRIVATE-TOKEN': this.token },
     );
-    if (r.status === 404)
-      throw new GitLabError(
-        404,
-        'GET',
-        '/projects/:id/repository/archive.tar.gz',
-      );
-    return Buffer.from(await r.arrayBuffer());
+    if (r.status < 200 || r.status >= 300)
+      throw new GitLabError(r.status, 'GET', ROTA_ARQUIVO);
+    return r.corpo;
   }
 
   async getFile(caminho: string, ref: string): Promise<string | null> {
