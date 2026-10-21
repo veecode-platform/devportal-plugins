@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: pedidos-api
+  description: Example service whose GitLab pipeline the agent card investigates.
+  annotations:
+    gitlab.com/project-slug: veecode-demos/pedidos-api
+spec:
+  type: service
+  lifecycle: experimental
+  owner: user:development/guest
