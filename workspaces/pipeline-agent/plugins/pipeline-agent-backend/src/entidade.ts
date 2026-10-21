@@ -5,6 +5,7 @@ import type { CatalogService } from '@backstage/plugin-catalog-node';
 import {
   GITLAB_PROJECT_SLUG_ANNOTATION,
   PIPELINE_AGENT_ENABLED_ANNOTATION,
+  PIPELINE_AGENT_ENABLED_VALUE,
 } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
 
 // The entity is the only way a caller names a project. The GitLab project comes
@@ -34,7 +35,11 @@ export async function resolverEntidade(
   const ref = normalizarEntityRef(entityRef);
   const entidade = await catalog.getEntityByRef(ref, { credentials });
   const anotacoes = entidade?.metadata.annotations ?? {};
-  if (!entidade || anotacoes[PIPELINE_AGENT_ENABLED_ANNOTATION] !== 'enabled') {
+  if (
+    !entidade ||
+    anotacoes[PIPELINE_AGENT_ENABLED_ANNOTATION] !==
+      PIPELINE_AGENT_ENABLED_VALUE
+  ) {
     throw new NotFoundError(`Entidade ${ref} não encontrada`);
   }
   const slug = (anotacoes[GITLAB_PROJECT_SLUG_ANNOTATION] ?? '').trim();

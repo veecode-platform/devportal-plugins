@@ -3,27 +3,44 @@
 This workspace contains the pipeline agent frontend, backend, and common packages,
 plus a dev shell for running them locally.
 
-On an entity page, the pipeline agent card starts an agent that diagnoses the entity's
-failed GitLab pipeline, proposes a fix, waits for a person to approve it, opens a merge
-request, and follows the pipeline that runs on that merge request.
-
-The current state is the skeleton: the card shows its title, the backend answers its
-health check, and the other routes return `501`. The contract that the frontend and the
-backend build against is in `plugins/pipeline-agent-common/src/contract.ts`.
+On an entity page, the pipeline agent card starts an investigation of the entity's
+failed GitLab pipeline. The agent diagnoses the failure and proposes a fix. A person
+approves the proposal, then the backend opens a merge request and follows the pipeline
+that runs on it.
 
 ## Packages
 
-- `plugins/pipeline-agent` (frontend-plugin): the entity card `PipelineAgentCard` and
-  the condition `isPipelineAgentAvailable`, which is true when the entity carries the
-  `gitlab.com/project-slug` annotation.
-- `plugins/pipeline-agent-backend` (backend-plugin): the router for the contract. Its
-  configuration (`pipelineAgent.*`) is declared in `config.d.ts`. `mode` defaults to
-  `fake`, and the secrets are `pipelineAgent.anthropic.apiKey` and
-  `pipelineAgent.gitlab.token`.
-- `plugins/pipeline-agent-common` (common-library): the wire types, the route
-  constants and request and response bodies, the entity annotation constant, and the
-  two catalog-entity permissions `pipeline-agent.investigation.create` and
-  `pipeline-agent.investigation.approve`.
+- `plugins/pipeline-agent` (frontend-plugin): the entity card `PipelineAgentCard`. The
+  condition `isPipelineAgentAvailable` shows it only on entities that carry
+  `veecode.io/pipeline-agent: enabled` and a `gitlab.com/project-slug` annotation.
+- `plugins/pipeline-agent-backend` (backend-plugin): the routes of the contract, the
+  investigations, and the GitLab and agent adapters. Its configuration is declared in
+  `config.d.ts`.
+- `plugins/pipeline-agent-common` (common-library): the wire types, the route constants,
+  the annotation names, and the catalog permissions `pipeline-agent.investigation.create`
+  and `pipeline-agent.investigation.approve`.
+
+## Configuration
+
+- `pipelineAgent.mode`: `fake` (default) runs scripted investigations with no Anthropic
+  or GitLab calls. `real` calls the Managed Agents API and GitLab.
+- `pipelineAgent.allowedProjects`: `{ project, entityRef }` bindings. An entity writes
+  only to the project bound to it. Fake mode defaults to `veecode-demos/pedidos-api`
+  bound to `component:default/pedidos-api`. Real mode with no list denies every project.
+- `pipelineAgent.anthropic.apiKey`, `pipelineAgent.agentId`,
+  `pipelineAgent.environmentId`: real mode only. Without them the backend starts, logs
+  the missing keys, and answers `503` on every route except `/health`.
+- `pipelineAgent.gitlab.token`, `pipelineAgent.gitlab.baseUrl`: real mode only. The
+  token opens merge requests. The base URL defaults to `https://gitlab.com`.
+
+The two secrets are declared `@visibility secret`. Only the backend reads them.
+
+## Opt-in and project binding
+
+An entity answers the contract only when it carries `veecode.io/pipeline-agent: enabled`.
+Any other entity is answered as unknown. The backend takes the GitLab project from the
+entity's `gitlab.com/project-slug` annotation, and only when `allowedProjects` binds that
+slug to the same entity. The browser never sends a project.
 
 ## Running the dev shell
 

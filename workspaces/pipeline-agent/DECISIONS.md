@@ -27,9 +27,10 @@ to the entity they are viewing.
 **Rationale:** the write token and the agent key are the two capabilities that can
 change a repository or spend on the Anthropic account. Keeping both behind the backend
 means a compromised browser session gains no direct access to either. The portal's
-authentication and permission checks gate every write once the handlers land; the
-current routes return `501`, so that gate is not yet enforced. Anchoring the project to
-the entity keeps the catalog the single source of which repository an entity owns.
+authentication and permission checks gate every route: starting or reading an
+investigation needs `pipeline-agent.investigation.create` on the entity, and a decision
+needs `pipeline-agent.investigation.approve`. Anchoring the project to the entity keeps
+the catalog the single source of which repository an entity owns.
 
 ## PDR-002: The HTTP contract mirrors the prototype
 

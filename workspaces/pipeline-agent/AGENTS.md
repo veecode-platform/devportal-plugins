@@ -20,7 +20,8 @@ in `backstage.json`, the host version.
 The frontend and backend export dynamically; the common package is embedded by the
 backend export rather than exported as a separate dynamic package. The root
 `dynamic-plugins.yaml` contains the proof-2 runner config; `examples/entities.yaml`
-holds the entity that carries the `gitlab.com/project-slug` annotation. The
+holds the entity that carries the `gitlab.com/project-slug` annotation and the opt-in
+`veecode.io/pipeline-agent: enabled` annotation. The
 Makefile's `replace-workspace` and `restore-workspace` targets manage the
 `workspace:*` reference to the common package.
 
@@ -40,8 +41,9 @@ in the backend process: the investigations, their event logs, and the rule of on
 investigation per entity. Run one replica of the backend. A second replica does not see
 the investigations of the first.
 
-Real mode needs `pipelineAgent.anthropic.apiKey`, `pipelineAgent.agentId`,
-`pipelineAgent.environmentId` and `pipelineAgent.gitlab.token`. Without them the backend
+Fake mode (`pipelineAgent.mode: fake`, the default) runs a scripted agent and a GitLab
+fake inside the backend process. Real mode needs `pipelineAgent.anthropic.apiKey`,
+`pipelineAgent.agentId`, `pipelineAgent.environmentId` and `pipelineAgent.gitlab.token`. Without them the backend
 starts, logs one warning that names the missing keys, and answers `503` on every route
 except `/health`. An entity is answered only when it carries `veecode.io/pipeline-agent:
 enabled`, and its `gitlab.com/project-slug` is bound to that entity's own `entityRef` in
