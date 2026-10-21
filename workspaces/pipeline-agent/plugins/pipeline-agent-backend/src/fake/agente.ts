@@ -2,6 +2,7 @@ import type { BetaManagedAgentsAgentCustomToolUseEvent } from '@anthropic-ai/sdk
 import { Canal } from '../agente/canal';
 import type {
   AgentRuntime,
+  ArquivoSessao,
   EventoUsuario,
   FluxoEventos,
   SdkEvent,
@@ -303,11 +304,13 @@ export class AgenteFake implements AgentRuntime {
     }
   }
 
+  // The files are accepted and ignored: the scripted agent reads no mount.
   async createSession(entrada: {
     agentId: string;
     environmentId: string;
     metadata: Record<string, string>;
     title: string;
+    arquivos: ArquivoSessao[];
   }): Promise<string> {
     this.contador += 1;
     const id = `sesn_fake_${String(this.contador).padStart(3, '0')}`;

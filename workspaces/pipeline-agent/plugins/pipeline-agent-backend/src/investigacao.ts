@@ -16,6 +16,7 @@ import { custoUsd, parseUsage } from './cost';
 import { diffArquivo } from './diff';
 import { ErroEstado } from './erros';
 import type { GitLab } from './gitlab/types';
+import { ocultarHost } from './sanitizar';
 
 // One investigation = one agent session. It reads the event flow, shows what
 // happens, and holds the abrir_mr tool call until a person decides.
@@ -23,6 +24,8 @@ import type { GitLab } from './gitlab/types';
 export type Dependencias = {
   runtime: AgentRuntime;
   gitlab: GitLab;
+  // The GitLab hostname: every text sent to the agent loses it.
+  host: string;
   intervaloPollMs: number;
   prazoPollMs: number;
   dormir: (ms: number) => Promise<void>;
@@ -277,6 +280,12 @@ export class Investigacao {
     this.setFase('encerrado');
   }
 
+  // The one exit toward the agent for tool results and error messages, which can
+  // carry GitLab text (log_final, a network error naming the host).
+  private paraAgente(texto: string): string {
+    return ocultarHost(texto, this.dep.host);
+  }
+
   private async responder(
     toolUseId: string,
     texto: string,
@@ -286,7 +295,7 @@ export class Investigacao {
       {
         type: 'user.custom_tool_result',
         custom_tool_use_id: toolUseId,
-        content: [{ type: 'text', text: texto }],
+        content: [{ type: 'text', text: this.paraAgente(texto) }],
         is_error: erro,
       },
     ]);
@@ -390,7 +399,10 @@ export class Investigacao {
     this.setFase('investigando');
     await this.dep.runtime.enviar(this.id, [
       { type: 'user.interrupt' },
-      { type: 'user.message', content: [{ type: 'text', text: texto }] },
+      {
+        type: 'user.message',
+        content: [{ type: 'text', text: this.paraAgente(texto) }],
+      },
     ]);
   }
 }

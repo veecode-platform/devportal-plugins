@@ -22,8 +22,15 @@ function clienteFalso(sessoes: unknown[] = []) {
     metadata: {},
     usage: {},
   }));
+  let enviados = 0;
+  const upload = jest.fn(async (_params: unknown) => ({
+    id: `file_${++enviados}`,
+  }));
   const cliente = {
-    beta: { sessions: { create, retrieve, list, events: { send, stream } } },
+    beta: {
+      files: { upload },
+      sessions: { create, retrieve, list, events: { send, stream } },
+    },
   };
   return {
     cliente: cliente as unknown as Anthropic,
@@ -31,6 +38,7 @@ function clienteFalso(sessoes: unknown[] = []) {
     send,
     stream,
     list,
+    upload,
   };
 }
 
@@ -42,6 +50,7 @@ describe('AnthropicRuntime (mocked SDK client)', () => {
       environmentId: 'env_x',
       metadata: { app: 'pipeline-agent', projeto: 'veecode-demos/pedidos-api' },
       title: 'Pipeline 9001 · job test',
+      arquivos: [],
     });
     expect(id).toBe('sesn_real_1');
     expect(create).toHaveBeenCalledWith({
@@ -49,7 +58,56 @@ describe('AnthropicRuntime (mocked SDK client)', () => {
       environment_id: 'env_x',
       metadata: { app: 'pipeline-agent', projeto: 'veecode-demos/pedidos-api' },
       title: 'Pipeline 9001 · job test',
+      resources: [],
     });
+  });
+
+  it('uploads each file with the managed-agents beta and mounts it in the session', async () => {
+    const { cliente, create, upload } = clienteFalso();
+    await new AnthropicRuntime(cliente).createSession({
+      agentId: 'agent_x',
+      environmentId: 'env_x',
+      metadata: {},
+      title: 't',
+      arquivos: [
+        {
+          nome: 'trace.log',
+          tipo: 'text/plain',
+          conteudo: new TextEncoder().encode('$ mvn -B test'),
+          caminho: '/pipeline/trace.log',
+        },
+        {
+          nome: 'repo.tar.gz',
+          tipo: 'application/gzip',
+          conteudo: new Uint8Array([0x1f, 0x8b]),
+          caminho: '/pipeline/repo.tar.gz',
+        },
+      ],
+    });
+    expect(upload).toHaveBeenCalledTimes(2);
+    const primeiro = upload.mock.calls[0][0] as unknown as {
+      file: File;
+      betas: string[];
+    };
+    expect(primeiro.betas).toEqual(['managed-agents-2026-04-01']);
+    expect(primeiro.file.name).toBe('trace.log');
+    expect(await primeiro.file.text()).toBe('$ mvn -B test');
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resources: [
+          {
+            type: 'file',
+            file_id: 'file_1',
+            mount_path: '/pipeline/trace.log',
+          },
+          {
+            type: 'file',
+            file_id: 'file_2',
+            mount_path: '/pipeline/repo.tar.gz',
+          },
+        ],
+      }),
+    );
   });
 
   it('sends user events in the events.send shape', async () => {

@@ -89,8 +89,9 @@ export function parseAbrirMrEntrada(bruto: unknown): Resultado<AbrirMrEntrada> {
   };
 }
 
+// The agent gets the MR number only; the full URL goes to the card through aoAbrirMr.
 export type ResultadoFerramenta = {
-  mr_url: string;
+  mr_iid: number;
   pipeline_status: string;
   log_final?: string;
   instrucao?: string;
@@ -212,7 +213,7 @@ export async function executarAbrirMr(
 
   const sucesso = pipeline.status === 'success';
   const resultado: ResultadoFerramenta = {
-    mr_url: mr.url,
+    mr_iid: mr.iid,
     pipeline_status: pipeline.status,
   };
   if (falhou) resultado.log_final = cauda(falhou.trace);

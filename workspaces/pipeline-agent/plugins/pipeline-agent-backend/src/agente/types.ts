@@ -32,12 +32,22 @@ export type FluxoEventos = {
   fechar: () => void;
 };
 
+// A file the session receives: the real runtime uploads it and mounts it at
+// caminho inside the session. The fake runtime keeps nothing.
+export type ArquivoSessao = {
+  nome: string;
+  tipo: string;
+  conteudo: Uint8Array;
+  caminho: string;
+};
+
 export interface AgentRuntime {
   createSession(entrada: {
     agentId: string;
     environmentId: string;
     metadata: Record<string, string>;
     title: string;
+    arquivos: ArquivoSessao[];
   }): Promise<string>;
   abrirFluxo(sessionId: string): Promise<FluxoEventos>;
   enviar(sessionId: string, eventos: EventoUsuario[]): Promise<void>;

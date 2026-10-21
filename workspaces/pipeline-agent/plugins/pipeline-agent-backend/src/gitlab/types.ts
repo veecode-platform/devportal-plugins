@@ -30,6 +30,8 @@ export interface GitLab {
   listFailedJobs(pipelineId: number): Promise<Job[]>;
   getJobTrace(jobId: number): Promise<string>;
   getCommitTitle(sha: string): Promise<string>;
+  getCommitDiff(sha: string): Promise<string>;
+  getArchive(sha: string): Promise<Uint8Array>;
   getFile(caminho: string, ref: string): Promise<string | null>;
   createBranch(nome: string, ref: string): Promise<void>;
   commit(branch: string, mensagem: string, acoes: AcaoArquivo[]): Promise<void>;

@@ -1,3 +1,4 @@
+import { type ArquivoCommit, renderizarDiffCommit } from '../diff';
 import type {
   AcaoArquivo,
   GitLab,
@@ -20,6 +21,16 @@ function texto(valor: unknown): string {
 
 function inteiro(valor: unknown): number {
   return typeof valor === 'number' && Number.isInteger(valor) ? valor : 0;
+}
+
+function arquivoDeCommit(j: Json): ArquivoCommit {
+  return {
+    antes: texto(j.old_path),
+    depois: texto(j.new_path),
+    novo: j.new_file === true,
+    removido: j.deleted_file === true,
+    hunks: texto(j.diff),
+  };
 }
 
 function pipelineDe(j: Json): Pipeline {
@@ -142,6 +153,38 @@ export class GitLabHttp implements GitLab {
       `/projects/${this.pid}/repository/commits/${encodeURIComponent(sha)}`,
     );
     return texto(j?.title);
+  }
+
+  // GitLab pages this endpoint (20 files by default), so every page is read.
+  async getCommitDiff(sha: string): Promise<string> {
+    const arquivos: ArquivoCommit[] = [];
+    for (let pagina = 1; ; pagina += 1) {
+      const itens = await this.lista(
+        `/projects/${this.pid}/repository/commits/${encodeURIComponent(
+          sha,
+        )}/diff?per_page=100&page=${pagina}`,
+      );
+      arquivos.push(...itens.map(arquivoDeCommit));
+      if (itens.length < 100) break;
+    }
+    return renderizarDiffCommit(arquivos);
+  }
+
+  // Unlike the trace, a missing commit is an error: there is no empty archive to fall back on.
+  async getArchive(sha: string): Promise<Uint8Array> {
+    const r = await this.chamar(
+      'GET',
+      `/projects/${this.pid}/repository/archive.tar.gz?sha=${encodeURIComponent(
+        sha,
+      )}`,
+    );
+    if (r.status === 404)
+      throw new GitLabError(
+        404,
+        'GET',
+        '/projects/:id/repository/archive.tar.gz',
+      );
+    return Buffer.from(await r.arrayBuffer());
   }
 
   async getFile(caminho: string, ref: string): Promise<string | null> {

@@ -2,18 +2,21 @@ import type {
   Banner,
   ItemHistorico,
 } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
-import type { AgentRuntime } from './agente/types';
+import type { ArquivoSessao, AgentRuntime } from './agente/types';
 import { custoUsd, parseUsage } from './cost';
 import type { EntidadeResolvida } from './entidade';
 import { ErroEstado, ErroNaoEncontrado } from './erros';
 import { Investigacao, type Dependencias } from './investigacao';
 import type { GitLab, Job, Pipeline } from './gitlab/types';
+import { ocultarHost, sanitizarTrace } from './sanitizar';
 
 // The investigations of this process. State lives in memory: one replica only. One
 // running investigation per entity; a second start answers 409 until the first ends.
 
 export const REF_PIPELINE = 'main';
 const APP = 'pipeline-agent';
+// Where the session finds the files: <DIRETORIO_MONTAGEM>/<nome>, under the session uploads.
+export const DIRETORIO_MONTAGEM = '/pipeline';
 
 export type Servico = {
   iniciar(alvo: EntidadeResolvida): Promise<Investigacao>;
@@ -25,9 +28,10 @@ export type Servico = {
 export type OpcoesServico = {
   runtime: AgentRuntime;
   gitlabPara: (projectSlug: string) => GitLab;
+  gitlabHost: string;
   agentId: string;
   environmentId: string;
-  ritmo: Omit<Dependencias, 'runtime' | 'gitlab'>;
+  ritmo: Omit<Dependencias, 'runtime' | 'gitlab' | 'host'>;
 };
 
 type FalhoAtual = { pipeline: Pipeline; job: Job; titulo: string };
@@ -41,6 +45,35 @@ async function falhoAtual(
   const job = (await gitlab.listFailedJobs(pipeline.id))[0];
   if (!job) return null;
   return { pipeline, job, titulo: await gitlab.getCommitTitle(pipeline.sha) };
+}
+
+function arquivo(
+  nome: string,
+  tipo: string,
+  conteudo: Uint8Array,
+): ArquivoSessao {
+  return { nome, tipo, conteudo, caminho: `${DIRETORIO_MONTAGEM}/${nome}` };
+}
+
+// The job log, the commit diff and the repository archive. The agent never fetches
+// them from GitLab: it reads these files, which carry no GitLab host.
+async function arquivosDoPipeline(
+  gitlab: GitLab,
+  pipeline: Pipeline,
+  job: Job,
+  host: string,
+): Promise<ArquivoSessao[]> {
+  const [trace, diff, repo] = await Promise.all([
+    gitlab.getJobTrace(job.id),
+    gitlab.getCommitDiff(pipeline.sha),
+    gitlab.getArchive(pipeline.sha),
+  ]);
+  const codificar = (texto: string) => new TextEncoder().encode(texto);
+  return [
+    arquivo('trace.log', 'text/plain', codificar(sanitizarTrace(trace, host))),
+    arquivo('commit.diff', 'text/plain', codificar(ocultarHost(diff, host))),
+    arquivo('repo.tar.gz', 'application/gzip', repo),
+  ];
 }
 
 // Initial message (pt-BR): the agent starts from the pipeline branch and the full commit.
@@ -103,6 +136,13 @@ export function criarServico(opcoes: OpcoesServico): Servico {
           );
         const projeto = await gitlab.getProject();
         const { pipeline, job, titulo } = atual;
+        // Fetched before the session exists: a GitLab failure leaves no session behind.
+        const arquivos = await arquivosDoPipeline(
+          gitlab,
+          pipeline,
+          job,
+          opcoes.gitlabHost,
+        );
         const sessaoId = await runtime.createSession({
           agentId: opcoes.agentId,
           environmentId: opcoes.environmentId,
@@ -112,9 +152,10 @@ export function criarServico(opcoes: OpcoesServico): Servico {
             pipeline_id: String(pipeline.id),
           },
           title: `Pipeline ${pipeline.id} · job ${job.nome}`,
+          arquivos,
         });
         const investigacao = new Investigacao(
-          { runtime, gitlab, ...ritmo },
+          { runtime, gitlab, host: opcoes.gitlabHost, ...ritmo },
           {
             id: sessaoId,
             entityRef,
@@ -136,7 +177,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
             jobId: job.id,
             jobNome: job.nome,
             sha: pipeline.sha,
-            titulo,
+            titulo: ocultarHost(titulo, opcoes.gitlabHost),
           }),
         );
         return investigacao;

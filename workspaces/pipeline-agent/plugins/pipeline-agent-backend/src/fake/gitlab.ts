@@ -7,8 +7,10 @@ import type {
   ProjetoInfo,
 } from '../gitlab/types';
 import { GitLabError } from '../gitlab/types';
+import { renderizarDiffCommit } from '../diff';
 import {
   CAMINHO_ALVO,
+  DIFF_COMMIT,
   JAVA_ANTES,
   JOB_BUILD_ID,
   JOB_TEST_ID,
@@ -20,6 +22,11 @@ import {
   TITULO_COMMIT,
   TRACE_TEST,
 } from './cenario';
+
+// tar of one README in pedidos-api-<sha>-<sha>/, made with
+// tar --sort=name --owner=0 --group=0 --numeric-owner -czf, then base64.
+const ARQUIVO_FAKE_BASE64 =
+  'H4sIAAAAAAAAA+3Uu27DIBQGYM99CsZ2sM3FGLM1UtLJXfoGJJAIJTHIdqQ+fh23SyJF7WKnUv5vAQESBw6H6Ky3oUtN9Gm55pZvlNbUVqLSlbFqoy23hjHJikJqvl2Xwpk/L8yTER0oKcd2cN2OfSa5VIIzfh7ngnGZEJnM4NT1piVkjq3+oyzP8tc6NLvaN/uJ9jgnuCyKm/ln8vItDK9FlSoh9UTxXHjw/MdJ6/9jtVi+r7Kjvfcx4YY58v9b/VMlrv7/gtLh/6dzXMCD1/+b/+xPrSM2kNbF0Pk+tD6QrdmPY9FHd/CNS83ONT15Pgb7PfmSPd07dAAAAAAAAAAAAAAAAAAAAPjxBbea9/QAKAAA';
 
 // In-memory GitLab for one project. The pipeline of the merge request stays
 // "running" for duracaoPipelineMs and then passes, as in the rehearsal.
@@ -111,6 +118,29 @@ export class GitLabFake implements GitLab {
 
   async getCommitTitle(sha: string): Promise<string> {
     return sha === SHA_COMMIT ? TITULO_COMMIT : '';
+  }
+
+  async getCommitDiff(sha: string): Promise<string> {
+    if (sha !== SHA_COMMIT) return '';
+    return renderizarDiffCommit([
+      {
+        antes: CAMINHO_ALVO,
+        depois: CAMINHO_ALVO,
+        novo: false,
+        removido: false,
+        hunks: DIFF_COMMIT,
+      },
+    ]);
+  }
+
+  async getArchive(sha: string): Promise<Uint8Array> {
+    if (sha !== SHA_COMMIT)
+      throw new GitLabError(
+        404,
+        'GET',
+        '/projects/:id/repository/archive.tar.gz',
+      );
+    return Buffer.from(ARQUIVO_FAKE_BASE64, 'base64');
   }
 
   // Files of a ref: "main" or a branch created in this process. Unknown refs

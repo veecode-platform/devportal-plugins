@@ -1,6 +1,8 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import { toFile } from '@anthropic-ai/sdk';
 import type {
   AgentRuntime,
+  ArquivoSessao,
   EventoUsuario,
   FluxoEventos,
   SdkEvent,
@@ -11,6 +13,7 @@ import type {
 // plugin configuration and is never printed or returned in an answer.
 
 const LIMITE_LISTAGEM = 100;
+const BETA_MANAGED_AGENTS = 'managed-agents-2026-04-01';
 
 type SessaoSdk = {
   id: string;
@@ -39,17 +42,38 @@ export class AnthropicRuntime implements AgentRuntime {
     this.cliente = cliente;
   }
 
+  // Files are uploaded before the session exists, so a failed upload leaves no session.
   async createSession(entrada: {
     agentId: string;
     environmentId: string;
     metadata: Record<string, string>;
     title: string;
+    arquivos: ArquivoSessao[];
   }): Promise<string> {
+    const recursos: Array<{
+      type: 'file';
+      file_id: string;
+      mount_path: string;
+    }> = [];
+    for (const arquivo of entrada.arquivos) {
+      const enviado = await this.cliente.beta.files.upload({
+        file: await toFile(arquivo.conteudo, arquivo.nome, {
+          type: arquivo.tipo,
+        }),
+        betas: [BETA_MANAGED_AGENTS],
+      });
+      recursos.push({
+        type: 'file',
+        file_id: enviado.id,
+        mount_path: arquivo.caminho,
+      });
+    }
     const sessao = await this.cliente.beta.sessions.create({
       agent: entrada.agentId,
       environment_id: entrada.environmentId,
       metadata: entrada.metadata,
       title: entrada.title,
+      resources: recursos,
     });
     return sessao.id;
   }
