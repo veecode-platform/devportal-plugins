@@ -1,5 +1,6 @@
 import type { DiscoveryApi, FetchApi } from '@backstage/core-plugin-api';
 import {
+  MENSAGEM_CONFLITO,
   MENSAGEM_NAO_CONFIGURADO,
   MENSAGEM_SEM_PERMISSAO,
   PipelineAgentError,
@@ -160,8 +161,57 @@ describe('PipelineAgentClient', () => {
     await expect(
       criarCliente(fetch).iniciar('component:default/x'),
     ).rejects.toMatchObject({
-      message: 'Falha ao falar com o agente (418).',
+      message: 'Erro inesperado ao falar com o agente (HTTP 418).',
       detalhe: 'teapot',
+    });
+  });
+
+  it('shows the backend conflict text on a 409 and keeps it as the detail', async () => {
+    const fetch = jest.fn().mockResolvedValue(
+      respostaJson(409, {
+        erro: 'Já existe uma investigação em andamento para pedidos-api.',
+      }),
+    );
+
+    await expect(
+      criarCliente(fetch).iniciar('component:default/x'),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: 'Já existe uma investigação em andamento para pedidos-api.',
+      detalhe: 'Já existe uma investigação em andamento para pedidos-api.',
+    });
+  });
+
+  it.each([
+    ['no erro field', {}],
+    ['an empty erro', { erro: '' }],
+    ['a blank erro', { erro: '   ' }],
+    ['a non-text erro', { erro: 42 }],
+  ])(
+    'falls back to the conflict message on a 409 with %s',
+    async (_nome, corpo) => {
+      const fetch = jest.fn().mockResolvedValue(respostaJson(409, corpo));
+
+      await expect(
+        criarCliente(fetch).aprovar('inv-1', 'toolu_9'),
+      ).rejects.toMatchObject({
+        status: 409,
+        message: MENSAGEM_CONFLITO,
+      });
+    },
+  );
+
+  it('never shows the backend text for a status other than 409', async () => {
+    const fetch = jest
+      .fn()
+      .mockResolvedValue(respostaJson(403, { erro: 'texto do backend' }));
+
+    await expect(
+      criarCliente(fetch).aprovar('inv-1', 'toolu_9'),
+    ).rejects.toMatchObject({
+      status: 403,
+      message: MENSAGEM_SEM_PERMISSAO,
+      detalhe: 'texto do backend',
     });
   });
 });

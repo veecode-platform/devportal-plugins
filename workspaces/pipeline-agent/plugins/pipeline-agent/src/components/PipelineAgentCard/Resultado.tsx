@@ -1,5 +1,6 @@
 import Link from '@material-ui/core/Link';
 import type { Visao } from '../../state/visao';
+import { listaComE } from '../../state/formato';
 import { rotuloPipeline } from '../../state/rotulos';
 import { useEstilos } from './estilos';
 
@@ -14,7 +15,9 @@ export function Resultado({ visao }: { visao: Visao }) {
   return (
     <>
       {recusa !== null && (
-        <p className={classes.texto}>Proposta recusada. Motivo: {recusa}</p>
+        <p className={classes.texto}>
+          {`Você recusou a proposta. Motivo: ${recusa}`}
+        </p>
       )}
       {mr !== null && (
         <p className={classes.texto}>
@@ -31,18 +34,21 @@ export function Resultado({ visao }: { visao: Visao }) {
       )}
       {pipeline?.status === 'success' && (
         <p className={classes.sucesso}>
-          Pipeline do MR passou: {pipeline.jobs.join(', ')}
+          O pipeline do MR passou
+          {pipeline.jobs.length > 0 && ` (${listaComE(pipeline.jobs)})`}.
         </p>
       )}
       {pipeline?.status === 'failed' && (
         <p className={classes.erro}>
-          Pipeline do MR falhou
-          {pipeline.jobFalho ? ` no job ${pipeline.jobFalho}` : ''}.
+          O pipeline do MR falhou
+          {pipeline.jobFalho && ` no job ${pipeline.jobFalho}`}.
         </p>
       )}
       {erro !== null && <p className={classes.erro}>{erro}</p>}
       {encerrado !== null && (
-        <p className={classes.subtitulo}>Sessão encerrada: {encerrado}.</p>
+        <p className={classes.subtitulo}>
+          {`Investigação encerrada: ${encerrado}.`}
+        </p>
       )}
     </>
   );

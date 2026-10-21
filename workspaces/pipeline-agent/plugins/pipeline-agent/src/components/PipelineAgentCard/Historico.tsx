@@ -1,6 +1,6 @@
 import Typography from '@material-ui/core/Typography';
 import type { ItemHistorico } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
-import { dolar } from '../../state/formato';
+import { dataCurta, dolar } from '../../state/formato';
 import { rotuloSessao } from '../../state/rotulos';
 import { type Carga } from './carga';
 import { useEstilos } from './estilos';
@@ -14,25 +14,28 @@ export function Historico({ carga }: { carga: Carga<ItemHistorico[]> }) {
 
   const titulo = (
     <Typography variant="subtitle1" component="h3">
-      Histórico
+      Investigações anteriores
     </Typography>
   );
 
   if (carga.estado === 'falhou') {
     if (carga.falha.tipo !== 'mensagem') return null;
     return (
-      <section className={classes.secao} aria-label="Histórico">
+      <section className={classes.secao} aria-label="Investigações anteriores">
         {titulo}
         <p className={classes.erro}>{carga.falha.texto}</p>
       </section>
     );
   }
 
+  const agora = new Date();
   return (
-    <section className={classes.secao} aria-label="Histórico">
+    <section className={classes.secao} aria-label="Investigações anteriores">
       {titulo}
       {carga.dados.length === 0 && (
-        <p className={classes.subtitulo}>Nenhuma investigação ainda.</p>
+        <p className={classes.subtitulo}>
+          Nenhuma investigação neste serviço ainda.
+        </p>
       )}
       {carga.dados.length > 0 && (
         <ul className={classes.lista}>
@@ -41,7 +44,7 @@ export function Historico({ carga }: { carga: Carga<ItemHistorico[]> }) {
               <span>{item.titulo}</span>
               <span className={classes.metaHistorico}>
                 <time dateTime={item.criadoEm}>
-                  {new Date(item.criadoEm).toLocaleString('pt-BR')}
+                  {dataCurta(item.criadoEm, agora)}
                 </time>{' '}
                 · {rotuloSessao(item.status)}
                 {item.custoUsd !== null ? ` · ${dolar(item.custoUsd)}` : ''}

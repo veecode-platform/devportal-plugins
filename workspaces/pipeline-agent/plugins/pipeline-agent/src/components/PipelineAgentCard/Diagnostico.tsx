@@ -6,6 +6,9 @@ import type { ArquivoDiff } from '@veecode-platform/backstage-plugin-pipeline-ag
 import type { Diagnostico } from '../../state/visao';
 import { useEstilos } from './estilos';
 
+// The backend's limit on diagnosis attempts.
+const MAX_TENTATIVAS = 3;
+
 type Estilos = ReturnType<typeof useEstilos>;
 
 const classeDaLinha = (linha: string, classes: Estilos) => {
@@ -45,7 +48,7 @@ function DetalheDiagnostico({ diagnostico }: { diagnostico: Diagnostico }) {
     <>
       <p className={classes.texto}>{diagnostico.causa}</p>
       <p className={classes.texto}>
-        <strong>Mudança proposta:</strong> {diagnostico.titulo}
+        <strong>Correção proposta:</strong> {diagnostico.titulo}
       </p>
       {diagnostico.arquivos.map(arquivo => (
         <Diff key={arquivo.caminho} arquivo={arquivo} />
@@ -61,7 +64,7 @@ export function DiagnosticoAprovado({
 }) {
   return (
     <details>
-      <summary>Diagnóstico e mudança aprovados</summary>
+      <summary>Ver o diagnóstico aprovado</summary>
       <DetalheDiagnostico diagnostico={diagnostico} />
     </details>
   );
@@ -103,7 +106,7 @@ export function BlocoDiagnostico({
   return (
     <section className={classes.diagnostico} aria-label="Diagnóstico">
       <Typography variant="subtitle1" component="h3">
-        Diagnóstico · tentativa {diagnostico.tentativa}
+        {`Diagnóstico (tentativa ${diagnostico.tentativa} de ${MAX_TENTATIVAS})`}
       </Typography>
       <DetalheDiagnostico diagnostico={diagnostico} />
       <div className={classes.acoes}>
@@ -137,8 +140,8 @@ export function BlocoDiagnostico({
             id={`pipeline-agent-${modo}`}
             label={
               modo === 'orientar'
-                ? 'O que o agente deve considerar'
-                : 'Motivo da recusa'
+                ? 'O que o agente deve levar em conta?'
+                : 'Por que você está recusando?'
             }
             multiline
             rows={2}
@@ -153,7 +156,7 @@ export function BlocoDiagnostico({
               disabled={ocupado || texto.trim() === ''}
               onClick={enviar}
             >
-              {modo === 'orientar' ? 'Enviar orientação' : 'Confirmar recusa'}
+              {modo === 'orientar' ? 'Enviar orientação' : 'Recusar a proposta'}
             </Button>
           </div>
         </div>

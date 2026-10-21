@@ -43,18 +43,22 @@ test('the card takes a failed pipeline to a green merge request', async ({
   await expect(page.getByRole('button', { name: APROVAR })).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByText('Diagnóstico · tentativa 1')).toBeVisible();
+  await expect(page.getByText('Diagnóstico (tentativa 1 de 3)')).toBeVisible();
   await capturar(page, testInfo, 'diagnostico');
 
   await page.getByRole('button', { name: APROVAR }).click();
   await expect(page.getByText(/MR !3 aberto/)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/Pipeline do MR passou/)).toBeVisible({
+  await expect(
+    page.getByText('O pipeline do MR passou (build e test).'),
+  ).toBeVisible({
     timeout: 60_000,
   });
-  await expect(page.getByText('Diagnóstico e mudança aprovados')).toBeVisible();
+  await expect(page.getByText('Ver o diagnóstico aprovado')).toBeVisible();
   await expect(page.getByRole('button', { name: APROVAR })).toHaveCount(0);
   await expect(
-    page.getByText(/Do clique ao verde: \d+m \d+s · custo da sessão/),
+    page.getByText(
+      /Do clique ao pipeline verde: (\d+ s|\d+ min( \d+ s)?)\. Custo da investigação: US\$ \d+,\d{2}\./,
+    ),
   ).toBeVisible();
   await capturar(page, testInfo, 'verde');
 });

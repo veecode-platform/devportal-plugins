@@ -118,7 +118,7 @@ describe('PipelineAgentCard', () => {
     expect(await botaoInvestigar()).toBeEnabled();
     expect(
       screen.getByText(
-        /Pipeline falhou no job test · commit "feat: desconto por faixa acumulado com cupom" · há 14 min/,
+        'O pipeline falhou no job test há 14 min. Último commit: "feat: desconto por faixa acumulado com cupom".',
       ),
     ).toBeInTheDocument();
   });
@@ -169,6 +169,9 @@ describe('PipelineAgentCard', () => {
       await screen.findByRole('button', { name: 'Aprovar e abrir MR' }),
     ).toBeEnabled();
     expect(
+      screen.getByText('Diagnóstico (tentativa 1 de 3)'),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('button', { name: 'Orientar o agente' }),
     ).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Recusar' })).toBeEnabled();
@@ -202,10 +205,12 @@ describe('PipelineAgentCard', () => {
     await user.click(await botaoInvestigar());
     await user.click(await screen.findByRole('button', { name: 'Recusar' }));
     await user.type(
-      screen.getByLabelText('Motivo da recusa'),
+      screen.getByLabelText('Por que você está recusando?'),
       'Não cobre o caso do cupom',
     );
-    await user.click(screen.getByRole('button', { name: 'Confirmar recusa' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Recusar a proposta' }),
+    );
 
     await waitFor(() =>
       expect(api.recusar).toHaveBeenCalledWith(
@@ -227,7 +232,7 @@ describe('PipelineAgentCard', () => {
     await user.click(await botaoInvestigar());
 
     expect(
-      await screen.findByText('Diagnóstico e mudança aprovados'),
+      await screen.findByText('Ver o diagnóstico aprovado'),
     ).toBeInTheDocument();
     expect(screen.getByText(/MR !3 aberto/)).toBeInTheDocument();
     expect(
@@ -281,7 +286,9 @@ describe('PipelineAgentCard', () => {
     );
 
     expect(
-      await screen.findByText('Você não tem permissão para esta ação.'),
+      await screen.findByText(
+        'Você não tem permissão para usar o agente neste serviço.',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Investigar e corrigir' }),
@@ -297,7 +304,7 @@ describe('PipelineAgentCard', () => {
 
     expect(
       await screen.findByText(
-        'Não consegui falar com o agente. Verifique a conexão e tente de novo.',
+        'Não foi possível falar com o agente. Confira a conexão e tente de novo.',
       ),
     ).toBeInTheDocument();
   });
@@ -315,7 +322,9 @@ describe('PipelineAgentCard', () => {
     await user.click(await botaoInvestigar());
 
     expect(
-      await screen.findByText(/Algo inesperado aconteceu com o agente/),
+      await screen.findByText(
+        'Erro inesperado no card do agente. Recarregue a página.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Evento sem tratamento/)).not.toBeInTheDocument();
   });
@@ -335,7 +344,48 @@ describe('PipelineAgentCard', () => {
     expect(
       await screen.findByText('fix: cupom e faixa somam sobre o valor bruto'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Concluída/)).toBeInTheDocument();
+    expect(screen.getByText(/concluída/)).toBeInTheDocument();
     expect(screen.getByText(/US\$ 0,31/)).toBeInTheDocument();
+  });
+
+  it('writes the green pipeline with its jobs and the time to green', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({
+        acompanhar: acompanharCom([
+          DIAGNOSTICO,
+          MR_ABERTO,
+          {
+            tipo: 'pipeline_mr',
+            pipelineId: 77,
+            status: 'success',
+            url: null,
+            jobs: ['build', 'test'],
+            jobFalho: null,
+          },
+          { tipo: 'verde', segundos: 252 },
+          {
+            tipo: 'uso',
+            tokensEntrada: 1200,
+            tokensSaida: 340,
+            tokensCacheLeitura: 0,
+            tokensCacheEscrita: 0,
+            segundosAtivos: 252,
+            custoUsd: 0.31,
+          },
+        ]),
+      }),
+    );
+
+    await user.click(await botaoInvestigar());
+
+    expect(
+      await screen.findByText('O pipeline do MR passou (build e test).'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Do clique ao pipeline verde: 4 min 12 s. Custo da investigação: US$ 0,31.',
+      ),
+    ).toBeInTheDocument();
   });
 });

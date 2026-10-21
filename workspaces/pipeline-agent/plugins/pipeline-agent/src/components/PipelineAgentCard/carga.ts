@@ -15,7 +15,7 @@ export type Carga<T> =
 export const CARREGANDO: { estado: 'carregando' } = { estado: 'carregando' };
 
 export const MENSAGEM_INESPERADA =
-  'Algo inesperado aconteceu com o agente. Recarregue a página para tentar de novo.';
+  'Erro inesperado no card do agente. Recarregue a página.';
 
 export function falhaDe(erro: unknown): Falha {
   if (!(erro instanceof PipelineAgentError)) {

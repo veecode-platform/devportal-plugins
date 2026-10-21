@@ -11,34 +11,37 @@ export class PipelineAgentError extends Error {
   }
 }
 
-export const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para esta ação.';
+export const MENSAGEM_SEM_PERMISSAO =
+  'Você não tem permissão para usar o agente neste serviço.';
 export const MENSAGEM_NAO_CONFIGURADO =
   'O agente de pipeline ainda não foi configurado neste portal.';
+export const MENSAGEM_CONFLITO =
+  'Esta proposta já foi respondida, ou outra investigação está em andamento.';
 const MENSAGEM_REDE =
-  'Não consegui falar com o agente. Verifique a conexão e tente de novo.';
+  'Não foi possível falar com o agente. Confira a conexão e tente de novo.';
 
 export function mensagemPara(status: number): string {
   switch (status) {
     case 0:
       return MENSAGEM_REDE;
     case 400:
-      return 'O pedido não foi aceito pelo agente.';
+      return 'O agente não aceitou o pedido. Recarregue a página e tente de novo.';
     case 401:
-      return 'Sua sessão expirou. Entre de novo para continuar.';
+      return 'Sua sessão no portal expirou. Entre de novo para continuar.';
     case 403:
       return MENSAGEM_SEM_PERMISSAO;
     case 404:
       return 'Esta investigação não existe mais.';
     case 409:
-      return 'A investigação não está em um estado que aceita esta ação.';
+      return MENSAGEM_CONFLITO;
     case 501:
       return 'Esta ação ainda não está disponível.';
     case 502:
-      return 'O agente não conseguiu falar com o GitLab. Tente de novo.';
+      return 'O portal não conseguiu falar com o GitLab ou com o agente. Tente de novo em instantes.';
     case 503:
       return MENSAGEM_NAO_CONFIGURADO;
     default:
-      return `Falha ao falar com o agente (${status}).`;
+      return `Erro inesperado ao falar com o agente (HTTP ${status}).`;
   }
 }
 
@@ -54,14 +57,24 @@ function detalheDoCorpo(corpo: unknown): string | undefined {
   return typeof corpo.erro === 'string' ? corpo.erro : undefined;
 }
 
+// A 409 names the conflict in the backend's text when it has one. No other
+// status shows the backend text; it stays in `detalhe` for debugging.
+function mensagemDaResposta(status: number, detalhe: string | undefined) {
+  if (status === 409 && detalhe !== undefined && detalhe.trim() !== '') {
+    return detalhe;
+  }
+  return mensagemPara(status);
+}
+
 export async function erroDaResposta(
   resposta: Response,
 ): Promise<PipelineAgentError> {
   const corpo: unknown = await resposta.json().catch(() => undefined);
+  const detalhe = detalheDoCorpo(corpo);
   return new PipelineAgentError(
     resposta.status,
-    mensagemPara(resposta.status),
-    detalheDoCorpo(corpo),
+    mensagemDaResposta(resposta.status, detalhe),
+    detalhe,
   );
 }
 

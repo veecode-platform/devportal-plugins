@@ -10,7 +10,7 @@ import type {
 } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
 import { MENSAGEM_NAO_CONFIGURADO } from '../../api/erros';
 import { pipelineAgentApiRef } from '../../api';
-import { dolar, duracao } from '../../state/formato';
+import { dolar, duracao, tempoAtras } from '../../state/formato';
 import { BlocoDiagnostico, DiagnosticoAprovado } from './Diagnostico';
 import { Historico } from './Historico';
 import { Passos } from './Passos';
@@ -79,6 +79,7 @@ export const PipelineAgentCard = () => {
       : null;
   const semPipelineFalho = banner.estado === 'pronta' && pipeline === null;
   const { diagnostico } = visao;
+  const custoDaSessao = dolar(visao.uso?.custoUsd ?? 0);
 
   const botaoInvestigar = (
     <Button
@@ -96,7 +97,7 @@ export const PipelineAgentCard = () => {
   return (
     <InfoCard
       title="Agente de pipeline"
-      subheader="lê o repositório e os logs · escreve só com aprovação"
+      subheader="Investiga o pipeline que falhou e propõe a correção. Só abre um MR depois que você aprovar."
     >
       <div className={classes.corpo}>
         {naoConfigurado && (
@@ -112,8 +113,9 @@ export const PipelineAgentCard = () => {
         {pipeline !== null && (
           <div className={classes.faixa} role="alert">
             <p className={classes.texto}>
-              Pipeline falhou no job {pipeline.job.nome} · commit &quot;
-              {pipeline.commit.titulo}&quot; · há {pipeline.haMinutos} min
+              O pipeline falhou no job {pipeline.job.nome} há{' '}
+              {tempoAtras(pipeline.haMinutos)}. Último commit: &quot;
+              {pipeline.commit.titulo}&quot;.
             </p>
             {botaoInvestigar}
           </div>
@@ -123,14 +125,14 @@ export const PipelineAgentCard = () => {
         )}
         {semPipelineFalho && (
           <p className={classes.subtitulo}>
-            Nenhum pipeline falhou neste projeto agora.
+            Nenhum pipeline com falha neste serviço agora.
           </p>
         )}
 
         {visao.passos.length > 0 && <Passos passos={visao.passos} />}
         {visao.orientacoes.map((texto, i) => (
           <p key={`orientacao-${i}`} className={classes.subtitulo}>
-            Orientação enviada: {texto}
+            {`Você orientou o agente: "${texto}"`}
           </p>
         ))}
         {diagnostico !== null && (
@@ -151,13 +153,16 @@ export const PipelineAgentCard = () => {
           <DiagnosticoAprovado diagnostico={visao.aprovado} />
         )}
 
-        {investigacao.temSessao && (
+        {investigacao.temSessao && visao.verdeSegundos !== null && (
           <p className={classes.rodape}>
-            Do clique ao verde:{' '}
-            {visao.verdeSegundos !== null
-              ? duracao(visao.verdeSegundos)
-              : `em andamento (${duracao(investigacao.segundosAteVerde)})`}{' '}
-            · custo da sessão: {dolar(visao.uso?.custoUsd ?? 0)}
+            Do clique ao pipeline verde: {duracao(visao.verdeSegundos)}. Custo
+            da investigação: {custoDaSessao}.
+          </p>
+        )}
+        {investigacao.temSessao && visao.verdeSegundos === null && (
+          <p className={classes.rodape}>
+            Tempo desde o clique: {duracao(investigacao.segundosAteVerde)}.
+            Custo até agora: {custoDaSessao}.
           </p>
         )}
 

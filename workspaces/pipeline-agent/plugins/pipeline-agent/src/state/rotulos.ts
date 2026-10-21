@@ -2,17 +2,17 @@
 // back to a generic pt-BR label, never to the raw English string.
 
 const ROTULOS_SESSAO = new Map<string, string>([
-  ['idle', 'Concluída'],
-  ['running', 'Em execução'],
-  ['rescheduling', 'Reagendando'],
-  ['terminated', 'Encerrada'],
+  ['idle', 'concluída'],
+  ['running', 'em andamento'],
+  ['rescheduling', 'reagendando'],
+  ['terminated', 'encerrada'],
 ]);
 
 const ROTULOS_PIPELINE = new Map<string, string>([
   ['created', 'criado'],
-  ['waiting_for_resource', 'aguardando recurso'],
-  ['preparing', 'preparando'],
-  ['pending', 'pendente'],
+  ['waiting_for_resource', 'esperando um runner (waiting_for_resource)'],
+  ['preparing', 'preparando o runner (preparing)'],
+  ['pending', 'na fila (pending)'],
   ['running', 'em andamento'],
   ['success', 'passou'],
   ['failed', 'falhou'],
@@ -23,7 +23,7 @@ const ROTULOS_PIPELINE = new Map<string, string>([
 ]);
 
 export function rotuloSessao(status: string): string {
-  return ROTULOS_SESSAO.get(status) ?? 'Estado desconhecido';
+  return ROTULOS_SESSAO.get(status) ?? 'estado desconhecido';
 }
 
 export function rotuloPipeline(status: string): string {
