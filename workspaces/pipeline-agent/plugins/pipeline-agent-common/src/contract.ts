@@ -44,6 +44,8 @@ export type FaseResposta = { fase: Fase };
 
 export type HistoricoResposta = { itens: ItemHistorico[] };
 
-// Error body for every non-2xx answer. 400 invalid input, 404 unknown
-// investigation, 409 wrong state, 501 not implemented yet, 502 upstream failure.
+// Error body for every non-2xx answer. 400 invalid input, 404 unknown or hidden
+// entity or investigation, 409 wrong state, 502 upstream failure, 503 the plugin is not
+// configured (real mode, missing keys). 401 and 403 come from the portal: 403 is
+// an RBAC or allowlist denial.
 export type ErroResposta = { erro: string };
