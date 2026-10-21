@@ -10,19 +10,33 @@ function componentWith(annotations?: Record<string, string>): Entity {
   };
 }
 
+const ENABLED = { 'veecode.io/pipeline-agent': 'enabled' };
+const SLUG = { 'gitlab.com/project-slug': 'veecode-demos/pedidos-api' };
+
 describe('isPipelineAgentAvailable', () => {
-  it('is true when the entity names a GitLab project', () => {
+  it('is true when the entity opts in and names a GitLab project', () => {
     expect(
-      isPipelineAgentAvailable(
-        componentWith({
-          'gitlab.com/project-slug': 'veecode-demos/pedidos-api',
-        }),
-      ),
+      isPipelineAgentAvailable(componentWith({ ...ENABLED, ...SLUG })),
     ).toBe(true);
   });
 
-  it('is false when the project annotation is missing', () => {
-    expect(isPipelineAgentAvailable(componentWith({}))).toBe(false);
+  it('is false for an entity that only has the GitLab project annotation', () => {
+    expect(isPipelineAgentAvailable(componentWith(SLUG))).toBe(false);
+  });
+
+  it('is false when the enabled annotation has any value other than enabled', () => {
+    expect(
+      isPipelineAgentAvailable(
+        componentWith({ 'veecode.io/pipeline-agent': 'disabled', ...SLUG }),
+      ),
+    ).toBe(false);
+  });
+
+  it('is false for an entity that opts in without a GitLab project', () => {
+    expect(isPipelineAgentAvailable(componentWith(ENABLED))).toBe(false);
+  });
+
+  it('is false when there are no annotations at all', () => {
     expect(isPipelineAgentAvailable(componentWith(undefined))).toBe(false);
   });
 });
