@@ -51,6 +51,16 @@ function mrDoResultado(
   return { iid: mr_iid, statusPipeline: pipeline_status };
 }
 
+// The last proposal whose result opened a merge request, so a later refusal, failure or
+// attempt-limit answer does not hide it. With no MR at all, the last proposal. -1 when
+// there are no proposals.
+function indiceDaMostrada(mrs: Array<ReturnType<typeof mrDoResultado>>): number {
+  for (let i = mrs.length - 1; i >= 0; i -= 1) {
+    if (mrs[i] !== null) return i;
+  }
+  return mrs.length - 1;
+}
+
 export function propostaDaSessao(eventos: SdkEvent[]): PropostaSessao | null {
   const propostas = new Map<string, Proposta>();
   for (const evento of eventos) {
@@ -70,19 +80,20 @@ export function propostaDaSessao(eventos: SdkEvent[]): PropostaSessao | null {
   }
 
   const todas = [...propostas.values()];
-  const ultima = todas[todas.length - 1];
-  if (!ultima) return null;
+  const mrs = todas.map(p => mrDoResultado(p.resultado));
+  const indice = indiceDaMostrada(mrs);
+  const mostrada = todas[indice];
+  if (!mostrada) return null;
 
-  // The live counter counts every approval, including one whose MR failed to open.
-  // The session only records MRs that opened, so this can be one lower in that case.
-  const anteriores = todas
-    .slice(0, -1)
-    .filter(p => mrDoResultado(p.resultado) !== null).length;
+  // The live counter counts every approval. An earlier approval whose result is an error
+  // carries no MR, so the session does not count it: this number can be lower by the
+  // count of those approvals.
+  const anteriores = mrs.slice(0, indice).filter(mr => mr !== null).length;
   return {
     tentativa: anteriores + 1,
-    titulo: ultima.entrada.titulo,
-    causa: ultima.entrada.causa,
-    arquivos: ultima.entrada.arquivos.map(a => a.caminho),
-    mr: mrDoResultado(ultima.resultado),
+    titulo: mostrada.entrada.titulo,
+    causa: mostrada.entrada.causa,
+    arquivos: mostrada.entrada.arquivos.map(a => a.caminho),
+    mr: mrs[indice] ?? null,
   };
 }
