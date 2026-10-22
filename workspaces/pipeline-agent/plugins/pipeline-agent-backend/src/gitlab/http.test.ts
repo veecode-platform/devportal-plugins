@@ -53,13 +53,51 @@ describe('GitLabHttp (mocked fetch)', () => {
       buscar: async () => respostaJson({ message: 'negado' }, 403),
     });
     const erro = await falha
-      .createBranch('agente/fix-1-1', 'main')
+      .commit({
+        branch: 'agente/fix-1-1',
+        base: 'main',
+        mensagem: 'fix: cupom',
+        acoes: [],
+      })
       .catch((e: Error) => e);
     expect(erro).toBeInstanceOf(Error);
     expect((erro as Error).message).toBe(
-      'GitLab respondeu 403 em POST /projects/g%2Fp/repository/branches',
+      'GitLab respondeu 403 em POST /projects/g%2Fp/repository/commits',
     );
     expect((erro as Error).message).not.toContain(TOKEN);
+  });
+
+  it('creates the branch inside the one commit request: branch plus start_branch, and no separate branch call', async () => {
+    const buscar = jest.fn(async () => respostaJson({ id: 'abc' }, 201));
+    const gitlab = new GitLabHttp({
+      base: 'https://gitlab.example.com/api/v4',
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar,
+    });
+    await gitlab.commit({
+      branch: 'agente/fix-1-1',
+      base: 'main',
+      mensagem: 'fix: cupom',
+      acoes: [{ acao: 'update', caminho: 'a.java', conteudo: 'class A {}' }],
+    });
+    expect(buscar).toHaveBeenCalledTimes(1);
+    const [url, init] = buscar.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe(
+      'https://gitlab.example.com/api/v4/projects/g%2Fp/repository/commits',
+    );
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      branch: 'agente/fix-1-1',
+      start_branch: 'main',
+      commit_message: 'fix: cupom',
+      actions: [
+        { action: 'update', file_path: 'a.java', content: 'class A {}' },
+      ],
+    });
   });
 });
 

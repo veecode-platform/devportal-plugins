@@ -23,6 +23,14 @@ export type AcaoArquivo = {
 
 export type ProjetoInfo = { id: number; caminho: string };
 
+// `branch` is created from `base` in the same request. GitLab refuses a `branch` that already exists.
+export type EntradaCommit = {
+  branch: string;
+  base: string;
+  mensagem: string;
+  acoes: AcaoArquivo[];
+};
+
 export interface GitLab {
   getProject(): Promise<ProjetoInfo>;
   findLatestFailedPipeline(ref: string): Promise<Pipeline | null>;
@@ -33,8 +41,7 @@ export interface GitLab {
   getCommitDiff(sha: string): Promise<string>;
   getArchive(sha: string): Promise<Uint8Array>;
   getFile(caminho: string, ref: string): Promise<string | null>;
-  createBranch(nome: string, ref: string): Promise<void>;
-  commit(branch: string, mensagem: string, acoes: AcaoArquivo[]): Promise<void>;
+  commit(entrada: EntradaCommit): Promise<void>;
   createMR(entrada: {
     origem: string;
     destino: string;

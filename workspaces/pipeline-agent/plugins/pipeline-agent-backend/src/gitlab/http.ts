@@ -2,7 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { type ArquivoCommit, renderizarDiffCommit } from '../diff';
 import type {
-  AcaoArquivo,
+  EntradaCommit,
   GitLab,
   Job,
   MergeRequest,
@@ -229,22 +229,14 @@ export class GitLabHttp implements GitLab {
     return Buffer.from(texto(j.content), 'base64').toString('utf8');
   }
 
-  async createBranch(nome: string, ref: string): Promise<void> {
-    await this.chamar('POST', `/projects/${this.pid}/repository/branches`, {
-      branch: nome,
-      ref,
-    });
-  }
-
-  async commit(
-    branch: string,
-    mensagem: string,
-    acoes: AcaoArquivo[],
-  ): Promise<void> {
+  // One request creates the branch from `base` and commits to it. Without force, GitLab
+  // answers 400 for a branch that already exists, so nothing is committed to it.
+  async commit(entrada: EntradaCommit): Promise<void> {
     await this.chamar('POST', `/projects/${this.pid}/repository/commits`, {
-      branch,
-      commit_message: mensagem,
-      actions: acoes.map(a => ({
+      branch: entrada.branch,
+      start_branch: entrada.base,
+      commit_message: entrada.mensagem,
+      actions: entrada.acoes.map(a => ({
         action: a.acao,
         file_path: a.caminho,
         content: a.conteudo,
