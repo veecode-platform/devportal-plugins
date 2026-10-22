@@ -63,6 +63,10 @@ function arquivoDeCommit(j: Json): ArquivoCommit {
   };
 }
 
+function urlOpcional(valor: unknown): string | null {
+  return typeof valor === 'string' && valor !== '' ? valor : null;
+}
+
 function pipelineDe(j: Json): Pipeline {
   return {
     id: inteiro(j.id),
@@ -70,7 +74,7 @@ function pipelineDe(j: Json): Pipeline {
     ref: texto(j.ref),
     sha: texto(j.sha),
     criadoEm: texto(j.created_at),
-    url: texto(j.web_url),
+    url: urlOpcional(j.web_url),
   };
 }
 

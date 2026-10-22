@@ -71,6 +71,15 @@ const MR_ABERTO: UiEvent = {
   url: 'https://gitlab.example.com/veecode-demos/pedidos-api/-/merge_requests/3',
 };
 
+const URL_PIPELINE =
+  'https://gitlab.example.com/veecode-demos/pedidos-api/-/pipelines/77';
+
+const DIAGNOSTICO_EM_LINHAS: UiEvent = {
+  ...DIAGNOSTICO,
+  causa:
+    'Causa: a faixa de 5% sai sobre o valor que o cupom já descontou.\nEvidência: o trecho usa `comCupom` como base.\nMudança: o nome `bruto sem fechar fica como texto.',
+};
+
 // Replays the given events as soon as the card follows the investigation, then
 // stays open until the card unmounts, as a live stream does.
 const acompanharCom =
@@ -387,5 +396,134 @@ describe('PipelineAgentCard', () => {
         'Do clique ao pipeline verde: 4 min 12 s. Custo da investigação: US$ 0,31.',
       ),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'abrir no GitLab' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows each line of the cause on its own, with code between backticks and a stray backtick as text', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({ acompanhar: acompanharCom([DIAGNOSTICO_EM_LINHAS]) }),
+    );
+
+    await user.click(await botaoInvestigar());
+    await screen.findByRole('button', { name: 'Aprovar e abrir MR' });
+
+    expect(
+      screen.getByText(
+        'Causa: a faixa de 5% sai sobre o valor que o cupom já descontou.',
+      ).tagName,
+    ).toBe('P');
+    expect(screen.getByText(/^Evidência: o trecho usa/).tagName).toBe('P');
+    expect(screen.getByText(/^Mudança:/).tagName).toBe('P');
+    expect(screen.getByText('comCupom').tagName).toBe('CODE');
+    expect(
+      screen.getByText('Mudança: o nome `bruto sem fechar fica como texto.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the same cause, with its code, in the approved diagnosis', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({
+        acompanhar: acompanharCom([DIAGNOSTICO_EM_LINHAS, MR_ABERTO]),
+      }),
+    );
+
+    await user.click(await botaoInvestigar());
+
+    expect(
+      await screen.findByText('Ver o diagnóstico aprovado'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('comCupom').tagName).toBe('CODE');
+    expect(
+      screen.getByText('Mudança: o nome `bruto sem fechar fica como texto.'),
+    ).toBeInTheDocument();
+  });
+
+  it('links the running merge request pipeline to GitLab', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({
+        acompanhar: acompanharCom([
+          MR_ABERTO,
+          {
+            tipo: 'pipeline_mr',
+            pipelineId: 77,
+            status: 'running',
+            url: URL_PIPELINE,
+            jobs: [],
+            jobFalho: null,
+          },
+        ]),
+      }),
+    );
+
+    await user.click(await botaoInvestigar());
+
+    expect(
+      await screen.findByText('Pipeline do MR: em andamento…'),
+    ).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'abrir no GitLab' });
+    expect(link).toHaveAttribute('href', URL_PIPELINE);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
+  });
+
+  it('links the passed merge request pipeline to GitLab', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({
+        acompanhar: acompanharCom([
+          MR_ABERTO,
+          {
+            tipo: 'pipeline_mr',
+            pipelineId: 77,
+            status: 'success',
+            url: URL_PIPELINE,
+            jobs: ['build', 'test'],
+            jobFalho: null,
+          },
+        ]),
+      }),
+    );
+
+    await user.click(await botaoInvestigar());
+
+    expect(
+      await screen.findByText('O pipeline do MR passou (build e test).'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'abrir no GitLab' }),
+    ).toHaveAttribute('href', URL_PIPELINE);
+  });
+
+  it('links the failed merge request pipeline to GitLab', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({
+        acompanhar: acompanharCom([
+          MR_ABERTO,
+          {
+            tipo: 'pipeline_mr',
+            pipelineId: 77,
+            status: 'failed',
+            url: URL_PIPELINE,
+            jobs: ['build', 'test'],
+            jobFalho: 'test',
+          },
+        ]),
+      }),
+    );
+
+    await user.click(await botaoInvestigar());
+
+    expect(
+      await screen.findByText('O pipeline do MR falhou no job test.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'abrir no GitLab' }),
+    ).toHaveAttribute('href', URL_PIPELINE);
   });
 });

@@ -4,6 +4,18 @@ import { listaComE } from '../../state/formato';
 import { rotuloPipeline } from '../../state/rotulos';
 import { useEstilos } from './estilos';
 
+function LinkPipeline({ url }: { url: string | null }) {
+  if (url === null) return null;
+  return (
+    <>
+      {' '}
+      <Link href={url} target="_blank" rel="noreferrer">
+        abrir no GitLab
+      </Link>
+    </>
+  );
+}
+
 export function Resultado({ visao }: { visao: Visao }) {
   const classes = useEstilos();
   const { recusa, mr, pipeline, erro, encerrado } = visao;
@@ -30,18 +42,21 @@ export function Resultado({ visao }: { visao: Visao }) {
       {pipeline !== null && emAndamento && (
         <p className={classes.texto}>
           Pipeline do MR: {rotuloPipeline(pipeline.status)}…
+          <LinkPipeline url={pipeline.url} />
         </p>
       )}
       {pipeline?.status === 'success' && (
         <p className={classes.sucesso}>
           O pipeline do MR passou
           {pipeline.jobs.length > 0 && ` (${listaComE(pipeline.jobs)})`}.
+          <LinkPipeline url={pipeline.url} />
         </p>
       )}
       {pipeline?.status === 'failed' && (
         <p className={classes.erro}>
           O pipeline do MR falhou
           {pipeline.jobFalho && ` no job ${pipeline.jobFalho}`}.
+          <LinkPipeline url={pipeline.url} />
         </p>
       )}
       {erro !== null && <p className={classes.erro}>{erro}</p>}

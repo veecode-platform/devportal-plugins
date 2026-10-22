@@ -70,6 +70,13 @@ export const useEstilos = makeStyles((tema: Theme) => ({
     border: `1px solid ${tema.palette.divider}`,
     backgroundColor: tema.palette.background.default,
   },
+  codigoEmLinha: {
+    fontFamily: 'monospace',
+    fontSize: '0.9em',
+    padding: tema.spacing(0, 0.5),
+    borderRadius: tema.shape.borderRadius,
+    backgroundColor: tema.palette.action.hover,
+  },
   diffLinha: {
     display: 'block',
   },

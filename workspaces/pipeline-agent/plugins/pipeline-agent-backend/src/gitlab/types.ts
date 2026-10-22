@@ -8,7 +8,7 @@ export type Pipeline = {
   ref: string;
   sha: string;
   criadoEm: string;
-  url: string;
+  url: string | null;
 };
 
 export type Job = { id: number; nome: string; status: string };

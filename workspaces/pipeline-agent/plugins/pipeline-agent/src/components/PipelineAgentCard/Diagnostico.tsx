@@ -4,6 +4,7 @@ import TextField from '@material-ui/core/TextField';
 import Typography from '@material-ui/core/Typography';
 import type { ArquivoDiff } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
 import type { Diagnostico } from '../../state/visao';
+import { partirCodigo } from '../../state/formato';
 import { useEstilos } from './estilos';
 
 // The backend's limit on diagnosis attempts.
@@ -40,13 +41,34 @@ function Diff({ arquivo }: { arquivo: ArquivoDiff }) {
   );
 }
 
+function Causa({ texto }: { texto: string }) {
+  const classes = useEstilos();
+  return (
+    <>
+      {texto.split('\n').map((linha, i) => (
+        <p key={i} className={classes.texto}>
+          {partirCodigo(linha).map((trecho, j) =>
+            trecho.tipo === 'codigo' ? (
+              <code key={j} className={classes.codigoEmLinha}>
+                {trecho.valor}
+              </code>
+            ) : (
+              trecho.valor
+            ),
+          )}
+        </p>
+      ))}
+    </>
+  );
+}
+
 // The cause, the proposed change and the diff. Shared by the pending proposal
 // and by the approved one that stays on screen after the MR opens.
 function DetalheDiagnostico({ diagnostico }: { diagnostico: Diagnostico }) {
   const classes = useEstilos();
   return (
     <>
-      <p className={classes.texto}>{diagnostico.causa}</p>
+      <Causa texto={diagnostico.causa} />
       <p className={classes.texto}>
         <strong>Correção proposta:</strong> {diagnostico.titulo}
       </p>

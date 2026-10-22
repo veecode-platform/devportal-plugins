@@ -84,4 +84,50 @@ describe('executarAbrirMr', () => {
     expect(resultado).toEqual({ mr_iid: 7, pipeline_status: 'success' });
     expect(cartao).toEqual([url]);
   });
+
+  it.each([
+    [
+      'the pipeline url GitLab gives',
+      'https://gitlab.example.com/veecode-demos/pedidos-api/-/pipelines/90',
+    ],
+    ['null when GitLab gives none', null],
+  ])('sends %s with every pipeline update', async (_nome, url) => {
+    const gitlab = {
+      listBranches: async () => [],
+      createBranch: async () => undefined,
+      commit: async () => undefined,
+      createMR: async () => ({
+        iid: 7,
+        titulo: 't',
+        url: 'https://gitlab.example.com/veecode-demos/pedidos-api/-/merge_requests/7',
+      }),
+      getMRPipeline: async () => ({
+        id: 90,
+        status: 'success',
+        ref: 'agente/fix-9001-1',
+        sha: 'x',
+        criadoEm: 'c',
+        url,
+      }),
+      listJobs: async () => [],
+      listFailedJobs: async () => [],
+      getJobTrace: async () => '',
+    } as unknown as GitLab;
+    const atualizacoes: Array<string | null> = [];
+    await executarAbrirMr({
+      gitlab,
+      pipelineId: 9001,
+      ref: 'main',
+      tentativa: 1,
+      entrada: { titulo: 't', causa: 'c', arquivos: [] },
+      arquivos: [],
+      intervaloMs: 0,
+      prazoMs: 1000,
+      dormir: async () => undefined,
+      aoAbrirMr: () => undefined,
+      aoMudarPipeline: p => atualizacoes.push(p.url),
+    });
+    expect(atualizacoes.length).toBeGreaterThan(0);
+    expect(atualizacoes.every(u => u === url)).toBe(true);
+  });
 });

@@ -40,3 +40,18 @@ export function dataCurta(iso: string, agora: Date): string {
 export function dolar(valor: number): string {
   return `US$ ${valor.toFixed(2).replace('.', ',')}`;
 }
+
+export type TrechoLinha = { tipo: 'texto' | 'codigo'; valor: string };
+
+// Splits a line at each pair of single backticks; an unpaired backtick stays text.
+export function partirCodigo(linha: string): TrechoLinha[] {
+  return linha
+    .split(/`([^`]+)`/)
+    .map(
+      (valor, i): TrechoLinha => ({
+        tipo: i % 2 === 1 ? 'codigo' : 'texto',
+        valor,
+      }),
+    )
+    .filter(trecho => trecho.valor !== '');
+}
