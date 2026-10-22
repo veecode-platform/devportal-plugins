@@ -554,3 +554,211 @@ describe('pipeline agent router, read paths need the create permission', () => {
     }
   });
 });
+
+const REF_OUTRO = 'component:default/outro';
+const VINCULO_OUTRO: Vinculo = {
+  project: 'interno/outro',
+  entityRef: REF_OUTRO,
+};
+
+// The history item with this title, as the card lists it, so the test reads the id
+// the way a user reaches it.
+async function idDoItem(
+  base: string,
+  entityRef: string,
+  titulo: string,
+): Promise<string> {
+  const lista = await fetch(`${base}/history?entityRef=${entityRef}`, {
+    headers: AUTH,
+  });
+  const { itens } = (await lista.json()) as {
+    itens: Array<{ id: string; titulo: string }>;
+  };
+  const item = itens.find(i => i.titulo === titulo);
+  if (!item) throw new Error(`sem item "${titulo}" no histórico`);
+  return item.id;
+}
+
+describe('pipeline agent router, one item of the history', () => {
+  it('answers the proposal of a finished investigation with its merge request and final pipeline', async () => {
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const id = await idDoItem(
+        servidor.base,
+        REF_PEDIDOS,
+        'Pipeline 8842 · job build · MR !2 aberto',
+      );
+
+      const res = await fetch(
+        `${servidor.base}/history/${id}?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        id,
+        proposta: {
+          tentativa: 1,
+          titulo: 'fix: cupom e faixa somam sobre o valor bruto',
+          causa: expect.stringContaining(
+            'Causa: DescontoService.calcularTotal',
+          ),
+          arquivos: [
+            'src/main/java/br/com/exemplo/pedidos/DescontoService.java',
+          ],
+          mr: {
+            iid: 2,
+            url: 'https://gitlab.com/veecode-demos/pedidos-api/-/merge_requests/2',
+            statusPipeline: 'success',
+          },
+        },
+      });
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers the refused proposal of an investigation with no merge request', async () => {
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const id = await idDoItem(
+        servidor.base,
+        REF_PEDIDOS,
+        'Pipeline 8810 · job test · recusado',
+      );
+
+      const res = await fetch(
+        `${servidor.base}/history/${id}?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        proposta: { titulo: expect.any(String), mr: null },
+      });
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers an empty detail, not an error, for a session with no proposal', async () => {
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const id = await idDoItem(
+        servidor.base,
+        REF_PEDIDOS,
+        'Pipeline 8777 · job lint · sem proposta',
+      );
+
+      const res = await fetch(
+        `${servidor.base}/history/${id}?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ id, proposta: null });
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it("refuses another project's session as not found, and still answers the entity's own", async () => {
+    const { app } = criarApp({ vinculos: [VINCULO_PEDIDOS, VINCULO_OUTRO] });
+    const servidor = await escutar(app);
+    try {
+      const doOutro = await idDoItem(
+        servidor.base,
+        REF_OUTRO,
+        'Pipeline 8842 · job build · MR !2 aberto',
+      );
+      const doPedidos = await idDoItem(
+        servidor.base,
+        REF_PEDIDOS,
+        'Pipeline 8842 · job build · MR !2 aberto',
+      );
+
+      const alheia = await fetch(
+        `${servidor.base}/history/${doOutro}?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(alheia.status).toBe(404);
+      expect(await alheia.json()).toEqual({
+        erro: 'investigação não encontrada',
+      });
+
+      const propria = await fetch(
+        `${servidor.base}/history/${doPedidos}?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(propria.status).toBe(200);
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers 404 for a session id the agent does not know', async () => {
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const res = await fetch(
+        `${servidor.base}/history/sesn_nao_existe?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({
+        erro: 'investigação não encontrada',
+      });
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers 400 for an id that is not a single path segment', async () => {
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const res = await fetch(
+        `${servidor.base}/history/sesn.fora?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        erro: 'id da investigação inválido',
+      });
+    } finally {
+      await servidor.fechar();
+    }
+  });
+
+  it('answers 403 when create is denied, and 403 for an entity bound to another project', async () => {
+    const { app, negados } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const id = await idDoItem(
+        servidor.base,
+        REF_PEDIDOS,
+        'Pipeline 8842 · job build · MR !2 aberto',
+      );
+      const clone = await fetch(
+        `${servidor.base}/history/${id}?entityRef=${REF_CLONE}`,
+        { headers: AUTH },
+      );
+      expect(clone.status).toBe(403);
+
+      negados.add('pipeline-agent.investigation.create');
+      const negado = await fetch(
+        `${servidor.base}/history/${id}?entityRef=${REF_PEDIDOS}`,
+        { headers: AUTH },
+      );
+      expect(negado.status).toBe(403);
+      expect(await negado.json()).toEqual({
+        erro: expect.stringContaining('pipeline-agent.investigation.create'),
+      });
+    } finally {
+      await servidor.fechar();
+    }
+  });
+});
