@@ -213,10 +213,52 @@ describe('aws:lambda:invoke', () => {
     expect(invocations).toHaveLength(4);
     expect(invocations[1].Payload).toBe('{"id":"abc"}');
     expect(info.mock.calls.map(call => call[0])).toEqual([
-      'Poll 1 at 10s: unmatched {"state":"pending"}',
-      'Poll 2 at 20s: unmatched {"state":"pending"}',
-      'Poll 3 at 30s: matched {"state":"ready","id":"abc"}',
+      'Poll 1 at 10s: unmatched state=pending',
+      'Poll 2 at 20s: unmatched state=pending',
+      'Poll 3 at 30s: matched state=ready',
     ]);
+  });
+
+  it('logs only the until keys of each poll, never the rest of the answer', async () => {
+    mockLambdaSend
+      .mockResolvedValueOnce({
+        StatusCode: 200,
+        Payload: encode({ status: 'created' }),
+      })
+      .mockResolvedValueOnce({
+        StatusCode: 200,
+        Payload: encode({ state: 'pending', secret: 'do-not-log' }),
+      })
+      .mockResolvedValueOnce({
+        StatusCode: 200,
+        Payload: encode(null),
+      })
+      .mockResolvedValueOnce({
+        StatusCode: 200,
+        Payload: encode({ state: 'ready', attempts: 3, secret: 'do-not-log' }),
+      });
+    const ctx = contextWith({
+      target: 'example-target',
+      payload: {},
+      poll: {
+        payload: {},
+        until: { state: 'ready', attempts: 3 },
+        intervalSeconds: 10,
+        timeoutSeconds: 60,
+      },
+    });
+    const info = jest.spyOn(ctx.logger, 'info');
+
+    await actionFor(exampleTarget).handler(ctx);
+
+    expect(info.mock.calls.map(call => call[0])).toEqual([
+      'Poll 1 at 10s: unmatched state=pending attempts=<missing>',
+      'Poll 2 at 20s: unmatched state=<missing> attempts=<missing>',
+      'Poll 3 at 30s: matched state=ready attempts=3',
+    ]);
+    const logged = JSON.stringify(info.mock.calls);
+    expect(logged).not.toContain('secret');
+    expect(logged).not.toContain('do-not-log');
   });
 
   it('fails the step when no poll matches before the timeout', async () => {

@@ -60,8 +60,10 @@ Behavior:
 - A function error fails the step with the function's `errorMessage`.
 - A failed role assumption or invocation fails the step with the AWS error name and message.
   Credentials never reach the task log.
-- With `poll`, each answer is logged as one task-log line with the elapsed seconds and whether
-  it matched.
+- With `poll`, each answer is logged as one task-log line: the attempt, the elapsed seconds, the
+  verdict, and the `until` keys with the value the answer returned for each, such as
+  `Poll 3 at 30s: matched state=ready`. A key the answer lacks is logged as `<missing>`. Nothing
+  else from the answer reaches the task log.
 
 Example step:
 

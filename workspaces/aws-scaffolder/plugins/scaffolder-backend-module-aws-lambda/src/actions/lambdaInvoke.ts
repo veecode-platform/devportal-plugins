@@ -112,8 +112,12 @@ export function createLambdaInvokeAction(options: {
         const matched = matchesUntil(answer.answer, until);
         const verdict = matched ? 'matched' : 'unmatched';
         const seconds = Math.round(elapsedMs / 1000);
-        const body = JSON.stringify(answer.answer);
-        ctx.logger.info(`Poll ${attempt} at ${seconds}s: ${verdict} ${body}`);
+        ctx.logger.info(
+          [
+            `Poll ${attempt} at ${seconds}s: ${verdict}`,
+            ...describeUntil(answer.answer, until),
+          ].join(' '),
+        );
         if (matched) {
           ctx.output('result', answer.answer);
           ctx.output('statusCode', answer.statusCode);
@@ -223,4 +227,26 @@ function matchesUntil(
   return Object.entries(until).every(([key, expected]) =>
     isDeepStrictEqual(fields[key], expected),
   );
+}
+
+/**
+ * Renders the answer's value for each key that `until` names. The task log
+ * gets these keys only, so the rest of the answer never reaches it.
+ */
+function describeUntil(
+  answer: unknown,
+  until: Record<string, unknown>,
+): string[] {
+  const fields =
+    typeof answer === 'object' && answer !== null && !Array.isArray(answer)
+      ? (answer as Record<string, unknown>)
+      : {};
+  return Object.keys(until).map(key => `${key}=${renderValue(fields[key])}`);
+}
+
+function renderValue(value: unknown): string {
+  if (value === undefined) {
+    return '<missing>';
+  }
+  return typeof value === 'string' ? value : JSON.stringify(value);
 }
