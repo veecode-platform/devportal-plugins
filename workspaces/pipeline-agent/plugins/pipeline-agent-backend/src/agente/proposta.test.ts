@@ -70,7 +70,7 @@ describe('propostaDaSessao', () => {
     });
   });
 
-  it('uses the last proposal of the session', () => {
+  it('uses the last proposal that opened a merge request, after an earlier refusal', () => {
     const eventos = [
       proposta('toolu_1', 'fix: primeira'),
       resposta('toolu_1', 'A pessoa recusou a proposta.', true),
@@ -81,6 +81,62 @@ describe('propostaDaSessao', () => {
     expect(propostaDaSessao(eventos)).toMatchObject({
       titulo: 'fix: segunda',
       mr: { iid: 5, statusPipeline: 'failed' },
+    });
+  });
+
+  it('shows the merge request an earlier attempt opened, not a later refusal', () => {
+    const eventos = [
+      proposta('toolu_1', 'fix: primeira'),
+      resposta('toolu_1', ABERTO(4, 'failed')),
+      proposta('toolu_2', 'fix: segunda'),
+      resposta('toolu_2', 'A pessoa recusou a proposta. Motivo: nao.', true),
+    ];
+
+    expect(propostaDaSessao(eventos)).toEqual({
+      tentativa: 1,
+      titulo: 'fix: primeira',
+      causa: CAUSA,
+      arquivos: [ARQUIVO.caminho],
+      mr: { iid: 4, statusPipeline: 'failed' },
+    });
+  });
+
+  it('shows the third red merge request, not the attempt-limit answer that came after it', () => {
+    const eventos = [
+      proposta('toolu_1', 'fix: primeira'),
+      resposta('toolu_1', ABERTO(1, 'failed')),
+      proposta('toolu_2', 'fix: segunda'),
+      resposta('toolu_2', ABERTO(2, 'failed')),
+      proposta('toolu_3', 'fix: terceira'),
+      resposta('toolu_3', ABERTO(3, 'failed')),
+      proposta('toolu_4', 'fix: quarta'),
+      resposta(
+        'toolu_4',
+        'Limite de tentativas atingido. Não abra outro MR: escreva o diagnóstico.',
+      ),
+    ];
+
+    expect(propostaDaSessao(eventos)).toEqual({
+      tentativa: 3,
+      titulo: 'fix: terceira',
+      causa: CAUSA,
+      arquivos: [ARQUIVO.caminho],
+      mr: { iid: 3, statusPipeline: 'failed' },
+    });
+  });
+
+  it('shows the last proposal when no attempt opened a merge request', () => {
+    const eventos = [
+      proposta('toolu_1', 'fix: primeira'),
+      resposta('toolu_1', 'A pessoa recusou a proposta.', true),
+      proposta('toolu_2', 'fix: segunda'),
+      resposta('toolu_2', 'Falha ao abrir o MR: a API não respondeu.', true),
+    ];
+
+    expect(propostaDaSessao(eventos)).toMatchObject({
+      tentativa: 1,
+      titulo: 'fix: segunda',
+      mr: null,
     });
   });
 

@@ -108,7 +108,7 @@ function criarApp(opcoes: { vinculos?: Vinculo[] } = {}) {
   const servico = criarServico({
     runtime: new AgenteFake({ esperar: async () => undefined }),
     gitlabPara: slug => new GitLabFake(slug, { duracaoPipelineMs: 0 }),
-    gitlabHost: 'gitlab.com',
+    gitlabBaseUrl: 'https://gitlab.com',
     agentId: 'agent_fake',
     environmentId: 'env_fake',
     ritmo: {

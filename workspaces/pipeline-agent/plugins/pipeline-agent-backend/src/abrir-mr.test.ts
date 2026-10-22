@@ -144,7 +144,6 @@ describe('executarAbrirMr', () => {
   ])('sends %s with every pipeline update', async (_nome, url) => {
     const gitlab = {
       listBranches: async () => [],
-      createBranch: async () => undefined,
       commit: async () => undefined,
       createMR: async () => ({
         iid: 7,
