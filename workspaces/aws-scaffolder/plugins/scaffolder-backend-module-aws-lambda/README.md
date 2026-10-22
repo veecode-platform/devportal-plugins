@@ -25,6 +25,62 @@ A template names a target by `alias`, never by ARN. An alias that is not listed 
 aliases. Changing which function a template can reach is a configuration change, not a template
 change.
 
+## Authorization
+
+The action authorizes nothing by itself. Any template that can run may name any alias listed under
+`aws.lambdaTargets`, so the portal's permission framework has to decide who may execute
+`aws:lambda:invoke` and with which `target`.
+
+Restrict it through the scaffolder action permission, `scaffolder.action.execute`, and its
+conditional rules on the step input:
+
+- `hasActionId` matches the action `aws:lambda:invoke`.
+- `hasStringProperty` with `key: target` matches the alias that the group owns.
+
+Bind each alias to the group that owns its target. Do not grant `scaffolder.action.execute`
+without those conditions. A plain grant, such as `p, role:default/developer,
+scaffolder.action.execute, use, allow` in an RBAC policy file, lets its holder invoke every configured alias.
+
+The scaffolder evaluates the decision against each step of a template, with that step's rendered
+input. The rule must therefore also pass the steps that are not `aws:lambda:invoke`. This example
+gives the members of `group:default/example-owners` the alias `example-target` and passes every
+other step:
+
+```ts
+import { isPermission } from '@backstage/plugin-permission-common';
+import { actionExecutePermission } from '@backstage/plugin-scaffolder-common/alpha';
+import {
+  createScaffolderActionConditionalDecision,
+  scaffolderActionConditions,
+} from '@backstage/plugin-scaffolder-backend/alpha';
+
+// Inside the handle(request, user) method of your PermissionPolicy:
+if (isPermission(request.permission, actionExecutePermission)) {
+  const ownsTarget = user?.info.ownershipEntityRefs.includes(
+    'group:default/example-owners',
+  );
+  return createScaffolderActionConditionalDecision(actionExecutePermission, {
+    anyOf: [
+      {
+        not: scaffolderActionConditions.hasActionId({
+          actionId: 'aws:lambda:invoke',
+        }),
+      },
+      ...(ownsTarget
+        ? [
+            scaffolderActionConditions.hasStringProperty({
+              key: 'target',
+              value: 'example-target',
+            }),
+          ]
+        : []),
+    ],
+  });
+}
+```
+
+For a group that owns several aliases, add one `hasStringProperty` per alias.
+
 ## Action: `aws:lambda:invoke`
 
 Input:
