@@ -152,7 +152,7 @@ export class PipelineAgentFake implements PipelineAgentApi {
     const sessao = this.sessoes.get(id);
     const proposta = sessao
       ? propostaDoRoteiro(sessao.eventos)
-      : (PROPOSTAS_HISTORICO[id] ?? null);
+      : PROPOSTAS_HISTORICO[id] ?? null;
     return { id, proposta };
   }
 
