@@ -60,4 +60,62 @@ describe('readLambdaTargets', () => {
       ),
     ).toThrow(/functionArn/);
   });
+  it('names the index and alias of an entry with an unknown key', () => {
+    expect(() =>
+      readLambdaTargets(
+        new ConfigReader({
+          aws: {
+            lambdaTargets: [
+              exampleEntry,
+              {
+                ...exampleEntry,
+                alias: 'other-target',
+                externalID: 'example-external-id',
+              },
+            ],
+          },
+        }),
+      ),
+    ).toThrow(
+      /^aws\.lambdaTargets\[1\] \(alias "other-target"\): entry Unrecognized key\(s\) in object: 'externalID'$/,
+    );
+  });
+
+  it('refuses a role ARN that is not an IAM role ARN, naming the index', () => {
+    expect(() =>
+      readLambdaTargets(
+        new ConfigReader({
+          aws: {
+            lambdaTargets: [
+              { ...exampleEntry, roleArn: 'arn:aws:s3:::example-bucket' },
+            ],
+          },
+        }),
+      ),
+    ).toThrow(
+      /^aws\.lambdaTargets\[0\] \(alias "example-target"\): roleArn must be an IAM role ARN/,
+    );
+  });
+
+  it('refuses a function ARN with a short account id, naming the index', () => {
+    expect(() =>
+      readLambdaTargets(
+        new ConfigReader({
+          aws: {
+            lambdaTargets: [
+              exampleEntry,
+              {
+                ...exampleEntry,
+                alias: 'other-target',
+                functionArn:
+                  'arn:aws:lambda:us-east-1:1234:function:example-function',
+              },
+            ],
+          },
+        }),
+      ),
+    ).toThrow(
+      /^aws\.lambdaTargets\[1\] \(alias "other-target"\): functionArn must be a Lambda function ARN/,
+    );
+  });
 });
