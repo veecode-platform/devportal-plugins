@@ -44,7 +44,7 @@ describe('criarServico.iniciar', () => {
     const servico = criarServico({
       runtime,
       gitlabPara: () => gitlab,
-      gitlabHost: HOST,
+      gitlabBaseUrl: `https://${HOST}`,
       agentId: 'agent_x',
       environmentId: 'env_x',
       ritmo: { intervaloPollMs: 0, prazoPollMs: 1000, dormir: async () => {} },
@@ -68,7 +68,7 @@ describe('criarServico.iniciar', () => {
     const servico = criarServico({
       runtime,
       gitlabPara: () => gitlab,
-      gitlabHost: HOST,
+      gitlabBaseUrl: `https://${HOST}`,
       agentId: 'agent_x',
       environmentId: 'env_x',
       ritmo: { intervaloPollMs: 0, prazoPollMs: 1000, dormir: async () => {} },
@@ -110,7 +110,7 @@ describe('criarServico.iniciar', () => {
     const servico = criarServico({
       runtime,
       gitlabPara: () => gitlab,
-      gitlabHost: HOST,
+      gitlabBaseUrl: `https://${HOST}`,
       agentId: 'agent_x',
       environmentId: 'env_x',
       ritmo: { intervaloPollMs: 0, prazoPollMs: 1000, dormir: async () => {} },
@@ -125,5 +125,58 @@ describe('criarServico.iniciar', () => {
     expect(texto).toContain('Pipeline 9001 falhou no job test (id 5531).');
     expect(texto).not.toContain(HOST);
     expect(texto).not.toMatch(/https?:\/\//);
+  });
+});
+
+describe('criarServico.detalhe', () => {
+  const PROPOSTA = {
+    id: 'evt_1',
+    type: 'agent.custom_tool_use',
+    name: 'abrir_mr',
+    input: {
+      titulo: 'fix: cupom e faixa somam sobre o valor bruto',
+      causa: 'Causa: a faixa é aplicada sobre o valor já descontado.',
+      arquivos: [{ caminho: 'src/Desconto.java', conteudo: 'class D {}' }],
+    },
+    processed_at: 'p',
+  };
+  const RESULTADO = {
+    id: 'evt_2',
+    type: 'user.custom_tool_result',
+    custom_tool_use_id: 'evt_1',
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({ mr_iid: 2, pipeline_status: 'success' }),
+      },
+    ],
+    is_error: false,
+    processed_at: 'p',
+  };
+
+  it('links the merge request under the configured GitLab base URL, with its port and path prefix', async () => {
+    const runtime = {
+      obterSessao: async () => ({
+        metadata: { app: 'pipeline-agent', projeto: ENTIDADE.projectSlug },
+      }),
+      listarEventos: async () => [PROPOSTA, RESULTADO],
+    } as unknown as AgentRuntime;
+    const servico = criarServico({
+      runtime,
+      gitlabPara: () =>
+        new GitLabFake(ENTIDADE.projectSlug, { duracaoPipelineMs: 0 }),
+      gitlabBaseUrl: 'https://gitlab.example.com:8443/gitlab',
+      agentId: 'agent_x',
+      environmentId: 'env_x',
+      ritmo: { intervaloPollMs: 0, prazoPollMs: 1000, dormir: async () => {} },
+    });
+
+    const detalhe = await servico.detalhe(ENTIDADE, 'sesn_1');
+
+    expect(detalhe.proposta?.mr).toEqual({
+      iid: 2,
+      url: 'https://gitlab.example.com:8443/gitlab/veecode-demos/pedidos-api/-/merge_requests/2',
+      statusPipeline: 'success',
+    });
   });
 });

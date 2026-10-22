@@ -10,7 +10,7 @@ import type { EntidadeResolvida } from './entidade';
 import { ErroEstado, ErroNaoEncontrado } from './erros';
 import { Investigacao, type Dependencias } from './investigacao';
 import type { GitLab, Job, Pipeline } from './gitlab/types';
-import { ocultarHost, sanitizarTrace } from './sanitizar';
+import { hostDe, ocultarHost, sanitizarTrace } from './sanitizar';
 
 // The investigations of this process. State lives in memory: one replica only. One
 // running investigation per entity; a second start answers 409 until the first ends.
@@ -31,7 +31,7 @@ export type Servico = {
 export type OpcoesServico = {
   runtime: AgentRuntime;
   gitlabPara: (projectSlug: string) => GitLab;
-  gitlabHost: string;
+  gitlabBaseUrl: string;
   agentId: string;
   environmentId: string;
   ritmo: Omit<Dependencias, 'runtime' | 'gitlab' | 'host'>;
@@ -82,9 +82,9 @@ async function arquivosDoPipeline(
 const TIPOS_DA_PROPOSTA = ['agent.custom_tool_use', 'user.custom_tool_result'];
 
 // The session records the merge request's iid, not its URL. The GitLab web address of
-// a merge request is the project path plus its iid, on the configured host.
-function urlDaMr(host: string, projectSlug: string, iid: number): string {
-  return `https://${host}/${projectSlug}/-/merge_requests/${iid}`;
+// a merge request is the configured base URL, the project path and the iid.
+function urlDaMr(baseUrl: string, projectSlug: string, iid: number): string {
+  return `${baseUrl}/${projectSlug}/-/merge_requests/${iid}`;
 }
 
 // Initial message (pt-BR): the agent starts from the pipeline branch and the full commit.
@@ -110,6 +110,7 @@ function mensagemInicial(p: {
 
 export function criarServico(opcoes: OpcoesServico): Servico {
   const { runtime, ritmo } = opcoes;
+  const host = hostDe(opcoes.gitlabBaseUrl);
   const investigacoes = new Map<string, Investigacao>();
   // The lock is per project: two entities bound to one project share its one investigation.
   const ativaPorProjeto = new Map<string, Investigacao>();
@@ -148,12 +149,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
         const projeto = await gitlab.getProject();
         const { pipeline, job, titulo } = atual;
         // Fetched before the session exists: a GitLab failure leaves no session behind.
-        const arquivos = await arquivosDoPipeline(
-          gitlab,
-          pipeline,
-          job,
-          opcoes.gitlabHost,
-        );
+        const arquivos = await arquivosDoPipeline(gitlab, pipeline, job, host);
         const sessaoId = await runtime.createSession({
           agentId: opcoes.agentId,
           environmentId: opcoes.environmentId,
@@ -166,7 +162,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
           arquivos,
         });
         const investigacao = new Investigacao(
-          { runtime, gitlab, host: opcoes.gitlabHost, ...ritmo },
+          { runtime, gitlab, host, ...ritmo },
           {
             id: sessaoId,
             entityRef,
@@ -188,7 +184,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
             jobId: job.id,
             jobNome: job.nome,
             sha: pipeline.sha,
-            titulo: ocultarHost(titulo, opcoes.gitlabHost),
+            titulo: ocultarHost(titulo, host),
           }),
         );
         return investigacao;
@@ -269,7 +265,7 @@ export function criarServico(opcoes: OpcoesServico): Servico {
               : {
                   iid: proposta.mr.iid,
                   url: urlDaMr(
-                    opcoes.gitlabHost,
+                    opcoes.gitlabBaseUrl,
                     alvo.projectSlug,
                     proposta.mr.iid,
                   ),

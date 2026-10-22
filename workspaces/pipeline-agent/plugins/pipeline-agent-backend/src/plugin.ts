@@ -15,7 +15,6 @@ import { GitLabFake } from './fake/gitlab';
 import { AgenteFake } from './fake/agente';
 import { GitLabHttp } from './gitlab/http';
 import { createRouter } from './router';
-import { hostDe } from './sanitizar';
 import { criarServico, type Servico } from './servico';
 
 // The test seam: "instantaneos" removes the pauses of the scripted agent and the
@@ -24,6 +23,7 @@ export type OpcoesPlugin = { ritmo?: 'reais' | 'instantaneos' };
 
 const PRAZO_PIPELINE_MS = 20 * 60_000;
 const PERMISSOES_RBAC = '/.well-known/backstage/permissions/metadata';
+const GITLAB_FAKE = 'https://gitlab.example.com';
 
 function montarServico(
   cfg: Configuracao,
@@ -40,7 +40,7 @@ function montarServico(
         new GitLabFake(projectSlug, {
           duracaoPipelineMs: instantaneo ? 0 : 4000,
         }),
-      gitlabHost: 'gitlab.com',
+      gitlabBaseUrl: GITLAB_FAKE,
       agentId: 'agent_fake',
       environmentId: 'env_fake',
       ritmo: {
@@ -62,7 +62,7 @@ function montarServico(
         token: real.gitlabToken,
         projeto: projectSlug,
       }),
-    gitlabHost: hostDe(real.gitlabBaseUrl),
+    gitlabBaseUrl: real.gitlabBaseUrl,
     agentId: real.agentId,
     environmentId: real.environmentId,
     ritmo: { intervaloPollMs: 5000, prazoPollMs: PRAZO_PIPELINE_MS, dormir },
