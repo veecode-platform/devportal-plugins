@@ -1,20 +1,33 @@
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import { AssumeRoleCommand, STSClient } from '@aws-sdk/client-sts';
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
+import { setTimeout as sleepFor } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import type { LambdaTarget } from '../config';
 
-/** The assumed-role session lasts one hour, so every poll has to finish inside it. */
+/**
+ * The assumed-role session lasts one hour and the poll deadline counts from
+ * AssumeRole, so no poll starts after 3000 seconds of it.
+ */
 const MAX_POLL_TIMEOUT_SECONDS = 3000;
+const MAX_LOGGED_VALUE_LENGTH = 200;
+const DEFAULT_SESSION_NAME = 'backstage-scaffolder';
+const MAX_SESSION_NAME_LENGTH = 64;
 
 export interface Clock {
   now(): number;
-  sleep(ms: number): Promise<void>;
+  /** Resolves when `ms` have passed or when `signal` aborts, whichever is first. */
+  sleep(ms: number, signal?: AbortSignal): Promise<void>;
 }
 
 const systemClock: Clock = {
   now: () => Date.now(),
-  sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+  // An abort ends the wait early; the caller checks the signal after it.
+  sleep: (ms, signal) =>
+    sleepFor(ms, undefined, { signal }).then(
+      () => undefined,
+      () => undefined,
+    ),
 };
 
 interface Invocation {
@@ -52,14 +65,17 @@ export function createLambdaInvokeAction(options: {
                 }),
                 until: z.record(z.string(), z.unknown(), {
                   description:
-                    'Top-level keys and values the answer must contain to stop polling.',
+                    'Top-level keys and values the answer must contain to stop polling. At least one key is required.',
                 }),
                 intervalSeconds: z
                   .number({ description: 'Seconds between polls.' })
                   .int()
                   .positive(),
                 timeoutSeconds: z
-                  .number({ description: 'Seconds after which polling fails.' })
+                  .number({
+                    description:
+                      'Seconds, counted from the AssumeRole call, after which polling fails.',
+                  })
                   .int()
                   .positive()
                   .max(MAX_POLL_TIMEOUT_SECONDS),
@@ -91,9 +107,22 @@ export function createLambdaInvokeAction(options: {
           `Unknown Lambda target alias "${ctx.input.target}": it is not listed under aws.lambdaTargets.`,
         );
       }
+      // The schema's JSON Schema cannot require a key, so the rule is enforced here.
+      if (ctx.input.poll && Object.keys(ctx.input.poll.until).length === 0) {
+        throw new Error(
+          'poll.until must name at least one key of the answer, for example { "state": "ready" }.',
+        );
+      }
+      if (ctx.signal?.aborted) {
+        throw cancelledError(target.alias);
+      }
 
-      const lambda = await lambdaClientFor(target);
-      const first = await invoke(lambda, target, ctx.input.payload);
+      const startedAt = clock.now();
+      const lambda = await lambdaClientFor(
+        target,
+        sessionNameFor(ctx.task?.id),
+      );
+      const first = await invoke(lambda, target, ctx.input.payload, ctx.signal);
       if (!ctx.input.poll) {
         ctx.output('result', first.answer);
         ctx.output('statusCode', first.statusCode);
@@ -102,12 +131,21 @@ export function createLambdaInvokeAction(options: {
 
       const { payload, until, intervalSeconds, timeoutSeconds } =
         ctx.input.poll;
-      const startedAt = clock.now();
+      const deadline = startedAt + timeoutSeconds * 1000;
       for (let attempt = 1; ; attempt += 1) {
-        const remainingMs = timeoutSeconds * 1000 - (clock.now() - startedAt);
-        await clock.sleep(Math.min(intervalSeconds * 1000, remainingMs));
+        const remainingMs = deadline - clock.now();
+        if (remainingMs <= 0) {
+          throw timeoutError(target.alias, timeoutSeconds);
+        }
+        if (ctx.signal?.aborted) {
+          throw cancelledError(target.alias);
+        }
+        await clock.sleep(
+          Math.min(intervalSeconds * 1000, remainingMs),
+          ctx.signal,
+        );
 
-        const answer = await invoke(lambda, target, payload);
+        const answer = await invoke(lambda, target, payload, ctx.signal);
         const elapsedMs = clock.now() - startedAt;
         const matched = matchesUntil(answer.answer, until);
         const verdict = matched ? 'matched' : 'unmatched';
@@ -123,11 +161,6 @@ export function createLambdaInvokeAction(options: {
           ctx.output('statusCode', answer.statusCode);
           return;
         }
-        if (elapsedMs >= timeoutSeconds * 1000) {
-          throw new Error(
-            `Lambda poll for target "${target.alias}" did not match within ${timeoutSeconds}s`,
-          );
-        }
       }
     },
   });
@@ -139,12 +172,38 @@ function describeAwsError(error: unknown): string {
     : 'unknown error';
 }
 
-async function lambdaClientFor(target: LambdaTarget): Promise<LambdaClient> {
+function cancelledError(alias: string): Error {
+  return new Error(`Lambda call for target "${alias}" was cancelled`);
+}
+
+function timeoutError(alias: string, timeoutSeconds: number): Error {
+  return new Error(
+    `Lambda poll for target "${alias}" did not match within ${timeoutSeconds}s`,
+  );
+}
+
+/**
+ * The session name ties each AWS call to its scaffolder task in CloudTrail.
+ * STS accepts only [\w+=,.@-], up to 64 characters.
+ */
+function sessionNameFor(taskId: string | undefined): string {
+  if (!taskId) {
+    return DEFAULT_SESSION_NAME;
+  }
+  return `${DEFAULT_SESSION_NAME}-${taskId}`
+    .replace(/[^\w+=,.@-]/g, '-')
+    .slice(0, MAX_SESSION_NAME_LENGTH);
+}
+
+async function lambdaClientFor(
+  target: LambdaTarget,
+  roleSessionName: string,
+): Promise<LambdaClient> {
   const response = await new STSClient({ region: target.region })
     .send(
       new AssumeRoleCommand({
         RoleArn: target.roleArn,
-        RoleSessionName: 'backstage-scaffolder',
+        RoleSessionName: roleSessionName,
         ...(target.externalId ? { ExternalId: target.externalId } : {}),
       }),
     )
@@ -169,6 +228,9 @@ async function lambdaClientFor(target: LambdaTarget): Promise<LambdaClient> {
 
   return new LambdaClient({
     region: target.region,
+    // Invoke must run at most once per call: a network error after the function
+    // started is reported, never retried.
+    maxAttempts: 1,
     credentials: {
       accessKeyId: credentials.AccessKeyId,
       secretAccessKey: credentials.SecretAccessKey,
@@ -182,7 +244,11 @@ async function invoke(
   lambda: LambdaClient,
   target: LambdaTarget,
   payload: Record<string, unknown>,
+  signal: AbortSignal | undefined,
 ): Promise<Invocation> {
+  if (signal?.aborted) {
+    throw cancelledError(target.alias);
+  }
   const response = await lambda
     .send(
       new InvokeCommand({
@@ -190,8 +256,12 @@ async function invoke(
         InvocationType: 'RequestResponse',
         Payload: JSON.stringify(payload),
       }),
+      { abortSignal: signal },
     )
     .catch((error: unknown) => {
+      if (signal?.aborted) {
+        throw cancelledError(target.alias);
+      }
       throw new Error(
         `Lambda invoke failed for target "${target.alias}": ${describeAwsError(
           error,
@@ -201,31 +271,66 @@ async function invoke(
 
   const body = new TextDecoder().decode(response.Payload);
   if (response.FunctionError) {
-    const { errorMessage } = JSON.parse(body) as { errorMessage?: string };
-    throw new Error(
-      `Lambda function for target "${target.alias}" failed: ${
-        errorMessage ?? body
-      }`,
-    );
+    throw new Error(functionErrorMessage(target.alias, body));
   }
   if (response.StatusCode === undefined) {
     throw new Error(
       `Lambda invoke for target "${target.alias}" returned no status code`,
     );
   }
-  return { statusCode: response.StatusCode, answer: JSON.parse(body) };
+  const parsed = parseJson(body);
+  if (!parsed.ok) {
+    throw new Error(
+      `Lambda target '${target.alias}' returned a response that is not JSON`,
+    );
+  }
+  return { statusCode: response.StatusCode, answer: parsed.value };
+}
+
+/**
+ * Names the function's own message when it has one. Otherwise it names only
+ * the error type, never the raw body or its stack trace.
+ */
+function functionErrorMessage(alias: string, body: string): string {
+  const parsed = parseJson(body);
+  const value = parsed.ok ? parsed.value : undefined;
+  if (isRecord(value) && isNonEmptyString(value.errorMessage)) {
+    return `Lambda function for target "${alias}" failed: ${value.errorMessage}`;
+  }
+  const errorType =
+    isRecord(value) && isNonEmptyString(value.errorType)
+      ? value.errorType
+      : 'function error';
+  return `Lambda target '${alias}' failed: ${errorType}`;
+}
+
+type ParsedJson = { ok: true; value: unknown } | { ok: false };
+
+function parseJson(body: string): ParsedJson {
+  try {
+    return { ok: true, value: JSON.parse(body) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value !== '';
 }
 
 function matchesUntil(
   answer: unknown,
   until: Record<string, unknown>,
 ): boolean {
-  if (typeof answer !== 'object' || answer === null || Array.isArray(answer)) {
+  if (!isRecord(answer)) {
     return false;
   }
-  const fields = answer as Record<string, unknown>;
   return Object.entries(until).every(([key, expected]) =>
-    isDeepStrictEqual(fields[key], expected),
+    isDeepStrictEqual(answer[key], expected),
   );
 }
 
@@ -237,16 +342,20 @@ function describeUntil(
   answer: unknown,
   until: Record<string, unknown>,
 ): string[] {
-  const fields =
-    typeof answer === 'object' && answer !== null && !Array.isArray(answer)
-      ? (answer as Record<string, unknown>)
-      : {};
+  const fields = isRecord(answer) ? answer : {};
   return Object.keys(until).map(key => `${key}=${renderValue(fields[key])}`);
 }
 
+/**
+ * JSON-encodes the value, so strings get quotes and newlines or control
+ * characters cannot split the log line. Clips a long value to 200 characters.
+ */
 function renderValue(value: unknown): string {
   if (value === undefined) {
     return '<missing>';
   }
-  return typeof value === 'string' ? value : JSON.stringify(value);
+  const rendered = JSON.stringify(value);
+  return rendered.length > MAX_LOGGED_VALUE_LENGTH
+    ? `${rendered.slice(0, MAX_LOGGED_VALUE_LENGTH)}…`
+    : rendered;
 }

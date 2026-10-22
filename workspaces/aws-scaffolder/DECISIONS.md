@@ -10,10 +10,13 @@ hides the STS call, so the tests could not inspect the `ExternalId` they must ch
 
 **Decision:** Each step calls `AssumeRole` once through an `STSClient` on the default credential
 chain, then builds one `LambdaClient` from the returned credentials. A poll loop reuses that
-client. `timeoutSeconds` is capped at 3000 so that every poll finishes inside the one-hour session.
+client. The poll deadline counts from that `AssumeRole` call. `timeoutSeconds` is capped at 3000,
+so no poll starts after 3000 seconds of the one-hour session.
 
-**Consequences:** A poll cannot outlive its session. Raising the cap needs a refresh of the
-credentials inside the loop.
+**Consequences:** A poll starts inside its session. A poll whose invoke runs longer than 600 seconds
+can still outlive the session, and then fails when the credentials expire. Raising the cap needs a
+refresh of the credentials inside the loop. The `LambdaClient` sets `maxAttempts: 1`, so an invoke
+never runs twice.
 
 ## PDR-002: Test the clients with jest.mock, not aws-sdk-client-mock
 
