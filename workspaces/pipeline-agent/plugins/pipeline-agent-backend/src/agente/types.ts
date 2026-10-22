@@ -51,6 +51,9 @@ export interface AgentRuntime {
   }): Promise<string>;
   abrirFluxo(sessionId: string): Promise<FluxoEventos>;
   enviar(sessionId: string, eventos: EventoUsuario[]): Promise<void>;
+  // Throws ErroNaoEncontrado for an id the runtime does not know.
   obterSessao(sessionId: string): Promise<SessaoResumo>;
   listarSessoes(agentId: string, projeto: string): Promise<SessaoResumo[]>;
+  // Every event of the session in order, restricted to the given event types.
+  listarEventos(sessionId: string, tipos: string[]): Promise<SdkEvent[]>;
 }

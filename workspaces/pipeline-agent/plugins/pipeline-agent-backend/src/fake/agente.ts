@@ -1,5 +1,6 @@
 import type { BetaManagedAgentsAgentCustomToolUseEvent } from '@anthropic-ai/sdk/resources/beta/sessions/events';
 import { Canal } from '../agente/canal';
+import { ErroNaoEncontrado } from '../erros';
 import type {
   AgentRuntime,
   ArquivoSessao,
@@ -39,11 +40,17 @@ type Sessao = {
   status: 'idle' | 'running' | 'terminated';
   entrada: Canal<EventoUsuario>;
   saida: Canal<SdkEvent>;
+  // The session log, as the API keeps it: every event in order, the user's too.
+  registro: SdkEvent[];
   uso: Uso;
 };
 
 const PAUSA_CURTA_MS = 700;
 const PAUSA_FERRAMENTA_MS = 900;
+
+const TITULO_PROPOSTA = 'fix: cupom e faixa somam sobre o valor bruto';
+const CAUSA_INICIAL =
+  'Causa: DescontoService.calcularTotal calcula a faixa sobre o valor já descontado pelo cupom (comCupom). Evidência: expected 900,00 mas foi 902,50 no teste faixaECupomSomamSobreOValorBruto. A mudança soma o percentual de faixa e o de cupom e aplica sobre o valor bruto.';
 
 function textoDoEvento(content: { type: 'text'; text: string }[]): string {
   return content.map(b => b.text).join('\n');
@@ -55,6 +62,7 @@ function sessaoPassada(
   metadata: Record<string, string>,
   title: string,
   segundos: number,
+  registro: SdkEvent[],
 ): Sessao {
   const entrada = new Canal<EventoUsuario>();
   const saida = new Canal<SdkEvent>();
@@ -70,6 +78,7 @@ function sessaoPassada(
     status: 'idle',
     entrada,
     saida,
+    registro,
     uso: {
       input: 52_000,
       output: 4_100,
@@ -77,6 +86,36 @@ function sessaoPassada(
       cacheEscrita: 6_000,
     },
   };
+}
+
+// A past proposal as the session logged it: the abrir_mr tool use, then the answer
+// the backend gave it (the same shape the live flow sends).
+function propostaPassada(
+  prefixo: string,
+  criadaEm: string,
+  resposta: { texto: string; erro: boolean },
+): SdkEvent[] {
+  const id = `toolu_mr_${prefixo}`;
+  const uso: BetaManagedAgentsAgentCustomToolUseEvent = {
+    id,
+    type: 'agent.custom_tool_use',
+    name: 'abrir_mr',
+    input: {
+      titulo: TITULO_PROPOSTA,
+      causa: CAUSA_INICIAL,
+      arquivos: [{ caminho: CAMINHO_ALVO, conteudo: JAVA_DEPOIS }],
+    },
+    processed_at: criadaEm,
+  };
+  const resultado: SdkEvent = {
+    id: `evt_res_${prefixo}`,
+    type: 'user.custom_tool_result',
+    custom_tool_use_id: id,
+    content: [{ type: 'text', text: resposta.texto }],
+    is_error: resposta.erro,
+    processed_at: criadaEm,
+  };
+  return [uso, resultado];
 }
 
 export class AgenteFake implements AgentRuntime {
@@ -90,8 +129,9 @@ export class AgenteFake implements AgentRuntime {
     this.esperar = opcoes.esperar;
   }
 
-  // Two finished investigations per project, so the history list is not empty
-  // on first use. Seeded once per project, on the first listing.
+  // Three finished investigations per project, so the history list is not empty
+  // on first use: one that opened an MR, one refused, one that ended without a
+  // proposal. Seeded once per project, on the first listing.
   private semear(projeto: string): void {
     if (this.projetosSemeados.has(projeto)) return;
     this.projetosSemeados.add(projeto);
@@ -106,6 +146,10 @@ export class AgenteFake implements AgentRuntime {
         { ...base, pipeline_id: '8842' },
         'Pipeline 8842 · job build · MR !2 aberto',
         412,
+        propostaPassada(`${n}a`, anteontem, {
+          texto: JSON.stringify({ mr_iid: 2, pipeline_status: 'success' }),
+          erro: false,
+        }),
       ),
       sessaoPassada(
         `sesn_fake_hist_${n}b`,
@@ -113,6 +157,19 @@ export class AgenteFake implements AgentRuntime {
         { ...base, pipeline_id: '8810' },
         'Pipeline 8810 · job test · recusado',
         287,
+        propostaPassada(`${n}b`, ontem, {
+          texto:
+            'A pessoa recusou a proposta. Motivo: a correção mexe no cálculo do cupom. Não abra MR com a mesma proposta.',
+          erro: true,
+        }),
+      ),
+      sessaoPassada(
+        `sesn_fake_hist_${n}c`,
+        ontem,
+        { ...base, pipeline_id: '8777' },
+        'Pipeline 8777 · job lint · sem proposta',
+        96,
+        [],
       ),
     ];
     for (const s of passadas) this.sessoes.set(s.id, s);
@@ -127,7 +184,41 @@ export class AgenteFake implements AgentRuntime {
   private emitir(sessao: Sessao, evento: SdkEvent): void {
     if (evento.type === 'session.status_running') sessao.status = 'running';
     if (evento.type === 'session.status_idle') sessao.status = 'idle';
+    sessao.registro.push(evento);
     sessao.saida.enviar(evento);
+  }
+
+  // The user's events enter the session log with the ids the API would assign.
+  private eventoDeUsuario(evento: EventoUsuario): SdkEvent {
+    const id = this.nomeEvento('evt');
+    const processed_at = new Date().toISOString();
+    switch (evento.type) {
+      case 'user.message':
+        return {
+          id,
+          type: 'user.message',
+          content: evento.content,
+          processed_at,
+        };
+      case 'user.interrupt':
+        return { id, type: 'user.interrupt', processed_at };
+      case 'user.custom_tool_result':
+        return {
+          id,
+          type: 'user.custom_tool_result',
+          custom_tool_use_id: evento.custom_tool_use_id,
+          content: evento.content,
+          is_error: evento.is_error,
+          processed_at,
+        };
+      default: {
+        // A new user event type fails to compile here until the log records it.
+        const semCaso: never = evento;
+        throw new Error(
+          `evento de usuário sem tratamento: ${JSON.stringify(semCaso)}`,
+        );
+      }
+    }
   }
 
   private mensagem(sessao: Sessao, texto: string): void {
@@ -188,7 +279,7 @@ export class AgenteFake implements AgentRuntime {
       type: 'agent.custom_tool_use',
       name: 'abrir_mr',
       input: {
-        titulo: 'fix: cupom e faixa somam sobre o valor bruto',
+        titulo: TITULO_PROPOSTA,
         causa,
         arquivos: [{ caminho: CAMINHO_ALVO, conteudo: JAVA_DEPOIS }],
       },
@@ -260,10 +351,7 @@ export class AgenteFake implements AgentRuntime {
       'Reproduzi a falha no sandbox com o mesmo valor. A correção é somar os dois descontos sobre o bruto.',
     );
     await this.esperar(PAUSA_CURTA_MS);
-    let pendente = this.pedirAbrirMr(
-      sessao,
-      'Causa: DescontoService.calcularTotal calcula a faixa sobre o valor já descontado pelo cupom (comCupom). Evidência: expected 900,00 mas foi 902,50 no teste faixaECupomSomamSobreOValorBruto. A mudança soma o percentual de faixa e o de cupom e aplica sobre o valor bruto.',
-    );
+    let pendente = this.pedirAbrirMr(sessao, CAUSA_INICIAL);
     for (;;) {
       const evento = await sessao.entrada.pegar();
       if (!evento) return;
@@ -341,6 +429,7 @@ export class AgenteFake implements AgentRuntime {
       status: 'idle',
       entrada: new Canal<EventoUsuario>(),
       saida: new Canal<SdkEvent>(),
+      registro: [],
       uso: { input: 0, output: 0, cacheLeitura: 0, cacheEscrita: 0 },
     };
     this.sessoes.set(id, sessao);
@@ -350,7 +439,7 @@ export class AgenteFake implements AgentRuntime {
 
   private porId(id: string): Sessao {
     const sessao = this.sessoes.get(id);
-    if (!sessao) throw new Error(`sessão fake ${id} não existe`);
+    if (!sessao) throw new ErroNaoEncontrado('investigação não encontrada');
     return sessao;
   }
 
@@ -364,7 +453,15 @@ export class AgenteFake implements AgentRuntime {
 
   async enviar(sessionId: string, eventos: EventoUsuario[]): Promise<void> {
     const sessao = this.porId(sessionId);
-    for (const evento of eventos) sessao.entrada.enviar(evento);
+    for (const evento of eventos) {
+      sessao.registro.push(this.eventoDeUsuario(evento));
+      sessao.entrada.enviar(evento);
+    }
+  }
+
+  async listarEventos(sessionId: string, tipos: string[]): Promise<SdkEvent[]> {
+    const sessao = this.porId(sessionId);
+    return sessao.registro.filter(evento => tipos.includes(evento.type));
   }
 
   async obterSessao(sessionId: string): Promise<SessaoResumo> {

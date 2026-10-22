@@ -1,8 +1,14 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import { NotFoundError } from '@anthropic-ai/sdk';
+import { ErroNaoEncontrado } from '../erros';
 import { AnthropicRuntime } from './real';
 
 // The SDK client is mocked at the seam the adapter uses: beta.sessions.*.
-function clienteFalso(sessoes: unknown[] = []) {
+function clienteFalso(
+  sessoes: unknown[] = [],
+  eventos: unknown[] = [],
+  falhaAoRecuperar?: unknown,
+) {
   const send = jest.fn(async () => ({}));
   const create = jest.fn(async () => ({ id: 'sesn_real_1' }));
   const stream = jest.fn(async () => ({
@@ -14,13 +20,21 @@ function clienteFalso(sessoes: unknown[] = []) {
       for (const s of sessoes) yield s;
     },
   }));
-  const retrieve = jest.fn(async () => ({
-    id: 'sesn_real_1',
-    status: 'idle',
-    title: 't',
-    created_at: 'c',
-    metadata: {},
-    usage: {},
+  const retrieve = jest.fn(async () => {
+    if (falhaAoRecuperar) throw falhaAoRecuperar;
+    return {
+      id: 'sesn_real_1',
+      status: 'idle',
+      title: 't',
+      created_at: 'c',
+      metadata: {},
+      usage: {},
+    };
+  });
+  const listarEventos = jest.fn(() => ({
+    [Symbol.asyncIterator]: async function* eventosDaFila() {
+      for (const e of eventos) yield e;
+    },
   }));
   let enviados = 0;
   const upload = jest.fn(async (_params: unknown) => ({
@@ -29,7 +43,12 @@ function clienteFalso(sessoes: unknown[] = []) {
   const cliente = {
     beta: {
       files: { upload },
-      sessions: { create, retrieve, list, events: { send, stream } },
+      sessions: {
+        create,
+        retrieve,
+        list,
+        events: { send, stream, list: listarEventos },
+      },
     },
   };
   return {
@@ -38,6 +57,7 @@ function clienteFalso(sessoes: unknown[] = []) {
     send,
     stream,
     list,
+    listarEventos,
     upload,
   };
 }
@@ -150,5 +170,50 @@ describe('AnthropicRuntime (mocked SDK client)', () => {
       limit: 50,
     });
     expect(itens.map(s => s.id)).toEqual(['a']);
+  });
+
+  it('lists the events of a session in order, asking the API only for the types it names', async () => {
+    const eventos = [
+      { id: 'toolu_1', type: 'agent.custom_tool_use', name: 'abrir_mr' },
+      {
+        id: 'evt_2',
+        type: 'user.custom_tool_result',
+        custom_tool_use_id: 'toolu_1',
+      },
+    ];
+    const { cliente, listarEventos } = clienteFalso([], eventos);
+    const tipos = ['agent.custom_tool_use', 'user.custom_tool_result'];
+
+    const itens = await new AnthropicRuntime(cliente).listarEventos(
+      'sesn_real_1',
+      tipos,
+    );
+
+    expect(listarEventos).toHaveBeenCalledWith('sesn_real_1', {
+      order: 'asc',
+      types: tipos,
+    });
+    expect(itens).toEqual(eventos);
+  });
+
+  it('answers the domain not-found for a session the API does not know', async () => {
+    const { cliente } = clienteFalso(
+      [],
+      [],
+      new NotFoundError(404, undefined, 'not found', new Headers()),
+    );
+
+    await expect(
+      new AnthropicRuntime(cliente).obterSessao('sesn_nao_existe'),
+    ).rejects.toBeInstanceOf(ErroNaoEncontrado);
+  });
+
+  it('lets any other failure of the session lookup through unchanged', async () => {
+    const falha = new Error('rede indisponível');
+    const { cliente } = clienteFalso([], [], falha);
+
+    await expect(
+      new AnthropicRuntime(cliente).obterSessao('sesn_real_1'),
+    ).rejects.toBe(falha);
   });
 });
