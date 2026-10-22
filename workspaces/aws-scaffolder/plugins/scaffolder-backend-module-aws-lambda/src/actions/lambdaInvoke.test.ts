@@ -155,9 +155,12 @@ describe('aws:lambda:invoke', () => {
 
   it('fails the step with the AWS error name and message when the role cannot be assumed', async () => {
     mockStsSend.mockRejectedValue(
-      Object.assign(new Error('User is not authorized to perform: sts:AssumeRole'), {
-        name: 'AccessDenied',
-      }),
+      Object.assign(
+        new Error('User is not authorized to perform: sts:AssumeRole'),
+        {
+          name: 'AccessDenied',
+        },
+      ),
     );
     const ctx = contextWith({ target: 'example-target', payload: {} });
 

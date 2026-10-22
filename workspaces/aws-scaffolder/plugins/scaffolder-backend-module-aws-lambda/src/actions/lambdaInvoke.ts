@@ -100,7 +100,8 @@ export function createLambdaInvokeAction(options: {
         return;
       }
 
-      const { payload, until, intervalSeconds, timeoutSeconds } = ctx.input.poll;
+      const { payload, until, intervalSeconds, timeoutSeconds } =
+        ctx.input.poll;
       const startedAt = clock.now();
       for (let attempt = 1; ; attempt += 1) {
         const remainingMs = timeoutSeconds * 1000 - (clock.now() - startedAt);
@@ -109,9 +110,10 @@ export function createLambdaInvokeAction(options: {
         const answer = await invoke(lambda, target, payload);
         const elapsedMs = clock.now() - startedAt;
         const matched = matchesUntil(answer.answer, until);
-        ctx.logger.info(
-          `Poll ${attempt} at ${Math.round(elapsedMs / 1000)}s: ${matched ? 'matched' : 'unmatched'} ${JSON.stringify(answer.answer)}`,
-        );
+        const verdict = matched ? 'matched' : 'unmatched';
+        const seconds = Math.round(elapsedMs / 1000);
+        const body = JSON.stringify(answer.answer);
+        ctx.logger.info(`Poll ${attempt} at ${seconds}s: ${verdict} ${body}`);
         if (matched) {
           ctx.output('result', answer.answer);
           ctx.output('statusCode', answer.statusCode);
@@ -144,7 +146,9 @@ async function lambdaClientFor(target: LambdaTarget): Promise<LambdaClient> {
     )
     .catch((error: unknown) => {
       throw new Error(
-        `Could not assume the role for target "${target.alias}": ${describeAwsError(error)}`,
+        `Could not assume the role for target "${
+          target.alias
+        }": ${describeAwsError(error)}`,
       );
     });
 
@@ -185,7 +189,9 @@ async function invoke(
     )
     .catch((error: unknown) => {
       throw new Error(
-        `Lambda invoke failed for target "${target.alias}": ${describeAwsError(error)}`,
+        `Lambda invoke failed for target "${target.alias}": ${describeAwsError(
+          error,
+        )}`,
       );
     });
 
@@ -193,7 +199,9 @@ async function invoke(
   if (response.FunctionError) {
     const { errorMessage } = JSON.parse(body) as { errorMessage?: string };
     throw new Error(
-      `Lambda function for target "${target.alias}" failed: ${errorMessage ?? body}`,
+      `Lambda function for target "${target.alias}" failed: ${
+        errorMessage ?? body
+      }`,
     );
   }
   if (response.StatusCode === undefined) {
@@ -204,7 +212,10 @@ async function invoke(
   return { statusCode: response.StatusCode, answer: JSON.parse(body) };
 }
 
-function matchesUntil(answer: unknown, until: Record<string, unknown>): boolean {
+function matchesUntil(
+  answer: unknown,
+  until: Record<string, unknown>,
+): boolean {
   if (typeof answer !== 'object' || answer === null || Array.isArray(answer)) {
     return false;
   }

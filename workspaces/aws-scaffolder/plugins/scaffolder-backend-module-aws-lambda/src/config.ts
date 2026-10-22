@@ -19,7 +19,8 @@ export function readLambdaTargets(
   config: Config,
 ): ReadonlyMap<string, LambdaTarget> {
   const targets = new Map<string, LambdaTarget>();
-  for (const entry of config.getOptionalConfigArray('aws.lambdaTargets') ?? []) {
+  const entries = config.getOptionalConfigArray('aws.lambdaTargets') ?? [];
+  for (const entry of entries) {
     const target = lambdaTargetSchema.parse(entry.get());
     if (targets.has(target.alias)) {
       throw new Error(

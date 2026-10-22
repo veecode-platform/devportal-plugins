@@ -29,27 +29,27 @@ change.
 
 Input:
 
-| Field | Type | Required | Meaning |
-| --- | --- | --- | --- |
-| `target` | string | yes | Alias of an entry in `aws.lambdaTargets`. |
-| `payload` | object | yes | Sent to the function as its event. |
-| `poll` | object | no | Repeats a payload until the answer matches (below). |
+| Field     | Type   | Required | Meaning                                             |
+| --------- | ------ | -------- | --------------------------------------------------- |
+| `target`  | string | yes      | Alias of an entry in `aws.lambdaTargets`.           |
+| `payload` | object | yes      | Sent to the function as its event.                  |
+| `poll`    | object | no       | Repeats a payload until the answer matches (below). |
 
 `poll`:
 
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `payload` | object | Sent on every poll. |
-| `until` | object | Top-level keys and values the answer must contain. Values are compared with deep equality. |
-| `intervalSeconds` | positive integer | Seconds between polls. The first poll comes one interval after the first invoke. |
-| `timeoutSeconds` | positive integer, at most 3000 | Polling fails when this many seconds pass without a match. |
+| Field             | Type                           | Meaning                                                                                    |
+| ----------------- | ------------------------------ | ------------------------------------------------------------------------------------------ |
+| `payload`         | object                         | Sent on every poll.                                                                        |
+| `until`           | object                         | Top-level keys and values the answer must contain. Values are compared with deep equality. |
+| `intervalSeconds` | positive integer               | Seconds between polls. The first poll comes one interval after the first invoke.           |
+| `timeoutSeconds`  | positive integer, at most 3000 | Polling fails when this many seconds pass without a match.                                 |
 
 Output:
 
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `result` | JSON | Parsed answer of the function. With `poll`, the answer that matched. |
-| `statusCode` | number | HTTP status of the invocation that produced `result`. |
+| Field        | Type   | Meaning                                                              |
+| ------------ | ------ | -------------------------------------------------------------------- |
+| `result`     | JSON   | Parsed answer of the function. With `poll`, the answer that matched. |
+| `statusCode` | number | HTTP status of the invocation that produced `result`.                |
 
 Behavior:
 
