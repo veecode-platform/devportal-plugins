@@ -1,5 +1,5 @@
 import type {
-  AcaoArquivo,
+  EntradaCommit,
   GitLab,
   Job,
   MergeRequest,
@@ -156,20 +156,12 @@ export class GitLabFake implements GitLab {
     return this.arquivosDe(ref).get(caminho) ?? null;
   }
 
-  async createBranch(nome: string, ref: string): Promise<void> {
-    if (this.branches.has(nome))
-      throw new GitLabError(400, 'POST', '/repository/branches');
-    this.branches.set(nome, new Map(this.arquivosDe(ref)));
-  }
-
-  async commit(
-    branch: string,
-    _mensagem: string,
-    acoes: AcaoArquivo[],
-  ): Promise<void> {
-    const arquivos = this.branches.get(branch);
-    if (!arquivos) throw new GitLabError(404, 'POST', '/repository/commits');
-    for (const acao of acoes) arquivos.set(acao.caminho, acao.conteudo);
+  async commit(entrada: EntradaCommit): Promise<void> {
+    if (this.branches.has(entrada.branch))
+      throw new GitLabError(400, 'POST', '/repository/commits');
+    const arquivos = new Map(this.arquivosDe(entrada.base));
+    for (const acao of entrada.acoes) arquivos.set(acao.caminho, acao.conteudo);
+    this.branches.set(entrada.branch, arquivos);
   }
 
   async createMR(entrada: {

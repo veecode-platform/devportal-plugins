@@ -1,8 +1,9 @@
 import type { AcaoArquivo, GitLab, Pipeline } from './gitlab/types';
 import { STATUS_TERMINAIS } from './gitlab/types';
 
-// Custom tool abrir_mr: after approval, create the branch, commit, open the merge
-// request and wait for its pipeline. The contract is in the rehearsal design.
+// Custom tool abrir_mr: after approval, commit the fix to a new branch (one request
+// creates it), open the merge request and wait for its pipeline. The contract is in
+// the rehearsal design.
 
 export const ROTULO_MR = 'agente-pipeline';
 export const LIMITE_TENTATIVAS = 3;
@@ -174,13 +175,17 @@ export async function executarAbrirMr(
   x: ExecucaoAbrirMr,
 ): Promise<DesfechoAbrirMr> {
   const branch = await escolherBranch(x.gitlab, x.pipelineId, x.tentativa);
-  await x.gitlab.createBranch(branch, x.ref);
   const acoes: AcaoArquivo[] = x.arquivos.map(a => ({
     acao: a.existente === null ? 'create' : 'update',
     caminho: a.caminho,
     conteudo: a.conteudo,
   }));
-  await x.gitlab.commit(branch, x.entrada.titulo, acoes);
+  await x.gitlab.commit({
+    branch,
+    base: x.ref,
+    mensagem: x.entrada.titulo,
+    acoes,
+  });
   const mr = await x.gitlab.createMR({
     origem: branch,
     destino: x.ref,
