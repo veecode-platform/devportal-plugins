@@ -54,7 +54,9 @@ function mrDoResultado(
 // The last proposal whose result opened a merge request, so a later refusal, failure or
 // attempt-limit answer does not hide it. With no MR at all, the last proposal. -1 when
 // there are no proposals.
-function indiceDaMostrada(mrs: Array<ReturnType<typeof mrDoResultado>>): number {
+function indiceDaMostrada(
+  mrs: Array<ReturnType<typeof mrDoResultado>>,
+): number {
   for (let i = mrs.length - 1; i >= 0; i -= 1) {
     if (mrs[i] !== null) return i;
   }
