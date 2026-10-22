@@ -71,6 +71,12 @@ const MR_ABERTO: UiEvent = {
   url: 'https://gitlab.example.com/veecode-demos/pedidos-api/-/merge_requests/3',
 };
 
+const DIAGNOSTICO_EM_LINHAS: UiEvent = {
+  ...DIAGNOSTICO,
+  causa:
+    'Causa: a faixa de 5% sai sobre o valor que o cupom já descontou.\nEvidência: o trecho usa `comCupom` como base.\nMudança: o nome `bruto sem fechar fica como texto.',
+};
+
 // Replays the given events as soon as the card follows the investigation, then
 // stays open until the card unmounts, as a live stream does.
 const acompanharCom =
@@ -386,6 +392,47 @@ describe('PipelineAgentCard', () => {
       screen.getByText(
         'Do clique ao pipeline verde: 4 min 12 s. Custo da investigação: US$ 0,31.',
       ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows each line of the cause on its own, with code between backticks and a stray backtick as text', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({ acompanhar: acompanharCom([DIAGNOSTICO_EM_LINHAS]) }),
+    );
+
+    await user.click(await botaoInvestigar());
+    await screen.findByRole('button', { name: 'Aprovar e abrir MR' });
+
+    expect(
+      screen.getByText(
+        'Causa: a faixa de 5% sai sobre o valor que o cupom já descontou.',
+      ).tagName,
+    ).toBe('P');
+    expect(screen.getByText(/^Evidência: o trecho usa/).tagName).toBe('P');
+    expect(screen.getByText(/^Mudança:/).tagName).toBe('P');
+    expect(screen.getByText('comCupom').tagName).toBe('CODE');
+    expect(
+      screen.getByText('Mudança: o nome `bruto sem fechar fica como texto.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the same cause, with its code, in the approved diagnosis', async () => {
+    const user = userEvent.setup();
+    renderizar(
+      criarApi({
+        acompanhar: acompanharCom([DIAGNOSTICO_EM_LINHAS, MR_ABERTO]),
+      }),
+    );
+
+    await user.click(await botaoInvestigar());
+
+    expect(
+      await screen.findByText('Ver o diagnóstico aprovado'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('comCupom').tagName).toBe('CODE');
+    expect(
+      screen.getByText('Mudança: o nome `bruto sem fechar fica como texto.'),
     ).toBeInTheDocument();
   });
 });

@@ -1,4 +1,11 @@
-import { dataCurta, dolar, duracao, listaComE, tempoAtras } from './formato';
+import {
+  dataCurta,
+  dolar,
+  duracao,
+  listaComE,
+  partirCodigo,
+  tempoAtras,
+} from './formato';
 
 describe('duracao', () => {
   it('writes less than a minute in seconds', () => {
@@ -76,5 +83,32 @@ describe('dolar', () => {
   it('writes dollars with a decimal comma', () => {
     expect(dolar(0.04)).toBe('US$ 0,04');
     expect(dolar(1.5)).toBe('US$ 1,50');
+  });
+});
+
+describe('partirCodigo', () => {
+  it('keeps a line without backticks as one text piece', () => {
+    expect(partirCodigo('Causa: a faixa sai sobre o bruto.')).toEqual([
+      { tipo: 'texto', valor: 'Causa: a faixa sai sobre o bruto.' },
+    ]);
+  });
+
+  it('turns the text between each pair of backticks into code', () => {
+    expect(partirCodigo('usa `comCupom` e `bruto`')).toEqual([
+      { tipo: 'texto', valor: 'usa ' },
+      { tipo: 'codigo', valor: 'comCupom' },
+      { tipo: 'texto', valor: ' e ' },
+      { tipo: 'codigo', valor: 'bruto' },
+    ]);
+  });
+
+  it('keeps an unpaired backtick as text', () => {
+    expect(partirCodigo('o nome `Desconto sem fechar')).toEqual([
+      { tipo: 'texto', valor: 'o nome `Desconto sem fechar' },
+    ]);
+  });
+
+  it('does not read a double backtick as a code pair', () => {
+    expect(partirCodigo('``')).toEqual([{ tipo: 'texto', valor: '``' }]);
   });
 });
