@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { toFile } from '@anthropic-ai/sdk';
+import { NotFoundError, toFile } from '@anthropic-ai/sdk';
+import { ErroNaoEncontrado } from '../erros';
 import type {
   AgentRuntime,
   ArquivoSessao,
@@ -94,8 +95,27 @@ export class AnthropicRuntime implements AgentRuntime {
     });
   }
 
+  // An unknown id is the domain's not-found, so it answers 404 and not the 502 an
+  // SDK error would become.
   async obterSessao(sessionId: string): Promise<SessaoResumo> {
-    return paraResumo(await this.cliente.beta.sessions.retrieve(sessionId));
+    try {
+      return paraResumo(await this.cliente.beta.sessions.retrieve(sessionId));
+    } catch (erro) {
+      if (erro instanceof NotFoundError)
+        throw new ErroNaoEncontrado('investigação não encontrada');
+      throw erro;
+    }
+  }
+
+  async listarEventos(sessionId: string, tipos: string[]): Promise<SdkEvent[]> {
+    const eventos: SdkEvent[] = [];
+    for await (const evento of this.cliente.beta.sessions.events.list(
+      sessionId,
+      { order: 'asc', types: tipos },
+    )) {
+      eventos.push(evento);
+    }
+    return eventos;
   }
 
   async listarSessoes(

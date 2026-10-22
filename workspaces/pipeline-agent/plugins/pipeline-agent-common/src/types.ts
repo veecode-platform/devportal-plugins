@@ -75,4 +75,15 @@ export type ItemHistorico = {
   custoUsd: number | null;
 };
 
+// The proposal of a past investigation: its last abrir_mr with a valid input. mr is
+// set when that proposal opened a merge request, and statusPipeline is the status of
+// the merge request's pipeline as the session recorded it.
+export type PropostaHistorico = {
+  tentativa: number;
+  titulo: string;
+  causa: string;
+  arquivos: string[];
+  mr: { iid: number; url: string; statusPipeline: string } | null;
+};
+
 export type IniciarResposta = { id: string; iniciadoEm: string };

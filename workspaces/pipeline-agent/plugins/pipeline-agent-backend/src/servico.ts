@@ -1,7 +1,9 @@
 import type {
   Banner,
+  DetalheHistorico,
   ItemHistorico,
 } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
+import { propostaDaSessao } from './agente/proposta';
 import type { ArquivoSessao, AgentRuntime } from './agente/types';
 import { custoUsd, parseUsage } from './cost';
 import type { EntidadeResolvida } from './entidade';
@@ -23,6 +25,7 @@ export type Servico = {
   investigacao(id: string): Investigacao;
   banner(alvo: EntidadeResolvida): Promise<Banner>;
   historico(alvo: EntidadeResolvida): Promise<ItemHistorico[]>;
+  detalhe(alvo: EntidadeResolvida, sessaoId: string): Promise<DetalheHistorico>;
 };
 
 export type OpcoesServico = {
@@ -73,6 +76,15 @@ async function arquivosDoPipeline(
     arquivo('commit.diff', 'text/plain', codificar(ocultarHost(diff, host))),
     arquivo('repo.tar.gz', 'application/gzip', repo),
   ];
+}
+
+// The event types that carry a proposal: the abrir_mr call and the answer it got.
+const TIPOS_DA_PROPOSTA = ['agent.custom_tool_use', 'user.custom_tool_result'];
+
+// The session records the merge request's iid, not its URL. The GitLab web address of
+// a merge request is the project path plus its iid, on the configured host.
+function urlDaMr(host: string, projectSlug: string, iid: number): string {
+  return `https://${host}/${projectSlug}/-/merge_requests/${iid}`;
 }
 
 // Initial message (pt-BR): the agent starts from the pipeline branch and the full commit.
@@ -229,6 +241,42 @@ export function criarServico(opcoes: OpcoesServico): Servico {
           status: x.status,
           custoUsd: custoUsd(parseUsage(x.usage), 0),
         }));
+    },
+
+    async detalhe(alvo, sessaoId) {
+      const sessao = await runtime.obterSessao(sessaoId);
+      // Another project's session is not found, the same as an unknown id, so the
+      // caller cannot tell whether it exists. Events are read only after this check.
+      if (
+        sessao.metadata.app !== APP ||
+        sessao.metadata.projeto !== alvo.projectSlug
+      )
+        throw new ErroNaoEncontrado('investigação não encontrada');
+      const proposta = propostaDaSessao(
+        await runtime.listarEventos(sessaoId, TIPOS_DA_PROPOSTA),
+      );
+      if (proposta === null) return { id: sessaoId, proposta: null };
+      return {
+        id: sessaoId,
+        proposta: {
+          tentativa: proposta.tentativa,
+          titulo: proposta.titulo,
+          causa: proposta.causa,
+          arquivos: proposta.arquivos,
+          mr:
+            proposta.mr === null
+              ? null
+              : {
+                  iid: proposta.mr.iid,
+                  url: urlDaMr(
+                    opcoes.gitlabHost,
+                    alvo.projectSlug,
+                    proposta.mr.iid,
+                  ),
+                  statusPipeline: proposta.mr.statusPipeline,
+                },
+        },
+      };
     },
   };
 }

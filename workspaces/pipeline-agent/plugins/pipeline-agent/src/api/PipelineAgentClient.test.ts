@@ -214,4 +214,20 @@ describe('PipelineAgentClient', () => {
       detalhe: 'texto do backend',
     });
   });
+
+  it('asks for one history item by its session id, encoded, with the entity reference', async () => {
+    const detalhe = { id: 'sesn/1', proposta: null };
+    const fetch = jest.fn().mockResolvedValue(respostaJson(200, detalhe));
+
+    const resultado = await criarCliente(fetch).detalheHistorico(
+      'component:default/x',
+      'sesn/1',
+    );
+
+    expect(resultado).toEqual(detalhe);
+    expect(fetch).toHaveBeenCalledWith(
+      `${BASE}/history/sesn%2F1?entityRef=component%3Adefault%2Fx`,
+      expect.anything(),
+    );
+  });
 });

@@ -1,6 +1,7 @@
 import { createApiRef } from '@backstage/core-plugin-api';
 import type {
   Banner,
+  DetalheHistorico,
   Fase,
   IniciarResposta,
   ItemHistorico,
@@ -12,6 +13,8 @@ import type {
 export interface PipelineAgentApi {
   banner(entityRef: string): Promise<Banner>;
   historico(entityRef: string): Promise<ItemHistorico[]>;
+  // id is the session id of an item from historico.
+  detalheHistorico(entityRef: string, id: string): Promise<DetalheHistorico>;
   iniciar(entityRef: string): Promise<IniciarResposta>;
   // Calls aoEvento for every event of the investigation, replaying from the
   // start. Resolves when the investigation ends or the signal aborts.

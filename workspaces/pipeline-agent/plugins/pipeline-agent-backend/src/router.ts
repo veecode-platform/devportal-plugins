@@ -2,6 +2,7 @@ import type { LoggerService } from '@backstage/backend-plugin-api';
 import { InputError } from '@backstage/errors';
 import { createPermissionIntegrationRouter } from '@backstage/plugin-permission-node';
 import {
+  type DetalheHistorico,
   type FaseResposta,
   type IniciarResposta,
   PIPELINE_AGENT_ROUTES,
@@ -19,14 +20,17 @@ import type { Servico } from './servico';
 // The contract routes of PIPELINE_AGENT_ROUTES. Paths and bodies come from the common
 // package, so the frontend and the backend cannot drift apart.
 //
-// Authorization: starting an investigation, and reading its events, its history and
-// its project banner, all need pipeline-agent.investigation.create on the entity: whoever
-// may use the agent on an entity may watch it. Decisions need the approve permission.
+// Authorization: starting an investigation, and reading its events, its history (the list
+// and one item) and its project banner, all need pipeline-agent.investigation.create on
+// the entity: whoever may use the agent on an entity may watch it. Decisions need the
+// approve permission.
 
 const INTERVALO_BATIMENTO_MS = 15_000;
 const TAMANHO_MAX_TOOL_USE_ID = 200;
 const TAMANHO_MAX_MOTIVO = 500;
 const TAMANHO_MAX_TEXTO = 2000;
+// A session id is one path segment of the Managed Agents API: no slash, no dots.
+const FORMATO_ID_SESSAO = /^[A-Za-z0-9_-]{1,200}$/;
 
 export type DepsRouter = {
   logger: LoggerService;
@@ -52,6 +56,12 @@ function textoObrigatorio(valor: unknown, nome: string, max: number): string {
 
 function textoDaQuery(valor: unknown): string {
   return typeof valor === 'string' ? valor : '';
+}
+
+function idDaSessao(valor: string): string {
+  if (!FORMATO_ID_SESSAO.test(valor))
+    throw new InputError('id da investigação inválido');
+  return valor;
 }
 
 function nomeDoErro(erro: unknown): string {
@@ -260,6 +270,23 @@ export function createRouter(deps: DepsRouter): express.Router {
         pipelineAgentInvestigationCreatePermission,
       );
       res.json({ itens: await servico.historico(alvo) });
+    }),
+  );
+
+  router.get(
+    PIPELINE_AGENT_ROUTES.historyItem,
+    rota(async (req, res) => {
+      const credenciais = await autorizador.credenciais(req);
+      const alvo = await autorizador.entidade(
+        credenciais,
+        textoDaQuery(req.query.entityRef),
+        pipelineAgentInvestigationCreatePermission,
+      );
+      const corpo: DetalheHistorico = await servico.detalhe(
+        alvo,
+        idDaSessao(req.params.id),
+      );
+      res.json(corpo);
     }),
   );
 

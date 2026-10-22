@@ -1,4 +1,4 @@
-import type { Fase, ItemHistorico } from './types';
+import type { Fase, ItemHistorico, PropostaHistorico } from './types';
 
 // HTTP contract between the frontend and the pipeline agent backend. Paths are
 // relative to the plugin's API prefix, /api/pipeline-agent. The routes and
@@ -23,6 +23,9 @@ export const PIPELINE_AGENT_ROUTES = {
   project: '/project',
   // GET with the EntidadeQuery parameter, answers HistoricoResposta.
   history: '/history',
+  // GET with the EntidadeQuery parameter, answers DetalheHistorico. The id is the
+  // session id of an item in the history answer.
+  historyItem: '/history/:id',
 } as const;
 
 export const PIPELINE_AGENT_EVENTS_CONTENT_TYPE = 'text/event-stream';
@@ -43,6 +46,13 @@ export type OrientarCorpo = { toolUseId: string; texto: string };
 export type FaseResposta = { fase: Fase };
 
 export type HistoricoResposta = { itens: ItemHistorico[] };
+
+// proposta is null when the session has no usable proposal: that is an empty
+// detail, answered with 200, not an error.
+export type DetalheHistorico = {
+  id: string;
+  proposta: PropostaHistorico | null;
+};
 
 // Error body for every non-2xx answer. 400 invalid input, 404 unknown or hidden
 // entity or investigation, 409 wrong state, 502 upstream failure, 503 the plugin is not
