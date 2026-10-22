@@ -5,6 +5,7 @@ import {
   PIPELINE_AGENT_ROUTES,
   type AprovarCorpo,
   type Banner,
+  type DetalheHistorico,
   type Fase,
   type FaseResposta,
   type HistoricoResposta,
@@ -89,6 +90,14 @@ export class PipelineAgentClient implements PipelineAgentApi {
       { entityRef },
     );
     return itens;
+  }
+
+  detalheHistorico(entityRef: string, id: string): Promise<DetalheHistorico> {
+    return this.pedirJson<DetalheHistorico>(
+      rota(PIPELINE_AGENT_ROUTES.historyItem, id),
+      {},
+      { entityRef },
+    );
   }
 
   iniciar(entityRef: string): Promise<IniciarResposta> {

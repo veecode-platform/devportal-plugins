@@ -5,6 +5,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type {
   Banner,
+  DetalheHistorico,
   ItemHistorico,
   UiEvent,
 } from '@veecode-platform/backstage-plugin-pipeline-agent-common';
@@ -86,6 +87,7 @@ const criarApi = (sobrescritos: Partial<PipelineAgentApi> = {}) => {
   const api: PipelineAgentApi = {
     banner: jest.fn().mockResolvedValue(BANNER_FALHO),
     historico: jest.fn().mockResolvedValue([]),
+    detalheHistorico: jest.fn().mockResolvedValue({ id: 'h1', proposta: null }),
     iniciar: jest.fn().mockResolvedValue({
       id: 'inv-1',
       iniciadoEm: '2026-10-21T12:00:00.000Z',
@@ -385,6 +387,148 @@ describe('PipelineAgentCard', () => {
     expect(
       screen.getByText(
         'Do clique ao pipeline verde: 4 min 12 s. Custo da investigação: US$ 0,31.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('PipelineAgentCard, one item of the history', () => {
+  const ITEM: ItemHistorico = {
+    id: 'sesn_1',
+    titulo: 'Pipeline 8842 · job build · MR !2 aberto',
+    criadoEm: '2026-10-20T12:00:00.000Z',
+    status: 'idle',
+    custoUsd: 0.19,
+  };
+  const CAUSA =
+    'Causa: a faixa sai sobre o valor que o cupom já descontou.\nEvidência: expected 900,00 mas foi 902,50.';
+  const DETALHE: DetalheHistorico = {
+    id: 'sesn_1',
+    proposta: {
+      tentativa: 1,
+      titulo: 'fix: cupom e faixa somam sobre o valor bruto',
+      causa: CAUSA,
+      arquivos: ['src/main/java/br/com/exemplo/pedidos/DescontoService.java'],
+      mr: {
+        iid: 2,
+        url: 'https://gitlab.com/veecode-demos/pedidos-api/-/merge_requests/2',
+        statusPipeline: 'success',
+      },
+    },
+  };
+  const ABRIR = /Pipeline 8842/;
+
+  const comItem = (detalheHistorico: PipelineAgentApi['detalheHistorico']) =>
+    criarApi({
+      historico: jest.fn().mockResolvedValue([ITEM]),
+      detalheHistorico,
+    });
+
+  it('opens an item inline with its proposal, and asks the agent for the detail once', async () => {
+    const detalheHistorico = jest.fn().mockResolvedValue(DETALHE);
+    renderizar(comItem(detalheHistorico));
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: ABRIR }));
+
+    expect(
+      await screen.findByText('fix: cupom e faixa somam sobre o valor bruto'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Tentativa 1')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'src/main/java/br/com/exemplo/pedidos/DescontoService.java',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'MR !2' })).toHaveAttribute(
+      'href',
+      'https://gitlab.com/veecode-demos/pedidos-api/-/merge_requests/2',
+    );
+    expect(screen.getByText(/pipeline passou/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: ABRIR })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(detalheHistorico).toHaveBeenCalledTimes(1);
+    expect(detalheHistorico).toHaveBeenCalledWith(
+      'component:default/pedidos-api',
+      'sesn_1',
+    );
+  });
+
+  it('keeps the line breaks of the cause', async () => {
+    renderizar(comItem(jest.fn().mockResolvedValue(DETALHE)));
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: ABRIR }));
+
+    expect((await screen.findByText(/Causa: a faixa/)).textContent).toBe(CAUSA);
+  });
+
+  it('collapses and reopens an item without asking the agent again', async () => {
+    const detalheHistorico = jest.fn().mockResolvedValue(DETALHE);
+    renderizar(comItem(detalheHistorico));
+    const user = userEvent.setup();
+    const botao = await screen.findByRole('button', { name: ABRIR });
+
+    await user.click(botao);
+    expect(await screen.findByText('Tentativa 1')).toBeInTheDocument();
+    await user.click(botao);
+    expect(botao).toHaveAttribute('aria-expanded', 'false');
+    await user.click(botao);
+
+    expect(botao).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Tentativa 1')).toBeInTheDocument();
+    expect(detalheHistorico).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a loading state in pt-BR while the detail is on its way', async () => {
+    renderizar(comItem(() => new Promise<DetalheHistorico>(() => undefined)));
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: ABRIR }));
+
+    expect(
+      await screen.findByText('Carregando a investigação…'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows a failure in pt-BR, and asks again when the item is opened again', async () => {
+    const detalheHistorico = jest
+      .fn()
+      .mockRejectedValueOnce(
+        new PipelineAgentError(
+          502,
+          'O portal não conseguiu falar com o GitLab ou com o agente. Tente de novo em instantes.',
+        ),
+      )
+      .mockResolvedValueOnce(DETALHE);
+    renderizar(comItem(detalheHistorico));
+    const user = userEvent.setup();
+    const botao = await screen.findByRole('button', { name: ABRIR });
+
+    await user.click(botao);
+    expect(
+      await screen.findByText(/O portal não conseguiu falar com o GitLab/),
+    ).toBeInTheDocument();
+    await user.click(botao);
+    await user.click(botao);
+
+    expect(await screen.findByText('Tentativa 1')).toBeInTheDocument();
+    expect(detalheHistorico).toHaveBeenCalledTimes(2);
+  });
+
+  it('says in pt-BR when the investigation has no proposal', async () => {
+    renderizar(
+      comItem(jest.fn().mockResolvedValue({ id: 'sesn_1', proposta: null })),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: ABRIR }));
+
+    expect(
+      await screen.findByText(
+        'Esta investigação não chegou a propor uma correção.',
       ),
     ).toBeInTheDocument();
   });

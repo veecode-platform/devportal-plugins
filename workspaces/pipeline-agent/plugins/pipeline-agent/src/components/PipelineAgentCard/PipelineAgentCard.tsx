@@ -17,6 +17,7 @@ import { Passos } from './Passos';
 import { Resultado } from './Resultado';
 import { CARREGANDO, falhaDe, type Carga } from './carga';
 import { useEstilos } from './estilos';
+import { useDetalhesHistorico } from './useDetalhesHistorico';
 import { useInvestigacao } from './useInvestigacao';
 
 export const PipelineAgentCard = () => {
@@ -25,6 +26,7 @@ export const PipelineAgentCard = () => {
   const entityRef = stringifyEntityRef(entity);
   const classes = useEstilos();
   const investigacao = useInvestigacao(api, entityRef);
+  const detalhes = useDetalhesHistorico(api, entityRef);
   const { visao } = investigacao;
   const terminou = visao.encerrado !== null;
 
@@ -166,7 +168,11 @@ export const PipelineAgentCard = () => {
           </p>
         )}
 
-        <Historico carga={historico} />
+        <Historico
+          carga={historico}
+          detalhe={detalhes.detalhe}
+          aoAbrir={detalhes.abrir}
+        />
       </div>
     </InfoCard>
   );

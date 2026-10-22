@@ -1,10 +1,12 @@
 import {
   PipelineAgentError,
   type Banner,
+  type DetalheHistorico,
   type Fase,
   type IniciarResposta,
   type ItemHistorico,
   type PipelineAgentApi,
+  type PropostaHistorico,
   type UiEvent,
 } from '@veecode-platform/backstage-plugin-pipeline-agent';
 import {
@@ -55,6 +57,56 @@ const pausa = (ms: number) =>
 
 const CUSTO_USD = 0.04;
 
+// The proposals of the two seeded history items. A run of this fake answers from the
+// events it kept instead (see propostaDoRoteiro).
+const PROPOSTAS_HISTORICO: Record<string, PropostaHistorico | undefined> = {
+  'historico-2': {
+    tentativa: 1,
+    titulo: MR_TITULO,
+    causa: CAUSA_DIAGNOSTICO,
+    arquivos: [CAMINHO_ALVO],
+    mr: {
+      iid: 2,
+      url: 'https://gitlab.com/veecode-demos/pedidos-api/-/merge_requests/2',
+      statusPipeline: 'success',
+    },
+  },
+  'historico-1': {
+    tentativa: 1,
+    titulo: MR_TITULO,
+    causa: CAUSA_DIAGNOSTICO,
+    arquivos: [CAMINHO_ALVO],
+    mr: null,
+  },
+};
+
+// The last diagnosis of a run, and the merge request and pipeline that followed it.
+function propostaDoRoteiro(eventos: UiEvent[]): PropostaHistorico | null {
+  let diagnostico: Extract<UiEvent, { tipo: 'diagnostico' }> | null = null;
+  let mr: { iid: number; url: string } | null = null;
+  let statusPipeline: string | null = null;
+  for (const evento of eventos) {
+    if (evento.tipo === 'diagnostico') {
+      diagnostico = evento;
+      mr = null;
+      statusPipeline = null;
+    }
+    if (evento.tipo === 'mr_aberto') mr = { iid: evento.iid, url: evento.url };
+    if (evento.tipo === 'pipeline_mr') statusPipeline = evento.status;
+  }
+  if (diagnostico === null) return null;
+  return {
+    tentativa: diagnostico.tentativa,
+    titulo: diagnostico.titulo,
+    causa: diagnostico.causa,
+    arquivos: diagnostico.arquivos.map(arquivo => arquivo.caminho),
+    mr:
+      mr === null || statusPipeline === null
+        ? null
+        : { iid: mr.iid, url: mr.url, statusPipeline },
+  };
+}
+
 export class PipelineAgentFake implements PipelineAgentApi {
   private readonly passoMs: number;
   private readonly sessoes = new Map<string, Sessao>();
@@ -91,6 +143,17 @@ export class PipelineAgentFake implements PipelineAgentApi {
 
   async historico(_entityRef: string): Promise<ItemHistorico[]> {
     return [...this.itensHistorico];
+  }
+
+  async detalheHistorico(
+    _entityRef: string,
+    id: string,
+  ): Promise<DetalheHistorico> {
+    const sessao = this.sessoes.get(id);
+    const proposta = sessao
+      ? propostaDoRoteiro(sessao.eventos)
+      : (PROPOSTAS_HISTORICO[id] ?? null);
+    return { id, proposta };
   }
 
   async iniciar(_entityRef: string): Promise<IniciarResposta> {
