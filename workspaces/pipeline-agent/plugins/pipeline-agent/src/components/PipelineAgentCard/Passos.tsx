@@ -1,5 +1,6 @@
 import type { Passo } from '../../state/visao';
 import { useEstilos } from './estilos';
+import { TextoDoAgente } from './TextoDoAgente';
 
 export function Passos({ passos }: { passos: Passo[] }) {
   const classes = useEstilos();
@@ -8,10 +9,10 @@ export function Passos({ passos }: { passos: Passo[] }) {
       {passos.map(passo => (
         <li key={`${passo.tipo}-${passo.id}`}>
           {passo.tipo === 'passo' ? (
-            <p className={classes.texto}>{passo.texto}</p>
+            <TextoDoAgente texto={passo.texto} />
           ) : (
             <>
-              <p className={classes.texto}>{passo.resumo}</p>
+              <TextoDoAgente texto={passo.resumo} />
               <details className={classes.comando}>
                 <summary>Ver comando e saída</summary>
                 <pre className={classes.codigo}>{passo.comando}</pre>

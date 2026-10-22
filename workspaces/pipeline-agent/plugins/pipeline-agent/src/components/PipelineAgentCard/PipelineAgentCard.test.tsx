@@ -146,6 +146,11 @@ describe('PipelineAgentCard', () => {
             texto: 'Vou ler o log do job test.',
           },
           {
+            tipo: 'passo',
+            id: 'p2',
+            texto: 'O commit só muda o `README.md`.\nVou reproduzir.',
+          },
+          {
             tipo: 'comando',
             id: 'c1',
             resumo: 'Consultou a API do GitLab',
@@ -168,6 +173,8 @@ describe('PipelineAgentCard', () => {
     expect(screen.getByText('Consultou a API do GitLab')).toBeInTheDocument();
     expect(screen.getByText('Tests run: 7, Failures: 1')).toBeInTheDocument();
     expect(screen.getAllByText('Ver comando e saída')).toHaveLength(1);
+    expect(screen.getByText('README.md').tagName).toBe('CODE');
+    expect(screen.getByText('Vou reproduzir.').tagName).toBe('P');
   });
 
   it('shows the three decisions for a diagnosis', async () => {
@@ -600,7 +607,9 @@ describe('PipelineAgentCard, one item of the history', () => {
 
     await user.click(await screen.findByRole('button', { name: ABRIR }));
 
-    expect((await screen.findByText(/Causa: a faixa/)).textContent).toBe(CAUSA);
+    for (const linha of CAUSA.split('\n')) {
+      expect((await screen.findByText(linha)).tagName).toBe('P');
+    }
   });
 
   it('collapses and reopens an item without asking the agent again', async () => {

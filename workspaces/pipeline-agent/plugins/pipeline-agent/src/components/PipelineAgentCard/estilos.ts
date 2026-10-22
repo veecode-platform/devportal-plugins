@@ -140,8 +140,4 @@ export const useEstilos = makeStyles((tema: Theme) => ({
     borderRadius: tema.shape.borderRadius,
     border: `1px solid ${tema.palette.divider}`,
   },
-  causa: {
-    margin: 0,
-    whiteSpace: 'pre-line',
-  },
 }));

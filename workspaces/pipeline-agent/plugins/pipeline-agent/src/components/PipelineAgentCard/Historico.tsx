@@ -9,6 +9,7 @@ import { dataCurta, dolar } from '../../state/formato';
 import { rotuloPipeline, rotuloSessao } from '../../state/rotulos';
 import { type Carga, type Falha } from './carga';
 import { useEstilos } from './estilos';
+import { TextoDoAgente } from './TextoDoAgente';
 
 // A 404 or a 503 is not a history error: the card already says what is wrong,
 // so the history block stays out of the way.
@@ -141,7 +142,7 @@ function DetalheDoItem({
         <strong>{proposta.titulo}</strong>
       </p>
       <p className={classes.subtitulo}>Tentativa {proposta.tentativa}</p>
-      <p className={classes.causa}>{proposta.causa}</p>
+      <TextoDoAgente texto={proposta.causa} />
       <ul className={classes.lista}>
         {proposta.arquivos.map(caminho => (
           <li key={caminho} className={classes.arquivo}>
