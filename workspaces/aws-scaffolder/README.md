@@ -1,9 +1,10 @@
 # aws-scaffolder
 
-This workspace contains a `backend-plugin` package and only the harness needed to prove
-that package before it is published through the export overlay. The package under
-`plugins/` was created with `backstage-cli new`; the harness, `dynamic-plugins.yaml`
-and this guidance come from the repository workspace template.
+This workspace contains a `backend-plugin-module` for the scaffolder plugin
+(`plugins/scaffolder-backend-module-aws-lambda`) and only the harness needed to prove it before
+it is published through the export overlay. The module was created with `backstage-cli new`;
+the dev shell, `dynamic-plugins.yaml` and this guidance come from the repository workspace
+template.
 
 ## Local flow
 
