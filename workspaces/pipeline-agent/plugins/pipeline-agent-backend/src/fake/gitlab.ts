@@ -64,7 +64,7 @@ export class GitLabFake implements GitLab {
       ref: REF_PIPELINE,
       sha: SHA_COMMIT,
       criadoEm: new Date(this.iniciadoEm - 14 * 60_000).toISOString(),
-      url: `https://gitlab.com/${this.projeto}/-/pipelines/${PIPELINE_FALHO_ID}`,
+      url: `https://gitlab.example.com/${this.projeto}/-/pipelines/${PIPELINE_FALHO_ID}`,
     };
   }
 
@@ -83,7 +83,7 @@ export class GitLabFake implements GitLab {
       ref: mr.origem,
       sha: 'fake-sha-mr',
       criadoEm: new Date(mr.criadoEmMs).toISOString(),
-      url: `https://gitlab.com/${this.projeto}/-/pipelines/${id}`,
+      url: `https://gitlab.example.com/${this.projeto}/-/pipelines/${id}`,
     };
   }
 
@@ -190,7 +190,7 @@ export class GitLabFake implements GitLab {
     return {
       iid,
       titulo: entrada.titulo,
-      url: `https://gitlab.com/${this.projeto}/-/merge_requests/${iid}`,
+      url: `https://gitlab.example.com/${this.projeto}/-/merge_requests/${iid}`,
     };
   }
 

@@ -63,6 +63,57 @@ describe('GitLabHttp (mocked fetch)', () => {
   });
 });
 
+describe('GitLabHttp merge request pipeline (mocked fetch)', () => {
+  const RAIZ = 'https://gitlab.example.com/api/v4';
+  const PIPELINE = {
+    id: 77,
+    status: 'running',
+    ref: 'agente/fix-9001-1',
+    sha: 'abc123',
+    created_at: '2026-10-22T10:00:00.000Z',
+  };
+
+  it('maps the head pipeline web_url to the pipeline url', async () => {
+    const webUrl = 'https://gitlab.example.com/g/p/-/pipelines/77';
+    const buscar = jest.fn(async () =>
+      respostaJson({ head_pipeline: { ...PIPELINE, web_url: webUrl } }),
+    );
+    const gitlab = new GitLabHttp({
+      base: RAIZ,
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar,
+    });
+    await expect(gitlab.getMRPipeline(3)).resolves.toEqual({
+      id: 77,
+      status: 'running',
+      ref: 'agente/fix-9001-1',
+      sha: 'abc123',
+      criadoEm: '2026-10-22T10:00:00.000Z',
+      url: webUrl,
+    });
+    expect((buscar.mock.calls[0] as unknown as [string])[0]).toBe(
+      `${RAIZ}/projects/g%2Fp/merge_requests/3`,
+    );
+  });
+
+  it('answers a null url when GitLab sends no web_url or an empty one', async () => {
+    for (const semUrl of [{}, { web_url: '' }]) {
+      const gitlab = new GitLabHttp({
+        base: RAIZ,
+        token: TOKEN,
+        projeto: 'g/p',
+        buscar: async () =>
+          respostaJson({ head_pipeline: { ...PIPELINE, ...semUrl } }),
+      });
+      await expect(gitlab.getMRPipeline(3)).resolves.toMatchObject({
+        id: 77,
+        url: null,
+      });
+    }
+  });
+});
+
 describe('GitLabHttp commit diff and archive (mocked fetch)', () => {
   const SHA = 'abc123';
   const RAIZ = 'https://gitlab.example.com/api/v4';
