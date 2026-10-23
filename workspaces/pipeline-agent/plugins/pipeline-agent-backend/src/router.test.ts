@@ -330,6 +330,115 @@ describe('pipeline agent router, fake mode', () => {
     }
   });
 
+  it('sends guidance as the result of the pending call and gets a revised proposal', async () => {
+    const enviar = jest.spyOn(AgenteFake.prototype, 'enviar');
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const criada = await iniciar(servidor.base, REF_PEDIDOS);
+      const { id } = (await criada.json()) as { id: string };
+      const sse = leitorSse(
+        await fetch(`${servidor.base}/investigations/${id}/events`, {
+          headers: AUTH,
+        }),
+      );
+      await sse.ate(q => q.some(x => x.evento.tipo === 'diagnostico'));
+      const primeiro = sse.quadros.find(
+        q => q.evento.tipo === 'diagnostico',
+      )?.evento;
+      if (primeiro?.tipo !== 'diagnostico') throw new Error('sem diagnóstico');
+      const antes = enviar.mock.calls.length;
+
+      const orientada = await fetch(
+        `${servidor.base}/investigations/${id}/orientar`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            toolUseId: primeiro.ferramentaId,
+            texto: 'confira o teste antes',
+          }),
+        },
+      );
+      expect(orientada.status).toBe(200);
+      expect(await orientada.json()).toEqual({ fase: 'investigando' });
+
+      await sse.ate(
+        q => q.filter(x => x.evento.tipo === 'diagnostico').length === 2,
+      );
+      await sse.fechar();
+      const ordem = sse.quadros
+        .map(q => q.evento.tipo)
+        .filter(t => t === 'diagnostico' || t === 'orientacao');
+      expect(ordem).toEqual(['diagnostico', 'orientacao', 'diagnostico']);
+      const segundo = sse.quadros.filter(
+        q => q.evento.tipo === 'diagnostico',
+      )[1].evento;
+      if (segundo.tipo !== 'diagnostico') throw new Error('sem diagnóstico');
+      expect(segundo.causa).toContain(
+        'Orientação recebida: confira o teste antes',
+      );
+
+      const enviados = enviar.mock.calls
+        .slice(antes)
+        .flatMap(([, eventos]) => eventos);
+      expect(enviados.map(e => e.type)).toEqual(['user.custom_tool_result']);
+      expect(enviados[0]).toMatchObject({
+        type: 'user.custom_tool_result',
+        custom_tool_use_id: primeiro.ferramentaId,
+        is_error: true,
+      });
+    } finally {
+      enviar.mockRestore();
+      await servidor.fechar();
+    }
+  });
+
+  it('keeps the proposal pending when the guidance does not reach the agent', async () => {
+    const enviar = jest.spyOn(AgenteFake.prototype, 'enviar');
+    const { app } = criarApp();
+    const servidor = await escutar(app);
+    try {
+      const criada = await iniciar(servidor.base, REF_PEDIDOS);
+      const { id } = (await criada.json()) as { id: string };
+      const sse = leitorSse(
+        await fetch(`${servidor.base}/investigations/${id}/events`, {
+          headers: AUTH,
+        }),
+      );
+      await sse.ate(q => q.some(x => x.evento.tipo === 'diagnostico'));
+      const primeiro = sse.quadros.find(
+        q => q.evento.tipo === 'diagnostico',
+      )?.evento;
+      if (primeiro?.tipo !== 'diagnostico') throw new Error('sem diagnóstico');
+      const orientar = () =>
+        fetch(`${servidor.base}/investigations/${id}/orientar`, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            toolUseId: primeiro.ferramentaId,
+            texto: 'confira o teste antes',
+          }),
+        });
+
+      enviar.mockRejectedValueOnce(new Error('sessão indisponível'));
+      expect((await orientar()).status).toBe(502);
+      await sse.ate(
+        q => q.filter(x => x.evento.tipo === 'diagnostico').length === 2,
+      );
+      const reanunciado = sse.quadros.filter(
+        q => q.evento.tipo === 'diagnostico',
+      )[1].evento;
+      expect(reanunciado).toEqual(primeiro);
+
+      expect((await orientar()).status).toBe(200);
+      await sse.fechar();
+    } finally {
+      enviar.mockRestore();
+      await servidor.fechar();
+    }
+  });
+
   it('answers 409 to a second start while the first one is still waiting for approval', async () => {
     const { app } = criarApp();
     const servidor = await escutar(app);

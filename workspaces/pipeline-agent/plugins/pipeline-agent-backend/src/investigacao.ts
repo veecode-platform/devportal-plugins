@@ -35,6 +35,7 @@ type Pendente = {
   toolUseId: string;
   entrada: AbrirMrEntrada;
   arquivos: ArquivoProposto[];
+  anuncio: UiEvent;
 };
 
 export type Ouvinte = (indice: number, evento: UiEvent) => void;
@@ -54,7 +55,6 @@ export class Investigacao {
   private pendente: Pendente | null = null;
   private tentativas = 0;
   private ultimoVermelho = false;
-  private interrompendo = false;
   private verdeEm: number | null = null;
   private motivoFim: string | null = null;
   private custo: number | null = null;
@@ -159,10 +159,6 @@ export class Investigacao {
         await this.ocioso(sinal.motivo);
         return;
       case 'rodando':
-        // The docs put the end of an interrupted turn before the next turn. If the
-        // interrupted turn produced no idle (the session was already waiting in
-        // requires_action), this event is the sign that the guidance was read.
-        this.interrompendo = false;
         return;
       case 'terminou':
         this.encerrar('a sessão foi encerrada antes do fim');
@@ -221,20 +217,21 @@ export class Investigacao {
       );
       return;
     }
-    this.pendente = { toolUseId, entrada: entrada.valor, arquivos };
     const diffs: ArquivoDiff[] = arquivos.map(a => ({
       caminho: a.caminho,
       novo: a.existente === null,
       diff: diffArquivo(a.caminho, a.existente ?? '', a.conteudo),
     }));
-    this.emitir({
+    const anuncio: UiEvent = {
       tipo: 'diagnostico',
       ferramentaId: toolUseId,
       titulo: entrada.valor.titulo,
       causa: entrada.valor.causa,
       tentativa: this.tentativas + 1,
       arquivos: diffs,
-    });
+    };
+    this.pendente = { toolUseId, entrada: entrada.valor, arquivos, anuncio };
+    this.emitir(anuncio);
     this.setFase('aguardando_aprovacao');
   }
 
@@ -243,10 +240,6 @@ export class Investigacao {
   ): Promise<void> {
     await this.atualizarUso();
     if (motivo !== 'end_turn') return;
-    if (this.interrompendo) {
-      this.interrompendo = false;
-      return;
-    }
     this.encerrar('o agente terminou');
   }
 
@@ -380,29 +373,42 @@ export class Investigacao {
   }
 
   async recusar(toolUseId: string, motivo: string): Promise<void> {
-    this.exigirPendente(toolUseId);
-    this.pendente = null;
-    this.emitir({ tipo: 'recusa', motivo });
-    this.setFase('investigando');
-    await this.responder(
+    await this.responderDecisao(
       toolUseId,
+      { tipo: 'recusa', motivo },
       `A pessoa recusou a proposta. Motivo: ${motivo}. Não abra MR com a mesma proposta.`,
-      true,
     );
   }
 
+  // The session waits in requires_action for the abrir_mr result and rejects a user
+  // message until that call is answered, so the guidance goes in the tool result.
   async orientar(toolUseId: string, texto: string): Promise<void> {
-    this.exigirPendente(toolUseId);
+    await this.responderDecisao(
+      toolUseId,
+      { tipo: 'orientacao', texto },
+      `A pessoa orientou o agente antes de aprovar: ${texto}. Siga a orientação, diga em um passo o que mudou por causa dela e chame abrir_mr de novo com a proposta revista.`,
+    );
+  }
+
+  // Answers the pending proposal without opening the MR. The decision is announced
+  // before the send, so it reaches the card ahead of the agent's next steps. If the
+  // send fails, the proposal is pending and announced again, so the person can retry.
+  private async responderDecisao(
+    toolUseId: string,
+    decisao: UiEvent,
+    texto: string,
+  ): Promise<void> {
+    const p = this.exigirPendente(toolUseId);
     this.pendente = null;
-    this.interrompendo = true;
-    this.emitir({ tipo: 'orientacao', texto });
+    this.emitir(decisao);
     this.setFase('investigando');
-    await this.dep.runtime.enviar(this.id, [
-      { type: 'user.interrupt' },
-      {
-        type: 'user.message',
-        content: [{ type: 'text', text: this.paraAgente(texto) }],
-      },
-    ]);
+    try {
+      await this.responder(toolUseId, texto, true);
+    } catch (erro) {
+      this.pendente = p;
+      this.emitir(p.anuncio);
+      this.setFase('aguardando_aprovacao');
+      throw erro;
+    }
   }
 }

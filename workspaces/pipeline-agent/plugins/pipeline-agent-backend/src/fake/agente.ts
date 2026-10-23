@@ -47,6 +47,9 @@ type Sessao = {
 
 const PAUSA_CURTA_MS = 700;
 const PAUSA_FERRAMENTA_MS = 900;
+// The backend sends guidance as the error result of the pending abrir_mr call.
+const ORIENTACAO =
+  /^A pessoa orientou o agente antes de aprovar: ([\s\S]*)\. Siga a orientação/;
 
 const TITULO_PROPOSTA = 'fix: cupom e faixa somam sobre o valor bruto';
 const CAUSA_INICIAL =
@@ -356,35 +359,13 @@ export class AgenteFake implements AgentRuntime {
       const evento = await sessao.entrada.pegar();
       if (!evento) return;
       if (
-        evento.type === 'user.custom_tool_result' &&
-        evento.custom_tool_use_id === pendente
-      ) {
-        if (evento.is_error) {
-          this.mensagem(
-            sessao,
-            `Entendi. Não abro o MR. Motivo registrado: ${textoDoEvento(
-              evento.content,
-            )}`,
-          );
-        } else {
-          const resultado = JSON.parse(textoDoEvento(evento.content)) as {
-            pipeline_status?: string;
-          };
-          await this.esperar(PAUSA_CURTA_MS);
-          this.mensagem(
-            sessao,
-            resultado.pipeline_status === 'success'
-              ? 'MR aberto e o pipeline do MR passou. Encerro aqui com o diagnóstico.'
-              : 'O pipeline do MR falhou. Leio o log final antes de propor outra correção.',
-          );
-        }
-        this.ocioso(sessao, { type: 'end_turn' });
-        return;
-      }
-      if (evento.type === 'user.interrupt') {
-        this.ocioso(sessao, { type: 'end_turn' });
-        const orientacao = await sessao.entrada.pegar();
-        if (!orientacao || orientacao.type !== 'user.message') return;
+        evento.type !== 'user.custom_tool_result' ||
+        evento.custom_tool_use_id !== pendente
+      )
+        continue;
+      const texto = textoDoEvento(evento.content);
+      const orientacao = evento.is_error ? ORIENTACAO.exec(texto) : null;
+      if (orientacao) {
         this.emitir(sessao, {
           id: this.nomeEvento('evt'),
           type: 'session.status_running',
@@ -401,11 +382,27 @@ export class AgenteFake implements AgentRuntime {
         );
         pendente = this.pedirAbrirMr(
           sessao,
-          `Causa: a faixa é aplicada sobre o valor já descontado. Orientação recebida: ${textoDoEvento(
-            orientacao.content,
-          )}. A mudança fica só em DescontoService.`,
+          `Causa: a faixa é aplicada sobre o valor já descontado. Orientação recebida: ${orientacao[1]}. A mudança fica só em DescontoService.`,
+        );
+        continue;
+      }
+      if (evento.is_error) {
+        this.mensagem(
+          sessao,
+          `Entendi. Não abro o MR. Motivo registrado: ${texto}`,
+        );
+      } else {
+        const resultado = JSON.parse(texto) as { pipeline_status?: string };
+        await this.esperar(PAUSA_CURTA_MS);
+        this.mensagem(
+          sessao,
+          resultado.pipeline_status === 'success'
+            ? 'MR aberto e o pipeline do MR passou. Encerro aqui com o diagnóstico.'
+            : 'O pipeline do MR falhou. Leio o log final antes de propor outra correção.',
         );
       }
+      this.ocioso(sessao, { type: 'end_turn' });
+      return;
     }
   }
 
