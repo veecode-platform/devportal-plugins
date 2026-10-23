@@ -1,0 +1,261 @@
+import { GitLabHttp } from './http';
+
+const TOKEN = 'token-de-teste-nao-real';
+
+function respostaJson(corpo: unknown, status = 200): Response {
+  return new Response(JSON.stringify(corpo), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+describe('GitLabHttp (mocked fetch)', () => {
+  it('sends the token only in PRIVATE-TOKEN and encodes the project and the file path', async () => {
+    const buscar = jest.fn(async () =>
+      respostaJson({ content: Buffer.from('conteudo').toString('base64') }),
+    );
+    const gitlab = new GitLabHttp({
+      base: 'https://gitlab.example.com/api/v4/',
+      token: TOKEN,
+      projeto: 'veecode-demos/pedidos-api',
+      buscar,
+    });
+    await expect(
+      gitlab.getFile('src/main/Desconto.java', 'main'),
+    ).resolves.toBe('conteudo');
+    const [url, init] = buscar.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe(
+      'https://gitlab.example.com/api/v4/projects/veecode-demos%2Fpedidos-api/repository/files/src%2Fmain%2FDesconto.java?ref=main',
+    );
+    expect((init.headers as Record<string, string>)['PRIVATE-TOKEN']).toBe(
+      TOKEN,
+    );
+  });
+
+  it('answers null for a missing file, and throws an error that carries status and route, never the token', async () => {
+    const naoEncontrado = new GitLabHttp({
+      base: 'https://gitlab.example.com/api/v4',
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar: async () => respostaJson({}, 404),
+    });
+    await expect(
+      naoEncontrado.getFile('x.java', 'agente/fix-1-1'),
+    ).resolves.toBeNull();
+
+    const falha = new GitLabHttp({
+      base: 'https://gitlab.example.com/api/v4',
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar: async () => respostaJson({ message: 'negado' }, 403),
+    });
+    const erro = await falha
+      .commit({
+        branch: 'agente/fix-1-1',
+        base: 'main',
+        mensagem: 'fix: cupom',
+        acoes: [],
+      })
+      .catch((e: Error) => e);
+    expect(erro).toBeInstanceOf(Error);
+    expect((erro as Error).message).toBe(
+      'GitLab respondeu 403 em POST /projects/g%2Fp/repository/commits',
+    );
+    expect((erro as Error).message).not.toContain(TOKEN);
+  });
+
+  it('creates the branch inside the one commit request: branch plus start_branch, and no separate branch call', async () => {
+    const buscar = jest.fn(async () => respostaJson({ id: 'abc' }, 201));
+    const gitlab = new GitLabHttp({
+      base: 'https://gitlab.example.com/api/v4',
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar,
+    });
+    await gitlab.commit({
+      branch: 'agente/fix-1-1',
+      base: 'main',
+      mensagem: 'fix: cupom',
+      acoes: [{ acao: 'update', caminho: 'a.java', conteudo: 'class A {}' }],
+    });
+    expect(buscar).toHaveBeenCalledTimes(1);
+    const [url, init] = buscar.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe(
+      'https://gitlab.example.com/api/v4/projects/g%2Fp/repository/commits',
+    );
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      branch: 'agente/fix-1-1',
+      start_branch: 'main',
+      commit_message: 'fix: cupom',
+      actions: [
+        { action: 'update', file_path: 'a.java', content: 'class A {}' },
+      ],
+    });
+  });
+});
+
+describe('GitLabHttp merge request pipeline (mocked fetch)', () => {
+  const RAIZ = 'https://gitlab.example.com/api/v4';
+  const PIPELINE = {
+    id: 77,
+    status: 'running',
+    ref: 'agente/fix-9001-1',
+    sha: 'abc123',
+    created_at: '2026-10-22T10:00:00.000Z',
+  };
+
+  it('maps the head pipeline web_url to the pipeline url', async () => {
+    const webUrl = 'https://gitlab.example.com/g/p/-/pipelines/77';
+    const buscar = jest.fn(async () =>
+      respostaJson({ head_pipeline: { ...PIPELINE, web_url: webUrl } }),
+    );
+    const gitlab = new GitLabHttp({
+      base: RAIZ,
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar,
+    });
+    await expect(gitlab.getMRPipeline(3)).resolves.toEqual({
+      id: 77,
+      status: 'running',
+      ref: 'agente/fix-9001-1',
+      sha: 'abc123',
+      criadoEm: '2026-10-22T10:00:00.000Z',
+      url: webUrl,
+    });
+    expect((buscar.mock.calls[0] as unknown as [string])[0]).toBe(
+      `${RAIZ}/projects/g%2Fp/merge_requests/3`,
+    );
+  });
+
+  it('answers a null url when GitLab sends no web_url or an empty one', async () => {
+    for (const semUrl of [{}, { web_url: '' }]) {
+      const gitlab = new GitLabHttp({
+        base: RAIZ,
+        token: TOKEN,
+        projeto: 'g/p',
+        buscar: async () =>
+          respostaJson({ head_pipeline: { ...PIPELINE, ...semUrl } }),
+      });
+      await expect(gitlab.getMRPipeline(3)).resolves.toMatchObject({
+        id: 77,
+        url: null,
+      });
+    }
+  });
+});
+
+describe('GitLabHttp commit diff and archive (mocked fetch)', () => {
+  const SHA = 'abc123';
+  const RAIZ = 'https://gitlab.example.com/api/v4';
+
+  it('renders the commit diff as unified text, one git header per file, and reads the first page', async () => {
+    const buscar = jest.fn(async () =>
+      respostaJson([
+        {
+          old_path: 'a.java',
+          new_path: 'a.java',
+          new_file: false,
+          deleted_file: false,
+          diff: '@@ -1 +1 @@\n-x\n+y\n',
+        },
+        {
+          old_path: 'novo.txt',
+          new_path: 'novo.txt',
+          new_file: true,
+          deleted_file: false,
+          diff: '@@ -0,0 +1 @@\n+oi\n',
+        },
+      ]),
+    );
+    const gitlab = new GitLabHttp({
+      base: RAIZ,
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar,
+    });
+    await expect(gitlab.getCommitDiff(SHA)).resolves.toBe(
+      [
+        'diff --git a/a.java b/a.java',
+        '--- a/a.java',
+        '+++ b/a.java',
+        '@@ -1 +1 @@',
+        '-x',
+        '+y',
+        'diff --git a/novo.txt b/novo.txt',
+        '--- /dev/null',
+        '+++ b/novo.txt',
+        '@@ -0,0 +1 @@',
+        '+oi',
+        '',
+      ].join('\n'),
+    );
+    expect((buscar.mock.calls[0] as unknown as [string])[0]).toBe(
+      `${RAIZ}/projects/g%2Fp/repository/commits/abc123/diff?per_page=100&page=1`,
+    );
+  });
+
+  it('keeps asking for pages while a page is full', async () => {
+    const pagina = Array.from({ length: 100 }, (_, i) => ({
+      old_path: `f${i}.txt`,
+      new_path: `f${i}.txt`,
+      diff: '',
+    }));
+    const buscar = jest
+      .fn()
+      .mockResolvedValueOnce(respostaJson(pagina))
+      .mockResolvedValueOnce(respostaJson([]));
+    const gitlab = new GitLabHttp({
+      base: RAIZ,
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar,
+    });
+    const diff = await gitlab.getCommitDiff(SHA);
+    expect(buscar).toHaveBeenCalledTimes(2);
+    expect((buscar.mock.calls[1] as unknown as [string])[0]).toContain(
+      'page=2',
+    );
+    expect(
+      diff.split('\n').filter(l => l.startsWith('diff --git')),
+    ).toHaveLength(100);
+  });
+
+  it('downloads the archive without fetch, with the token header, and throws on a missing commit or a refusal', async () => {
+    const corpo = Buffer.from([0x1f, 0x8b, 0x08]);
+    const baixar = jest.fn(async () => ({ status: 200, corpo }));
+    const buscar = jest.fn();
+    const ok = new GitLabHttp({
+      base: RAIZ,
+      token: TOKEN,
+      projeto: 'g/p',
+      buscar,
+      baixar,
+    });
+    await expect(ok.getArchive(SHA)).resolves.toEqual(corpo);
+    expect(buscar).not.toHaveBeenCalled();
+    expect(baixar).toHaveBeenCalledWith(
+      `${RAIZ}/projects/g%2Fp/repository/archive.tar.gz?sha=${SHA}`,
+      { 'PRIVATE-TOKEN': TOKEN },
+    );
+
+    for (const status of [404, 406]) {
+      const recusa = new GitLabHttp({
+        base: RAIZ,
+        token: TOKEN,
+        projeto: 'g/p',
+        baixar: async () => ({ status, corpo: Buffer.from('{}') }),
+      });
+      await expect(recusa.getArchive(SHA)).rejects.toThrow(
+        `GitLab respondeu ${status} em GET /projects/:id/repository/archive.tar.gz`,
+      );
+    }
+  });
+});
