@@ -18,7 +18,9 @@ describe('scaffolderModuleAwsAppSecrets', () => {
     const actionsRegistry = { register: jest.fn() };
     const features: BackendFeature[] = [
       scaffolderModuleAwsAppSecrets,
-      mockServices.rootConfig.factory({ data: { appSecrets: exampleSettings } }),
+      mockServices.rootConfig.factory({
+        data: { appSecrets: exampleSettings },
+      }),
       createServiceFactory({
         service: actionsRegistryServiceRef,
         deps: {},

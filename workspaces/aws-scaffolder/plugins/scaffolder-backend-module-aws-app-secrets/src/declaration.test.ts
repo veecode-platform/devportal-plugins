@@ -1,11 +1,7 @@
 import type { Entity } from '@backstage/catalog-model';
 import { mockCredentials } from '@backstage/backend-test-utils';
 import { declaredNames } from './declaration';
-import {
-  exampleComponent,
-  exampleSystem,
-  fakeWorld,
-} from './fixtures';
+import { exampleComponent, exampleSystem, fakeWorld } from './fixtures';
 
 const devDeclarationUrl =
   'https://git.example.com/example-org/example-app/blob/main/apps/example-component/config/dev.yaml';
@@ -22,7 +18,11 @@ function componentWithLocation(name: string, location?: string): Entity {
         ? {}
         : { annotations: { 'backstage.io/managed-by-location': location } }),
     },
-    spec: { type: 'service', lifecycle: 'production', owner: 'group:default/example-team' },
+    spec: {
+      type: 'service',
+      lifecycle: 'production',
+      owner: 'group:default/example-team',
+    },
   } as Entity;
 }
 
@@ -64,7 +64,10 @@ describe('declaredNames', () => {
 
   it('skips a component that has no managed-by location at all', async () => {
     const { world, names } = namesOf(
-      [componentWithLocation('unmanaged-component'), exampleComponent('example-component')],
+      [
+        componentWithLocation('unmanaged-component'),
+        exampleComponent('example-component'),
+      ],
       { [devDeclarationUrl]: 'secrets:\n  - DATABASE_PASSWORD\n' },
     );
 
