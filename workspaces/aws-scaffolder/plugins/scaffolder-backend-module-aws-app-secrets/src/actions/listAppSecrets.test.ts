@@ -213,7 +213,46 @@ describe('list-app-secrets', () => {
       RoleArn: 'arn:aws:iam::123456789012:role/example-secret-writer',
       RoleSessionName: 'list-app-secrets',
       SourceIdentity: 'example.user',
+      Policy: expect.any(String),
     });
+  });
+
+  it('narrows the session to DescribeSecret on the paths of each configured environment', async () => {
+    secretsByPath({});
+    const world = fakeWorldWithTwoEnvironments();
+
+    await list(world.deps);
+
+    const policy = JSON.parse(mockStsSend.mock.calls[0][0].input.Policy);
+    expect(policy).toEqual({
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Action: ['secretsmanager:DescribeSecret'],
+          Resource: [
+            'arn:aws:secretsmanager:us-east-1:*:secret:/example-cluster/apps/example-app/dev/*-??????',
+            'arn:aws:secretsmanager:us-east-1:*:secret:/example-cluster/apps/example-app/staging/*-??????',
+          ],
+        },
+      ],
+    });
+  });
+
+  it('keeps the session policy under 2,048 characters with more environments', async () => {
+    secretsByPath({});
+    const world = fakeWorld();
+
+    await list({
+      ...world.deps,
+      settings: {
+        ...exampleSettings,
+        environments: ['dev', 'staging', 'production', 'qa', 'sandbox'],
+      },
+    });
+
+    const policy: string = mockStsSend.mock.calls[0][0].input.Policy;
+    expect(policy.length).toBeLessThan(2048);
   });
 
   it('refuses an app the user does not own, before any AWS call', async () => {

@@ -13,6 +13,8 @@ export interface WriterSession {
   roleArn: string;
   roleSessionName: string;
   sourceIdentity: string;
+  /** Session policy JSON, which narrows the session to the secrets this call names. */
+  policy: string;
 }
 
 export interface SecretState {
@@ -38,6 +40,7 @@ export async function writerClient(
         RoleArn: session.roleArn,
         RoleSessionName: session.roleSessionName,
         SourceIdentity: session.sourceIdentity,
+        Policy: session.policy,
       }),
     )
     .catch((error: unknown) => {

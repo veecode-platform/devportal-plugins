@@ -282,7 +282,42 @@ describe('aws:secrets-manager:app-secret:register', () => {
         RoleArn: 'arn:aws:iam::123456789012:role/example-secret-writer',
         RoleSessionName: 'task-example-task-1',
         SourceIdentity: 'example.user',
+        Policy: expect.any(String),
       });
+    });
+
+    it('narrows the session to the one secret it writes, with the four actions it uses', async () => {
+      const world = fakeWorld({
+        components: [exampleComponent('example-component')],
+        files: { [exampleDeclarationUrl]: exampleDeclaration },
+      });
+      const { ctx } = contextWith(exampleInput, {
+        secrets: { value: exampleMarker },
+      });
+
+      await run(world.deps, ctx);
+
+      const policy = JSON.parse(mockStsSend.mock.calls[0][0].input.Policy);
+      expect(policy).toEqual({
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: [
+              'secretsmanager:CreateSecret',
+              'secretsmanager:PutSecretValue',
+              'secretsmanager:TagResource',
+              'secretsmanager:DescribeSecret',
+            ],
+            Resource: [
+              `arn:aws:secretsmanager:us-east-1:*:secret:${examplePath}-??????`,
+            ],
+          },
+        ],
+      });
+      expect(mockStsSend.mock.calls[0][0].input.Policy.length).toBeLessThan(
+        2048,
+      );
     });
 
     it('cuts a long task id to the 64 characters a session name allows', async () => {

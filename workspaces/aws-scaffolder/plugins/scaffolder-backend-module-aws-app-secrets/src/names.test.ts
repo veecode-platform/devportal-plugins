@@ -5,6 +5,7 @@ import {
   buildSecretPath,
   checkSecretName,
   pathIdentity,
+  secretPathGlob,
 } from './names';
 
 const settings: AppSecretsSettings = {
@@ -148,6 +149,27 @@ describe('pathIdentity', () => {
         '/{cluster}/{namespace}/apps/{app}/{environment}/{name}',
       ),
     ).toEqual({ app: 'example-app', namespace: 'other-ns' });
+  });
+});
+
+describe('secretPathGlob', () => {
+  const parts = {
+    cluster: 'example-cluster',
+    namespace: 'default',
+    app: 'example-app',
+    environment: 'dev',
+  };
+
+  it('opens {name} as a wildcard and fills the other placeholders', () => {
+    expect(secretPathGlob(settings.pathPattern, parts)).toBe(
+      '/example-cluster/apps/example-app/dev/*',
+    );
+  });
+
+  it('refuses a wildcard in any part other than the name', () => {
+    expect(() =>
+      secretPathGlob(settings.pathPattern, { ...parts, cluster: 'example*' }),
+    ).toThrow('is not a valid Secrets Manager name');
   });
 });
 

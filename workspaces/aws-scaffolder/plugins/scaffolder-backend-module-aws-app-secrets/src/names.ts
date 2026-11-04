@@ -90,6 +90,19 @@ export function buildSecretPath(
   return path;
 }
 
+/**
+ * Every path one environment of an app can produce, with {name} open as `*`.
+ * The name is the only wildcard: the other parts are checked as plain path
+ * characters by building the path with a placeholder name first.
+ */
+export function secretPathGlob(
+  pattern: string,
+  parts: Omit<SecretPathParts, 'name'>,
+): string {
+  buildSecretPath(pattern, { ...parts, name: 'NAME' });
+  return fillPattern(pattern, { ...parts, name: '*' });
+}
+
 /** STS rejects any other character in a session name or source identity. */
 export function awsName(value: string, maxLength: number): string {
   return value.replace(AWS_NAME_CHARACTERS_PATTERN, '-').slice(0, maxLength);

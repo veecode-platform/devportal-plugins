@@ -12,6 +12,7 @@ import {
   pathIdentity,
 } from '../names';
 import { writeSecret, writerClient } from '../secretsManager';
+import { writeSessionPolicy } from '../sessionPolicy';
 
 export const REGISTER_APP_SECRET_ACTION_ID =
   'aws:secrets-manager:app-secret:register';
@@ -105,6 +106,7 @@ export function createRegisterAppSecretAction(deps: AppSecretsDependencies) {
         roleArn: settings.writerRoleArn,
         roleSessionName: awsName(`task-${ctx.task.id}`, AWS_NAME_MAX_LENGTH),
         sourceIdentity: awsName(user.name, AWS_NAME_MAX_LENGTH),
+        policy: writeSessionPolicy({ region: settings.region, path }),
       });
       const result = await writeSecret(client, {
         path,

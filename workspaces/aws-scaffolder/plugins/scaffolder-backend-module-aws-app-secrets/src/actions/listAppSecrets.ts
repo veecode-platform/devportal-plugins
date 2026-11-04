@@ -9,12 +9,14 @@ import {
   buildSecretPath,
   checkSecretName,
   pathIdentity,
+  secretPathGlob,
 } from '../names';
 import {
   describeSecret,
   type SecretState,
   writerClient,
 } from '../secretsManager';
+import { describeSessionPolicy } from '../sessionPolicy';
 
 export const LIST_APP_SECRETS_ACTION_NAME = 'list-app-secrets';
 const LIST_SESSION_NAME = LIST_APP_SECRETS_ACTION_NAME;
@@ -80,6 +82,16 @@ export function registerListAppSecretsAction(
         roleArn: settings.writerRoleArn,
         roleSessionName: awsName(LIST_SESSION_NAME, AWS_NAME_MAX_LENGTH),
         sourceIdentity: awsName(user.name, AWS_NAME_MAX_LENGTH),
+        policy: describeSessionPolicy({
+          region: settings.region,
+          globs: settings.environments.map(environment =>
+            secretPathGlob(settings.pathPattern, {
+              ...identity,
+              environment,
+              cluster: settings.cluster,
+            }),
+          ),
+        }),
       });
 
       const environments: Record<string, Record<string, SecretState>> = {};
