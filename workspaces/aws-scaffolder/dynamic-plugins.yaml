@@ -1,0 +1,17 @@
+plugins:
+  - package: ./dynamic-plugins-src/veecode-platform-plugin-scaffolder-backend-module-aws-app-secrets-dynamic
+    disabled: false
+    pluginConfig:
+      appSecrets:
+        region: us-east-1
+        writerRoleArn: arn:aws:iam::123456789012:role/example-secret-writer
+        pathPattern: /{cluster}/apps/{app}/{environment}/{name}
+        cluster: example-cluster
+        environments:
+          - dev
+        declarationFile: config/{environment}.yaml
+        reservedNames:
+          - PORT
+          - OTEL_SERVICE_NAME
+        reservedPrefixes:
+          - OTEL_
