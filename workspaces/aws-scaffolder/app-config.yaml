@@ -1,0 +1,29 @@
+app:
+  title: AwsScaffolder backend development
+  baseUrl: http://localhost:3000
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+
+auth:
+  providers:
+    guest: {}
+
+appSecrets:
+  region: us-east-1
+  writerRoleArn: arn:aws:iam::123456789012:role/example-secret-writer
+  pathPattern: /{cluster}/apps/{app}/{environment}/{name}
+  cluster: example-cluster
+  environments:
+    - dev
+  declarationFile: config/{environment}.yaml
+  reservedNames:
+    - PORT
+    - OTEL_SERVICE_NAME
+  reservedPrefixes:
+    - OTEL_
