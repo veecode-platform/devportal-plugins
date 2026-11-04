@@ -76,3 +76,32 @@ secret path. A failed `TagResource` after `PutSecretValue` fails the step too.
 step is reported as failed while the new version exists, and when two users register the same name
 at the same time the last write wins. CloudTrail records each `PutSecretValue` with its session and
 source identity.
+
+## PDR-006: The System namespace is part of the secret's identity
+
+**Status:** Accepted
+
+**Context:** Two Systems in different catalog namespaces can share a name. A path built from the
+name alone would let the owner of `system:team-a/billing` write the secrets of
+`system:default/billing`.
+
+**Decision:** `pathPattern` accepts `{namespace}`. When the pattern does not use it, both actions
+refuse a System outside the `default` namespace, before any AWS call.
+
+**Consequences:** A host that keeps every app in `default` needs no change. A host with apps in
+other namespaces must put `{namespace}` in the pattern, and its IAM prefix follows.
+
+## PDR-007: Narrow each writer session to the secrets the call names
+
+**Status:** Accepted
+
+**Context:** The writer role can write every secret under the app prefix. A bug in the checks
+would let one run write another app's secret.
+
+**Decision:** Each `AssumeRole` carries an inline session policy. The register action's session
+allows only the secret it writes, as `<path>-??????`, the pattern AWS documents for a secret that
+does not exist yet. The list action's session allows only `DescribeSecret` under each
+environment's prefix of the app.
+
+**Consequences:** A mistake in the checks cannot write outside the named secret. The pattern was
+taken from the AWS documentation; the first run against a real account confirms it.
