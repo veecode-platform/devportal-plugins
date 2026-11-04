@@ -10,8 +10,7 @@ import type {
   UserInfoService,
 } from '@backstage/backend-plugin-api';
 import type { CatalogService } from '@backstage/plugin-catalog-node';
-
-const DEFAULT_NAMESPACE = 'default';
+import { DEFAULT_NAMESPACE } from './names';
 
 export interface OwnershipServices {
   auth: AuthService;

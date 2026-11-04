@@ -1,5 +1,11 @@
 import type { AppSecretsSettings } from './config';
-import { awsName, buildSecretPath, checkSecretName } from './names';
+import { exampleSystem } from './fixtures';
+import {
+  awsName,
+  buildSecretPath,
+  checkSecretName,
+  pathIdentity,
+} from './names';
 
 const settings: AppSecretsSettings = {
   region: 'us-east-1',
@@ -51,6 +57,7 @@ describe('buildSecretPath', () => {
     expect(
       buildSecretPath(settings.pathPattern, {
         cluster: 'example-cluster',
+        namespace: 'default',
         app: 'example-app',
         environment: 'dev',
         name: 'DATABASE_PASSWORD',
@@ -58,10 +65,26 @@ describe('buildSecretPath', () => {
     ).toBe('/example-cluster/apps/example-app/dev/DATABASE_PASSWORD');
   });
 
+  it('puts the namespace of the System in the path when the pattern names it', () => {
+    expect(
+      buildSecretPath(
+        '/{cluster}/{namespace}/apps/{app}/{environment}/{name}',
+        {
+          cluster: 'example-cluster',
+          namespace: 'other-ns',
+          app: 'example-app',
+          environment: 'dev',
+          name: 'TOKEN',
+        },
+      ),
+    ).toBe('/example-cluster/other-ns/apps/example-app/dev/TOKEN');
+  });
+
   it('leaves out {cluster} when the pattern does not use it', () => {
     expect(
       buildSecretPath('/apps/{app}/{environment}/{name}', {
         app: 'example-app',
+        namespace: 'default',
         environment: 'dev',
         name: 'TOKEN',
       }),
@@ -72,6 +95,7 @@ describe('buildSecretPath', () => {
     expect(() =>
       buildSecretPath(settings.pathPattern, {
         app: 'example-app',
+        namespace: 'default',
         environment: 'dev',
         name: 'TOKEN',
       }),
@@ -82,11 +106,48 @@ describe('buildSecretPath', () => {
     expect(() =>
       buildSecretPath(settings.pathPattern, {
         cluster: 'example cluster',
+        namespace: 'default',
         app: 'example-app',
         environment: 'dev',
         name: 'TOKEN',
       }),
     ).toThrow('is not a valid Secrets Manager name');
+  });
+});
+
+describe('pathIdentity', () => {
+  it('names a System of the default namespace without needing {namespace}', () => {
+    expect(
+      pathIdentity(
+        exampleSystem(),
+        '/{cluster}/apps/{app}/{environment}/{name}',
+      ),
+    ).toEqual({ app: 'example-app', namespace: 'default' });
+  });
+
+  it('refuses a System outside the default namespace when the pattern has no {namespace}, naming the System and the fix', () => {
+    const system = exampleSystem({
+      metadata: { name: 'example-app', namespace: 'other-ns' },
+    });
+
+    expect(() =>
+      pathIdentity(system, '/{cluster}/apps/{app}/{environment}/{name}'),
+    ).toThrow(
+      'System "system:other-ns/example-app" is outside the "default" namespace, and appSecrets.pathPattern has no {namespace}: its secrets would share paths with a System of the same name in "default". Add {namespace} to appSecrets.pathPattern to register them.',
+    );
+  });
+
+  it('keeps the namespace of a System outside the default one when the pattern has {namespace}', () => {
+    const system = exampleSystem({
+      metadata: { name: 'example-app', namespace: 'other-ns' },
+    });
+
+    expect(
+      pathIdentity(
+        system,
+        '/{cluster}/{namespace}/apps/{app}/{environment}/{name}',
+      ),
+    ).toEqual({ app: 'example-app', namespace: 'other-ns' });
   });
 });
 

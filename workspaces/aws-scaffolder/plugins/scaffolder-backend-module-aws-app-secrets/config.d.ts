@@ -15,7 +15,8 @@ export interface Config {
     writerRoleArn: string;
     /**
      * Secret name pattern. Must contain {app}, {environment} and {name}; may
-     * contain {cluster}.
+     * contain {cluster} and {namespace}. Without {namespace}, only Systems in
+     * the default namespace can register secrets.
      * @visibility backend
      */
     pathPattern: string;

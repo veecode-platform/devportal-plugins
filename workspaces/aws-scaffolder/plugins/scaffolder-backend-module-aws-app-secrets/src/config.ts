@@ -6,7 +6,13 @@ const ENVIRONMENT_PATTERN = /^[a-z][a-z0-9-]*$/;
 const PATH_CHARACTERS_PATTERN = /^[A-Za-z0-9/_+=.@{}-]+$/;
 const DECLARATION_CHARACTERS_PATTERN = /^[A-Za-z0-9._/{}-]+$/;
 const PLACEHOLDER_PATTERN = /\{([^{}]*)\}/g;
-const PATH_PLACEHOLDERS = ['app', 'environment', 'name', 'cluster'];
+const PATH_PLACEHOLDERS = [
+  'app',
+  'environment',
+  'name',
+  'cluster',
+  'namespace',
+];
 const REQUIRED_PATH_PLACEHOLDERS = ['app', 'environment', 'name'];
 const DECLARATION_PLACEHOLDERS = ['environment'];
 export const DEFAULT_DECLARATION_FILE = 'config/{environment}.yaml';
@@ -63,7 +69,7 @@ const settingsSchema = z
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['pathPattern'],
-          message: `uses the unknown placeholder {${placeholder}}; allowed: {app}, {environment}, {name}, {cluster}`,
+          message: `uses the unknown placeholder {${placeholder}}; allowed: {app}, {environment}, {name}, {cluster}, {namespace}`,
         });
       }
     }

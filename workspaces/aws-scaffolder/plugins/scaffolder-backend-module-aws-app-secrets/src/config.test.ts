@@ -58,6 +58,14 @@ describe('readAppSecretsConfig', () => {
     ).toThrow('appSecrets.pathPattern must contain {name}');
   });
 
+  it('accepts {namespace} in the path pattern', () => {
+    expect(
+      readWith({
+        pathPattern: '/{cluster}/{namespace}/apps/{app}/{environment}/{name}',
+      }).pathPattern,
+    ).toBe('/{cluster}/{namespace}/apps/{app}/{environment}/{name}');
+  });
+
   it('refuses a path pattern with an unknown placeholder', () => {
     expect(() =>
       readWith({ pathPattern: '/apps/{app}/{environment}/{owner}/{name}' }),

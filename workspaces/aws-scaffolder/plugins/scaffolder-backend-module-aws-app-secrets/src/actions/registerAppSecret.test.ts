@@ -10,6 +10,7 @@ import { createMockActionContext } from '@backstage/plugin-scaffolder-node-test-
 import {
   exampleAppRef,
   exampleComponent,
+  exampleSettings,
   exampleSystem,
   exampleTeamRef,
   exampleUserRef,
@@ -319,6 +320,38 @@ describe('aws:secrets-manager:app-secret:register', () => {
       ).toBe(exampleMarker);
     });
 
+    it('writes under the namespace of the System when the path pattern names it', async () => {
+      const world = fakeWorld({
+        appRef: 'system:other-ns/example-app',
+        system: exampleSystem({
+          metadata: { name: 'example-app', namespace: 'other-ns' },
+        }),
+        components: [exampleComponent('example-component')],
+        files: { [exampleDeclarationUrl]: exampleDeclaration },
+      });
+      const { ctx, output } = contextWith(
+        { ...exampleInput, app: 'system:other-ns/example-app' },
+        { secrets: { value: exampleMarker } },
+      );
+
+      await run(
+        {
+          ...world.deps,
+          settings: {
+            ...exampleSettings,
+            pathPattern:
+              '/{cluster}/{namespace}/apps/{app}/{environment}/{name}',
+          },
+        },
+        ctx,
+      );
+
+      expect(output).toHaveBeenCalledWith(
+        'path',
+        '/example-cluster/other-ns/apps/example-app/dev/DATABASE_PASSWORD',
+      );
+    });
+
     it('accepts an owner written without its namespace', async () => {
       const world = fakeWorld({
         system: exampleSystem({ spec: { owner: 'group:example-team' } }),
@@ -434,6 +467,28 @@ describe('aws:secrets-manager:app-secret:register', () => {
       expect(world.catalog.getEntityByRef).toHaveBeenCalledWith(exampleAppRef, {
         credentials: expect.anything(),
       });
+      expectNoAwsCall();
+    });
+
+    it('refuses a System outside the default namespace when the path pattern has no {namespace}, before any AWS call', async () => {
+      const world = fakeWorld({
+        appRef: 'system:other-ns/example-app',
+        system: exampleSystem({
+          metadata: { name: 'example-app', namespace: 'other-ns' },
+        }),
+        components: [exampleComponent('example-component')],
+        files: { [exampleDeclarationUrl]: exampleDeclaration },
+      });
+      const { ctx } = contextWith(
+        { ...exampleInput, app: 'system:other-ns/example-app' },
+        { secrets: { value: exampleMarker } },
+      );
+
+      const error = await failureOf(run(world.deps, ctx));
+
+      expect(error.message).toMatch(
+        /^System "system:other-ns\/example-app" is outside the "default" namespace, and appSecrets\.pathPattern has no \{namespace\}/,
+      );
       expectNoAwsCall();
     });
 

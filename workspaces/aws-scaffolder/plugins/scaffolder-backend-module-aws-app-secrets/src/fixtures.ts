@@ -68,6 +68,7 @@ export interface FakeWorld {
 export function fakeWorld(
   options: {
     system?: Entity | undefined;
+    appRef?: string;
     ownershipRefs?: string[];
     components?: Entity[];
     files?: Record<string, string>;
@@ -75,9 +76,10 @@ export function fakeWorld(
   } = {},
 ): FakeWorld {
   const system = 'system' in options ? options.system : exampleSystem();
+  const appRef = options.appRef ?? exampleAppRef;
   const catalog = {
     getEntityByRef: jest.fn(async (ref: string) =>
-      ref === exampleAppRef ? system : undefined,
+      ref === appRef ? system : undefined,
     ),
     getEntities: jest.fn(async () => ({
       items: options.components ?? [],

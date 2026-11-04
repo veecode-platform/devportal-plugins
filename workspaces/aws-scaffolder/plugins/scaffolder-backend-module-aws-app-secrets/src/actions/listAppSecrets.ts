@@ -8,6 +8,7 @@ import {
   AWS_NAME_MAX_LENGTH,
   buildSecretPath,
   checkSecretName,
+  pathIdentity,
 } from '../names';
 import {
   describeSecret,
@@ -73,6 +74,7 @@ export function registerListAppSecretsAction(
         app: appRef,
         credentials,
       });
+      const identity = pathIdentity(system, settings.pathPattern);
       const client = await writerClient({
         region: settings.region,
         roleArn: settings.writerRoleArn,
@@ -102,7 +104,7 @@ export function registerListAppSecretsAction(
             continue;
           }
           const path = buildSecretPath(settings.pathPattern, {
-            app: system.metadata.name,
+            ...identity,
             environment,
             name,
             cluster: settings.cluster,

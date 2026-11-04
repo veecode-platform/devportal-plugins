@@ -9,6 +9,8 @@ import type { AppSecretsDependencies } from '../dependencies';
 import {
   exampleAppRef,
   exampleComponent,
+  exampleSettings,
+  exampleSystem,
   exampleUserRef,
   fakeWorld,
 } from '../fixtures';
@@ -229,6 +231,61 @@ describe('list-app-secrets', () => {
     expect(world.catalog.getEntityByRef).toHaveBeenCalledWith(exampleAppRef, {
       credentials: expect.anything(),
     });
+    expect(mockStsSend).not.toHaveBeenCalled();
+    expect(mockSecretsSend).not.toHaveBeenCalled();
+  });
+
+  it('reads the paths of the System namespace when the path pattern names it', async () => {
+    secretsByPath({
+      '/example-cluster/other-ns/apps/example-app/dev/DATABASE_PASSWORD': {
+        LastChangedDate: new Date('2026-10-01T08:00:00.000Z'),
+      },
+    });
+    const world = fakeWorld({
+      appRef: 'system:other-ns/example-app',
+      system: exampleSystem({
+        metadata: { name: 'example-app', namespace: 'other-ns' },
+      }),
+      components: [exampleComponent('example-component')],
+      files: { [devDeclarationUrl]: 'secrets:\n  - DATABASE_PASSWORD\n' },
+    });
+
+    const result = await list(
+      {
+        ...world.deps,
+        settings: {
+          ...exampleSettings,
+          pathPattern: '/{cluster}/{namespace}/apps/{app}/{environment}/{name}',
+        },
+      },
+      { app: 'system:other-ns/example-app' },
+    );
+
+    expect(result.output.environments.dev).toEqual({
+      DATABASE_PASSWORD: {
+        hasValue: true,
+        lastChangedDate: '2026-10-01T08:00:00.000Z',
+      },
+    });
+  });
+
+  it('refuses a System outside the default namespace when the path pattern has no {namespace}, before any AWS call', async () => {
+    const world = fakeWorld({
+      appRef: 'system:other-ns/example-app',
+      system: exampleSystem({
+        metadata: { name: 'example-app', namespace: 'other-ns' },
+      }),
+      components: [exampleComponent('example-component')],
+      files: { [devDeclarationUrl]: 'secrets: [API_TOKEN]\n' },
+    });
+
+    const error = await failureOf(
+      list(world.deps, { app: 'system:other-ns/example-app' }),
+    );
+
+    expect(error.message).toMatch(
+      /^System "system:other-ns\/example-app" is outside the "default" namespace/,
+    );
     expect(mockStsSend).not.toHaveBeenCalled();
     expect(mockSecretsSend).not.toHaveBeenCalled();
   });
