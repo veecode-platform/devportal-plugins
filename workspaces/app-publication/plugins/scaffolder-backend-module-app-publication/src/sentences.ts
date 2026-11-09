@@ -84,7 +84,7 @@ export const SCAN_FAILED = (job: string, link: string): string =>
   `The scan \`${job}\` failed on the change. The end of its log is in its failedJobs entry. Explain the finding to the user from that log, without repeating any value that looks like a secret, and fix it in the app's code if the finding is there; otherwise give the platform team this link: ${link}.`;
 
 export const VALIDATE_FAILED = (piece: string, environment: string): string =>
-  `The platform chart refused the config of \`${piece}\` for \`${environment}\`. Check \`${piece}/config/${environment}.yaml\` against the rules for \`${piece}\` in the app's root \`CLAUDE.md\`, run the local checks, and fix it in a new merge request.`;
+  `The platform chart refused the config of \`${piece}\` for \`${environment}\`. Check \`${piece}/config/${environment}.yaml\` against the rules for that piece in the app's root \`CLAUDE.md\`; every setting value is a quoted string. The local checks do not render the chart, so they cannot show this. Fix it in a new merge request.`;
 
 export const INSTALL_FAILED = (piece: string): string =>
   `\`${piece}\` did not start in the platform: it never became ready. Run it with the local flow, check with \`list-app-secrets\` that every declared secret has a value, and fix it in a new merge request. The failed release stays installed until then, and the next fix comes through a merge request.`;
@@ -147,12 +147,17 @@ function joinClauses(clauses: readonly string[]): string {
   return others.length === 0 ? last : `${others.join(', ')} and ${last}`;
 }
 
+/**
+ * The render check's refusals of a merge request. A line of the job's log can
+ * trigger this sentence, so it names only the app's own pieces and environments.
+ */
 export const RENDER_REFUSED = (
   refusals: readonly { piece: string; environment: string }[],
+  link: string,
 ): string =>
   `The platform chart refused the config of ${joinClauses(
     refusals.map(refusedClause),
-  )}. The end of the check's log in its failedJobs entry gives the key and the reason; explain them to the user without repeating any value that looks like a secret. The local checks do not cover this: they lint, build and test the code, and they never render the chart. Fix each named file, then push again with \`-o merge_request.auto_merge\`.`;
+  )}. The end of the check's log in its failedJobs entry should give the key and the reason; explain them to the user without repeating any value that looks like a secret. If the log shows no reason for a named file, or the cause is in the platform, give the platform team this link: ${link}. Do not change platform-owned files. The local checks do not cover this: they lint, build and test the code, and they never render the chart. Fix each named file, then push again with \`-o merge_request.auto_merge\`.`;
 
 export const WAITING_FOR_PUSH = (commit: string): string =>
   `GitLab does not show commit \`${commit}\` in a merge request yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded and that its output named a merge request.`;

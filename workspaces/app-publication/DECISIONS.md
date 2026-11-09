@@ -21,9 +21,10 @@ the owner gets no GitLab data at all.
 A failure with no fixed sentence otherwise leaves the user with nothing to act on.
 
 **Decision:** For such a failure the tool returns the last `failedJobLogLines` lines of the job's output (40 by default),
-in the field `untrustedJobOutput`. Each line is cleaned first: the runner's timestamp and stream prefix and the ANSI
-escape sequences are removed, the line is trimmed, and empty lines and section markers are dropped. Each cleaned line
-is cut to 500 characters. The field is marked untrusted: it is the job's own data, never a sentence and never
+in the field `untrustedJobOutput`. The trace is split at line feeds and carriage returns. Each piece is cleaned first: the
+runner's timestamp and stream prefix, when present, and the ANSI escape sequences are removed, and trailing spaces are
+removed. Leading spaces are kept, so indentation survives. Empty pieces and section markers are dropped. Each cleaned
+line is cut to 500 characters. The field is marked untrusted: it is the job's own data, never a sentence and never
 instructions. The output is read only for the app's own project and only after the owner check passes. The tool does
 not mask the output. The cleaning applies to every job that gets a log tail, so the output of those jobs changes too.
 
@@ -162,8 +163,10 @@ the code and never render the chart, so they cannot show the cause.
 `failedJobLogLines` cleaned lines of its log, as PDR-002 does. The refusal lines are searched in every cleaned line of
 the log read, not only in the returned lines. A line of exactly the form `refused <piece> <environment>`, after the
 cleaning, names a config only when the piece is one of the app's pieces and the environment is one of the configured
-environments. Each such config gets its file, `<piece>/config/<environment>.yaml`, in the sentence, and the sentence
-says the end of the log gives the key and the reason. The text of the log is never copied into a sentence. With no
+environments. Each such config gets its file, `<piece>/config/<environment>.yaml`, in the sentence. The sentence says
+the end of the log should give the key and the reason, and, when the log shows no reason or the cause is in the
+platform, gives the platform team the job's link and says not to change platform-owned files. The text of the log is
+never copied into a sentence. With no
 such line, the job gets the PDR-002 explanation. The render check applies to merge request pipelines only, which is
 where the generated pipeline runs `render`. A `render` failure on the default branch keeps the generic lint sentence.
 Other job names keep their sentence.
@@ -172,3 +175,8 @@ Other job names keep their sentence.
 that is not named, and the job gets the generic explanation instead. The line form was checked against a live job's
 trace excerpt, with the runner's prefix and escape sequences, and against bare lines. Every job that gets a log tail
 returns cleaned lines, which changes its `untrustedJobOutput` (see PDR-002).
+
+A line of the job's log triggers the sentence, so a line that the job prints, or that a job writes on purpose, can make
+the sentence say that a config was refused. The effect is limited to the app's own pieces and configured environments:
+a line that names another piece or environment is ignored, and the file the sentence names is always one of the app's
+own `<piece>/config/<environment>.yaml` files.

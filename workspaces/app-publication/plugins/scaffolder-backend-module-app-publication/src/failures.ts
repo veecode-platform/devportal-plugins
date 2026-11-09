@@ -284,7 +284,7 @@ async function describeRender(
     job: { ...entry, untrustedJobOutput: lastLines(ctx, log) },
     sentence:
       refusals.length > 0
-        ? S.RENDER_REFUSED(refusals)
+        ? S.RENDER_REFUSED(refusals, link)
         : S.EXPLAIN_FROM_LOG(name, link),
   };
 }
@@ -300,7 +300,7 @@ function refusedConfigs(
 ): { piece: string; environment: string }[] {
   const refusals: { piece: string; environment: string }[] = [];
   for (const line of lines) {
-    const match = REFUSED_LINE.exec(line);
+    const match = REFUSED_LINE.exec(line.trim());
     const piece = match?.[1];
     const environment = match?.[2];
     if (piece === undefined || environment === undefined) {
@@ -326,10 +326,11 @@ function refusedConfigs(
 }
 
 /**
- * The lines of a trace window as the reader sees them. The runner's prefix and
- * the escape sequences are removed, and empty lines and section markers are
- * dropped. A cut-off first line is dropped too. A trace without the runner's
- * prefix reads the same way.
+ * The lines of a trace window as the reader sees them. The window is split at
+ * line feeds and carriage returns, and the runner's prefix and the escape
+ * sequences are removed. Leading spaces are kept. Empty lines and section
+ * markers are dropped, and a cut-off first line is dropped too. A trace without
+ * the runner's prefix goes through the same steps, minus the prefix.
  */
 function cleanLines(
   tail: { text: string; truncated: boolean } | undefined,
@@ -337,19 +338,19 @@ function cleanLines(
   if (tail === undefined) {
     return [];
   }
-  const raw = tail.text.split(/\r?\n/);
+  const raw = tail.text.split(/\r\n|\r|\n/);
   if (tail.truncated) {
     raw.shift();
   }
   return raw
     .map(cleanLine)
-    .filter(line => line !== '' && !SECTION_MARKER.test(line))
+    .filter(line => line.trim() !== '' && !SECTION_MARKER.test(line.trim()))
     .map(line => line.slice(0, LOG_LINE_LIMIT));
 }
 
-/** One trace line without the runner's prefix and escape sequences, trimmed. */
+/** One trace line without the runner's prefix and escape sequences, trailing spaces removed. */
 function cleanLine(line: string): string {
-  return line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '').trim();
+  return line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '').trimEnd();
 }
 
 /** The last `failedJobLogLines` cleaned lines of a log. */
