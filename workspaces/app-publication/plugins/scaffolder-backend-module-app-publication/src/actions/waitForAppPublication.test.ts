@@ -597,7 +597,9 @@ describe('wait-for-app-publication: deploy failures', () => {
     expect(output.nextStep).toContain("in the app's root `CLAUDE.md`");
     expect(output.nextStep).toContain('`back/config/dev.yaml`');
     expect(output.nextStep).toContain('every setting value is a quoted string');
-    expect(output.nextStep).toContain('The local checks do not render the chart');
+    expect(output.nextStep).toContain(
+      'The local checks do not render the chart',
+    );
     expect(output.nextStep).not.toContain('run the local checks');
     expect(output.nextStep).not.toContain('back/CLAUDE.md');
   });
