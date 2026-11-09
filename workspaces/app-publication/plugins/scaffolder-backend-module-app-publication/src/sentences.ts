@@ -5,6 +5,8 @@
  */
 
 export const SENTENCE = {
+  olderDeploy:
+    'The last deploy is older than the most recent default-branch pipelines this tool reads, so the sheet cannot show it. Do not report the app as never deployed.',
   partial:
     'The sheet is partial: GitLab did not answer within the time limit, so part of it is missing. Do not report this state; call get-app-status again.',
   noPieces: 'The app has no piece yet, so there is nothing to publish.',
@@ -133,3 +135,6 @@ export const WAITING_FOR_PUSH = (commit: string): string =>
 
 export const MERGE_STUCK = (mergeStatus: string): string =>
   `The checks passed and the merge request is merging. Call this tool again with the same input. If three calls in a row return \`merging\`, the merge is stuck on \`${mergeStatus}\`: give the platform team the merge request's link.`;
+
+export const DEPLOY_NOT_RUN = (link: string): string =>
+  `The deploy job of this change did not run, although its pipeline succeeded, and no newer default-branch pipeline publishes it. This is not caused by the change. Give the platform team this link: ${link}. Do not change the code.`;

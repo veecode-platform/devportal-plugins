@@ -148,18 +148,30 @@ describe('deploy job states on the default branch', () => {
     expect(output.nextStep).toContain('local checks');
   });
 
-  it('a deploy skipped on a succeeded pipeline with no newer pipeline keeps waiting', async () => {
-    const w = world();
-    merged(w, 'success', [job(302, DEPLOY_JOB, 'deploy', 'skipped')]);
-    w.gitlab.reply(
-      paths.newestMain,
-      json([pipeline(201, MERGE_COMMIT, 'success')]),
-    );
+  it.each(['skipped', 'canceled'])(
+    'a deploy %s on a succeeded pipeline with no newer pipeline is a failed deploy with no detail and no output',
+    async status => {
+      const w = world();
+      merged(w, 'success', [job(302, DEPLOY_JOB, 'deploy', status)]);
+      w.gitlab.reply(
+        paths.newestMain,
+        json([pipeline(201, MERGE_COMMIT, 'success')]),
+      );
 
-    const output = await run(w, WAIT, input);
+      const output = await run(w, WAIT, input);
 
-    expect(output).toMatchObject({ done: false, state: 'deploying' });
-  });
+      expect(output).toMatchObject({
+        done: true,
+        state: 'failed',
+        step: 'deploy',
+        deploy: { code: 'no_detail' },
+      });
+      expect(output.nextStep).toContain('did not run');
+      expect(output.nextStep).toContain('platform team');
+      expect(w.gitlab.paths).not.toContain(paths.trace(302));
+      expect(JSON.stringify(output)).not.toContain('untrustedJobOutput');
+    },
+  );
 
   it('a deploy skipped on a succeeded pipeline follows the newer default-branch pipeline', async () => {
     const w = world();

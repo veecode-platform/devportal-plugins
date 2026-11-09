@@ -120,3 +120,29 @@ project's address.
 
 **Consequences:** A link or file name that does not fit is replaced by a note and a platform-team step. The text of
 the untrusted fields still reaches Claude as data.
+
+## PDR-009: Components whose names are not piece names are left out of the sheet
+
+**Status:** Accepted
+
+**Context:** A piece is a Component whose name is the app's name plus a piece name in the closed form. A Component with
+any other name cannot be matched to a deploy result, and its name would reach the sheet unchecked.
+
+**Decision:** The sheet and the deploy checks use only the Components whose names fit the piece form. Other Components of
+the System are left out, with no note in the sheet.
+
+**Consequences:** A misnamed Component is invisible to this tool. The platform team finds it in the catalog.
+
+## PDR-010: A deploy that did not run, and a deploy history window
+
+**Status:** Accepted
+
+**Context:** A deploy job can be skipped or canceled after its pipeline succeeded, and the default branch may hold no
+deploy within the pipelines the tool reads.
+
+**Decision:** A skipped or canceled deploy job on a succeeded pipeline, with no newer default-branch pipeline, is a failed
+deploy with no detail, and returns no job output. The sheet reads the ten most recent default-branch pipelines for
+deploys. When that window is full and holds no deploy, the sheet is partial and says the last deploy is older than what
+the tool reads.
+
+**Consequences:** An app whose last deploy is older than the window shows as partial until a newer deploy happens.

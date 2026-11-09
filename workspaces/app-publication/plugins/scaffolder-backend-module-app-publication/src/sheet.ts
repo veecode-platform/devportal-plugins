@@ -101,11 +101,17 @@ export async function readSheet(
       ? mainFailure(ctx, latest, await pipelineJobs(ctx, latest.id))
       : undefined,
   );
-  const deploys = await within<DeployEntry[]>([], () =>
-    recentDeploys(ctx, input, () => {
-      partial.value = true;
-    }),
+  const deployRead = await within<DeployRead>(
+    { entries: [], windowFull: false },
+    () =>
+      recentDeploys(ctx, input, () => {
+        partial.value = true;
+      }),
   );
+  const deploys = deployRead.entries;
+  // The window of recent pipelines is full and holds no deploy: the last deploy
+  // is older than what this tool reads.
+  const olderThanWindow = deploys.length === 0 && deployRead.windowFull;
   const live = deploys.find(entry => entry.step.kind === 'published');
   const last = deploys[0];
   const liveSentence = live ? ` ${S.LIVE_VERSION(live.step.commit)}` : '';
@@ -129,7 +135,12 @@ export async function readSheet(
     nextStep = S.PUBLISHED_AT(last.step.commit);
   } else {
     state = 'not_published';
-    nextStep = S.SENTENCE.notPublished;
+    nextStep = olderThanWindow
+      ? S.SENTENCE.olderDeploy
+      : S.SENTENCE.notPublished;
+  }
+  if (olderThanWindow && state !== 'not_published') {
+    nextStep = `${S.SENTENCE.olderDeploy} ${nextStep}`;
   }
 
   const openRequests: StatusOutput['openRequests'] = [];
@@ -208,7 +219,7 @@ export async function readSheet(
       : {}),
     openRequests,
     state,
-    ...(partial.value ? { partial: true } : {}),
+    ...(partial.value || olderThanWindow ? { partial: true } : {}),
     nextStep: partial.value ? `${S.SENTENCE.partial} ${nextStep}` : nextStep,
   };
 }
@@ -259,6 +270,12 @@ async function openRequestEntry(
   };
 }
 
+interface DeployRead {
+  entries: DeployEntry[];
+  /** True when the window of recent default-branch pipelines was read in full. */
+  windowFull: boolean;
+}
+
 /**
  * The deploys of the default branch, newest first, read from its own pipelines,
  * so an app with many request pipelines since its last deploy still finds it.
@@ -270,7 +287,7 @@ async function recentDeploys(
   ctx: FailureContext,
   input: SheetInput,
   onPartial: () => void,
-): Promise<DeployEntry[]> {
+): Promise<DeployRead> {
   const pipelines =
     (await ctx.gitlab.json(
       `/pipelines?ref=${encodeURIComponent(
@@ -309,7 +326,7 @@ async function recentDeploys(
       ...(deployJob.finished_at ? { finishedAt: deployJob.finished_at } : {}),
     });
   }
-  return entries;
+  return { entries, windowFull: pipelines.length >= MAX_DEPLOY_PIPELINES };
 }
 
 function newest(jobs: readonly JobShape[]): JobShape | undefined {

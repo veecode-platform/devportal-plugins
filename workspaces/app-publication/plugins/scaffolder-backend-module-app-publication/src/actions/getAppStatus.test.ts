@@ -490,3 +490,75 @@ describe('get-app-status: the deploys come from the default branch itself', () =
     ]);
   });
 });
+
+describe('get-app-status: the window of recent default-branch pipelines', () => {
+  const buildOnly = (id: number) => [
+    job(900 + id, 'build-app', 'build', 'success'),
+  ];
+
+  it('reads partial, with the older-deploy sentence, when the window is full and holds no deploy', async () => {
+    const w = world();
+    const window = Array.from({ length: 10 }, (_, index) =>
+      pipeline(210 - index, COMMIT, 'success'),
+    );
+    w.gitlab.reply(paths.newestMain, json([window[0]]));
+    w.gitlab.reply(paths.mainPipelines, json(window));
+    for (const candidate of window) {
+      w.gitlab.reply(paths.jobs(candidate.id), json(buildOnly(candidate.id)));
+    }
+    w.gitlab.reply(paths.openRequests, json([]));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output).toMatchObject({ state: 'not_published', partial: true });
+    expect(output.nextStep).toContain(
+      'is older than the most recent default-branch pipelines',
+    );
+    expect(output.nextStep).not.toContain('has not been deployed yet');
+    expectDeclared(w, GET_APP_STATUS, output);
+  });
+
+  it('does not mark the sheet partial when the window is not full', async () => {
+    const w = world();
+    const window = [
+      pipeline(202, COMMIT, 'success'),
+      pipeline(201, COMMIT, 'success'),
+    ];
+    w.gitlab.reply(paths.newestMain, json([window[0]]));
+    w.gitlab.reply(paths.mainPipelines, json(window));
+    for (const candidate of window) {
+      w.gitlab.reply(paths.jobs(candidate.id), json(buildOnly(candidate.id)));
+    }
+    w.gitlab.reply(paths.openRequests, json([]));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output).toMatchObject({ state: 'not_published' });
+    expect(output.partial).toBeUndefined();
+    expect(output.nextStep).toContain('has not been deployed yet');
+  });
+
+  it('leaves out a component whose name is not a piece name', async () => {
+    const w = world({
+      components: [
+        exampleComponent('example-app-back'),
+        exampleComponent('Bad Name'),
+      ],
+    });
+    w.gitlab.reply(paths.newestMain, json([pipeline(200, COMMIT, 'success')]));
+    w.gitlab.reply(
+      paths.mainPipelines,
+      json([pipeline(200, COMMIT, 'success')]),
+    );
+    w.gitlab.reply(paths.jobs(200), json([]));
+    w.gitlab.reply(paths.openRequests, json([]));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.pieces).toEqual([
+      expect.objectContaining({
+        entityRef: 'component:default/example-app-back',
+      }),
+    ]);
+  });
+});

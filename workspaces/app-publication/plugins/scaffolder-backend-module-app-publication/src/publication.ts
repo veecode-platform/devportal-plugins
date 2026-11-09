@@ -4,6 +4,7 @@ import {
   describeFailedJobs,
   type DeployStep,
   type FailureContext,
+  jobEntry,
   readDeployStep,
   type RequestFailure,
 } from './failures';
@@ -326,6 +327,34 @@ async function mainPipelineFailure(
   };
 }
 
+/**
+ * The pipeline succeeded, its deploy job was skipped or canceled, and no newer
+ * pipeline publishes the commit: a failed deploy with no detail and no output.
+ */
+function deployNotRun(
+  ctx: FailureContext,
+  job: JobShape,
+  pipeline: PipelineShape,
+  out: PipelineOut,
+  followedCommit: string | undefined,
+): Observation {
+  return {
+    done: true,
+    state: 'failed',
+    step: 'deploy',
+    pipeline: out,
+    followedCommit,
+    deploy: {
+      commit: pipeline.sha,
+      result: 'failed',
+      code: 'no_detail',
+      pieces: [],
+    },
+    failedJobs: [jobEntry(ctx, job)],
+    nextStep: S.DEPLOY_NOT_RUN(linkText(ctx.projectWebUrl, job.web_url)),
+  };
+}
+
 /** The main pipeline was canceled or skipped before its deploy ran. */
 function mainPipelineEnded(
   ctx: FailureContext,
@@ -410,7 +439,9 @@ async function observeDefaultBranch(
       // branch pipeline publishes this commit; without one, keep waiting.
       const next = await newerDefaultCommit(ctx, commit);
       if (next === undefined) {
-        return deploying(out);
+        return DEPLOY_NOT_RUN_STATES.includes(deployJob.status)
+          ? deployNotRun(ctx, deployJob, pipeline, out, followedCommit)
+          : deploying(out);
       }
       commit = next;
       followedCommit = next;

@@ -90,6 +90,11 @@ export async function describeFailedJobs(
   };
 }
 
+/** The job's name, stage, link and failure reason, without any output. */
+export function jobEntry(ctx: FailureContext, job: JobShape): FailedJob {
+  return baseEntry(ctx, job);
+}
+
 function baseEntry(ctx: FailureContext, job: JobShape): FailedJob {
   const reason = job.failure_reason ?? undefined;
   const webUrl = shownLink(ctx.projectWebUrl, job.web_url);
