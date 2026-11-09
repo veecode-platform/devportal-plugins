@@ -80,7 +80,7 @@ export const SCAN_FAILED = (job: string, link: string): string =>
   `The scan \`${job}\` failed on the change. The end of its log is in its failedJobs entry. Explain the finding to the user from that log, without repeating any value that looks like a secret, and fix it in the app's code if the finding is there; otherwise give the platform team this link: ${link}.`;
 
 export const VALIDATE_FAILED = (piece: string, environment: string): string =>
-  `The platform chart refused the config of \`${piece}\` for \`${environment}\`. Check \`${piece}/config/${environment}.yaml\` against the rules in \`${piece}/CLAUDE.md\`, run the local checks, and fix it in a new merge request.`;
+  `The platform chart refused the config of \`${piece}\` for \`${environment}\`. Check \`${piece}/config/${environment}.yaml\` against the rules for \`${piece}\` in the app's root \`CLAUDE.md\`, run the local checks, and fix it in a new merge request.`;
 
 export const INSTALL_FAILED = (piece: string): string =>
   `\`${piece}\` did not start in the platform: it never became ready. Run it with the local flow, check with \`list-app-secrets\` that every declared secret has a value, and fix it in a new merge request. The failed release stays installed until then, and the next fix comes through a merge request.`;
@@ -124,7 +124,7 @@ export const PUBLISHED_AT = (commit: string): string =>
   `Published at commit \`${commit}\`; every piece passed the smoke check.`;
 
 export const LINT_OR_BUILD = (job: string): string =>
-  `The check \`${job}\` failed on the change. Run the app's local checks that the piece's \`CLAUDE.md\` names, fix what fails, and push again with \`-o merge_request.auto_merge\`.`;
+  `The check \`${job}\` failed on the change. Run the local checks that the app's root \`CLAUDE.md\` names, fix what fails, and push again with \`-o merge_request.auto_merge\`.`;
 
 export const WAITING_FOR_PUSH = (commit: string): string =>
   `GitLab does not show commit \`${commit}\` in a merge request yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded and that its output named a merge request.`;

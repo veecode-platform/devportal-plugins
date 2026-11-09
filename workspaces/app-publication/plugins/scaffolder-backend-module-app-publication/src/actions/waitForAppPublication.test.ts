@@ -569,6 +569,32 @@ describe('wait-for-app-publication: deploy failures', () => {
     expect(output.nextStep).not.toContain('previous version keeps running');
   });
 
+  it('points a validate_failed sentence to the app root CLAUDE.md, not to a file in the piece', async () => {
+    const w = failingDeploy({
+      schema: 2,
+      job: DEPLOY_JOB,
+      result: 'failed',
+      code: 'validate_failed',
+      commit: MERGE_COMMIT,
+      environment: 'dev',
+      chart: null,
+      pieces: [
+        {
+          piece: 'back',
+          result: 'failed',
+          code: 'validate_failed',
+          checks: [],
+        },
+      ],
+    });
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain("in the app's root `CLAUDE.md`");
+    expect(output.nextStep).toContain('`back/config/dev.yaml`');
+    expect(output.nextStep).not.toContain('back/CLAUDE.md');
+  });
+
   it('reports the top code and both pieces when the second piece failed', async () => {
     const w = world({
       components: [
