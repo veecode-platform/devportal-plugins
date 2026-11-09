@@ -146,3 +146,23 @@ deploys. When that window is full and holds no deploy, the sheet is partial and 
 the tool reads.
 
 **Consequences:** An app whose last deploy is older than the window shows as partial until a newer deploy happens.
+
+## PDR-011: A refused render config names its file, and the log gives the key
+
+**Status:** Accepted
+
+**Context:** Every merge request of a generated app runs a `render` job that renders each piece's config with the
+platform chart. When the chart refuses a config, the job exits 1 and prints a `refused <piece> <environment>` line.
+The module treated that job like a lint job and sent the user to the local checks. Those checks lint, build and test
+the code and never render the chart, so they cannot show the cause.
+
+**Decision:** A failed job named `renderJobName` (default `render`) in a merge request pipeline returns the last
+`failedJobLogLines` lines of its log, as PDR-002 does. A line of exactly the form `refused <piece> <environment>` among
+them names a config only when the piece is one of the app's pieces and the environment is one of the configured
+environments. Each such config gets its file, `<piece>/config/<environment>.yaml`, in the sentence, and the sentence
+says the end of the log gives the key and the reason. The text of the log is never copied into a sentence. With no
+such line, the job gets the PDR-002 explanation. The main pipeline and every other job name keep their behavior.
+
+**Consequences:** A refusal line above the last `failedJobLogLines` lines is not named, and the job gets the generic
+explanation instead. A refusal printed with a prefix, such as a timestamp, does not match. The line form was checked
+against one captured log of a refused render job.

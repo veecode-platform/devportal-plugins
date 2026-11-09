@@ -10,6 +10,7 @@ export const DEFAULT_DEPLOY_ARTIFACT = 'smoke-result.json';
 export const DEFAULT_CONTRACT_JOB = 'contract';
 export const DEFAULT_CONTRACT_ARTIFACT = 'contract-result.json';
 export const DEFAULT_CONFLICT_JOB = 'conflict-markers';
+export const DEFAULT_RENDER_JOB = 'render';
 export const DEFAULT_ADDRESS_LINK_TYPE = 'app-address';
 export const DEFAULT_DASHBOARD_ANNOTATION = 'grafana/overview-dashboard';
 
@@ -63,6 +64,13 @@ const settingsSchema = z
         'may contain only letters, digits and . _ : / -',
       )
       .default(DEFAULT_CONFLICT_JOB),
+    renderJobName: z
+      .string()
+      .regex(
+        JOB_OR_ARTIFACT_PATTERN,
+        'may contain only letters, digits and . _ : / -',
+      )
+      .default(DEFAULT_RENDER_JOB),
     maxWaitSeconds: z.number().int().min(1).max(270).default(20),
     pollIntervalSeconds: z.number().int().min(2).max(60).default(5),
     maxArtifactBytes: z.number().int().min(1024).max(1048576).default(65536),

@@ -23,6 +23,8 @@ const REASON_PATTERN = /^[a-z_]{1,64}$/;
 const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
+/** A line the render check prints for a config the platform chart refused, and nothing else on the line. */
+const REFUSED_LINE = /^refused (\S+) (\S+)$/;
 
 export interface FailureContext {
   gitlab: GitlabClient;
@@ -148,6 +150,9 @@ async function describeJob(
     }
     return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
   }
+  if (job.name === ctx.settings.renderJobName && request !== undefined) {
+    return describeRender(ctx, job, entry, name, link);
+  }
   if (job.stage === 'lint' || job.stage === 'build') {
     return { job: entry, sentence: S.LINT_OR_BUILD(name) };
   }
@@ -237,15 +242,77 @@ async function explain(
   entry: FailedJob,
   sentence: string,
 ): Promise<Described> {
+  return {
+    job: { ...entry, untrustedJobOutput: await jobTail(ctx, job) },
+    sentence,
+  };
+}
+
+/** The end of the job's log, as the log-tail path reads it. */
+async function jobTail(ctx: FailureContext, job: JobShape): Promise<string[]> {
   const tail = await ctx.gitlab.textTail(
     `/jobs/${job.id}/trace`,
     LOG_READ_BYTES,
   );
-  const lines = logLines(tail, ctx.settings.failedJobLogLines);
+  return logLines(tail, ctx.settings.failedJobLogLines);
+}
+
+/**
+ * The render check of a merge request. Each refusal line in the log tail names
+ * a config of this app, and its file is named to the user. With no such line,
+ * the job gets the generic log explanation.
+ */
+async function describeRender(
+  ctx: FailureContext,
+  job: JobShape,
+  entry: FailedJob,
+  name: string,
+  link: string,
+): Promise<Described> {
+  const lines = await jobTail(ctx, job);
+  const refusals = refusedConfigs(ctx, lines);
   return {
     job: { ...entry, untrustedJobOutput: lines },
-    sentence,
+    sentence:
+      refusals.length > 0
+        ? S.RENDER_REFUSED(refusals)
+        : S.EXPLAIN_FROM_LOG(name, link),
   };
+}
+
+/**
+ * The refusals in a log tail that name one of the app's pieces and one of its
+ * configured environments, each pair once, in the order of the log. Any other
+ * line is ignored, and no text of the line is kept.
+ */
+function refusedConfigs(
+  ctx: FailureContext,
+  lines: readonly string[],
+): { piece: string; environment: string }[] {
+  const refusals: { piece: string; environment: string }[] = [];
+  for (const line of lines) {
+    const match = REFUSED_LINE.exec(line.trim());
+    const piece = match?.[1];
+    const environment = match?.[2];
+    if (piece === undefined || environment === undefined) {
+      continue;
+    }
+    if (
+      !ctx.pieces.has(piece) ||
+      !ctx.settings.environments.includes(environment)
+    ) {
+      continue;
+    }
+    if (
+      refusals.some(
+        refusal => refusal.piece === piece && refusal.environment === environment,
+      )
+    ) {
+      continue;
+    }
+    refusals.push({ piece, environment });
+  }
+  return refusals;
 }
 
 function logLines(

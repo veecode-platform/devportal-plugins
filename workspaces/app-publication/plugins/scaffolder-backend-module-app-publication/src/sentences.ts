@@ -130,6 +130,30 @@ export const PUBLISHED_AT = (commit: string): string =>
 export const LINT_OR_BUILD = (job: string): string =>
   `The check \`${job}\` failed on the change. Run the local checks that the app's root \`CLAUDE.md\` names, fix what fails, and push again with \`-o merge_request.auto_merge\`.`;
 
+/** One refused config: a piece and an environment, both already checked against the app. */
+const refusedClause = ({
+  piece,
+  environment,
+}: {
+  piece: string;
+  environment: string;
+}): string =>
+  `\`${piece}\` for \`${environment}\` (file \`${piece}/config/${environment}.yaml\`)`;
+
+/** The refusals of the render check, named one by one: "a", "a and b", "a, b and c". */
+function joinClauses(clauses: readonly string[]): string {
+  const last = clauses.slice(-1).join('');
+  const others = clauses.slice(0, -1);
+  return others.length === 0 ? last : `${others.join(', ')} and ${last}`;
+}
+
+export const RENDER_REFUSED = (
+  refusals: readonly { piece: string; environment: string }[],
+): string =>
+  `The platform chart refused the config of ${joinClauses(
+    refusals.map(refusedClause),
+  )}. The end of the check's log in its failedJobs entry gives the key and the reason; explain them to the user without repeating any value that looks like a secret. The local checks do not cover this: they lint, build and test the code, and they never render the chart. Fix each named file, then push again with \`-o merge_request.auto_merge\`.`;
+
 export const WAITING_FOR_PUSH = (commit: string): string =>
   `GitLab does not show commit \`${commit}\` in a merge request yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded and that its output named a merge request.`;
 
