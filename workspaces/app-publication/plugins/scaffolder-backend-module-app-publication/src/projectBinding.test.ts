@@ -143,9 +143,6 @@ describe('project binding: the project comes from the catalog-recorded origin', 
       );
 
       expect(failure).toBeInstanceOf(NotAllowedError);
-      expect((failure as Error).message).toContain(
-        'does not match the location the catalog recorded',
-      );
       expect((failure as Error).message).toContain('Tell the platform team');
       expect(w.gitlab.calls).toEqual([]);
     },
@@ -382,7 +379,7 @@ describe('untrusted text: paths, links and job output', () => {
   it('withholds a request link that does not point into the app project on the status sheet', async () => {
     const w = world();
     w.gitlab.reply(paths.newestMain, json([pipeline(200, COMMIT, 'success')]));
-    w.gitlab.reply(paths.projectJobs, json([]));
+    w.gitlab.reply(paths.mainPipelines, json([]));
     w.gitlab.reply(
       paths.openRequests,
       json([

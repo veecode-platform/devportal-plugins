@@ -128,9 +128,17 @@ export function parseFile<T>(
  */
 export function smokeIsConsistent(
   file: SmokeResult,
-  expected: { job: string; commit: string; pieces: ReadonlySet<string> },
+  expected: {
+    job: string;
+    commit: string;
+    pieces: ReadonlySet<string>;
+    environments: ReadonlySet<string>;
+  },
 ): boolean {
   if (file.job !== expected.job || file.commit !== expected.commit) {
+    return false;
+  }
+  if (!expected.environments.has(file.environment)) {
     return false;
   }
   const names = file.pieces.map(piece => piece.piece);

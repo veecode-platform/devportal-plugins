@@ -21,6 +21,7 @@ describe('readAppPublicationConfig', () => {
       failedJobLogLines: 40,
       addressLinkType: 'app-address',
       dashboardAnnotation: 'grafana/overview-dashboard',
+      environments: ['dev'],
     });
   });
 

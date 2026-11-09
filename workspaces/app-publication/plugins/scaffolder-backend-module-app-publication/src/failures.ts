@@ -19,7 +19,8 @@ export const MAX_FAILED = 5;
 const LOG_READ_BYTES = 262144;
 const LOG_LINE_LIMIT = 500;
 const REASON_PATTERN = /^[a-z_]{1,64}$/;
-const LABEL_PATTERN = /^[A-Za-z0-9._:/ -]{1,255}$/;
+/** A job or stage name that may appear in a sentence: a closed label, no space, no URL. */
+const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
 
@@ -43,8 +44,14 @@ interface Described {
   sentence: string;
 }
 
-export function safeLabel(value: string): string {
-  return LABEL_PATTERN.test(value) ? value : '(name not shown)';
+/**
+ * A name a sentence may show, or a placeholder with the raw name kept in an
+ * untrusted field. The raw name is data written by the job's author.
+ */
+function labelOf(value: string): { shown: string; untrusted?: string } {
+  return LABEL_PATTERN.test(value)
+    ? { shown: value }
+    : { shown: '(name not shown)', untrusted: value };
 }
 
 function stageRank(stage: string): number {
@@ -86,9 +93,17 @@ export async function describeFailedJobs(
 function baseEntry(ctx: FailureContext, job: JobShape): FailedJob {
   const reason = job.failure_reason ?? undefined;
   const webUrl = shownLink(ctx.projectWebUrl, job.web_url);
+  const name = labelOf(job.name);
+  const stage = labelOf(job.stage);
   return {
-    name: safeLabel(job.name),
-    stage: safeLabel(job.stage),
+    name: name.shown,
+    stage: stage.shown,
+    ...(name.untrusted !== undefined
+      ? { untrustedJobName: name.untrusted }
+      : {}),
+    ...(stage.untrusted !== undefined
+      ? { untrustedStage: stage.untrusted }
+      : {}),
     ...(webUrl !== undefined ? { webUrl } : {}),
     ...(reason !== undefined && REASON_PATTERN.test(reason)
       ? { failureReason: reason }
@@ -279,6 +294,7 @@ export async function readDeployStep(
       job: job.name,
       commit: pipeline.sha,
       pieces: ctx.pieces,
+      environments: new Set(ctx.settings.environments),
     })
       ? parsed
       : undefined;
@@ -308,22 +324,32 @@ export async function readDeployStep(
   return noDetailStep(ctx, job, pipeline);
 }
 
-/** A failed deploy with no readable result: the end of its log, and the job's link for the platform team. */
+/**
+ * A deploy with no readable result. A failed job also returns the end of its
+ * output for the platform team; a job that succeeded, or did not run, returns
+ * no output at all, because it did not fail.
+ */
 export async function noDetailStep(
   ctx: FailureContext,
   job: JobShape,
   pipeline: { sha: string },
 ): Promise<Extract<DeployStep, { kind: 'failed' }>> {
-  const explained = await explain(
-    ctx,
-    job,
-    baseEntry(ctx, job),
-    S.DEPLOY_NO_DETAIL(linkText(ctx.projectWebUrl, job.web_url)),
-  );
+  const sentence = S.DEPLOY_NO_DETAIL(linkText(ctx.projectWebUrl, job.web_url));
+  const deploy = noDetailDeploy(pipeline.sha);
+  if (job.status !== 'failed') {
+    return {
+      kind: 'failed',
+      commit: pipeline.sha,
+      deploy,
+      failedJobs: [baseEntry(ctx, job)],
+      sentence,
+    };
+  }
+  const explained = await explain(ctx, job, baseEntry(ctx, job), sentence);
   return {
     kind: 'failed',
     commit: pipeline.sha,
-    deploy: noDetailDeploy(pipeline.sha),
+    deploy,
     failedJobs: [explained.job],
     sentence: explained.sentence,
   };

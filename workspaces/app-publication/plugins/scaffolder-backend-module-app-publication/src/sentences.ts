@@ -5,6 +5,8 @@
  */
 
 export const SENTENCE = {
+  partial:
+    'The sheet is partial: GitLab did not answer within the time limit, so part of it is missing. Do not report this state; call get-app-status again.',
   noPieces: 'The app has no piece yet, so there is nothing to publish.',
   notPublished:
     'The app has pieces but has not been deployed yet. Merge a change to the default branch to publish it.',

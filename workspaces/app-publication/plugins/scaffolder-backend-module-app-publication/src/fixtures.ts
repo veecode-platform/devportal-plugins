@@ -48,7 +48,8 @@ export const paths = {
   jobs: (pipelineId: number) => `/pipelines/${pipelineId}/jobs?per_page=100`,
   trace: (jobId: number) => `/jobs/${jobId}/trace`,
   artifact: (jobId: number, file: string) => `/jobs/${jobId}/artifacts/${file}`,
-  projectJobs: '/jobs?scope[]=success&scope[]=failed&per_page=100',
+  /** The newest default-branch pipelines, as the status sheet reads them for deploys. */
+  mainPipelines: `/pipelines?ref=${DEFAULT_BRANCH}&order_by=id&sort=desc&per_page=10`,
   openRequests:
     '/merge_requests?state=opened&order_by=created_at&sort=desc&per_page=5',
   project: '',
@@ -122,9 +123,26 @@ export function status(code: number): () => Response {
 export class FakeGitlab {
   readonly calls: { path: string; hasSignal: boolean }[] = [];
   private readonly replies = new Map<string, Reply[]>();
+  private latency?: {
+    clock: Clock & { elapsed(): number };
+    milliseconds: number;
+    cutOffWhen?: (now: number) => boolean;
+  };
 
   reply(path: string, ...replies: Reply[]): void {
     this.replies.set(path, replies);
+  }
+
+  /**
+   * Every request takes `milliseconds` of the fake clock. A request that ends
+   * while `cutOffWhen` holds is cut off, as a fetch aborted by its deadline is.
+   */
+  slowdown(options: {
+    clock: Clock & { elapsed(): number };
+    milliseconds: number;
+    cutOffWhen?: (now: number) => boolean;
+  }): void {
+    this.latency = options;
   }
 
   readonly fetch = async (
@@ -136,6 +154,12 @@ export class FakeGitlab {
     }
     const path = input.slice(PROJECT_BASE.length);
     this.calls.push({ path, hasSignal: init?.signal !== undefined });
+    if (this.latency) {
+      await this.latency.clock.sleep(this.latency.milliseconds);
+      if (this.latency.cutOffWhen?.(this.latency.clock.now())) {
+        throw new TypeError('fetch failed: the request was aborted');
+      }
+    }
     const queue = this.replies.get(path);
     if (!queue || queue.length === 0) {
       return status(404)();

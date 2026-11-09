@@ -7,18 +7,33 @@ export const LINK_WITHHELD =
   "(link withheld: it does not point into the app's GitLab project; ask the platform team to find the job by its name)";
 
 const PLAIN_LINK_PATTERN = /^[A-Za-z0-9._~:/?#=&%+@-]+$/;
+const DOT_SEGMENT_PATTERN = /\.\.|%2e/i;
 
-/** The address when it is plain and sits under the project's own web address; undefined otherwise. */
+/**
+ * The link, normalized, when it has the project's origin and sits under the
+ * project's own path. The raw text is checked for dot segments first, and the
+ * normalized URL is compared, so a link that climbs out of the project is refused.
+ */
 export function shownLink(
   projectWebUrl: string,
   url: string,
 ): string | undefined {
-  if (!PLAIN_LINK_PATTERN.test(url)) {
+  if (!PLAIN_LINK_PATTERN.test(url) || DOT_SEGMENT_PATTERN.test(url)) {
     return undefined;
   }
-  return url === projectWebUrl || url.startsWith(`${projectWebUrl}/`)
-    ? url
-    : undefined;
+  let link: URL;
+  let project: URL;
+  try {
+    link = new URL(url);
+    project = new URL(projectWebUrl);
+  } catch {
+    return undefined;
+  }
+  const base = project.pathname.replace(/\/+$/, '');
+  const inside =
+    link.origin === project.origin &&
+    (link.pathname === base || link.pathname.startsWith(`${base}/`));
+  return inside ? link.href : undefined;
 }
 
 /** The link as a sentence shows it: the address, or the note that it was withheld. */

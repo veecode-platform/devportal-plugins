@@ -12,6 +12,12 @@ export interface Config {
      */
     projectPathPrefix: string;
     /**
+     * Environments a deploy file may name. A file for any other environment is
+     * treated as unreadable. Default: dev.
+     * @visibility backend
+     */
+    environments?: string[];
+    /**
      * Name of the job that deploys every piece and runs the smoke check.
      * Default: deploy.
      * @visibility backend

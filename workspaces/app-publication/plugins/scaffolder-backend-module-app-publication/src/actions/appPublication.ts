@@ -27,7 +27,8 @@ export const WAIT_FOR_APP_PUBLICATION = 'wait-for-app-publication';
 const APP_DESCRIPTION =
   "Entity reference of the app: system:<namespace>/<name>. Only the app's owner may read it.";
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
-const SHORT_REQUEST_MILLISECONDS = 15000;
+/** The whole status call: past this, the sheet is returned partial. */
+const STATUS_BUDGET_MILLISECONDS = 20000;
 
 const appInput = z.object({ app: z.string() }).strict();
 const waitInput = z
@@ -186,12 +187,9 @@ async function readStatus(
   app: string,
   credentials: BackstageCredentials,
 ): Promise<StatusOutput> {
-  const opened = await openApp(
-    deps,
-    app,
-    credentials,
-    () => SHORT_REQUEST_MILLISECONDS,
-  );
+  const deadline = deps.clock.now() + STATUS_BUDGET_MILLISECONDS;
+  const remainingMs = () => Math.max(1, deadline - deps.clock.now());
+  const opened = await openApp(deps, app, credentials, remainingMs);
   if ('noProject' in opened) {
     return {
       app,
@@ -205,6 +203,7 @@ async function readStatus(
   return readSheet(opened.context, {
     app,
     system: opened.system,
+    expired: () => deps.clock.now() >= deadline,
     pieces: opened.pieces,
     projectWebUrl: opened.projectWebUrl,
     portalUrl: portalUrlOf(deps, opened.system),

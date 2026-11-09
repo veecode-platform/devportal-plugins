@@ -86,6 +86,11 @@ state between calls.
 
 **Status:** Accepted
 
+**Verified:** The catalog overwrites `backstage.io/managed-by-location` for an entity read from a URL. The collector
+that receives the parsed entity sets the location after spreading the entity's own annotations
+(`@backstage/plugin-catalog-backend` 3.8.0 and 3.9.2, `processing/ProcessorOutputCollector`). The version used by the
+portal's Backstage 1.54.9 release was not checked.
+
 **Context:** The project slug is an annotation the app's own catalog file sets. If the portal read the project it names,
 an owner could point the slug at another project and read that project's jobs and output with the portal's token.
 

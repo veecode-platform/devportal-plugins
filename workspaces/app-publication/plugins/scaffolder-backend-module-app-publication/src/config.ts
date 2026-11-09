@@ -3,6 +3,7 @@ import { z } from 'zod/v3';
 
 const JOB_OR_ARTIFACT_PATTERN = /^[A-Za-z0-9._:/-]{1,255}$/;
 const KEY_PATTERN = /^[A-Za-z0-9._/-]{1,253}$/;
+const ENVIRONMENT_PATTERN = /^[a-z][a-z0-9-]{0,30}$/;
 const GROUP_PATH_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
 export const DEFAULT_DEPLOY_JOB = 'deploy';
 export const DEFAULT_DEPLOY_ARTIFACT = 'smoke-result.json';
@@ -66,6 +67,21 @@ const settingsSchema = z
     pollIntervalSeconds: z.number().int().min(2).max(60).default(5),
     maxArtifactBytes: z.number().int().min(1024).max(1048576).default(65536),
     failedJobLogLines: z.number().int().min(1).max(200).default(40),
+    environments: z
+      .array(
+        z
+          .string()
+          .regex(
+            ENVIRONMENT_PATTERN,
+            'must start with a lowercase letter and contain only lowercase letters, digits and hyphens',
+          ),
+      )
+      .min(1)
+      .refine(
+        environments => new Set(environments).size === environments.length,
+        'lists an environment more than once',
+      )
+      .default(['dev']),
     addressLinkType: z
       .string()
       .regex(KEY_PATTERN, 'may contain only letters, digits and . _ / -')

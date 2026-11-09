@@ -4,7 +4,6 @@ import {
   describeFailedJobs,
   type DeployStep,
   type FailureContext,
-  noDetailStep,
   readDeployStep,
   type RequestFailure,
 } from './failures';
@@ -37,7 +36,8 @@ export const RUNNING_STATES = [
   'scheduled',
 ];
 const DEPLOY_RUNNING_STATES = [...RUNNING_STATES, 'manual'];
-const FINISHED_DEPLOY_STATES = ['success', 'failed', 'skipped', 'canceled'];
+/** Deploy job states for a job that did not run. */
+const DEPLOY_NOT_RUN_STATES = ['skipped', 'canceled'];
 const MAX_FOLLOWED_COMMITS = 3;
 const SAFE_WORD = /^[a-z_]{1,40}$/;
 
@@ -283,6 +283,70 @@ async function observeOpenRequest(
   };
 }
 
+/**
+ * The newer default-branch commit, when the default branch has one that is not
+ * `commit`; undefined when the newest pipeline is this one or none is visible.
+ */
+async function newerDefaultCommit(
+  ctx: FailureContext,
+  commit: string,
+): Promise<string | undefined> {
+  const latest = await ctx.gitlab.json(
+    `/pipelines?ref=${encodeRef(
+      ctx.defaultBranch,
+    )}&order_by=id&sort=desc&per_page=1`,
+    z.array(pipelineShape),
+  );
+  const next = latest?.[0];
+  return next !== undefined && next.sha !== commit ? next.sha : undefined;
+}
+
+/** The main pipeline failed: its failed jobs and what to do about each. */
+async function mainPipelineFailure(
+  ctx: FailureContext,
+  pipeline: PipelineShape,
+  out: PipelineOut,
+  jobs: readonly JobShape[],
+  followedCommit: string | undefined,
+): Promise<Observation> {
+  const described = await describeFailedJobs(ctx, jobs);
+  return {
+    done: true,
+    state: 'failed',
+    step: 'main_pipeline',
+    pipeline: out,
+    followedCommit,
+    failedJobs: described.failedJobs,
+    nextStep:
+      described.sentences.length > 0
+        ? described.sentences.join(' ')
+        : S.DEFAULT_PIPELINE_FAILED_NO_JOB(
+            linkText(ctx.projectWebUrl, pipeline.web_url),
+          ),
+  };
+}
+
+/** The main pipeline was canceled or skipped before its deploy ran. */
+function mainPipelineEnded(
+  ctx: FailureContext,
+  pipeline: PipelineShape,
+  out: PipelineOut,
+  commit: string,
+  followedCommit: string | undefined,
+): Observation {
+  return {
+    done: true,
+    state: 'failed',
+    step: 'main_pipeline',
+    pipeline: out,
+    followedCommit,
+    nextStep: S.DEFAULT_PIPELINE_ENDED(
+      commit,
+      linkText(ctx.projectWebUrl, pipeline.web_url),
+    ),
+  };
+}
+
 /** The default branch's pipeline for the landed commit, and its deploy job. */
 async function observeDefaultBranch(
   ctx: FailureContext,
@@ -297,7 +361,6 @@ async function observeDefaultBranch(
     followedCommit,
     nextStep: S.SENTENCE.deploying,
   });
-
   for (let hop = 0; hop <= MAX_FOLLOWED_COMMITS; hop += 1) {
     const pipelines =
       (await ctx.gitlab.json(
@@ -315,75 +378,53 @@ async function observeDefaultBranch(
     const deployJob = newest(
       jobs.filter(job => job.name === ctx.settings.deployJobName),
     );
-
-    if (deployJob === undefined) {
+    // A deploy job that has not run (waiting, skipped or canceled) follows the
+    // outcome of its pipeline: a failed or ended pipeline is reported as the
+    // main pipeline's failure, a running one is waited for.
+    const notRun =
+      deployJob === undefined ||
+      DEPLOY_NOT_RUN_STATES.includes(deployJob.status) ||
+      DEPLOY_RUNNING_STATES.includes(deployJob.status);
+    if (notRun) {
+      if (pipeline.status === 'failed') {
+        return mainPipelineFailure(ctx, pipeline, out, jobs, followedCommit);
+      }
+      if (pipeline.status === 'canceled' || pipeline.status === 'skipped') {
+        return mainPipelineEnded(ctx, pipeline, out, commit, followedCommit);
+      }
       if (DEPLOY_RUNNING_STATES.includes(pipeline.status)) {
         return deploying(out);
       }
-      if (pipeline.status === 'success') {
-        return {
-          done: true,
-          state: 'merged',
-          pipeline: out,
-          followedCommit,
-          nextStep: S.SENTENCE.merged,
-        };
+      if (deployJob === undefined) {
+        return pipeline.status === 'success'
+          ? {
+              done: true,
+              state: 'merged',
+              pipeline: out,
+              followedCommit,
+              nextStep: S.SENTENCE.merged,
+            }
+          : deploying(out);
       }
-      if (pipeline.status === 'failed') {
-        const described = await describeFailedJobs(ctx, jobs);
-        return {
-          done: true,
-          state: 'failed',
-          step: 'main_pipeline',
-          pipeline: out,
-          followedCommit,
-          failedJobs: described.failedJobs,
-          nextStep:
-            described.sentences.length > 0
-              ? described.sentences.join(' ')
-              : S.DEFAULT_PIPELINE_FAILED_NO_JOB(
-                  linkText(ctx.projectWebUrl, pipeline.web_url),
-                ),
-        };
+      // The pipeline succeeded but its deploy did not run: a newer default
+      // branch pipeline publishes this commit; without one, keep waiting.
+      const next = await newerDefaultCommit(ctx, commit);
+      if (next === undefined) {
+        return deploying(out);
       }
-      if (pipeline.status === 'canceled' || pipeline.status === 'skipped') {
-        return {
-          done: true,
-          state: 'failed',
-          step: 'main_pipeline',
-          pipeline: out,
-          followedCommit,
-          nextStep: S.DEFAULT_PIPELINE_ENDED(
-            commit,
-            linkText(ctx.projectWebUrl, pipeline.web_url),
-          ),
-        };
-      }
-      return deploying(out);
+      commit = next;
+      followedCommit = next;
+      continue;
     }
 
-    if (!FINISHED_DEPLOY_STATES.includes(deployJob.status)) {
-      return deploying(out);
-    }
     const step = await readDeployStep(ctx, deployJob, pipeline);
     if (step.kind === 'superseded') {
-      const latestMain = await ctx.gitlab.json(
-        `/pipelines?ref=${encodeRef(
-          ctx.defaultBranch,
-        )}&order_by=id&sort=desc&per_page=1`,
-        z.array(pipelineShape),
-      );
-      const next = latestMain?.[0];
-      if (next === undefined || next.sha === commit) {
-        return deployFailure(
-          ctx,
-          pipeline,
-          followedCommit,
-          await noDetailStep(ctx, deployJob, pipeline),
-        );
+      const next = await newerDefaultCommit(ctx, commit);
+      if (next === undefined) {
+        return deploying(out);
       }
-      commit = next.sha;
-      followedCommit = next.sha;
+      commit = next;
+      followedCommit = next;
       continue;
     }
     if (step.kind === 'published') {
@@ -432,8 +473,20 @@ export async function waitForPublication(
   input: { commit: string; mergeRequest?: number },
   options: { clock: Clock; deadline: number; pollMilliseconds: number },
 ): Promise<WaitOutput> {
+  let last: Observation | undefined;
   for (;;) {
-    const observation = await observeCommit(ctx, input);
+    let observation: Observation;
+    try {
+      observation = await observeCommit(ctx, input);
+    } catch (error) {
+      // A GitLab request cut short by the deadline is not an outage: the last
+      // complete observation is still the answer, and the call returns it.
+      if (last !== undefined && options.clock.now() >= options.deadline) {
+        return toWaitOutput(last, input.commit);
+      }
+      throw error;
+    }
+    last = observation;
     if (
       observation.done ||
       options.clock.now() + options.pollMilliseconds >= options.deadline

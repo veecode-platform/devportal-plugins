@@ -83,9 +83,27 @@ const superseded = (commit: string) => ({
 });
 
 /** The newest default-branch pipeline, and no open requests, unless the test sets them. */
-function baseline(w: World, latest: unknown[], deploys: unknown[] = []): void {
+/**
+ * The newest default-branch pipeline, and the deploy jobs of the default branch.
+ * Each deploy job sits in its own pipeline, read through the pipeline list.
+ */
+function baseline(
+  w: World,
+  latest: unknown[],
+  deploys: Array<{ id: number; pipeline: { id: number; sha: string } }> = [],
+): void {
   w.gitlab.reply(paths.newestMain, json(latest));
-  w.gitlab.reply(paths.projectJobs, json(deploys));
+  const deployPipelines = deploys.map(deploy => ({
+    id: deploy.pipeline.id,
+    sha: deploy.pipeline.sha,
+    ref: 'main',
+    status: 'success',
+    web_url: `${PROJECT_WEB_URL}/-/pipelines/${deploy.pipeline.id}`,
+  }));
+  w.gitlab.reply(paths.mainPipelines, json([...latest, ...deployPipelines]));
+  for (const deploy of deploys) {
+    w.gitlab.reply(paths.jobs(deploy.pipeline.id), json([deploy]));
+  }
   w.gitlab.reply(paths.openRequests, json([]));
 }
 
@@ -244,10 +262,7 @@ describe('get-app-status', () => {
     baseline(
       w,
       [pipeline(200, NEWER, 'failed')],
-      [
-        job(302, DEPLOY_JOB, 'deploy', 'failed'),
-        job(301, DEPLOY_JOB, 'deploy', 'success'),
-      ],
+      [job(301, DEPLOY_JOB, 'deploy', 'success')],
     );
     w.gitlab.reply(
       paths.jobs(200),
@@ -374,5 +389,104 @@ describe('get-app-status', () => {
     const output = await run(w, GET_APP_STATUS, { app: APP_REF });
 
     expect(JSON.stringify(output)).not.toContain(CANARY);
+  });
+});
+
+describe('get-app-status: the deploys come from the default branch itself', () => {
+  it('finds the last deploy of the default branch behind several pipelines that did not deploy', async () => {
+    const w = world();
+    w.gitlab.reply(paths.newestMain, json([pipeline(203, COMMIT, 'success')]));
+    w.gitlab.reply(
+      paths.mainPipelines,
+      json([
+        pipeline(203, COMMIT, 'success'),
+        pipeline(202, COMMIT, 'success'),
+        pipeline(201, COMMIT, 'success'),
+        pipeline(1301, MERGE_COMMIT, 'success'),
+      ]),
+    );
+    w.gitlab.reply(
+      paths.jobs(203),
+      json([
+        {
+          id: 9,
+          name: 'build-app',
+          stage: 'build',
+          status: 'success',
+          web_url: `${PROJECT_WEB_URL}/-/jobs/9`,
+          ref: 'main',
+        },
+      ]),
+    );
+    w.gitlab.reply(paths.jobs(202), json([]));
+    w.gitlab.reply(paths.jobs(201), json([]));
+    w.gitlab.reply(
+      paths.jobs(1301),
+      json([job(301, DEPLOY_JOB, 'deploy', 'success')]),
+    );
+    w.gitlab.reply(
+      paths.artifact(301, SMOKE_FILE),
+      text(JSON.stringify(smoke(MERGE_COMMIT))),
+    );
+    w.gitlab.reply(paths.openRequests, json([]));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output).toMatchObject({
+      state: 'published',
+      environments: [
+        expect.objectContaining({
+          name: 'dev',
+          lastDeploy: expect.objectContaining({ commit: MERGE_COMMIT }),
+        }),
+      ],
+    });
+    expect(w.gitlab.paths.some(path => path.startsWith('/jobs?scope'))).toBe(
+      false,
+    );
+  });
+
+  it('shows only http and https addresses from the catalog', async () => {
+    const w = world({
+      system: exampleSystem({
+        metadata: {
+          name: 'example-app',
+          namespace: 'default',
+          annotations: {
+            'gitlab.com/project-slug': 'example-org/example-app',
+            'backstage.io/managed-by-location': `url:${PROJECT_WEB_URL}/-/blob/main/catalog-info.yaml`,
+          },
+          links: [
+            {
+              url: ['javascript', 'alert(1)'].join(':'),
+              type: 'app-address',
+              title: 'Not a link',
+            },
+            {
+              url: 'https://app.example.com',
+              type: 'app-address',
+              title: 'Example app',
+            },
+          ],
+        },
+      } as never),
+    });
+    baseline(
+      w,
+      [pipeline(200, MERGE_COMMIT, 'success')],
+      [job(301, DEPLOY_JOB, 'deploy', 'success')],
+    );
+    w.gitlab.reply(
+      paths.artifact(301, SMOKE_FILE),
+      text(JSON.stringify(smoke(MERGE_COMMIT))),
+    );
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.environments).toEqual([
+      expect.objectContaining({
+        addresses: [{ url: 'https://app.example.com', title: 'Example app' }],
+      }),
+    ]);
   });
 });
