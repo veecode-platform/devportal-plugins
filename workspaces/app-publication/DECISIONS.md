@@ -21,9 +21,11 @@ the owner gets no GitLab data at all.
 A failure with no fixed sentence otherwise leaves the user with nothing to act on.
 
 **Decision:** For such a failure the tool returns the last `failedJobLogLines` lines of the job's output (40 by default),
-each line cut to 500 characters, in the field `untrustedJobOutput`. The field is marked untrusted: it is the job's own
-data, never a sentence and never instructions. The output is read only for the app's own project and only after the
-owner check passes. The tool does not mask the output.
+in the field `untrustedJobOutput`. Each line is cleaned first: the runner's timestamp and stream prefix and the ANSI
+escape sequences are removed, the line is trimmed, and empty lines and section markers are dropped. Each cleaned line
+is cut to 500 characters. The field is marked untrusted: it is the job's own data, never a sentence and never
+instructions. The output is read only for the app's own project and only after the owner check passes. The tool does
+not mask the output. The cleaning applies to every job that gets a log tail, so the output of those jobs changes too.
 
 **Consequences:** A value the job script printed, such as a credential, can reach Claude's reply. The product owner
 chose this risk. Revisit it when the deploy access leaves the app's pipeline.
@@ -157,12 +159,16 @@ The module treated that job like a lint job and sent the user to the local check
 the code and never render the chart, so they cannot show the cause.
 
 **Decision:** A failed job named `renderJobName` (default `render`) in a merge request pipeline returns the last
-`failedJobLogLines` lines of its log, as PDR-002 does. A line of exactly the form `refused <piece> <environment>` among
-them names a config only when the piece is one of the app's pieces and the environment is one of the configured
+`failedJobLogLines` cleaned lines of its log, as PDR-002 does. The refusal lines are searched in every cleaned line of
+the log read, not only in the returned lines. A line of exactly the form `refused <piece> <environment>`, after the
+cleaning, names a config only when the piece is one of the app's pieces and the environment is one of the configured
 environments. Each such config gets its file, `<piece>/config/<environment>.yaml`, in the sentence, and the sentence
 says the end of the log gives the key and the reason. The text of the log is never copied into a sentence. With no
-such line, the job gets the PDR-002 explanation. The main pipeline and every other job name keep their behavior.
+such line, the job gets the PDR-002 explanation. The render check applies to merge request pipelines only, which is
+where the generated pipeline runs `render`. A `render` failure on the default branch keeps the generic lint sentence.
+Other job names keep their sentence.
 
-**Consequences:** A refusal line above the last `failedJobLogLines` lines is not named, and the job gets the generic
-explanation instead. A refusal printed with a prefix, such as a timestamp, does not match. The line form was checked
-against one captured log of a refused render job.
+**Consequences:** The search covers the 256 KB that the tool reads from the end of the trace. A refusal earlier than
+that is not named, and the job gets the generic explanation instead. The line form was checked against a live job's
+trace excerpt, with the runner's prefix and escape sequences, and against bare lines. Every job that gets a log tail
+returns cleaned lines, which changes its `untrustedJobOutput` (see PDR-002).

@@ -25,6 +25,13 @@ const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
 /** A line the render check prints for a config the platform chart refused, and nothing else on the line. */
 const REFUSED_LINE = /^refused (\S+) (\S+)$/;
+/** The prefix the runner puts in front of each trace line: an RFC 3339 time, a two-digit hex index, O or E, then a space or +. */
+const RUNNER_PREFIX =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z [0-9A-Fa-f]{2}[OE][ +]/;
+/** An ANSI escape sequence, such as a colour or an erase-line code. */
+const ANSI_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
+/** A section marker line the runner prints around a step. It has no text for the reader. */
+const SECTION_MARKER = /^section_(?:start|end):\S*$/;
 
 export interface FailureContext {
   gitlab: GitlabClient;
@@ -232,9 +239,9 @@ function ownedFileSentence(
 }
 
 /**
- * The job's own name, stage and link, plus the end of its output for a failure
- * with no fixed explanation. The output is returned as untrusted data in its own
- * field and never put in a sentence.
+ * The job's own name, stage and link, plus the end of its log for a failure with
+ * no fixed explanation. The log is returned as untrusted data in its own field
+ * and never put in a sentence.
  */
 async function explain(
   ctx: FailureContext,
@@ -242,25 +249,26 @@ async function explain(
   entry: FailedJob,
   sentence: string,
 ): Promise<Described> {
+  const log = await jobLog(ctx, job);
   return {
-    job: { ...entry, untrustedJobOutput: await jobTail(ctx, job) },
+    job: { ...entry, untrustedJobOutput: lastLines(ctx, log) },
     sentence,
   };
 }
 
-/** The end of the job's log, as the log-tail path reads it. */
-async function jobTail(ctx: FailureContext, job: JobShape): Promise<string[]> {
+/** The job's log as the reader sees it: every cleaned line of the window that was read. */
+async function jobLog(ctx: FailureContext, job: JobShape): Promise<string[]> {
   const tail = await ctx.gitlab.textTail(
     `/jobs/${job.id}/trace`,
     LOG_READ_BYTES,
   );
-  return logLines(tail, ctx.settings.failedJobLogLines);
+  return cleanLines(tail);
 }
 
 /**
- * The render check of a merge request. Each refusal line in the log tail names
- * a config of this app, and its file is named to the user. With no such line,
- * the job gets the generic log explanation.
+ * The render check of a merge request. A refusal line anywhere in the log read
+ * names a config of this app, and its file is named to the user. Only the last
+ * lines are returned. With no such line, the job gets the generic explanation.
  */
 async function describeRender(
   ctx: FailureContext,
@@ -269,10 +277,10 @@ async function describeRender(
   name: string,
   link: string,
 ): Promise<Described> {
-  const lines = await jobTail(ctx, job);
-  const refusals = refusedConfigs(ctx, lines);
+  const log = await jobLog(ctx, job);
+  const refusals = refusedConfigs(ctx, log);
   return {
-    job: { ...entry, untrustedJobOutput: lines },
+    job: { ...entry, untrustedJobOutput: lastLines(ctx, log) },
     sentence:
       refusals.length > 0
         ? S.RENDER_REFUSED(refusals)
@@ -281,7 +289,7 @@ async function describeRender(
 }
 
 /**
- * The refusals in a log tail that name one of the app's pieces and one of its
+ * The refusals in a cleaned log that name one of the app's pieces and one of its
  * configured environments, each pair once, in the order of the log. Any other
  * line is ignored, and no text of the line is kept.
  */
@@ -291,7 +299,7 @@ function refusedConfigs(
 ): { piece: string; environment: string }[] {
   const refusals: { piece: string; environment: string }[] = [];
   for (const line of lines) {
-    const match = REFUSED_LINE.exec(line.trim());
+    const match = REFUSED_LINE.exec(line);
     const piece = match?.[1];
     const environment = match?.[2];
     if (piece === undefined || environment === undefined) {
@@ -316,21 +324,36 @@ function refusedConfigs(
   return refusals;
 }
 
-function logLines(
+/**
+ * The lines of a trace window as the reader sees them. The runner's prefix and
+ * the escape sequences are removed, and empty lines and section markers are
+ * dropped. A cut-off first line is dropped too. A trace without the runner's
+ * prefix reads the same way.
+ */
+function cleanLines(
   tail: { text: string; truncated: boolean } | undefined,
-  count: number,
 ): string[] {
   if (tail === undefined) {
     return [];
   }
-  const lines = tail.text.split(/\r?\n/);
+  const raw = tail.text.split(/\r?\n/);
   if (tail.truncated) {
-    lines.shift();
+    raw.shift();
   }
-  while (lines.length > 0 && lines[lines.length - 1]?.trim() === '') {
-    lines.pop();
-  }
-  return lines.slice(-count).map(line => line.slice(0, LOG_LINE_LIMIT));
+  return raw
+    .map(cleanLine)
+    .filter(line => line !== '' && !SECTION_MARKER.test(line))
+    .map(line => line.slice(0, LOG_LINE_LIMIT));
+}
+
+/** One trace line without the runner's prefix and escape sequences, trimmed. */
+function cleanLine(line: string): string {
+  return line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '').trim();
+}
+
+/** The last `failedJobLogLines` cleaned lines of a log. */
+function lastLines(ctx: FailureContext, lines: readonly string[]): string[] {
+  return lines.slice(-ctx.settings.failedJobLogLines);
 }
 
 export type DeployStep =

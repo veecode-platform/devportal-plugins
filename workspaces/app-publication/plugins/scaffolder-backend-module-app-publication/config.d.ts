@@ -71,8 +71,9 @@ export interface Config {
     maxArtifactBytes?: number;
     /**
      * Number of final log lines returned for a failed job that is explained
-     * from its log, and searched for the render check's refusals. Default 40;
-     * from 1 to 200.
+     * from its log. The lines are cleaned of the runner's prefix and escape
+     * sequences. The render check searches the whole log it reads, not only
+     * these lines. Default 40; from 1 to 200.
      * @visibility backend
      */
     failedJobLogLines?: number;
