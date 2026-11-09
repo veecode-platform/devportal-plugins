@@ -1,0 +1,24 @@
+# app-publication
+
+This workspace contains a `backend-plugin-module` for the scaffolder plugin
+(`plugins/scaffolder-backend-module-app-publication`). It registers two read-only actions that the
+portal's MCP server exposes as tools. They report whether a change to an app is merged, deployed and
+smoke-checked, so Claude can tell a business user what happened without that user opening GitLab or the
+cluster.
+
+- `get-app-status` takes `{ app }` and returns the app's sheet: its pieces, the last deploy of each
+  environment with its smoke result, the default branch's newest pipeline and the open merge requests.
+  It returns one `state` and one `nextStep`. It never waits.
+- `wait-for-app-publication` takes `{ app, commit, mergeRequest? }` and follows a pushed commit for at
+  most `maxWaitSeconds` (20 by default). It returns `done`, a `state`, the facts it read and a `nextStep`.
+
+Only the app's owner may call either one. The decisions behind the choices are in [DECISIONS.md](DECISIONS.md).
+
+## Configuration
+
+Every key under `appPublication` is optional; `config.d.ts` lists them with their defaults. GitLab hosts and
+tokens come from `integrations.gitlab`. `app-config.yaml` shows an example with a placeholder host.
+
+## Development
+
+Run the commands in [AGENTS.md](AGENTS.md) from this folder.

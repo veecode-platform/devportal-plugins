@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: app-publication
+  description: Scaffolder module with two MCP actions that report whether an app's change is merged, deployed and smoke-checked.
+spec:
+  type: library
+  owner: platform
+  lifecycle: experimental

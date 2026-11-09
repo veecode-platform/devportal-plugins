@@ -1,0 +1,26 @@
+app:
+  title: AppPublication backend development
+  baseUrl: http://localhost:3000
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+
+auth:
+  providers:
+    guest: {}
+
+integrations:
+  gitlab:
+    - host: gitlab.example.com
+      apiBaseUrl: https://gitlab.example.com/api/v4
+      token: ${GITLAB_TOKEN}
+
+appPublication:
+  deployJobName: deploy
+  maxWaitSeconds: 20
+  pollIntervalSeconds: 5
