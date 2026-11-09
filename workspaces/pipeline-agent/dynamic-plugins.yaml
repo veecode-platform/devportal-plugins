@@ -1,0 +1,25 @@
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-pipeline-agent-backend-dynamic
+    disabled: false
+    pluginConfig:
+      pipelineAgent:
+        mode: fake
+      catalog:
+        locations:
+          - type: file
+            target: /opt/app-root/src/examples/entities.yaml
+  - package: ./dynamic-plugins/dist/veecode-platform-backstage-plugin-pipeline-agent-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          veecode-platform.backstage-plugin-pipeline-agent:
+            mountPoints:
+              - mountPoint: entity.page.ci/cards
+                importName: PipelineAgentCard
+                config:
+                  layout: { gridColumn: '1 / -1' }
+                  if: { allOf: [isPipelineAgentAvailable] }

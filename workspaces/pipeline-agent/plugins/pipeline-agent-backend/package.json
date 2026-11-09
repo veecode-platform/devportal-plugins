@@ -1,0 +1,54 @@
+{
+  "name": "@veecode-platform/backstage-plugin-pipeline-agent-backend",
+  "version": "0.1.2",
+  "license": "Apache-2.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "configSchema": "config.d.ts",
+  "publishConfig": {
+    "access": "public",
+    "main": "dist/index.cjs.js",
+    "types": "dist/index.d.ts"
+  },
+  "backstage": {
+    "role": "backend-plugin",
+    "pluginId": "pipeline-agent",
+    "pluginPackages": [
+      "@veecode-platform/backstage-plugin-pipeline-agent-backend"
+    ]
+  },
+  "scripts": {
+    "start": "backstage-cli package start",
+    "build": "backstage-cli package build",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "clean": "backstage-cli package clean",
+    "prepack": "backstage-cli package prepack",
+    "postpack": "backstage-cli package postpack",
+    "export-dynamic": "rhdh-cli plugin export",
+    "export-dynamic:clean": "run export-dynamic --clean"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.113.0",
+    "@backstage/backend-plugin-api": "^1.9.2",
+    "@backstage/catalog-model": "^1.9.0",
+    "@backstage/errors": "^1.3.1",
+    "@backstage/plugin-catalog-node": "^2.2.2",
+    "@backstage/plugin-permission-common": "^0.9.9",
+    "@backstage/plugin-permission-node": "^0.11.1",
+    "@veecode-platform/backstage-plugin-pipeline-agent-common": "workspace:*",
+    "diff": "^9.0.0",
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "@backstage/backend-test-utils": "^1.11.4",
+    "@backstage/cli": "^0.36.3",
+    "@red-hat-developer-hub/cli": "1.11.2",
+    "@types/express": "^4.17.6",
+    "@types/supertest": "^2.0.12",
+    "supertest": "^6.2.4"
+  },
+  "files": [
+    "dist"
+  ]
+}

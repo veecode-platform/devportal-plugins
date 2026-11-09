@@ -1,0 +1,39 @@
+app:
+  title: Pipeline Agent development
+  baseUrl: http://localhost:3000
+
+organization:
+  name: VeeCode
+
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  # Local development only: an in-memory database is discarded on every restart.
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+
+auth:
+  environment: development
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, User, Group, Template]
+  locations:
+    # Example entities that carry the gitlab.com/project-slug annotation.
+    - type: file
+      target: ../../examples/entities.yaml
+
+# The fake mode runs scripted investigations, so the card works without an
+# Anthropic key or a GitLab token. Switch to real only with the secrets set
+# in the environment.
+pipelineAgent:
+  mode: fake
