@@ -9,7 +9,11 @@ import {
   COMMIT,
   CONTRACT_FILE,
   DEPLOY_JOB,
+  FAILED_LINE,
   FakeGitlab,
+  REFUSAL_LINE,
+  RUNNER_TRACE,
+  RUNNER_TRACE_CLEANED,
   MERGE_COMMIT,
   NEWER,
   OTHER,
@@ -1164,11 +1168,6 @@ describe('wait-for-app-publication: a canary in every field GitLab or the job ca
   });
 });
 
-/** The first line the platform chart prints for a refused config (a generic example). */
-const REFUSAL_LINE =
-  "The platform chart refused back/config/dev.yaml: [ERROR] templates/: values don't meet the specifications of the schema(s) in the following chart(s): platform-app: - at '/settings/TIMEOUT_MS': got number, want string";
-const FAILED_LINE = 'Job failed: exit code 1';
-
 /** A merge request whose render job failed, with the job's log as given. */
 function renderFailure(w: World, log: string, jobName = 'render'): void {
   failedRequest(w, [
@@ -1302,6 +1301,96 @@ describe('wait-for-app-publication: a refused render config', () => {
       expect.objectContaining({
         name: 'unit-tests',
         untrustedJobOutput: ['refused back dev'],
+      }),
+    ]);
+  });
+
+  it('reads the refusal in a real runner trace, and returns its lines cleaned', async () => {
+    const w = world();
+    renderFailure(w, RUNNER_TRACE);
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.nextStep).not.toContain('Run the local checks');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: RUNNER_TRACE_CLEANED,
+      }),
+    ]);
+  });
+
+  it('returns no runner prefix, escape sequence or section marker anywhere in the output', async () => {
+    const w = world();
+    renderFailure(w, RUNNER_TRACE);
+
+    const output = await run(w, WAIT, input());
+    const serialized = JSON.stringify(output);
+
+    expect(serialized).not.toContain('2026-11-09T');
+    expect(serialized).not.toContain('\\u001b');
+    expect(serialized).not.toContain('\\r');
+    expect(serialized).not.toContain('section_start');
+    expect(serialized).not.toContain('section_end');
+  });
+
+  it('cleans the log tail of every job that gets one, not only the render check', async () => {
+    const w = world();
+    failedRequest(w, [
+      job(403, 'scan-deps', 'scan', 'failed', {
+        failure_reason: 'script_failure',
+      }),
+    ]);
+    w.gitlab.reply(paths.trace(403), text(RUNNER_TRACE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'scan-deps',
+        untrustedJobOutput: RUNNER_TRACE_CLEANED,
+      }),
+    ]);
+  });
+
+  it('does not match a refusal line with extra text, with or without the runner prefix', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      [
+        '2026-11-09T21:33:00.742481Z 01O xrefused back dev',
+        '2026-11-09T21:33:00.742482Z 01O refused back dev extra',
+        FAILED_LINE,
+      ].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `render` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+  });
+
+  it('names a refusal above the returned lines, and returns only the last failedJobLogLines lines', async () => {
+    const w = world({ settings: { failedJobLogLines: 2 } });
+    renderFailure(
+      w,
+      ['refused back dev', 'filler one', 'filler two', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: ['filler two', FAILED_LINE],
       }),
     ]);
   });
