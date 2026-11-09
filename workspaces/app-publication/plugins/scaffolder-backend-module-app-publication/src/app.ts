@@ -11,10 +11,12 @@ export const MANAGED_BY_LOCATION_ANNOTATION =
 export const TEMPLATE_VERSION_ANNOTATION = 'backstage.io/template-version';
 
 const PROJECT_PATH_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/;
-/** GitLab's separator before a repository route. A project path never contains it, so the project ends at its first occurrence. */
+/**
+ * GitLab's separator before a repository route. The project path ends at its
+ * first occurrence. A location without it is refused: the legacy form, with
+ * `blob`, `tree` or `raw` after the project, cannot tell the project apart.
+ */
 const REPOSITORY_SEPARATOR = '/-/';
-/** The legacy form, with no separator: `group/project/blob/<ref>/<file>`. */
-const LEGACY_MARKER = /\/(?:blob|tree|raw)\//g;
 
 /** The app's GitLab project, as the portal reads it: where it is and which host holds it. */
 export interface AppProject {
@@ -64,21 +66,12 @@ export function projectOf(
 }
 
 /**
- * Where the project path ends. With GitLab's separator, the project ends at the
- * first one, so a project segment named blob, tree or raw is part of the path.
- * Without it, the legacy form has exactly one marker; a path with more than one
- * is ambiguous and is refused (undefined).
+ * Where the project path ends: at the first GitLab separator. A location
+ * without one is refused (undefined).
  */
 function projectEnd(pathname: string): number | undefined {
   const separator = pathname.indexOf(REPOSITORY_SEPARATOR);
-  if (separator !== -1) {
-    return separator > 0 ? separator : undefined;
-  }
-  const markers = [...pathname.matchAll(LEGACY_MARKER)];
-  if (markers.length !== 1) {
-    return undefined;
-  }
-  return markers[0]?.index;
+  return separator > 0 ? separator : undefined;
 }
 
 /** The host and project path of a location the catalog recorded, as a URL. */

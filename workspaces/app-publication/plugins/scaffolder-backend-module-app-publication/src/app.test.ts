@@ -61,23 +61,23 @@ describe("projectOf: the project path is cut at GitLab's separator", () => {
     expect(project?.slug).toBe('example-org/example-app');
   });
 
-  it('accepts the legacy form when it has exactly one marker', () => {
-    const project = projectOf(
-      systemAt(
-        `${PROJECT_WEB_URL}/blob/main/catalog-info.yaml`,
-        'example-org/example-app',
-      ),
-      PREFIX,
-    );
-
-    expect(project?.slug).toBe('example-org/example-app');
-  });
-
-  it('refuses a legacy location that mixes two markers, because its project is ambiguous', () => {
+  it('refuses a location with no GitLab separator, which is the legacy form', () => {
     expect(() =>
       projectOf(
         systemAt(
-          `${PROJECT_WEB_URL}/blob/main/tree/catalog-info.yaml`,
+          `${PROJECT_WEB_URL}/blob/main/catalog-info.yaml`,
+          'example-org/example-app',
+        ),
+        PREFIX,
+      ),
+    ).toThrow(NotAllowedError);
+  });
+
+  it('refuses a legacy path that mixes blob and tree markers', () => {
+    expect(() =>
+      projectOf(
+        systemAt(
+          `${PROJECT_WEB_URL}/tree/blob/catalog-info.yaml`,
           'example-org/example-app',
         ),
         PREFIX,
