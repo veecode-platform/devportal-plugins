@@ -90,7 +90,9 @@ state between calls.
 an owner could point the slug at another project and read that project's jobs and output with the portal's token.
 
 **Decision:** The project path comes from `backstage.io/managed-by-location`, which the catalog sets from where it read
-the entity. The slug annotation must name that same project, and the project must sit under `projectPathPrefix`, a
+the entity. The project path ends at GitLab's `/-/` separator, so a segment named `tree`, `blob` or `raw` in the path is
+part of it. A location with no separator must have exactly one legacy `/blob/`, `/tree/` or `/raw/` marker; any other
+location is refused. The slug annotation must name that same project, and the project must sit under `projectPathPrefix`, a
 required key. Every refusal is a `NotAllowedError` with a next step, and it happens before any GitLab request. GitLab's
 own address for the project must match the same origin and path.
 
