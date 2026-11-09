@@ -1412,7 +1412,9 @@ describe('wait-for-app-publication: a refused render config', () => {
 
     const output = await run(w, WAIT, input());
 
-    expect(output.nextStep.split('back/config/dev.yaml').length - 1).toBe(1);
+    expect(
+      String(output.nextStep).split('back/config/dev.yaml').length - 1,
+    ).toBe(1);
   });
 
   it('splits a bare trace on carriage returns, and cleans its section markers and colour sequences', async () => {
