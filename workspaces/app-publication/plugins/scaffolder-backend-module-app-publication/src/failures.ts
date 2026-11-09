@@ -305,7 +305,8 @@ function refusedConfigs(
     }
     if (
       refusals.some(
-        refusal => refusal.piece === piece && refusal.environment === environment,
+        refusal =>
+          refusal.piece === piece && refusal.environment === environment,
       )
     ) {
       continue;

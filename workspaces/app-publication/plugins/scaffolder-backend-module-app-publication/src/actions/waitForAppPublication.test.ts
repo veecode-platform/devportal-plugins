@@ -1180,7 +1180,10 @@ function renderFailure(w: World, log: string, jobName = 'render'): void {
 describe('wait-for-app-publication: a refused render config', () => {
   it('names the refused file, gives the end of the log, and does not send the user to the local checks', async () => {
     const w = world();
-    renderFailure(w, [REFUSAL_LINE, 'refused back dev', FAILED_LINE].join('\n'));
+    renderFailure(
+      w,
+      [REFUSAL_LINE, 'refused back dev', FAILED_LINE].join('\n'),
+    );
 
     const output = await run(w, WAIT, input());
 
@@ -1263,7 +1266,12 @@ describe('wait-for-app-publication: a refused render config', () => {
     const w = world();
     renderFailure(
       w,
-      ['refused front dev', 'refused back prod', 'refused back dev', FAILED_LINE].join('\n'),
+      [
+        'refused front dev',
+        'refused back prod',
+        'refused back dev',
+        FAILED_LINE,
+      ].join('\n'),
     );
 
     const output = await run(w, WAIT, input());
