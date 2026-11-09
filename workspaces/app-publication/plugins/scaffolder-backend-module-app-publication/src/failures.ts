@@ -29,6 +29,7 @@ const REFUSED_LINE = /^refused (\S+) (\S+)$/;
 const RUNNER_PREFIX =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z [0-9A-Fa-f]{2}[OE][ +]/;
 /** An ANSI escape sequence, such as a colour or an erase-line code. */
+// eslint-disable-next-line no-control-regex -- matching the escape character is the point of this pattern
 const ANSI_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
 /** A section marker line the runner prints around a step. It has no text for the reader. */
 const SECTION_MARKER = /^section_(?:start|end):\S*$/;
