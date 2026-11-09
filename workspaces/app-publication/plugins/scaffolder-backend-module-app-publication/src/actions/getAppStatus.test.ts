@@ -349,6 +349,70 @@ describe('get-app-status', () => {
     ]);
   });
 
+  it('adds the render refusal to the blocked sentence and to the failed job, with the end of its log', async () => {
+    const w = world();
+    baseline(w, [pipeline(200, COMMIT, 'success')], []);
+    w.gitlab.reply(
+      paths.openRequests,
+      json([
+        {
+          iid: 7,
+          state: 'opened',
+          target_branch: 'main',
+          sha: OTHER,
+          web_url: `${PROJECT_WEB_URL}/-/merge_requests/7`,
+        },
+      ]),
+    );
+    w.gitlab.reply(
+      paths.request(7),
+      json({
+        iid: 7,
+        title: 'Example change',
+        state: 'opened',
+        sha: OTHER,
+        target_branch: 'main',
+        web_url: `${PROJECT_WEB_URL}/-/merge_requests/7`,
+        merge_when_pipeline_succeeds: true,
+        detailed_merge_status: 'ci_must_pass',
+        head_pipeline: pipeline(100, OTHER, 'failed'),
+      }),
+    );
+    w.gitlab.reply(
+      paths.jobs(100),
+      json([
+        job(401, 'render', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    const log = [
+      "The platform chart refused back/config/dev.yaml: [ERROR] templates/: values don't meet the specifications of the schema(s) in the following chart(s): platform-app: - at '/settings/TIMEOUT_MS': got number, want string",
+      'refused back dev',
+      'Job failed: exit code 1',
+    ];
+    w.gitlab.reply(paths.trace(401), text(log.join('\n')));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.nextStep).toContain(
+      'Merge request !7 is blocked: The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.nextStep).not.toContain('Run the local checks');
+    expect(output.openRequests).toEqual([
+      expect.objectContaining({
+        iid: 7,
+        failedJobs: [
+          expect.objectContaining({
+            name: 'render',
+            untrustedJobOutput: log,
+          }),
+        ],
+      }),
+    ]);
+    expectDeclared(w, GET_APP_STATUS, output);
+  });
+
   it('refuses a stranger before any GitLab request', async () => {
     const w = world();
     await expect(

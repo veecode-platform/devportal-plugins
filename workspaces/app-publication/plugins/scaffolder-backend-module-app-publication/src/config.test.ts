@@ -15,6 +15,7 @@ describe('readAppPublicationConfig', () => {
       contractJobName: 'contract',
       contractResultArtifact: 'contract-result.json',
       conflictMarkersJobName: 'conflict-markers',
+      renderJobName: 'render',
       maxWaitSeconds: 20,
       pollIntervalSeconds: 5,
       maxArtifactBytes: 65536,
@@ -63,6 +64,10 @@ describe('readAppPublicationConfig', () => {
     [
       'a job name with a space',
       { projectPathPrefix: 'example-org', deployJobName: 'deploy job' },
+    ],
+    [
+      'a render job name with a space',
+      { projectPathPrefix: 'example-org', renderJobName: 'render job' },
     ],
     [
       'a log of 0 lines',
