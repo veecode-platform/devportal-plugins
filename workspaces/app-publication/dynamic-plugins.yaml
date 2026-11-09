@@ -1,0 +1,9 @@
+plugins:
+  - package: ./dynamic-plugins-src/veecode-platform-plugin-scaffolder-backend-module-app-publication-dynamic
+    disabled: false
+    pluginConfig:
+      appPublication:
+        projectPathPrefix: example-org/apps
+        deployJobName: deploy
+        maxWaitSeconds: 20
+        pollIntervalSeconds: 5
