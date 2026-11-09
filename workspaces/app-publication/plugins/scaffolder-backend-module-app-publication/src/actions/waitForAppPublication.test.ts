@@ -596,6 +596,9 @@ describe('wait-for-app-publication: deploy failures', () => {
 
     expect(output.nextStep).toContain("in the app's root `CLAUDE.md`");
     expect(output.nextStep).toContain('`back/config/dev.yaml`');
+    expect(output.nextStep).toContain('every setting value is a quoted string');
+    expect(output.nextStep).toContain('The local checks do not render the chart');
+    expect(output.nextStep).not.toContain('run the local checks');
     expect(output.nextStep).not.toContain('back/CLAUDE.md');
   });
 
@@ -1177,7 +1180,7 @@ function renderFailure(w: World, log: string, jobName = 'render'): void {
 }
 
 describe('wait-for-app-publication: a refused render config', () => {
-  it('names the refused file, gives the end of the log, and does not send the user to the local checks', async () => {
+  it('names the refused file, points to the end of the log, and does not send the user to the local checks', async () => {
     const w = world();
     renderFailure(
       w,
@@ -1195,6 +1198,11 @@ describe('wait-for-app-publication: a refused render config', () => {
       'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
     );
     expect(output.nextStep).toContain('The local checks do not cover this');
+    expect(output.nextStep).toContain('should give the key and the reason');
+    expect(output.nextStep).toContain(
+      `give the platform team this link: ${PROJECT_WEB_URL}/-/jobs/401`,
+    );
+    expect(output.nextStep).toContain('Do not change platform-owned files.');
     expect(output.nextStep).toContain('-o merge_request.auto_merge');
     expect(output.nextStep).not.toContain('Run the local checks');
     expect(output.nextStep).not.toContain('TIMEOUT_MS');
@@ -1391,6 +1399,106 @@ describe('wait-for-app-publication: a refused render config', () => {
       expect.objectContaining({
         name: 'render',
         untrustedJobOutput: ['filler two', FAILED_LINE],
+      }),
+    ]);
+  });
+
+  it('names a repeated pair once', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      ['refused back dev', 'refused back dev', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep.split('back/config/dev.yaml').length - 1).toBe(1);
+  });
+
+  it('splits a bare trace on carriage returns, and cleans its section markers and colour sequences', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      [
+        'section_start:1794259981:step_script\r\x1b[0K\x1b[36;1mValidating configs\x1b[0;m',
+        'Downloading 10%\rDownloading 90%',
+        'refused back dev',
+        'section_end:1794259982:step_script\r\x1b[0K',
+        FAILED_LINE,
+      ].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: [
+          'Validating configs',
+          'Downloading 10%',
+          'Downloading 90%',
+          'refused back dev',
+          FAILED_LINE,
+        ],
+      }),
+    ]);
+  });
+
+  it('keeps the indentation of a log line, drops only its trailing spaces, and drops an indented section marker', async () => {
+    const w = world();
+    failedRequest(w, [
+      job(403, 'scan-deps', 'scan', 'failed', {
+        failure_reason: 'script_failure',
+      }),
+    ]);
+    w.gitlab.reply(
+      paths.trace(403),
+      text(
+        [
+          'Traceback (most recent call last):',
+          '  File "run.py", line 3',
+          '    raise ValueError  ',
+          '   section_start:1794259981:step_script',
+          '2026-11-09T21:33:00.742470Z 01O   settings:',
+        ].join('\n'),
+      ),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'scan-deps',
+        untrustedJobOutput: [
+          'Traceback (most recent call last):',
+          '  File "run.py", line 3',
+          '    raise ValueError',
+          '  settings:',
+        ],
+      }),
+    ]);
+  });
+
+  it('drops the partial first line of a cut read window, so a fragment at the cut is not matched', async () => {
+    const w = world();
+    // The module reads the last 256 KiB of a trace. This window starts inside the line "x refused back dev".
+    const readBytes = 256 * 1024;
+    const cutWindow = `refused back dev\n${'z'.repeat(readBytes - 18)}\n`;
+    renderFailure(w, `x ${cutWindow}`);
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `render` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: ['z'.repeat(500)],
       }),
     ]);
   });
