@@ -1,6 +1,7 @@
 import type { AppPublicationSettings } from './config';
 import type { GitlabClient } from './gitlab';
 import type { JobShape } from './gitlabShapes';
+import { linkText, shownLink } from './links';
 import * as S from './sentences';
 import type { DeployOut, FailedJob, PieceOut } from './types';
 import {
@@ -26,6 +27,8 @@ export interface FailureContext {
   gitlab: GitlabClient;
   settings: AppPublicationSettings;
   defaultBranch: string;
+  /** The project's own web address, the prefix every link the module shows must start with. */
+  projectWebUrl: string;
   pieces: ReadonlySet<string>;
 }
 
@@ -80,12 +83,13 @@ export async function describeFailedJobs(
   };
 }
 
-function baseEntry(job: JobShape): FailedJob {
+function baseEntry(ctx: FailureContext, job: JobShape): FailedJob {
   const reason = job.failure_reason ?? undefined;
+  const webUrl = shownLink(ctx.projectWebUrl, job.web_url);
   return {
     name: safeLabel(job.name),
     stage: safeLabel(job.stage),
-    webUrl: job.web_url,
+    ...(webUrl !== undefined ? { webUrl } : {}),
     ...(reason !== undefined && REASON_PATTERN.test(reason)
       ? { failureReason: reason }
       : {}),
@@ -97,9 +101,9 @@ async function describeJob(
   job: JobShape,
   request: RequestFailure | undefined,
 ): Promise<Described> {
-  const entry = baseEntry(job);
+  const entry = baseEntry(ctx, job);
   const name = entry.name;
-  const link = job.web_url;
+  const link = linkText(ctx.projectWebUrl, job.web_url);
   const reason = job.failure_reason ?? undefined;
 
   if (reason !== undefined && !FIXED_REASONS.includes(reason)) {
@@ -151,17 +155,23 @@ async function describeContract(
   if (!(CONTRACT_CODES as readonly string[]).includes(file.code)) {
     return undefined;
   }
+  const link = linkText(ctx.projectWebUrl, job.web_url);
   if (file.code === 'owned_file_changed') {
-    const paths = ownedPathsInDiff(file.paths, await request.diffPaths());
-    if (paths.length === 0) {
+    const { safe, untrusted } = ownedPathsInDiff(
+      file.paths,
+      await request.diffPaths(),
+    );
+    if (safe.length === 0 && untrusted.length === 0) {
       return undefined;
     }
     return {
-      job: { ...entry, code: 'owned_file_changed', paths },
-      sentence: S.CONTRACT_OWNED(
-        paths.map(path => `\`${path}\``).join(', '),
-        ctx.defaultBranch,
-      ),
+      job: {
+        ...entry,
+        code: 'owned_file_changed',
+        ...(safe.length > 0 ? { paths: safe } : {}),
+        ...(untrusted.length > 0 ? { untrustedPaths: untrusted } : {}),
+      },
+      sentence: ownedFileSentence(ctx, safe, untrusted.length, link),
     };
   }
   if (file.code === 'unreadable_path') {
@@ -172,11 +182,35 @@ async function describeContract(
   }
   return {
     job: { ...entry, code: 'checker_missing' },
-    sentence: S.CONTRACT_CHECKER_MISSING(job.web_url),
+    sentence: S.CONTRACT_CHECKER_MISSING(link),
   };
 }
 
-/** The job's own name, stage and link, plus the end of its log for a failure with no fixed explanation. */
+/** The restore sentence for the safe paths, and the note for any path that does not fit the safe form. */
+function ownedFileSentence(
+  ctx: FailureContext,
+  safe: readonly string[],
+  untrustedCount: number,
+  link: string,
+): string {
+  if (safe.length === 0) {
+    return S.CONTRACT_OWNED_ONLY_WITHHELD(untrustedCount, link);
+  }
+  const restore = S.CONTRACT_OWNED(
+    safe.map(path => `\`${path}\``).join(', '),
+    ctx.defaultBranch,
+  );
+  if (untrustedCount === 0) {
+    return restore;
+  }
+  return `${restore} ${S.CONTRACT_OWNED_WITHHELD(untrustedCount, link)}`;
+}
+
+/**
+ * The job's own name, stage and link, plus the end of its output for a failure
+ * with no fixed explanation. The output is returned as untrusted data in its own
+ * field and never put in a sentence.
+ */
 async function explain(
   ctx: FailureContext,
   job: JobShape,
@@ -189,7 +223,7 @@ async function explain(
   );
   const lines = logLines(tail, ctx.settings.failedJobLogLines);
   return {
-    job: { ...entry, logTail: lines },
+    job: { ...entry, untrustedJobOutput: lines },
     sentence,
   };
 }
@@ -232,7 +266,7 @@ export async function readDeployStep(
   job: JobShape,
   pipeline: { sha: string },
 ): Promise<DeployStep> {
-  const link = job.web_url;
+  const link = linkText(ctx.projectWebUrl, job.web_url);
   const text = await ctx.gitlab.artifact(
     job.id,
     ctx.settings.deployResultArtifact,
@@ -266,7 +300,7 @@ export async function readDeployStep(
         kind: 'failed',
         commit: pipeline.sha,
         deploy: deployOf(file, pipeline.sha),
-        failedJobs: [baseEntry(job)],
+        failedJobs: [baseEntry(ctx, job)],
         sentence,
       };
     }
@@ -283,8 +317,8 @@ export async function noDetailStep(
   const explained = await explain(
     ctx,
     job,
-    baseEntry(job),
-    S.DEPLOY_NO_DETAIL(job.web_url),
+    baseEntry(ctx, job),
+    S.DEPLOY_NO_DETAIL(linkText(ctx.projectWebUrl, job.web_url)),
   );
   return {
     kind: 'failed',

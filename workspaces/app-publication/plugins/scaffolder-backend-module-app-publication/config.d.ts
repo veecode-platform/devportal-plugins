@@ -5,6 +5,13 @@ export interface Config {
    */
   appPublication?: {
     /**
+     * GitLab group path under which every app's project must sit, for example
+     * example-org/apps. Required. An app whose catalog entry names a project
+     * outside this group is refused before the portal reads GitLab.
+     * @visibility backend
+     */
+    projectPathPrefix: string;
+    /**
      * Name of the job that deploys every piece and runs the smoke check.
      * Default: deploy.
      * @visibility backend

@@ -3,7 +3,13 @@ import type { BackstageCredentials } from '@backstage/backend-plugin-api';
 import type { Entity } from '@backstage/catalog-model';
 import { ServiceUnavailableError } from '@backstage/errors';
 import { z } from 'zod/v3';
-import { type AppPiece, appPieces, projectOf } from '../app';
+import {
+  type AppPiece,
+  type AppProject,
+  appPieces,
+  projectOf,
+  refuseProject,
+} from '../app';
 import type { PublicationDependencies } from '../dependencies';
 import type { FailureContext } from '../failures';
 import { GitlabClient, MSG_NO_ACCESS } from '../gitlab';
@@ -99,7 +105,7 @@ interface Opened {
   pieces: AppPiece[];
   gitlab: GitlabClient;
   context: FailureContext;
-  project: { host: string; slug: string };
+  project: AppProject;
   projectWebUrl: string;
 }
 
@@ -119,7 +125,7 @@ async function openApp(
     app: ref,
     credentials,
   });
-  const project = projectOf(system);
+  const project = projectOf(system, deps.settings.projectPathPrefix);
   if (project === undefined) {
     return { system, noProject: true };
   }
@@ -134,12 +140,14 @@ async function openApp(
     remainingMs,
   });
   const info = await gitlab.projectInfo(projectShape);
+  const projectWebUrl = verifiedProjectAddress(project, info.web_url);
   const defaultBranch = info.default_branch ?? 'main';
   const pieces = await appPieces(deps, system, credentials);
   const context: FailureContext = {
     gitlab,
     settings: deps.settings,
     defaultBranch,
+    projectWebUrl,
     pieces: new Set(pieces.map(piece => piece.name)),
   };
   return {
@@ -148,8 +156,29 @@ async function openApp(
     gitlab,
     context,
     project,
-    projectWebUrl: info.web_url,
+    projectWebUrl,
   };
+}
+
+/**
+ * GitLab's own address for the project must be the origin and path the catalog
+ * recorded. The links the module shows are checked against this address.
+ */
+function verifiedProjectAddress(project: AppProject, reported: string): string {
+  let url: URL;
+  try {
+    url = new URL(reported);
+  } catch {
+    throw refuseProject(
+      'GitLab reported an address for this project that does not match its catalog entry.',
+    );
+  }
+  if (url.origin !== project.origin || url.pathname !== `/${project.slug}`) {
+    throw refuseProject(
+      'GitLab reports this project at another address than its catalog entry.',
+    );
+  }
+  return `${project.origin}/${project.slug}`;
 }
 
 async function readStatus(

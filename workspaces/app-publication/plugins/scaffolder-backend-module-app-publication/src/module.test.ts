@@ -15,6 +15,7 @@ describe('scaffolderModuleAppPublication', () => {
       scaffolderModuleAppPublication,
       mockServices.rootConfig.factory({
         data: {
+          appPublication: { projectPathPrefix: 'example-org' },
           integrations: {
             gitlab: [
               {

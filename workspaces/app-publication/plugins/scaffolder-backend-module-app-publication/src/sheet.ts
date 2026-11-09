@@ -1,6 +1,7 @@
 import type { Entity } from '@backstage/catalog-model';
 import { z } from 'zod/v3';
 import type { AppPiece } from './app';
+import { linkText, shownLink } from './links';
 import {
   describeFailedJobs,
   type DeployStep,
@@ -42,7 +43,7 @@ interface DeployEntry {
   environment?: string;
   step: Finished;
   pipelineUrl: string;
-  jobUrl: string;
+  jobUrl?: string;
   finishedAt?: string;
 }
 
@@ -109,7 +110,7 @@ export async function readSheet(
     if (mr === undefined) {
       continue;
     }
-    const request = mergeRequestOut(mr);
+    const request = mergeRequestOut(ctx.projectWebUrl, mr);
     const head =
       mr.head_pipeline?.sha === mr.sha ? mr.head_pipeline : undefined;
     let failedJobs: FailedJob[] | undefined;
@@ -123,13 +124,17 @@ export async function readSheet(
       const detail =
         described.sentences.length > 0
           ? described.sentences.join(' ')
-          : S.REQUEST_PIPELINE_FAILED_NO_JOB(head.web_url);
+          : S.REQUEST_PIPELINE_FAILED_NO_JOB(
+              linkText(ctx.projectWebUrl, head.web_url),
+            );
       nextStep += ` ${S.BLOCKED_MR(mr.iid, detail)}`;
     }
     openRequests.push({
       iid: mr.iid,
       title: mr.title ?? '',
-      webUrl: mr.web_url,
+      ...(shownLink(ctx.projectWebUrl, mr.web_url) !== undefined
+        ? { webUrl: shownLink(ctx.projectWebUrl, mr.web_url) }
+        : {}),
       headCommit: mr.sha,
       pipelineStatus: head?.status ?? 'unknown',
       autoMerge: request.autoMerge,
@@ -179,7 +184,9 @@ export async function readSheet(
           latestMain: {
             commit: latest.sha,
             status: latest.status,
-            webUrl: latest.web_url,
+            ...(shownLink(ctx.projectWebUrl, latest.web_url) !== undefined
+              ? { webUrl: shownLink(ctx.projectWebUrl, latest.web_url) }
+              : {}),
             ...(mainFail !== undefined
               ? { failedJobs: mainFail.failedJobs }
               : {}),
@@ -225,7 +232,7 @@ async function recentDeploys(
       environment: step.deploy.environment,
       step,
       pipelineUrl: `${input.projectWebUrl}/-/pipelines/${pipelineId}`,
-      jobUrl: job.web_url,
+      jobUrl: shownLink(ctx.projectWebUrl, job.web_url),
       ...(job.finished_at ? { finishedAt: job.finished_at } : {}),
     });
   }
@@ -267,6 +274,8 @@ async function mainFailure(
     sentence:
       described.sentences.length > 0
         ? described.sentences.join(' ')
-        : S.DEFAULT_PIPELINE_FAILED_NO_JOB(latest.web_url),
+        : S.DEFAULT_PIPELINE_FAILED_NO_JOB(
+            linkText(ctx.projectWebUrl, latest.web_url),
+          ),
   };
 }

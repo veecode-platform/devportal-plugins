@@ -16,8 +16,10 @@ Only the app's owner may call either one. The decisions behind the choices are i
 
 ## Configuration
 
-Every key under `appPublication` is optional; `config.d.ts` lists them with their defaults. GitLab hosts and
-tokens come from `integrations.gitlab`. `app-config.yaml` shows an example with a placeholder host.
+`appPublication.projectPathPrefix` is required: the GitLab group path under which every app project must sit, for
+example `example-org/apps`. An app whose catalog entry names a project outside it is refused. The other keys are optional;
+`config.d.ts` lists them with their defaults. GitLab hosts and tokens come from `integrations.gitlab`.
+`app-config.yaml` shows an example with a placeholder host.
 
 ## Development
 

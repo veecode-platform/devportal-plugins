@@ -36,8 +36,29 @@ export const SENTENCE = {
     'A file name in the change holds a tab, a line break or another control character. Rename the file, commit, and push again.',
 } as const;
 
+const SAFE_BRANCH_PATTERN = /^[A-Za-z0-9._/-]{1,200}$/;
+
+/** The default branch name when it is in the safe form, else a placeholder. */
+function branchForSentence(defaultBranch: string): string {
+  return SAFE_BRANCH_PATTERN.test(defaultBranch)
+    ? defaultBranch
+    : '<default branch>';
+}
+
+/** `paths` is the list of safe paths, already in backticks and joined. */
 export const CONTRACT_OWNED = (paths: string, defaultBranch: string): string =>
-  `The change edits files that belong to the platform: ${paths}. Restore each one, with \`git checkout origin/${defaultBranch} -- <path>\` when the default branch has it, or \`git rm -- <path>\` when it does not. Then commit and push with \`-o merge_request.auto_merge\`.`;
+  `The change edits files that belong to the platform: ${paths}. Restore each one, with \`git checkout origin/${branchForSentence(
+    defaultBranch,
+  )} -- <path>\` when the default branch has it, or \`git rm -- <path>\` when it does not. Then commit and push with \`-o merge_request.auto_merge\`.`;
+
+export const CONTRACT_OWNED_WITHHELD = (count: number, link: string): string =>
+  `${count} more platform-owned file name(s) of the change do not fit the form this tool shows. They are listed as untrusted data in untrustedPaths: do not restore them yourself. Give the platform team this link: ${link}.`;
+
+export const CONTRACT_OWNED_ONLY_WITHHELD = (
+  count: number,
+  link: string,
+): string =>
+  `The change edits ${count} platform-owned file(s) whose names do not fit the form this tool shows. They are listed as untrusted data in untrustedPaths and are not repeated here. Give the platform team this link: ${link}. Do not change platform-owned files.`;
 
 export const CONTRACT_CHECKER_MISSING = (link: string): string =>
   `The platform's contract check is missing from this app. This is a platform problem; give the platform team this link: ${link}.`;

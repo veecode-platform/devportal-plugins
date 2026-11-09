@@ -35,15 +35,14 @@ const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const SEMVER_PATTERN =
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-/** A path of at most 300 characters with no control character. Whether it is in the change is checked against GitLab. */
-function isPlainPath(path: string): boolean {
+/** The closed form a path shows in a sentence: no character outside the set, no absolute path, no `..` segment. */
+export const SAFE_PATH_PATTERN = /^[A-Za-z0-9._/-]{1,300}$/;
+
+export function isSafePath(path: string): boolean {
   return (
-    path.length >= 1 &&
-    path.length <= 300 &&
-    ![...path].some(character => {
-      const code = character.charCodeAt(0);
-      return code < 32 || code === 127;
-    })
+    SAFE_PATH_PATTERN.test(path) &&
+    !path.startsWith('/') &&
+    !path.split('/').some(segment => segment === '..')
   );
 }
 
@@ -154,16 +153,21 @@ export function smokeIsConsistent(
   return file.result === 'failed';
 }
 
-/** A path the job reports is kept only when GitLab's own diff of the request holds it. */
+/**
+ * The change's paths that the contract job reports, kept only when GitLab's own
+ * diff of the request holds them. A path in the safe form goes to `safe`, which
+ * a sentence may show. Any other path in the diff goes to `untrusted`, which is
+ * returned as data and never put in a sentence.
+ */
 export function ownedPathsInDiff(
   paths: readonly string[],
   diffPaths: ReadonlySet<string>,
-): string[] {
-  return paths.filter(
-    path =>
-      isPlainPath(path) &&
-      !path.startsWith('/') &&
-      !path.split('/').includes('..') &&
-      diffPaths.has(path),
+): { safe: string[]; untrusted: string[] } {
+  const inDiff = [...new Set(paths)].filter(
+    path => diffPaths.has(path) && path.length <= 300,
   );
+  return {
+    safe: inDiff.filter(isSafePath),
+    untrusted: inDiff.filter(path => !isSafePath(path)),
+  };
 }

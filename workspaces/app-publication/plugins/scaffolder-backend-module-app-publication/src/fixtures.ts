@@ -20,6 +20,7 @@ export const API_BASE = `https://${GITLAB_HOST}/api/v4`;
 export const PROJECT_BASE = `${API_BASE}/projects/example-org%2Fexample-app`;
 export const PROJECT_WEB_URL = `https://${GITLAB_HOST}/example-org/example-app`;
 export const DEFAULT_BRANCH = 'main';
+export const EXAMPLE_PREFIX = 'example-org';
 export const APP_REF = 'system:default/example-app';
 export const USER_REF = 'user:default/example.user';
 export const TEAM_REF = 'group:default/example-team';
@@ -57,7 +58,9 @@ export const exampleSettings = (
   overrides: Record<string, unknown> = {},
 ): AppPublicationSettings =>
   readAppPublicationConfig(
-    new ConfigReader({ appPublication: overrides } as never),
+    new ConfigReader({
+      appPublication: { projectPathPrefix: EXAMPLE_PREFIX, ...overrides },
+    } as never),
   );
 
 export function exampleSystem(overrides: Partial<Entity> = {}): Entity {
@@ -69,7 +72,7 @@ export function exampleSystem(overrides: Partial<Entity> = {}): Entity {
       namespace: 'default',
       annotations: {
         'gitlab.com/project-slug': 'example-org/example-app',
-        'backstage.io/source-location': `url:${PROJECT_WEB_URL}/-/blob/main/catalog-info.yaml`,
+        'backstage.io/managed-by-location': `url:${PROJECT_WEB_URL}/-/blob/main/catalog-info.yaml`,
       },
     },
     spec: { owner: TEAM_REF },

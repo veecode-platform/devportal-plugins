@@ -18,6 +18,7 @@ import {
   pipelineShape,
   type PipelineShape,
 } from './gitlabShapes';
+import { linkText, shownLink } from './links';
 import * as S from './sentences';
 import type {
   FailedJob,
@@ -57,26 +58,32 @@ export function encodeRef(ref: string): string {
 }
 
 export function pipelineOut(
+  projectWebUrl: string,
   pipeline: PipelineShape,
   defaultBranch: string,
 ): PipelineOut {
+  const webUrl = shownLink(projectWebUrl, pipeline.web_url);
   return {
     id: pipeline.id,
     commit: pipeline.sha,
     ref: pipeline.ref ?? defaultBranch,
     status: pipeline.status,
-    webUrl: pipeline.web_url,
+    ...(webUrl !== undefined ? { webUrl } : {}),
   };
 }
 
-export function mergeRequestOut(mr: MergeRequestShape): MergeRequestOut {
+export function mergeRequestOut(
+  projectWebUrl: string,
+  mr: MergeRequestShape,
+): MergeRequestOut {
   const status = mr.detailed_merge_status ?? 'unknown';
+  const webUrl = shownLink(projectWebUrl, mr.web_url);
   return {
     iid: mr.iid,
     state: mr.state,
     autoMerge: mr.merge_when_pipeline_succeeds ?? false,
     mergeStatus: SAFE_WORD.test(status) ? status : 'unknown',
-    webUrl: mr.web_url,
+    ...(webUrl !== undefined ? { webUrl } : {}),
   };
 }
 
@@ -160,7 +167,7 @@ export async function observeCommit(
     return waitingForPush(input.commit);
   }
   const followedCommit = mr.sha !== input.commit ? mr.sha : undefined;
-  const request = mergeRequestOut(mr);
+  const request = mergeRequestOut(ctx.projectWebUrl, mr);
 
   if (mr.state === 'closed') {
     return {
@@ -201,6 +208,7 @@ async function observeOpenRequest(
     return checking;
   }
   const pipeline = pipelineOut(
+    ctx.projectWebUrl,
     { ...head, ref: head.ref ?? ctx.defaultBranch },
     ctx.defaultBranch,
   );
@@ -225,7 +233,9 @@ async function observeOpenRequest(
       nextStep:
         described.sentences.length > 0
           ? described.sentences.join(' ')
-          : S.REQUEST_PIPELINE_FAILED_NO_JOB(head.web_url),
+          : S.REQUEST_PIPELINE_FAILED_NO_JOB(
+              linkText(ctx.projectWebUrl, head.web_url),
+            ),
     };
   }
   if (head.status === 'canceled' || head.status === 'skipped') {
@@ -300,7 +310,7 @@ async function observeDefaultBranch(
     if (pipeline === undefined) {
       return deploying();
     }
-    const out = pipelineOut(pipeline, ctx.defaultBranch);
+    const out = pipelineOut(ctx.projectWebUrl, pipeline, ctx.defaultBranch);
     const jobs = await pipelineJobs(ctx, pipeline.id);
     const deployJob = newest(
       jobs.filter(job => job.name === ctx.settings.deployJobName),
@@ -331,7 +341,9 @@ async function observeDefaultBranch(
           nextStep:
             described.sentences.length > 0
               ? described.sentences.join(' ')
-              : S.DEFAULT_PIPELINE_FAILED_NO_JOB(pipeline.web_url),
+              : S.DEFAULT_PIPELINE_FAILED_NO_JOB(
+                  linkText(ctx.projectWebUrl, pipeline.web_url),
+                ),
         };
       }
       if (pipeline.status === 'canceled' || pipeline.status === 'skipped') {
@@ -341,7 +353,10 @@ async function observeDefaultBranch(
           step: 'main_pipeline',
           pipeline: out,
           followedCommit,
-          nextStep: S.DEFAULT_PIPELINE_ENDED(commit, pipeline.web_url),
+          nextStep: S.DEFAULT_PIPELINE_ENDED(
+            commit,
+            linkText(ctx.projectWebUrl, pipeline.web_url),
+          ),
         };
       }
       return deploying(out);
@@ -396,7 +411,7 @@ function deployFailure(
     done: true,
     state: 'failed',
     step: 'deploy',
-    pipeline: pipelineOut(pipeline, ctx.defaultBranch),
+    pipeline: pipelineOut(ctx.projectWebUrl, pipeline, ctx.defaultBranch),
     followedCommit,
     deploy: step.deploy,
     failedJobs: step.failedJobs,

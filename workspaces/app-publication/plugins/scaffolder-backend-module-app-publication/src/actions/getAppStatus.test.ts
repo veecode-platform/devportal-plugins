@@ -145,7 +145,7 @@ describe('get-app-status', () => {
           namespace: 'default',
           annotations: {
             'gitlab.com/project-slug': 'example-org/example-app',
-            'backstage.io/source-location': `url:${PROJECT_WEB_URL}/-/blob/main/catalog-info.yaml`,
+            'backstage.io/managed-by-location': `url:${PROJECT_WEB_URL}/-/blob/main/catalog-info.yaml`,
           },
           links: [
             {

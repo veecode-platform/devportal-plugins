@@ -3,6 +3,7 @@ import { z } from 'zod/v3';
 
 const JOB_OR_ARTIFACT_PATTERN = /^[A-Za-z0-9._:/-]{1,255}$/;
 const KEY_PATTERN = /^[A-Za-z0-9._/-]{1,253}$/;
+const GROUP_PATH_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
 export const DEFAULT_DEPLOY_JOB = 'deploy';
 export const DEFAULT_DEPLOY_ARTIFACT = 'smoke-result.json';
 export const DEFAULT_CONTRACT_JOB = 'contract';
@@ -13,6 +14,19 @@ export const DEFAULT_DASHBOARD_ANNOTATION = 'grafana/overview-dashboard';
 
 const settingsSchema = z
   .object({
+    projectPathPrefix: z
+      .string()
+      .regex(
+        GROUP_PATH_PATTERN,
+        'must be a GitLab group path such as example-org, with no leading or trailing slash',
+      )
+      .refine(
+        prefix =>
+          !prefix
+            .split('/')
+            .some(segment => segment === '..' || segment === '.'),
+        'must not contain a . or .. segment',
+      ),
     deployJobName: z
       .string()
       .regex(

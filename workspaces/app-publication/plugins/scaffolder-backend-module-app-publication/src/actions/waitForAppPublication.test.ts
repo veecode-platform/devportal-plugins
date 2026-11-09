@@ -736,10 +736,12 @@ describe('wait-for-app-publication: deploy failures', () => {
       step: 'deploy',
       deploy: { code: 'no_detail' },
     });
-    const failedJob = (output.failedJobs as { logTail?: string[] }[])[0];
-    expect(failedJob.logTail).toHaveLength(40);
-    expect(failedJob.logTail?.[39]).toBe('log line 60');
-    expect(failedJob.logTail?.[0]).toBe('log line 21');
+    const failedJob = (
+      output.failedJobs as { untrustedJobOutput?: string[] }[]
+    )[0];
+    expect(failedJob.untrustedJobOutput).toHaveLength(40);
+    expect(failedJob.untrustedJobOutput?.[39]).toBe('log line 60');
+    expect(failedJob.untrustedJobOutput?.[0]).toBe('log line 21');
   });
 });
 
@@ -835,7 +837,7 @@ describe('wait-for-app-publication: failed request pipeline', () => {
     expect(missing.failedJobs).toEqual([
       expect.objectContaining({
         name: 'contract',
-        logTail: ['first', `second ${CANARY}`, 'third'],
+        untrustedJobOutput: ['first', `second ${CANARY}`, 'third'],
       }),
     ]);
 
@@ -854,7 +856,7 @@ describe('wait-for-app-publication: failed request pipeline', () => {
     );
     const passed = await run(w, WAIT, input());
     expect(passed.failedJobs).toEqual([
-      expect.objectContaining({ logTail: expect.any(Array) }),
+      expect.objectContaining({ untrustedJobOutput: expect.any(Array) }),
     ]);
     expect(passed.failedJobs).toEqual([
       expect.not.objectContaining({ code: 'owned_file_changed' }),
@@ -879,7 +881,7 @@ describe('wait-for-app-publication: failed request pipeline', () => {
     const output = await run(w, WAIT, input());
 
     expect(output.failedJobs).toEqual([
-      expect.objectContaining({ name: 'contract', logTail: [] }),
+      expect.objectContaining({ name: 'contract', untrustedJobOutput: [] }),
     ]);
   });
 
@@ -939,7 +941,10 @@ describe('wait-for-app-publication: failed request pipeline', () => {
       'The scan `scan-deps` failed on the change',
     );
     expect(output.failedJobs).toEqual([
-      expect.objectContaining({ name: 'scan-deps', logTail: ['scan output'] }),
+      expect.objectContaining({
+        name: 'scan-deps',
+        untrustedJobOutput: ['scan output'],
+      }),
     ]);
   });
 
@@ -955,7 +960,7 @@ describe('wait-for-app-publication: failed request pipeline', () => {
 
     expect(output.nextStep).toContain('Git conflict markers');
     expect(output.failedJobs).toEqual([
-      expect.not.objectContaining({ logTail: expect.anything() }),
+      expect.not.objectContaining({ untrustedJobOutput: expect.anything() }),
     ]);
   });
 });

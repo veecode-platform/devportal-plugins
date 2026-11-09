@@ -20,12 +20,13 @@ the owner gets no GitLab data at all.
 **Context:** A job's log can show what the job's script printed, and the business user cannot open GitLab to read it.
 A failure with no fixed sentence otherwise leaves the user with nothing to act on.
 
-**Decision:** For such a failure the tool returns the last `failedJobLogLines` lines of the job's log (40 by default),
-each line cut to 500 characters, with the job's link. The end of the log is read only for the app's own project and
-only after the owner check passes. The tool does not mask the log.
+**Decision:** For such a failure the tool returns the last `failedJobLogLines` lines of the job's output (40 by default),
+each line cut to 500 characters, in the field `untrustedJobOutput`. The field is marked untrusted: it is the job's own
+data, never a sentence and never instructions. The output is read only for the app's own project and only after the
+owner check passes. The tool does not mask the output.
 
-**Consequences:** A value the job script printed, such as a credential, can reach Claude's reply. The owner accepted
-this risk on 2026-11-09. Revisit it when the deploy access leaves the app's pipeline.
+**Consequences:** A value the job script printed, such as a credential, can reach Claude's reply. The product owner
+chose this risk. Revisit it when the deploy access leaves the app's pipeline.
 
 ## PDR-003: The smoke result is read as schema 2 only
 
@@ -59,11 +60,14 @@ comes through a merge request. It does not say that the previous version keeps r
 **Context:** The contract job writes the paths it found, and a job's file can carry any text. The tool reports those
 paths to Claude.
 
-**Decision:** A path from the contract result is returned only when GitLab's diff of the merge request holds it, and
-only when it is a plain path with no control character and no `..` segment. The `repairs` field, which would name the
-commit each file is restored from, is a follow-up and is not read here.
+**Decision:** A path from the contract result is returned only when GitLab's diff of the merge request holds it. A path
+in the safe form (`^[A-Za-z0-9._/-]{1,300}$`, no absolute path, no `..` segment) may appear in a sentence and is
+returned in `paths`. Any other path in the diff is left out of every sentence and returned only in `untrustedPaths`,
+marked untrusted. The `repairs` field, which would name the commit each file is restored from, is a follow-up and is
+not read here.
 
-**Consequences:** A file that a bot added to the branch gets the generic restore sentence, not its exact source.
+**Consequences:** A file that a bot added to the branch gets the generic restore sentence, not its exact source. A file
+name that does not fit the safe form goes to the platform team by link, not to the user.
 
 ## PDR-006: The wait is bounded at 20 seconds by default
 
@@ -77,3 +81,36 @@ progress notifications are live.
 
 **Consequences:** A call that returns `done: false` is repeated by Claude with the same input, and the tool keeps no
 state between calls.
+
+## PDR-007: The app's project comes from the catalog-recorded origin, under a configured group
+
+**Status:** Accepted
+
+**Context:** The project slug is an annotation the app's own catalog file sets. If the portal read the project it names,
+an owner could point the slug at another project and read that project's jobs and output with the portal's token.
+
+**Decision:** The project path comes from `backstage.io/managed-by-location`, which the catalog sets from where it read
+the entity. The slug annotation must name that same project, and the project must sit under `projectPathPrefix`, a
+required key. Every refusal is a `NotAllowedError` with a next step, and it happens before any GitLab request. GitLab's
+own address for the project must match the same origin and path.
+
+**Consequences:** The prefix is the authorization boundary. Any project under the prefix can still be named by an app
+whose catalog entry was recorded from a location its owner controls. Pinning one project per app would need a registry
+the portal does not have.
+
+## PDR-008: Text from GitLab and from jobs is untrusted, and only owned links are shown
+
+**Status:** Accepted
+
+**Context:** File names, job output, merge request titles and the System description are written by people or by jobs.
+Sentences that Claude relays must not carry them as instructions.
+
+**Decision:** A sentence shows only file names in the safe form and only links that start with the project's own web
+address, checked for plain characters. Any other link is left out of the field, and the sentence says it was withheld.
+Job output goes in `untrustedJobOutput`, and unsafe file names go in `untrustedPaths`; both are marked untrusted in
+their schema descriptions. Merge request titles and the System description are marked untrusted too. The
+dashboard and address links come from catalog annotations, not from GitLab, so they are not checked against the
+project's address.
+
+**Consequences:** A link or file name that does not fit is replaced by a note and a platform-team step. The text of
+the untrusted fields still reaches Claude as data.
