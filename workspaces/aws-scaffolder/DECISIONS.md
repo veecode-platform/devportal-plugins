@@ -105,3 +105,61 @@ environment's prefix of the app.
 
 **Consequences:** A mistake in the checks cannot write outside the named secret. The pattern was
 taken from the AWS documentation; the first run against a real account confirms it.
+
+## PDR-008: The login client action never reads or overwrites a value, and a tag shows which client a secret belongs to
+
+**Status:** Accepted
+
+**Context:** `aws:cognito:app-login-client:ensure` writes three secrets and must report that all
+three already exist and match the client, or refuse. Matching the client ID by reading the secret
+would need `GetSecretValue`, which the writer role does not have and the module avoids. Using
+`writeSecret` would put a new version on a secret that exists and replace a value in place.
+
+**Decision:** The action calls `CreateSecret` only, and its session policy has no `PutSecretValue`
+and no `GetSecretValue`. Each secret it creates carries the tag `veecode.io/cognito-client-id`, and a
+rerun compares that tag, read with `DescribeSecret`, with the ID of the client it found. A missing
+or different tag refuses the run. It looks at the client list and at the three secrets before it
+creates the client, so secrets with no client refuse the run before anything is created.
+
+**Consequences:** The tag is only true while nothing else rewrites the value, so a host adds
+`OAUTH2_PROXY_` to `reservedPrefixes`. Secrets written by hand before the action existed carry no
+tag and are refused, not adopted. The values of the client secret and the cookie secret are never
+compared, only the tag.
+
+## PDR-009: Ownership of a login client follows the System, and the name alone does not grant it
+
+**Status:** Accepted
+
+**Context:** The create-app template runs the action before it publishes the repository, so the
+System may not be in the catalog yet. A rule that required the System to exist would block the first
+deploy; a rule that ignored it would let a user name another app and take its login client.
+
+**Decision:** A System in the catalog must be owned by the caller, as for the register action. A
+System that is not in the catalog may get a client only when no client of that name exists. A client
+that exists needs the System in the catalog and owned by the caller. A System outside the `default`
+namespace is refused unless `clientNamePattern` has `{namespace}`, for the reason of PDR-006. The
+app and namespace names must be DNS labels, because the caller supplies them when the System is not
+in the catalog and they end up in a host name and a client name.
+
+**Consequences:** A run that fails after it created the client, for a System that is not in the
+catalog, cannot be repeated: the client exists and the System does not. The extra client has to be
+removed by hand. Two first runs for one new app at the same moment can leave two clients of one
+name, and the action refuses until one is removed. A caller can create clients for names of apps
+that do not exist; the pool's limit on clients is the only bound, and the audit trail is the session
+name and source identity of each run.
+
+## PDR-010: The client settings are fixed in code
+
+**Status:** Accepted
+
+**Context:** A proven recipe sets the scopes, flows, token lifetimes and attributes of an app client.
+`aws.cognito.signin.user.admin` lets a signed-in user change their own e-mail address, which the
+login proxy trusts, so one mistaken setting would let a user become another.
+
+**Decision:** The configuration takes the pool, the region, the URL and name patterns and the
+identity providers, and nothing else. The block refuses unknown keys, so a `scopes` key stops the
+backend at start. The cookie secret is 32 random bytes as URL-safe base64, the form oauth2-proxy
+documents and decodes to 32 bytes.
+
+**Consequences:** Changing the recipe is a code change with a test, not a setting. An existing client
+is not checked against the recipe; a client changed by hand keeps its changes.
