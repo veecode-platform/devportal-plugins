@@ -196,9 +196,14 @@ name the file or the test without running the local checks.
 
 **Decision:**
 
-- A job or stage name is shown when it matches `^[A-Za-z0-9._:/-]{1,64}$` and holds no `//`. GitLab job names hold `:` and
-  `/` (the module's own job-name settings accept them already). A space and a backtick still send the name to
-  `untrustedJobName`, and `//` does too, so a shown name never reads as a URL (PDR-008).
+- A job or stage name is shown when it is at most 64 characters and has one of two forms. Without `:` and `/`, it holds
+  letters, digits and `._-`, as before. With `:` or `/`, it is segments of letters, digits, `_` and `-`, with exactly one
+  `:` or `/` between two segments and no dot anywhere, so `secrets:gitleaks`, `tofu:fmt` and `test/unit` are shown. GitLab
+  job names hold `:` and `/` (the module's own job-name settings accept them already). Any other name goes to
+  `untrustedJobName`: a space, a backtick, an empty segment (`a//b`, `:x`, `x/`) or a dot in a name that holds a
+  separator. The dot rule keeps a name that reads like a host, a host and port or a link (`example.com/login`,
+  `example.com:8080`, `https://…`) out of a sentence. The author of a merge request controls the job names in its
+  pipeline, and a sentence is read as the platform's own words (PDR-008).
 - Every cleaned log line returned in `untrustedJobOutput`, for every job, has each e-mail address replaced by `[email]`.
   This happens after the runner's prefix and the escape sequences are removed, and before the line is cut to 500
   characters, so half an address is never left. An address is a local part of letters, digits and `._%+-` (at most 64

@@ -20,11 +20,14 @@ const LOG_READ_BYTES = 262144;
 const LOG_LINE_LIMIT = 500;
 const REASON_PATTERN = /^[a-z_]{1,64}$/;
 /**
- * A job or stage name that may appear in a sentence: a closed label of plain
- * characters. It may hold `:` and `/`, as GitLab job names do (`secrets:gitleaks`,
- * `test/unit`), but no space, no backtick and no `//`, so it cannot read as a URL.
+ * A job or stage name that may appear in a sentence: at most 64 plain characters.
+ * A name with neither `:` nor `/` may hold `._-`. A name with one of them is
+ * segments of letters, digits, `_` and `-`, one separator between segments and
+ * no dot, as GitLab job names are (`secrets:gitleaks`, `test/unit`). So a name
+ * never reads as a host, a host and port, or a link.
  */
-const LABEL_PATTERN = /^(?!.*\/\/)[A-Za-z0-9._:/-]{1,64}$/;
+const LABEL_PATTERN =
+  /^(?=.{1,64}$)(?:[A-Za-z0-9._-]+|[A-Za-z0-9_-]+(?:[:/][A-Za-z0-9_-]+)+)$/;
 const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
 /** A line the render check prints for a config the platform chart refused, and nothing else on the line. */
