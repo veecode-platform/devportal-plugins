@@ -224,6 +224,10 @@ function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown error';
 }
 
+export const REGISTERED_BY_TAG = 'veecode.io/registered-by';
+export const APP_TAG = 'veecode.io/app';
+export const ENVIRONMENT_TAG = 'veecode.io/environment';
+
 export function registrationTags(options: {
   registeredBy: string;
   registeredAt: Date;
@@ -231,12 +235,12 @@ export function registrationTags(options: {
   environment: string;
 }): Tag[] {
   return [
-    { Key: 'veecode.io/registered-by', Value: options.registeredBy },
+    { Key: REGISTERED_BY_TAG, Value: options.registeredBy },
     {
       Key: 'veecode.io/registered-at',
       Value: options.registeredAt.toISOString(),
     },
-    { Key: 'veecode.io/app', Value: options.app },
-    { Key: 'veecode.io/environment', Value: options.environment },
+    { Key: APP_TAG, Value: options.app },
+    { Key: ENVIRONMENT_TAG, Value: options.environment },
   ];
 }

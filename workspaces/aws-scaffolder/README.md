@@ -125,7 +125,9 @@ string of the wrong length. Each secret carries the registration tags and the ta
   so nobody takes over the login of another app by naming it. One exception lets a template that
   creates an app run the step again before the System reaches the catalog: the action adopts the
   client when all three secrets exist and each carries the tag `veecode.io/cognito-client-id` with
-  the client's own ID, and the client's callback URL is this app's. Adopting writes nothing and
+  the client's own ID, the tags `veecode.io/registered-by`, `veecode.io/app` and
+  `veecode.io/environment` show that this same user wrote them for this app and environment, and the
+  client's callback URL is this app's. Adopting writes nothing and
   reveals nothing. With any secret missing, tagged for another client, untagged, or scheduled for
   deletion, the run is refused.
 - A System outside the `default` namespace is refused unless `clientNamePattern` has `{namespace}`,
@@ -143,8 +145,8 @@ The run looks first, then writes. It assumes the writer role once, lists the poo
 | none                           | none exist                                                  | creates the client, then the three secrets. `created` is true.                                     |
 | none                           | some exist                                                  | refuses before creating anything.                                                                  |
 | one, with another callback URL | any                                                         | refuses, naming no secret. The callback URL must be exactly this app's `<appUrl>/oauth2/callback`. |
-| one, System not in the catalog | all exist, each tagged with the client's ID                 | adopts the client, changes nothing, `created` is false.                                            |
-| one, System not in the catalog | any other state                                             | refuses.                                                                                           |
+| one, System not in the catalog | all exist, each tagged with the client's ID, by this user   | adopts the client, changes nothing, `created` is false.                                            |
+| one, System not in the catalog | any other state, or written by another user                 | refuses.                                                                                           |
 | one                            | all exist, each tagged with the client's ID                 | changes nothing, `created` is false.                                                               |
 | one                            | some missing, the others tagged with the client's ID        | writes the missing ones, the client secret read back from Cognito.                                 |
 | one                            | one exists without the client's ID tag, or is being deleted | refuses, naming the secret and no value.                                                           |

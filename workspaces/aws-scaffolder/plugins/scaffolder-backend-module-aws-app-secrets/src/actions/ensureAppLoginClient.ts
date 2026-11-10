@@ -170,6 +170,11 @@ export function createEnsureAppLoginClientAction(deps: AppSecretsDependencies) {
         clientIds,
         systemInCatalog: system !== undefined,
         secrets: presence,
+        caller: {
+          userEntityRef: user.entityRef,
+          app: identity.name,
+          environment,
+        },
       });
 
       const { clientId, missing, values } = await settle(plan, {

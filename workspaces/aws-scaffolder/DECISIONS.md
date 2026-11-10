@@ -142,8 +142,8 @@ does not exist. The register action reads with the user's credentials and refuse
 see, so it fails closed and is unchanged. A
 System that is not in the catalog may get a client only when no client of that name exists. A client
 that exists needs the System in the catalog and owned by the caller, with one exception: the action
-adopts the client when all three secrets exist and each is tagged with that client's ID, and the
-callback URL is this app's, so a rerun of a template that creates an app does not need the System
+adopts the client when all three secrets exist and each is tagged with that client's ID and with
+the same user, app and environment as this run, and the callback URL is this app's, so a rerun of a template that creates an app does not need the System
 yet. Adopting reads no value, writes nothing and returns only the client ID. A System outside the `default`
 namespace is refused unless `clientNamePattern` has `{namespace}`, for the reason of PDR-006. The
 app and namespace names must be DNS labels, because the caller supplies them when the System is not

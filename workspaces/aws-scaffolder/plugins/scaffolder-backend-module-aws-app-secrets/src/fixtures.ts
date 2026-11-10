@@ -84,6 +84,7 @@ export function fakeWorld(
     now?: Date;
     randomBytes?: (size: number) => Buffer;
     systemHiddenFromUsers?: boolean;
+    userRef?: string;
   } = {},
 ): FakeWorld {
   const system = 'system' in options ? options.system : exampleSystem();
@@ -110,7 +111,7 @@ export function fakeWorld(
   };
   const userInfo = {
     getUserInfo: jest.fn(async () => ({
-      userEntityRef: exampleUserRef,
+      userEntityRef: options.userRef ?? exampleUserRef,
       ownershipEntityRefs: options.ownershipRefs ?? [exampleTeamRef],
     })),
   };

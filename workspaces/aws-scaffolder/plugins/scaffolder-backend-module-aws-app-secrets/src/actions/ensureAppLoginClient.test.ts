@@ -271,6 +271,10 @@ function expectNothingWritten() {
   expect(pool.calls).not.toContain('CreateSecretCommand');
 }
 
+function withTag(tags: Tag[], key: string, value: string): Tag[] {
+  return [...tags.filter(tag => tag.Key !== key), { Key: key, Value: value }];
+}
+
 function createdClientInput() {
   const command = mockCognitoSend.mock.calls
     .map(([sent]) => sent)
@@ -294,7 +298,13 @@ function givenClientWith(secretNames: string[], clientId = 'example-client-1') {
   for (const name of secretNames) {
     pool.secrets.set(examplePath(name), {
       value: `stored-${name}`,
-      tags: [{ Key: 'veecode.io/cognito-client-id', Value: clientId }],
+      tags: [
+        { Key: 'veecode.io/registered-by', Value: exampleUserRef },
+        { Key: 'veecode.io/registered-at', Value: '2026-11-04T12:00:00.000Z' },
+        { Key: 'veecode.io/app', Value: 'example-app' },
+        { Key: 'veecode.io/environment', Value: 'dev' },
+        { Key: 'veecode.io/cognito-client-id', Value: clientId },
+      ],
     });
   }
 }
@@ -797,7 +807,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
         const error = await failureOf(run(world.deps, ctx));
 
         expect(error.message).toBe(
-          `a client named "${exampleClientName}" already exists in the user pool, and its three secrets are not all in place for it, so the System must be in the catalog and owned by the user before this step can use it`,
+          `a client named "${exampleClientName}" already exists in the user pool, and its three secrets were not all written for it by this user for this app, so the System must be in the catalog and owned by the user before this step can use it`,
         );
         expectNothingWritten();
       },
@@ -819,6 +829,32 @@ describe('aws:cognito:app-login-client:ensure', () => {
         },
       ],
       [
+        'a secret was registered by another user',
+        (secret: { tags: Tag[] }) => {
+          secret.tags = withTag(
+            secret.tags,
+            'veecode.io/registered-by',
+            'user:default/other.user',
+          );
+        },
+      ],
+      [
+        'a secret is for another app',
+        (secret: { tags: Tag[] }) => {
+          secret.tags = withTag(secret.tags, 'veecode.io/app', 'other-app');
+        },
+      ],
+      [
+        'a secret is for another environment',
+        (secret: { tags: Tag[] }) => {
+          secret.tags = withTag(
+            secret.tags,
+            'veecode.io/environment',
+            'staging',
+          );
+        },
+      ],
+      [
         'a secret is scheduled for deletion',
         (secret: { deleted?: boolean }) => {
           secret.deleted = true;
@@ -835,11 +871,36 @@ describe('aws:cognito:app-login-client:ensure', () => {
         const error = await failureOf(run(world.deps, ctx));
 
         expect(error.message).toMatch(
-          /^a client named ".*" already exists in the user pool, and its three secrets are not all in place for it/,
+          /^a client named ".*" already exists in the user pool, and its three secrets were not all written for it by this user for this app/,
         );
         expectNothingWritten();
       },
     );
+
+    it('refuses a second user who tries to adopt the fresh client of a first user', async () => {
+      const first = fakeWorld({ system: undefined });
+      await run(first.deps, contextWith(exampleInput).ctx);
+      const clientsBefore = structuredClone(pool.clients);
+      const secretsBefore = structuredClone([...pool.secrets]);
+      pool.calls.length = 0;
+      const second = fakeWorld({
+        system: undefined,
+        userRef: 'user:default/other.user',
+      });
+      const { ctx, output } = contextWith(exampleInput, {
+        credentials: mockCredentials.user('user:default/other.user'),
+      });
+
+      const error = await failureOf(run(second.deps, ctx));
+
+      expect(error.message).toBe(
+        `a client named "${exampleClientName}" already exists in the user pool, and its three secrets were not all written for it by this user for this app, so the System must be in the catalog and owned by the user before this step can use it`,
+      );
+      expect(output).not.toHaveBeenCalled();
+      expectNothingWritten();
+      expect(pool.clients).toEqual(clientsBefore);
+      expect([...pool.secrets]).toEqual(secretsBefore);
+    });
 
     it('refuses to adopt a client with another callback URL when the System is not in the catalog', async () => {
       givenClientWith(exampleNames);

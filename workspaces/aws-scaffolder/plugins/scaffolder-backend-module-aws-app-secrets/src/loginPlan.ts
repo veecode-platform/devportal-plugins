@@ -1,4 +1,9 @@
-import type { SecretPresence } from './secretsManager';
+import {
+  APP_TAG,
+  ENVIRONMENT_TAG,
+  REGISTERED_BY_TAG,
+  type SecretPresence,
+} from './secretsManager';
 
 export const LOGIN_SECRET_NAMES = [
   'OAUTH2_PROXY_CLIENT_ID',
@@ -19,8 +24,9 @@ export function planLoginClient(options: {
   clientIds: string[];
   systemInCatalog: boolean;
   secrets: Record<LoginSecretName, SecretPresence>;
+  caller: { userEntityRef: string; app: string; environment: string };
 }): LoginPlan {
-  const { clientName, clientIds, systemInCatalog, secrets } = options;
+  const { clientName, clientIds, systemInCatalog, secrets, caller } = options;
   const present = LOGIN_SECRET_NAMES.filter(name => secrets[name].exists);
 
   if (clientIds.length > 1) {
@@ -47,12 +53,15 @@ export function planLoginClient(options: {
       return (
         secret.exists &&
         !secret.scheduledForDeletion &&
-        secret.tags[CLIENT_ID_TAG] === clientId
+        secret.tags[CLIENT_ID_TAG] === clientId &&
+        secret.tags[REGISTERED_BY_TAG] === caller.userEntityRef &&
+        secret.tags[APP_TAG] === caller.app &&
+        secret.tags[ENVIRONMENT_TAG] === caller.environment
       );
     });
     if (!inPlace) {
       throw new Error(
-        `a client named "${clientName}" already exists in the user pool, and its three secrets are not all in place for it, so the System must be in the catalog and owned by the user before this step can use it`,
+        `a client named "${clientName}" already exists in the user pool, and its three secrets were not all written for it by this user for this app, so the System must be in the catalog and owned by the user before this step can use it`,
       );
     }
     return { kind: 'existing', clientId };
