@@ -121,4 +121,167 @@ describe('readAppSecretsConfig', () => {
       /^appSecrets\.reservedNames /,
     );
   });
+
+  describe('the login block', () => {
+    const exampleLogin = {
+      userPoolId: 'us-east-1_ExamplePool',
+      appUrlPattern: 'https://{app}.example.test',
+    };
+    const readLogin = (overrides: Record<string, unknown>) =>
+      readWith({ login: { ...exampleLogin, ...overrides } });
+
+    it('is optional', () => {
+      expect(readWith({}).login).toBeUndefined();
+    });
+
+    it('applies the defaults: the region of appSecrets, the client name and Google', () => {
+      expect(readLogin({}).login).toEqual({
+        userPoolId: 'us-east-1_ExamplePool',
+        region: 'us-east-1',
+        appUrlPattern: 'https://{app}.example.test',
+        clientNamePattern: '{app}-{environment}',
+        identityProviders: ['Google'],
+      });
+    });
+
+    it('keeps the values the app sets', () => {
+      expect(
+        readLogin({
+          userPoolId: 'eu-west-1_ExamplePool',
+          region: 'eu-west-1',
+          appUrlPattern: 'https://{app}-{environment}.example.test',
+          clientNamePattern: 'portal-{namespace}-{app}-{environment}',
+          identityProviders: ['Google', 'ExampleIdp'],
+        }).login,
+      ).toEqual({
+        userPoolId: 'eu-west-1_ExamplePool',
+        region: 'eu-west-1',
+        appUrlPattern: 'https://{app}-{environment}.example.test',
+        clientNamePattern: 'portal-{namespace}-{app}-{environment}',
+        identityProviders: ['Google', 'ExampleIdp'],
+      });
+    });
+
+    it('refuses a block without a user pool', () => {
+      expect(() => readLogin({ userPoolId: undefined })).toThrow(
+        /^appSecrets\.login\.userPoolId /,
+      );
+    });
+
+    it('refuses a user pool ID that is not a Cognito one', () => {
+      expect(() => readLogin({ userPoolId: 'example-pool' })).toThrow(
+        'appSecrets.login.userPoolId must be a Cognito user pool ID: <region>_<id>',
+      );
+    });
+
+    it('refuses a user pool of another region than the login block', () => {
+      expect(() => readLogin({ userPoolId: 'eu-west-1_ExamplePool' })).toThrow(
+        'appSecrets.login.userPoolId belongs to another region than "us-east-1"',
+      );
+    });
+
+    it('refuses a block without an app URL pattern', () => {
+      expect(() => readLogin({ appUrlPattern: undefined })).toThrow(
+        /^appSecrets\.login\.appUrlPattern /,
+      );
+    });
+
+    it('refuses an app URL pattern that is not https', () => {
+      expect(() =>
+        readLogin({ appUrlPattern: 'http://{app}.example.test' }),
+      ).toThrow(
+        'appSecrets.login.appUrlPattern gives an app URL the login cannot use: the app URL "http://example-app.example.test" must use https',
+      );
+    });
+
+    it.each([
+      ['a path', 'https://example.test/{app}'],
+      ['a query', 'https://{app}.example.test?x=1'],
+      ['a fragment', 'https://{app}.example.test#x'],
+      ['credentials', 'https://user:pass@{app}.example.test'],
+    ])('refuses an app URL pattern with %s', (_, appUrlPattern) => {
+      expect(() => readLogin({ appUrlPattern })).toThrow(
+        /^appSecrets\.login\.appUrlPattern gives an app URL the login cannot use/,
+      );
+    });
+
+    it('refuses an app URL pattern without {app}', () => {
+      expect(() =>
+        readLogin({ appUrlPattern: 'https://apps.example.test' }),
+      ).toThrow('appSecrets.login.appUrlPattern must contain {app}');
+    });
+
+    it('refuses an app URL pattern with an unknown placeholder', () => {
+      expect(() =>
+        readLogin({ appUrlPattern: 'https://{app}.{team}.example.test' }),
+      ).toThrow(
+        'appSecrets.login.appUrlPattern uses the unknown placeholder {team}',
+      );
+    });
+
+    it.each(['{app}', '{environment}'])(
+      'refuses a client name pattern that lacks %s, so two clients could share a name',
+      placeholder => {
+        const clientNamePattern = ['{app}', '{environment}']
+          .filter(item => item !== placeholder)
+          .join('-');
+        expect(() => readLogin({ clientNamePattern })).toThrow(
+          `appSecrets.login.clientNamePattern must contain ${placeholder}`,
+        );
+      },
+    );
+
+    it('refuses a client name pattern with a character Cognito would refuse', () => {
+      expect(() =>
+        readLogin({ clientNamePattern: '{app}/{environment}' }),
+      ).toThrow('appSecrets.login.clientNamePattern may contain only letters');
+    });
+
+    it('refuses a client name pattern that gives a name over 128 characters', () => {
+      expect(() =>
+        readLogin({
+          clientNamePattern: `${'a'.repeat(120)}-{app}-{environment}`,
+        }),
+      ).toThrow(
+        'appSecrets.login.clientNamePattern gives a client name Cognito would refuse',
+      );
+    });
+
+    it('refuses a scopes key, so the admin scope cannot be added from configuration', () => {
+      expect(() =>
+        readLogin({ scopes: ['openid', 'aws.cognito.signin.user.admin'] }),
+      ).toThrow("appSecrets.login Unrecognized key(s) in object: 'scopes'");
+    });
+
+    it.each([
+      ['token validity', { accessTokenValidity: 1440 }],
+      ['OAuth flows', { allowedOAuthFlows: ['implicit'] }],
+      ['callback URLs', { callbackUrls: ['https://example.test/'] }],
+    ])(
+      'refuses a %s key: the client settings are fixed in code',
+      (_, extra) => {
+        expect(() => readLogin(extra)).toThrow(/Unrecognized key\(s\)/);
+      },
+    );
+
+    it('refuses an empty list of identity providers', () => {
+      expect(() => readLogin({ identityProviders: [] })).toThrow(
+        'appSecrets.login.identityProviders Array must contain at least 1 element(s)',
+      );
+    });
+
+    it('refuses an identity provider listed twice', () => {
+      expect(() =>
+        readLogin({ identityProviders: ['Google', 'Google'] }),
+      ).toThrow(
+        'appSecrets.login.identityProviders lists an identity provider more than once',
+      );
+    });
+
+    it('refuses a region that is not a plain region name', () => {
+      expect(() => readLogin({ region: 'us-east-1/other' })).toThrow(
+        'appSecrets.login.region must be an AWS region such as us-east-1',
+      );
+    });
+  });
 });

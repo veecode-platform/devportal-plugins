@@ -1,6 +1,5 @@
 import { stringifyEntityRef } from '@backstage/catalog-model';
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
-import type { Tag } from '@aws-sdk/client-secrets-manager';
 import type { AppSecretsDependencies } from '../dependencies';
 import { assertDeclared, declaredNames } from '../declaration';
 import { parseSystemRef, requireOwnedSystem } from '../ownership';
@@ -11,7 +10,7 @@ import {
   checkSecretName,
   pathIdentity,
 } from '../names';
-import { writeSecret, writerClient } from '../secretsManager';
+import { registrationTags, writeSecret, writerClient } from '../secretsManager';
 import { writeSessionPolicy } from '../sessionPolicy';
 
 export const REGISTER_APP_SECRET_ACTION_ID =
@@ -129,21 +128,4 @@ export function createRegisterAppSecretAction(deps: AppSecretsDependencies) {
       );
     },
   });
-}
-
-function registrationTags(options: {
-  registeredBy: string;
-  registeredAt: Date;
-  app: string;
-  environment: string;
-}): Tag[] {
-  return [
-    { Key: 'veecode.io/registered-by', Value: options.registeredBy },
-    {
-      Key: 'veecode.io/registered-at',
-      Value: options.registeredAt.toISOString(),
-    },
-    { Key: 'veecode.io/app', Value: options.app },
-    { Key: 'veecode.io/environment', Value: options.environment },
-  ];
 }

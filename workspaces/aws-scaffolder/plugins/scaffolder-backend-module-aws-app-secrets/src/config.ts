@@ -1,11 +1,20 @@
 import type { Config } from '@backstage/config';
 import { z } from 'zod';
+import {
+  LOGIN_PLACEHOLDERS,
+  loginAppUrl,
+  loginClientName,
+  placeholdersIn,
+} from './loginNames';
 
 const ROLE_ARN_PATTERN = /^arn:aws[a-zA-Z-]*:iam::\d{12}:role\/.+$/;
 const ENVIRONMENT_PATTERN = /^[a-z][a-z0-9-]*$/;
 const PATH_CHARACTERS_PATTERN = /^[A-Za-z0-9/_+=.@{}-]+$/;
 const DECLARATION_CHARACTERS_PATTERN = /^[A-Za-z0-9._/{}-]+$/;
-const PLACEHOLDER_PATTERN = /\{([^{}]*)\}/g;
+const USER_POOL_ID_PATTERN = /^[a-z0-9-]+_[A-Za-z0-9]+$/;
+const REGION_PATTERN = /^[a-z0-9-]+$/;
+const CLIENT_NAME_CHARACTERS_PATTERN = /^[\w+=,.@{}-]+$/;
+const IDENTITY_PROVIDER_PATTERN = /^[\w.-]{1,32}$/;
 const PATH_PLACEHOLDERS = [
   'app',
   'environment',
@@ -16,10 +25,57 @@ const PATH_PLACEHOLDERS = [
 const REQUIRED_PATH_PLACEHOLDERS = ['app', 'environment', 'name'];
 const DECLARATION_PLACEHOLDERS = ['environment'];
 export const DEFAULT_DECLARATION_FILE = 'config/{environment}.yaml';
+export const DEFAULT_CLIENT_NAME_PATTERN = '{app}-{environment}';
+export const DEFAULT_IDENTITY_PROVIDERS = ['Google'];
+/** Stand-ins that show whether a login pattern can produce a valid name or URL. */
+const LOGIN_PROBE = {
+  app: 'example-app',
+  environment: 'dev',
+  namespace: 'default',
+};
 
-function placeholdersIn(text: string): string[] {
-  return [...text.matchAll(PLACEHOLDER_PATTERN)].map(match => match[1]);
-}
+/**
+ * The scopes, flows and token lifetimes of the app clients are fixed in code,
+ * so the block takes none: a `scopes` key is refused as an unknown key, and
+ * `aws.cognito.signin.user.admin` cannot be added from configuration.
+ */
+const loginSchema = z
+  .object({
+    userPoolId: z
+      .string()
+      .regex(
+        USER_POOL_ID_PATTERN,
+        'must be a Cognito user pool ID: <region>_<id>',
+      ),
+    region: z
+      .string()
+      .regex(REGION_PATTERN, 'must be an AWS region such as us-east-1')
+      .optional(),
+    appUrlPattern: z.string().min(1),
+    clientNamePattern: z
+      .string()
+      .regex(
+        CLIENT_NAME_CHARACTERS_PATTERN,
+        'may contain only letters, digits, _ + = , . @ - and {placeholders}',
+      )
+      .default(DEFAULT_CLIENT_NAME_PATTERN),
+    identityProviders: z
+      .array(
+        z
+          .string()
+          .regex(
+            IDENTITY_PROVIDER_PATTERN,
+            'must be an identity provider name of at most 32 letters, digits, _ . -',
+          ),
+      )
+      .min(1)
+      .refine(
+        providers => new Set(providers).size === providers.length,
+        'lists an identity provider more than once',
+      )
+      .default(DEFAULT_IDENTITY_PROVIDERS),
+  })
+  .strict();
 
 const settingsSchema = z
   .object({
@@ -60,6 +116,7 @@ const settingsSchema = z
       .default(DEFAULT_DECLARATION_FILE),
     reservedNames: z.array(z.string().min(1)),
     reservedPrefixes: z.array(z.string().min(1)),
+    login: loginSchema.optional(),
   })
   .strict()
   .superRefine((settings, context) => {
@@ -125,9 +182,106 @@ const settingsSchema = z
         });
       }
     }
-  });
 
-export type AppSecretsSettings = z.infer<typeof settingsSchema>;
+    if (settings.login) {
+      checkLogin(settings.login, settings.region, context);
+    }
+  })
+  .transform(({ login, ...settings }) => ({
+    ...settings,
+    ...(login
+      ? { login: { ...login, region: login.region ?? settings.region } }
+      : {}),
+  }));
+
+/** Where and how the app login clients are created. */
+export type LoginSettings = {
+  userPoolId: string;
+  region: string;
+  appUrlPattern: string;
+  clientNamePattern: string;
+  identityProviders: string[];
+};
+
+export type AppSecretsSettings = Omit<
+  z.infer<typeof settingsSchema>,
+  'login'
+> & { login?: LoginSettings };
+
+function checkLogin(
+  login: z.infer<typeof loginSchema>,
+  defaultRegion: string,
+  context: z.RefinementCtx,
+): void {
+  const issue = (path: string, message: string) =>
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['login', path],
+      message,
+    });
+
+  const region = login.region ?? defaultRegion;
+  if (login.userPoolId.split('_')[0] !== region) {
+    issue(
+      'userPoolId',
+      `belongs to another region than "${region}", the region of the login block`,
+    );
+  }
+
+  const clientPlaceholders = placeholdersIn(login.clientNamePattern);
+  for (const placeholder of clientPlaceholders) {
+    if (!LOGIN_PLACEHOLDERS.includes(placeholder)) {
+      issue(
+        'clientNamePattern',
+        `uses the unknown placeholder {${placeholder}}; allowed: {app}, {environment}, {namespace}`,
+      );
+    }
+  }
+  for (const placeholder of ['app', 'environment']) {
+    if (!clientPlaceholders.includes(placeholder)) {
+      issue('clientNamePattern', `must contain {${placeholder}}`);
+    }
+  }
+
+  const urlPlaceholders = placeholdersIn(login.appUrlPattern);
+  for (const placeholder of urlPlaceholders) {
+    if (!LOGIN_PLACEHOLDERS.includes(placeholder)) {
+      issue(
+        'appUrlPattern',
+        `uses the unknown placeholder {${placeholder}}; allowed: {app}, {environment}, {namespace}`,
+      );
+    }
+  }
+  if (!urlPlaceholders.includes('app')) {
+    issue('appUrlPattern', 'must contain {app}');
+  }
+
+  if (
+    clientPlaceholders.every(item => LOGIN_PLACEHOLDERS.includes(item)) &&
+    urlPlaceholders.every(item => LOGIN_PLACEHOLDERS.includes(item))
+  ) {
+    try {
+      loginClientName(login.clientNamePattern, LOGIN_PROBE);
+    } catch (error) {
+      issue(
+        'clientNamePattern',
+        `gives a client name Cognito would refuse: ${errorMessage(error)}`,
+      );
+    }
+    try {
+      loginAppUrl(login.appUrlPattern, LOGIN_PROBE);
+    } catch (error) {
+      issue(
+        'appUrlPattern',
+        `gives an app URL the login cannot use: ${errorMessage(error)}`,
+      );
+    }
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'is not valid';
+}
 
 /**
  * Reads `appSecrets` once at start. A missing or malformed entry stops the

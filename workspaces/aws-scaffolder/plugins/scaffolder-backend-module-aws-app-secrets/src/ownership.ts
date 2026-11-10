@@ -50,6 +50,28 @@ export async function requireOwnedSystem(
     credentials: BackstageCredentials;
   },
 ): Promise<OwnedSystem> {
+  const { system, user } = await findOwnedSystem(options);
+  if (!system) {
+    throw new Error(
+      `System "${stringifyEntityRef(
+        options.app,
+      )}" was not found, or the user cannot read it`,
+    );
+  }
+  return { system, user };
+}
+
+/**
+ * The same ownership rule, except that a System the catalog does not have is
+ * reported as `undefined` instead of refused. A System that is there must be
+ * owned by the caller.
+ */
+export async function findOwnedSystem(
+  options: OwnershipServices & {
+    app: CompoundEntityRef;
+    credentials: BackstageCredentials;
+  },
+): Promise<{ system: Entity | undefined; user: OwnedSystem['user'] }> {
   const { auth, catalog, userInfo, app, credentials } = options;
   if (!auth.isPrincipal(credentials, 'user')) {
     throw new Error('only a signed-in user can work with app secrets');
@@ -57,11 +79,13 @@ export async function requireOwnedSystem(
 
   const info = await userInfo.getUserInfo(credentials);
   const ref = stringifyEntityRef(app);
+  const user = {
+    entityRef: info.userEntityRef,
+    name: parseEntityRef(info.userEntityRef).name,
+  };
   const system = await catalog.getEntityByRef(ref, { credentials });
   if (!system) {
-    throw new Error(
-      `System "${ref}" was not found, or the user cannot read it`,
-    );
+    return { system: undefined, user };
   }
 
   const owner = system.spec?.owner;
@@ -76,13 +100,7 @@ export async function requireOwnedSystem(
     throw new Error(`the user does not own System "${ref}"`);
   }
 
-  return {
-    system,
-    user: {
-      entityRef: info.userEntityRef,
-      name: parseEntityRef(info.userEntityRef).name,
-    },
-  };
+  return { system, user };
 }
 
 function normalizedRef(ref: string): string {

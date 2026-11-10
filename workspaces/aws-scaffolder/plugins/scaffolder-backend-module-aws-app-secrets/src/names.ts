@@ -53,12 +53,29 @@ export function pathIdentity(
   system: Entity,
   pattern: string,
 ): SystemPathIdentity {
-  const app = system.metadata.name;
-  const namespace = system.metadata.namespace ?? DEFAULT_NAMESPACE;
+  return refPathIdentity(
+    {
+      name: system.metadata.name,
+      namespace: system.metadata.namespace ?? DEFAULT_NAMESPACE,
+    },
+    pattern,
+  );
+}
+
+/** The same check for a System that is named but may not be in the catalog yet. */
+export function refPathIdentity(
+  ref: { name: string; namespace: string },
+  pattern: string,
+): SystemPathIdentity {
+  const { name: app, namespace } = ref;
   if (namespace !== DEFAULT_NAMESPACE && !pattern.includes('{namespace}')) {
-    const ref = stringifyEntityRef({ kind: 'system', namespace, name: app });
+    const entityRef = stringifyEntityRef({
+      kind: 'system',
+      namespace,
+      name: app,
+    });
     throw new Error(
-      `System "${ref}" is outside the "${DEFAULT_NAMESPACE}" namespace, and appSecrets.pathPattern has no {namespace}: its secrets would share paths with a System of the same name in "${DEFAULT_NAMESPACE}". Add {namespace} to appSecrets.pathPattern to register them.`,
+      `System "${entityRef}" is outside the "${DEFAULT_NAMESPACE}" namespace, and appSecrets.pathPattern has no {namespace}: its secrets would share paths with a System of the same name in "${DEFAULT_NAMESPACE}". Add {namespace} to appSecrets.pathPattern to register them.`,
     );
   }
   return { app, namespace };

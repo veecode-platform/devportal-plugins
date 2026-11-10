@@ -8,6 +8,23 @@ const WRITE_ACTIONS = [
   'secretsmanager:DescribeSecret',
 ];
 const DESCRIBE_ACTIONS = ['secretsmanager:DescribeSecret'];
+/** CreateSecret with tags also needs TagResource. PutSecretValue is left out: the login action never overwrites. */
+const LOGIN_SECRET_ACTIONS = [
+  'secretsmanager:CreateSecret',
+  'secretsmanager:DescribeSecret',
+  'secretsmanager:TagResource',
+];
+const LOGIN_CLIENT_ACTIONS = [
+  'cognito-idp:ListUserPoolClients',
+  'cognito-idp:DescribeUserPoolClient',
+  'cognito-idp:CreateUserPoolClient',
+];
+
+interface Statement {
+  Effect: 'Allow';
+  Action: string[];
+  Resource: string[];
+}
 
 /**
  * The session policy the writer role's AssumeRole carries. IAM grants a call
@@ -18,7 +35,31 @@ export function writeSessionPolicy(options: {
   region: string;
   path: string;
 }): string {
-  return allowPolicy(WRITE_ACTIONS, [secretArn(options.region, options.path)]);
+  return policy([
+    allow(WRITE_ACTIONS, [secretArn(options.region, options.path)]),
+  ]);
+}
+
+/**
+ * The login action's session: the client actions on one user pool, and the
+ * create-only secret actions on the three secrets it names. It has no
+ * PutSecretValue and no GetSecretValue, so it can neither overwrite nor read.
+ */
+export function loginSessionPolicy(options: {
+  secretsRegion: string;
+  secretPaths: string[];
+  userPoolRegion: string;
+  userPoolId: string;
+}): string {
+  return policy([
+    allow(LOGIN_CLIENT_ACTIONS, [
+      `arn:aws:cognito-idp:${options.userPoolRegion}:*:userpool/${options.userPoolId}`,
+    ]),
+    allow(
+      LOGIN_SECRET_ACTIONS,
+      options.secretPaths.map(path => secretArn(options.secretsRegion, path)),
+    ),
+  ]);
 }
 
 /**
@@ -29,19 +70,22 @@ export function describeSessionPolicy(options: {
   region: string;
   globs: string[];
 }): string {
-  return allowPolicy(
-    DESCRIBE_ACTIONS,
-    options.globs.map(glob => secretArn(options.region, glob)),
-  );
+  return policy([
+    allow(
+      DESCRIBE_ACTIONS,
+      options.globs.map(glob => secretArn(options.region, glob)),
+    ),
+  ]);
 }
 
 function secretArn(region: string, path: string): string {
   return `arn:aws:secretsmanager:${region}:*:secret:${path}${SECRET_ARN_SUFFIX}`;
 }
 
-function allowPolicy(actions: string[], resources: string[]): string {
-  return JSON.stringify({
-    Version: POLICY_VERSION,
-    Statement: [{ Effect: 'Allow', Action: actions, Resource: resources }],
-  });
+function allow(actions: string[], resources: string[]): Statement {
+  return { Effect: 'Allow', Action: actions, Resource: resources };
+}
+
+function policy(statements: Statement[]): string {
+  return JSON.stringify({ Version: POLICY_VERSION, Statement: statements });
 }

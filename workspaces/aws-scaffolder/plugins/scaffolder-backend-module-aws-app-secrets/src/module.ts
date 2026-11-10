@@ -5,6 +5,8 @@ import {
 } from '@backstage/backend-plugin-api';
 import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
+import { randomBytes } from 'node:crypto';
+import { createEnsureAppLoginClientAction } from './actions/ensureAppLoginClient';
 import { registerListAppSecretsAction } from './actions/listAppSecrets';
 import { createRegisterAppSecretAction } from './actions/registerAppSecret';
 import { readAppSecretsConfig } from './config';
@@ -39,8 +41,12 @@ export const scaffolderModuleAwsAppSecrets = createBackendModule({
           userInfo,
           urlReader,
           now: () => new Date(),
+          randomBytes,
         };
-        scaffolderActions.addActions(createRegisterAppSecretAction(deps));
+        scaffolderActions.addActions(
+          createRegisterAppSecretAction(deps),
+          createEnsureAppLoginClientAction(deps),
+        );
         registerListAppSecretsAction(actionsRegistry, deps);
       },
     });
