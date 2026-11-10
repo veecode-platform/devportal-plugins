@@ -97,7 +97,7 @@ export class GitlabClient {
       await discard(response);
       return undefined;
     }
-    return readTail(response, maxBytes);
+    return unavailableIfReadFails(() => readTail(response, maxBytes));
   }
 
   /** One artifact file, as text, or undefined when it is missing, expired or larger than `maxBytes`. */
@@ -112,7 +112,7 @@ export class GitlabClient {
       await discard(response);
       return undefined;
     }
-    return readCapped(response, maxBytes);
+    return unavailableIfReadFails(() => readCapped(response, maxBytes));
   }
 }
 
@@ -131,6 +131,14 @@ async function parseBody<T>(
     throw new ServiceUnavailableError(MSG_UNAVAILABLE);
   }
   return parsed.data;
+}
+
+async function unavailableIfReadFails<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch {
+    throw new ServiceUnavailableError(MSG_UNAVAILABLE);
+  }
 }
 
 async function discard(response: Response): Promise<void> {

@@ -63,6 +63,76 @@ export const RUNNER_TRACE_CLEANED = [
   'ERROR: Job failed: exit code 1',
 ];
 
+export const AUTHOR_EMAIL = 'example.person@example.com';
+const FINDING_COMMIT = 'a'.repeat(40);
+
+export const SCAN_TRACE = [
+  '2026-11-10T14:02:10.100000Z 00O section_start:1794319330:step_script\r\x1b[0K\x1b[36;1mExecuting "step_script" stage of the job script\x1b[0;m',
+  '2026-11-10T14:02:10.200000Z 01O $ gitleaks detect --verbose --redact --no-banner',
+  '2026-11-10T14:02:11.300000Z 01O Finding:     api_key = "REDACTED"',
+  '2026-11-10T14:02:11.300010Z 01O Secret:      REDACTED',
+  '2026-11-10T14:02:11.300020Z 01O RuleID:      generic-api-key',
+  '2026-11-10T14:02:11.300030Z 01O Entropy:     3.6',
+  '2026-11-10T14:02:11.300040Z 01O File:        back/src/config.ts',
+  '2026-11-10T14:02:11.300050Z 01O Line:        3',
+  `2026-11-10T14:02:11.300060Z 01O Commit:      ${FINDING_COMMIT}`,
+  '2026-11-10T14:02:11.300070Z 01O Author:      Example Person',
+  `2026-11-10T14:02:11.300080Z 01O \x1b[1mEmail:\x1b[0m       ${AUTHOR_EMAIL}  `,
+  '2026-11-10T14:02:11.300090Z 01O Date:        2026-11-10T13:59:00Z',
+  `2026-11-10T14:02:11.300100Z 01O Fingerprint: ${FINDING_COMMIT}:back/src/config.ts:generic-api-key:3`,
+  '2026-11-10T14:02:11.400000Z 01O \x1b[90m2:02PM\x1b[0m \x1b[33mWRN\x1b[0m leaks found: 1',
+  '2026-11-10T14:02:11.500000Z 00O section_end:1794319331:step_script\r\x1b[0K',
+  '2026-11-10T14:02:11.600000Z 01O ERROR: Job failed: exit code 1',
+].join('\n');
+
+export const SCAN_TRACE_CLEANED = [
+  'Executing "step_script" stage of the job script',
+  '$ gitleaks detect --verbose --redact --no-banner',
+  'Finding:     api_key = "REDACTED"',
+  'Secret:      REDACTED',
+  'RuleID:      generic-api-key',
+  'Entropy:     3.6',
+  'File:        back/src/config.ts',
+  'Line:        3',
+  `Commit:      ${FINDING_COMMIT}`,
+  'Author:      Example Person',
+  'Email:       [email]',
+  'Date:        2026-11-10T13:59:00Z',
+  `Fingerprint: ${FINDING_COMMIT}:back/src/config.ts:generic-api-key:3`,
+  '2:02PM WRN leaks found: 1',
+  'ERROR: Job failed: exit code 1',
+];
+
+export const CONFLICT_TRACE = [
+  "2026-11-10T14:05:00.100000Z 01O $ grep -rnIE '^(<<<<<<<|>>>>>>>)' .",
+  '2026-11-10T14:05:00.200000Z 01O ./back/src/app.ts:12:<<<<<<< HEAD',
+  '2026-11-10T14:05:00.200010Z 01O ./back/src/app.ts:18:>>>>>>> origin/main',
+  '2026-11-10T14:05:00.300000Z 01O ERROR: Job failed: exit code 1',
+].join('\n');
+
+export const CONFLICT_TRACE_CLEANED = [
+  "$ grep -rnIE '^(<<<<<<<|>>>>>>>)' .",
+  './back/src/app.ts:12:<<<<<<< HEAD',
+  './back/src/app.ts:18:>>>>>>> origin/main',
+  'ERROR: Job failed: exit code 1',
+];
+
+export const TEST_TRACE = [
+  '2026-11-10T14:10:00.100000Z 01O $ yarn test',
+  '2026-11-10T14:10:03.000000Z 01O \x1b[31mFAIL\x1b[39m src/app.test.ts',
+  '2026-11-10T14:10:03.000010Z 01O   ● example › returns the greeting',
+  '2026-11-10T14:10:03.000020Z 01O     expect(received).toBe(expected)',
+  '2026-11-10T14:10:03.000030Z 01O ERROR: Job failed: exit code 1',
+].join('\n');
+
+export const TEST_TRACE_CLEANED = [
+  '$ yarn test',
+  'FAIL src/app.test.ts',
+  '  ● example › returns the greeting',
+  '    expect(received).toBe(expected)',
+  'ERROR: Job failed: exit code 1',
+];
+
 /** Relative paths under the project, exactly as the module requests them. */
 export const paths = {
   commitRequests: (sha: string) => `/repository/commits/${sha}/merge_requests`,
@@ -141,6 +211,67 @@ export function status(code: number): () => Response {
       },
     );
 }
+
+export function brokenBody(): () => Response {
+  return () =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('partial output\n'));
+        },
+        pull(controller) {
+          const timeout = new Error('The operation was aborted due to timeout');
+          timeout.name = 'TimeoutError';
+          controller.error(timeout);
+        },
+      }),
+    );
+}
+
+export const UNREADABLE_LOGS: readonly (readonly [
+  reason: string,
+  reply: () => Response,
+])[] = [
+  ['answers 500', status(500)],
+  ['answers 403', status(403)],
+  ['fails in the middle of its body', brokenBody()],
+];
+
+export const LOG_JOBS: readonly (readonly [
+  name: string,
+  stage: string,
+  start: string,
+])[] = [
+  ['lint-check', 'lint', 'The check `lint-check` failed on the change.'],
+  ['back-test', 'build', 'The check `back-test` failed on the change.'],
+  ['conflict-markers', 'lint', 'A file holds Git conflict markers'],
+  [
+    'secrets:gitleaks',
+    'scan',
+    'The scan `secrets:gitleaks` failed on the change.',
+  ],
+];
+
+type UnreadableLogCase = [
+  name: string,
+  stage: string,
+  reason: string,
+  start: string,
+  reply: () => Response,
+];
+
+export const UNREADABLE_LOG_CASES: UnreadableLogCase[] = LOG_JOBS.flatMap(
+  ([name, stage, start]) =>
+    UNREADABLE_LOGS.map(
+      ([reason, reply]): UnreadableLogCase => [
+        name,
+        stage,
+        reason,
+        start,
+        reply,
+      ],
+    ),
+);
 
 /**
  * A GitLab that answers by relative path. Replies for one path are used in

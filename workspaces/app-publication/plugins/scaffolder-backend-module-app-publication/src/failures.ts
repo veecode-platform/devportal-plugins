@@ -1,3 +1,4 @@
+import { ServiceUnavailableError } from '@backstage/errors';
 import type { AppPublicationSettings } from './config';
 import type { GitlabClient } from './gitlab';
 import type { JobShape } from './gitlabShapes';
@@ -19,7 +20,7 @@ export const MAX_FAILED = 5;
 const LOG_READ_BYTES = 262144;
 const LOG_LINE_LIMIT = 500;
 const REASON_PATTERN = /^[a-z_]{1,64}$/;
-/** A job or stage name that may appear in a sentence: a closed label, no space, no URL. */
+/** A job or stage name that may appear in a sentence: a closed label of plain characters. */
 const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
@@ -33,6 +34,9 @@ const RUNNER_PREFIX =
 const ANSI_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
 /** A section marker line the runner prints around a step. It has no text for the reader. */
 const SECTION_MARKER = /^section_(?:start|end):\S*$/;
+const EMAIL_ADDRESS =
+  /[\p{L}\p{N}._%+-]{1,64}@(?:[\p{L}\p{N}-]{1,63}\.)+\p{L}{2,63}/gu;
+const EMAIL_PLACEHOLDER = '[email]';
 
 export interface FailureContext {
   gitlab: GitlabClient;
@@ -58,10 +62,23 @@ interface Described {
  * A name a sentence may show, or a placeholder with the raw name kept in an
  * untrusted field. The raw name is data written by the job's author.
  */
-function labelOf(value: string): { shown: string; untrusted?: string } {
-  return LABEL_PATTERN.test(value)
+function labelOf(
+  value: string,
+  configured: readonly string[] = [],
+): { shown: string; untrusted?: string } {
+  return LABEL_PATTERN.test(value) || configured.includes(value)
     ? { shown: value }
     : { shown: '(name not shown)', untrusted: value };
+}
+
+function configuredJobNames(settings: AppPublicationSettings): string[] {
+  return [
+    settings.deployJobName,
+    settings.contractJobName,
+    settings.conflictMarkersJobName,
+    settings.renderJobName,
+    ...settings.knownJobNames,
+  ];
 }
 
 function stageRank(stage: string): number {
@@ -108,7 +125,7 @@ export function jobEntry(ctx: FailureContext, job: JobShape): FailedJob {
 function baseEntry(ctx: FailureContext, job: JobShape): FailedJob {
   const reason = job.failure_reason ?? undefined;
   const webUrl = shownLink(ctx.projectWebUrl, job.web_url);
-  const name = labelOf(job.name);
+  const name = labelOf(job.name, configuredJobNames(ctx.settings));
   const stage = labelOf(job.stage);
   return {
     name: name.shown,
@@ -146,7 +163,7 @@ async function describeJob(
     return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
   }
   if (job.name === ctx.settings.conflictMarkersJobName) {
-    return { job: entry, sentence: S.SENTENCE.conflictMarkers };
+    return explain(ctx, job, entry, S.SENTENCE.conflictMarkers);
   }
   if (reason === 'job_execution_timeout') {
     return { job: entry, sentence: S.TIMEOUT(name, link) };
@@ -162,10 +179,17 @@ async function describeJob(
     return describeRender(ctx, job, entry, name, link);
   }
   if (job.stage === 'lint' || job.stage === 'build') {
-    return { job: entry, sentence: S.LINT_OR_BUILD(name) };
+    return explain(ctx, job, entry, S.LINT_OR_BUILD(name));
   }
   if (job.stage === 'scan') {
-    return explain(ctx, job, entry, S.SCAN_FAILED(name, link));
+    return explain(
+      ctx,
+      job,
+      entry,
+      request === undefined
+        ? S.SCAN_FAILED_ON_DEFAULT_BRANCH(name, link)
+        : S.SCAN_FAILED(name, link),
+    );
   }
   return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
 }
@@ -240,9 +264,9 @@ function ownedFileSentence(
 }
 
 /**
- * The job's own name, stage and link, plus the end of its log for a failure with
- * no fixed explanation. The log is returned as untrusted data in its own field
- * and never put in a sentence.
+ * The job's own name, stage and link, plus the end of its log for a failure whose
+ * sentence points to the log. The log is returned as untrusted data in its own
+ * field and never put in a sentence.
  */
 async function explain(
   ctx: FailureContext,
@@ -250,20 +274,47 @@ async function explain(
   entry: FailedJob,
   sentence: string,
 ): Promise<Described> {
-  const log = await jobLog(ctx, job);
+  return withLog(ctx, entry, await jobLog(ctx, job), sentence);
+}
+
+function withLog(
+  ctx: FailureContext,
+  entry: FailedJob,
+  log: string[] | undefined,
+  sentence: string,
+): Described {
+  if (log === undefined) {
+    return {
+      job: entry,
+      sentence: `${sentence} ${S.LOG_UNREADABLE(entry.name)}`,
+    };
+  }
   return {
     job: { ...entry, untrustedJobOutput: lastLines(ctx, log) },
     sentence,
   };
 }
 
-/** The job's log as the reader sees it: every cleaned line of the window that was read. */
-async function jobLog(ctx: FailureContext, job: JobShape): Promise<string[]> {
-  const tail = await ctx.gitlab.textTail(
-    `/jobs/${job.id}/trace`,
-    LOG_READ_BYTES,
-  );
-  return cleanLines(tail);
+/**
+ * The job's log as the reader sees it: every cleaned line of the window that was
+ * read. Undefined, not empty, when GitLab could not give the log.
+ */
+async function jobLog(
+  ctx: FailureContext,
+  job: JobShape,
+): Promise<string[] | undefined> {
+  try {
+    const tail = await ctx.gitlab.textTail(
+      `/jobs/${job.id}/trace`,
+      LOG_READ_BYTES,
+    );
+    return cleanLines(tail);
+  } catch (error) {
+    if (error instanceof ServiceUnavailableError) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -279,14 +330,15 @@ async function describeRender(
   link: string,
 ): Promise<Described> {
   const log = await jobLog(ctx, job);
-  const refusals = refusedConfigs(ctx, log);
-  return {
-    job: { ...entry, untrustedJobOutput: lastLines(ctx, log) },
-    sentence:
-      refusals.length > 0
-        ? S.RENDER_REFUSED(refusals, link)
-        : S.EXPLAIN_FROM_LOG(name, link),
-  };
+  const refusals = log === undefined ? [] : refusedConfigs(ctx, log);
+  return withLog(
+    ctx,
+    entry,
+    log,
+    refusals.length > 0
+      ? S.RENDER_REFUSED(refusals, link)
+      : S.EXPLAIN_FROM_LOG(name, link),
+  );
 }
 
 /**
@@ -328,9 +380,10 @@ function refusedConfigs(
 /**
  * The lines of a trace window as the reader sees them. The window is split at
  * line feeds and carriage returns, and the runner's prefix and the escape
- * sequences are removed. Leading spaces are kept. Empty lines and section
- * markers are dropped, and a cut-off first line is dropped too. A trace without
- * the runner's prefix goes through the same steps, minus the prefix.
+ * sequences are removed. E-mail addresses are replaced by a placeholder. Leading
+ * spaces are kept. Empty lines and section markers are dropped, and a cut-off
+ * first line is dropped too. A trace without the runner's prefix goes through
+ * the same steps, minus the prefix.
  */
 function cleanLines(
   tail: { text: string; truncated: boolean } | undefined,
@@ -348,9 +401,13 @@ function cleanLines(
     .map(line => line.slice(0, LOG_LINE_LIMIT));
 }
 
-/** One trace line without the runner's prefix and escape sequences, trailing spaces removed. */
+/** One trace line without the runner's prefix and escape sequences, with e-mail addresses replaced, trailing spaces removed. */
 function cleanLine(line: string): string {
-  return line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '').trimEnd();
+  const text = line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '');
+  const redacted = text.includes('@')
+    ? text.replace(EMAIL_ADDRESS, EMAIL_PLACEHOLDER)
+    : text;
+  return redacted.trimEnd();
 }
 
 /** The last `failedJobLogLines` cleaned lines of a log. */

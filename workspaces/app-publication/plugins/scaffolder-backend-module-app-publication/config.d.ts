@@ -52,6 +52,15 @@ export interface Config {
      */
     renderJobName?: string;
     /**
+     * Job names that hold `:` or `/` and may be named in a sentence, besides
+     * the four job names above. A job name with one of those characters that
+     * is in none of these places is returned only as untrusted data. Setting
+     * this replaces the default; an empty list shows no such name.
+     * Default: ["secrets:gitleaks"].
+     * @visibility backend
+     */
+    knownJobNames?: string[];
+    /**
      * Longest wait of one wait-for-app-publication call, in seconds.
      * Default 20; at most 270. Raise it to about 240 only when the MCP server
      * sends progress notifications.
@@ -70,10 +79,12 @@ export interface Config {
      */
     maxArtifactBytes?: number;
     /**
-     * Number of final log lines returned for a failed job that is explained
-     * from its log. The lines are cleaned of the runner's prefix and escape
-     * sequences. The render check searches the whole log it reads, not only
-     * these lines. Default 40; from 1 to 200.
+     * Number of final log lines returned for a failed job whose sentence points
+     * to its log: a lint, build, scan, render or conflict-markers job, and any
+     * other job with no fixed explanation. The lines are cleaned of the
+     * runner's prefix and escape sequences, and e-mail addresses are replaced.
+     * The render check searches the whole log it reads, not only these lines.
+     * Default 40; from 1 to 200.
      * @visibility backend
      */
     failedJobLogLines?: number;
