@@ -1244,10 +1244,7 @@ describe('wait-for-app-publication: e-mail addresses in the returned log lines',
 
   it('replaces an address in the log of the render check, and still names the refused file', async () => {
     const w = world();
-    renderFailure(
-      w,
-      [AUTHOR_LINE, 'refused back dev', FAILED_LINE].join('\n'),
-    );
+    renderFailure(w, [AUTHOR_LINE, 'refused back dev', FAILED_LINE].join('\n'));
 
     const output = await run(w, WAIT, input());
 
