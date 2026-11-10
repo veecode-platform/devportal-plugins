@@ -124,12 +124,10 @@ function renderBlocked(w: World, log: string): void {
   blockedBy(w, 'render', 'lint', log);
 }
 
-/** A sheet whose one open request is blocked by one failed job, with the job's log as given. */
 function blockedBy(w: World, name: string, stage: string, log: string): void {
   blockedByJobs(w, [{ id: 401, name, stage, log }]);
 }
 
-/** A sheet whose one open request is blocked by these failed jobs, each with its own log. */
 function blockedByJobs(
   w: World,
   jobs: { id: number; name: string; stage: string; log: string }[],
@@ -558,14 +556,16 @@ describe('get-app-status', () => {
         `Merge request !7 is blocked: ${start}`,
       );
       expect(output.nextStep).toContain(
-        'The log could not be read this time, so this failedJobs entry holds none.',
+        `The log of \`${name}\` could not be read this time, so its failedJobs entry holds none. Call this tool again once to read it.`,
       );
       expect(output.nextStep).toContain(
         'The check `unit-tests` failed for a reason this tool has no fixed explanation for.',
       );
       const [request] = output.openRequests as {
+        pipelineStatus: string;
         failedJobs: { name: string; untrustedJobOutput?: string[] }[];
       }[];
+      expect(request.pipelineStatus).toBe('failed');
       expect(
         request.failedJobs.find(entry => entry.name === name),
       ).not.toHaveProperty('untrustedJobOutput');

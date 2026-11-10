@@ -1026,7 +1026,6 @@ describe('wait-for-app-publication: failed request pipeline', () => {
   });
 });
 
-/** A merge request whose pipeline failed in the given jobs, each with its own log. */
 function failedWithLogs(
   w: World,
   jobs: { id: number; name: string; stage: string; log: string }[],
@@ -1224,6 +1223,7 @@ describe('wait-for-app-publication: a log that cannot be read', () => {
         done: true,
         state: 'failed',
         step: 'merge_request',
+        pipeline: { id: 100, status: 'failed' },
       });
       const failed = output.failedJobs as {
         name: string;
@@ -1237,10 +1237,7 @@ describe('wait-for-app-publication: a log that cannot be read', () => {
       });
       expect(output.nextStep).toContain(start);
       expect(output.nextStep).toContain(
-        'The log could not be read this time, so this failedJobs entry holds none.',
-      );
-      expect(output.nextStep).toContain(
-        `give the platform team this link: ${PROJECT_WEB_URL}/-/jobs/402`,
+        `The log of \`${name}\` could not be read this time, so its failedJobs entry holds none. Call this tool again once to read it.`,
       );
       expect(output.nextStep).toContain(
         'The check `unit-tests` failed for a reason this tool has no fixed explanation for.',

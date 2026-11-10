@@ -63,15 +63,9 @@ export const RUNNER_TRACE_CLEANED = [
   'ERROR: Job failed: exit code 1',
 ];
 
-/** A commit author's address, as a scan prints it. Generic. */
 export const AUTHOR_EMAIL = 'example.person@example.com';
 const FINDING_COMMIT = 'a'.repeat(40);
 
-/**
- * The end of a secret scan's trace as the API returns it: the runner's
- * timestamps and stream markers, ANSI sequences and section markers around the
- * verbose finding block, which names the commit's author and e-mail address.
- */
 export const SCAN_TRACE = [
   '2026-11-10T14:02:10.100000Z 00O section_start:1794319330:step_script\r\x1b[0K\x1b[36;1mExecuting "step_script" stage of the job script\x1b[0;m',
   '2026-11-10T14:02:10.200000Z 01O $ gitleaks detect --verbose --redact --no-banner',
@@ -91,7 +85,6 @@ export const SCAN_TRACE = [
   '2026-11-10T14:02:11.600000Z 01O ERROR: Job failed: exit code 1',
 ].join('\n');
 
-/** What the tools return for SCAN_TRACE: cleaned lines, and the e-mail address replaced. */
 export const SCAN_TRACE_CLEANED = [
   'Executing "step_script" stage of the job script',
   '$ gitleaks detect --verbose --redact --no-banner',
@@ -110,7 +103,6 @@ export const SCAN_TRACE_CLEANED = [
   'ERROR: Job failed: exit code 1',
 ];
 
-/** The end of the conflict-marker check's trace: `grep -n` names each file and line. */
 export const CONFLICT_TRACE = [
   "2026-11-10T14:05:00.100000Z 01O $ grep -rnIE '^(<<<<<<<|>>>>>>>)' .",
   '2026-11-10T14:05:00.200000Z 01O ./back/src/app.ts:12:<<<<<<< HEAD',
@@ -125,7 +117,6 @@ export const CONFLICT_TRACE_CLEANED = [
   'ERROR: Job failed: exit code 1',
 ];
 
-/** The end of a failed unit-test job's trace, as a test runner prints it. */
 export const TEST_TRACE = [
   '2026-11-10T14:10:00.100000Z 01O $ yarn test',
   '2026-11-10T14:10:03.000000Z 01O \x1b[31mFAIL\x1b[39m src/app.test.ts',
@@ -221,10 +212,6 @@ export function status(code: number): () => Response {
     );
 }
 
-/**
- * A reply that sends one chunk of body and then fails, as a read cut off by the
- * call's deadline does.
- */
 export function brokenBody(): () => Response {
   return () =>
     new Response(
@@ -241,15 +228,20 @@ export function brokenBody(): () => Response {
     );
 }
 
-/** The ways a job's log can fail to be read, each as a reply. */
-export const UNREADABLE_LOGS: readonly (readonly [string, () => Response])[] = [
+export const UNREADABLE_LOGS: readonly (readonly [
+  reason: string,
+  reply: () => Response,
+])[] = [
   ['answers 500', status(500)],
   ['answers 403', status(403)],
   ['fails in the middle of its body', brokenBody()],
 ];
 
-/** Failed jobs whose sentence points to their log: name, stage, and how their sentence starts. */
-export const LOG_JOBS: readonly (readonly [string, string, string])[] = [
+export const LOG_JOBS: readonly (readonly [
+  name: string,
+  stage: string,
+  start: string,
+])[] = [
   ['lint-check', 'lint', 'The check `lint-check` failed on the change.'],
   ['back-test', 'build', 'The check `back-test` failed on the change.'],
   ['conflict-markers', 'lint', 'A file holds Git conflict markers'],
@@ -260,9 +252,14 @@ export const LOG_JOBS: readonly (readonly [string, string, string])[] = [
   ],
 ];
 
-type UnreadableLogCase = [string, string, string, string, () => Response];
+type UnreadableLogCase = [
+  name: string,
+  stage: string,
+  reason: string,
+  start: string,
+  reply: () => Response,
+];
 
-/** Every job of LOG_JOBS with every way of failing to read its log: name, stage, reason, sentence start, reply. */
 export const UNREADABLE_LOG_CASES: UnreadableLogCase[] = LOG_JOBS.flatMap(
   ([name, stage, start]) =>
     UNREADABLE_LOGS.map(

@@ -20,12 +20,7 @@ export const MAX_FAILED = 5;
 const LOG_READ_BYTES = 262144;
 const LOG_LINE_LIMIT = 500;
 const REASON_PATTERN = /^[a-z_]{1,64}$/;
-/**
- * A name that may appear in a sentence: at most 64 letters, digits and `._-`.
- * A job name that holds `:` or `/` is shown only when it is exactly a name the
- * operator configured, because its shape cannot tell `secrets:gitleaks` from
- * `mailto:attacker`. A shown name is still text the job's author chose.
- */
+/** A job or stage name that may appear in a sentence: a closed label of plain characters. */
 const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
@@ -39,7 +34,6 @@ const RUNNER_PREFIX =
 const ANSI_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
 /** A section marker line the runner prints around a step. It has no text for the reader. */
 const SECTION_MARKER = /^section_(?:start|end):\S*$/;
-/** An e-mail address. The domain must end in letters, so a version pin such as `lodash@4.17.21` is not one. */
 const EMAIL_ADDRESS =
   /[\p{L}\p{N}._%+-]{1,64}@(?:[\p{L}\p{N}-]{1,63}\.)+\p{L}{2,63}/gu;
 const EMAIL_PLACEHOLDER = '[email]';
@@ -66,8 +60,7 @@ interface Described {
 
 /**
  * A name a sentence may show, or a placeholder with the raw name kept in an
- * untrusted field. The raw name is data written by the job's author. A name
- * outside the plain form is shown only when it is one of `configured`.
+ * untrusted field. The raw name is data written by the job's author.
  */
 function labelOf(
   value: string,
@@ -78,7 +71,6 @@ function labelOf(
     : { shown: '(name not shown)', untrusted: value };
 }
 
-/** The job names the operator configured: the four the module looks for, and `knownJobNames`. */
 function configuredJobNames(settings: AppPublicationSettings): string[] {
   return [
     settings.deployJobName,
@@ -282,16 +274,11 @@ async function explain(
   entry: FailedJob,
   sentence: string,
 ): Promise<Described> {
-  return withLog(ctx, job, entry, await jobLog(ctx, job), sentence);
+  return withLog(ctx, entry, await jobLog(ctx, job), sentence);
 }
 
-/**
- * The entry with the end of the log, or, when the log could not be read, the
- * entry without it and the sentence followed by a clause that says so.
- */
 function withLog(
   ctx: FailureContext,
-  job: JobShape,
   entry: FailedJob,
   log: string[] | undefined,
   sentence: string,
@@ -299,9 +286,7 @@ function withLog(
   if (log === undefined) {
     return {
       job: entry,
-      sentence: `${sentence} ${S.LOG_UNREADABLE(
-        linkText(ctx.projectWebUrl, job.web_url),
-      )}`,
+      sentence: `${sentence} ${S.LOG_UNREADABLE(entry.name)}`,
     };
   }
   return {
@@ -312,9 +297,7 @@ function withLog(
 
 /**
  * The job's log as the reader sees it: every cleaned line of the window that was
- * read. It is undefined when GitLab could not give the log (an error status, no
- * access, or a read cut off by the deadline), so one unreadable log does not
- * fail the whole answer.
+ * read. Undefined, not empty, when GitLab could not give the log.
  */
 async function jobLog(
   ctx: FailureContext,
@@ -350,7 +333,6 @@ async function describeRender(
   const refusals = log === undefined ? [] : refusedConfigs(ctx, log);
   return withLog(
     ctx,
-    job,
     entry,
     log,
     refusals.length > 0
@@ -419,11 +401,7 @@ function cleanLines(
     .map(line => line.slice(0, LOG_LINE_LIMIT));
 }
 
-/**
- * One trace line without the runner's prefix and escape sequences, with each
- * e-mail address replaced, trailing spaces removed. The addresses go before the
- * line is cut to its length limit, so half of one is never left.
- */
+/** One trace line without the runner's prefix and escape sequences, with e-mail addresses replaced, trailing spaces removed. */
 function cleanLine(line: string): string {
   const text = line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '');
   const redacted = text.includes('@')
