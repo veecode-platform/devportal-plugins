@@ -4,9 +4,10 @@ import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
 import type { LoginSettings } from '../config';
 import type { AppSecretsDependencies } from '../dependencies';
 import {
+  appCallbackUrl,
   cognitoClient,
   createAppClient,
-  describeClientSecret,
+  describeAppClient,
   findClientIdsByName,
 } from '../cognito';
 import { newCookieSecret } from '../cookieSecret';
@@ -231,9 +232,6 @@ async function settle(
   values: Values;
 }> {
   const { cognito, login, randomBytes } = context;
-  if (plan.kind === 'existing') {
-    return { clientId: plan.clientId, missing: [], values: {} };
-  }
   if (plan.kind === 'create') {
     const created = await createAppClient(cognito, {
       userPoolId: login.userPoolId,
@@ -251,13 +249,33 @@ async function settle(
       },
     };
   }
+
+  const existing = await describeAppClient(
+    cognito,
+    login.userPoolId,
+    plan.clientId,
+  );
+  const callbackUrl = appCallbackUrl(context.appUrl);
+  if (
+    existing.callbackUrls.length !== 1 ||
+    existing.callbackUrls[0] !== callbackUrl
+  ) {
+    throw new Error(
+      `the client named "${context.clientName}" in the user pool does not belong to this app: its callback URL is not the one of this app; refusing to use it`,
+    );
+  }
+  if (plan.kind === 'existing') {
+    return { clientId: plan.clientId, missing: [], values: {} };
+  }
+
   const values: Values = { OAUTH2_PROXY_CLIENT_ID: plan.clientId };
   if (plan.missing.includes('OAUTH2_PROXY_CLIENT_SECRET')) {
-    values.OAUTH2_PROXY_CLIENT_SECRET = await describeClientSecret(
-      cognito,
-      login.userPoolId,
-      plan.clientId,
-    );
+    if (!existing.clientSecret) {
+      throw new Error(
+        'DescribeUserPoolClient returned no client secret: the client was not created with one',
+      );
+    }
+    values.OAUTH2_PROXY_CLIENT_SECRET = existing.clientSecret;
   }
   if (plan.missing.includes('OAUTH2_PROXY_COOKIE_SECRET')) {
     values.OAUTH2_PROXY_COOKIE_SECRET = newCookieSecret(randomBytes);

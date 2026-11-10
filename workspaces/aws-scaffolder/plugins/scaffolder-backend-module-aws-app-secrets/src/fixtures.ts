@@ -13,7 +13,7 @@ export const exampleLoginSettings: LoginSettings = {
   userPoolId: 'us-east-1_ExamplePool',
   region: 'us-east-1',
   appUrlPattern: 'https://{app}.example.test',
-  clientNamePattern: '{app}-{environment}',
+  clientNamePattern: '{app}.{environment}',
   identityProviders: ['Google'],
 };
 
@@ -83,13 +83,26 @@ export function fakeWorld(
     files?: Record<string, string>;
     now?: Date;
     randomBytes?: (size: number) => Buffer;
+    systemHiddenFromUsers?: boolean;
   } = {},
 ): FakeWorld {
   const system = 'system' in options ? options.system : exampleSystem();
   const appRef = options.appRef ?? exampleAppRef;
+  const principalType = (credentials?: BackstageCredentials) =>
+    (credentials?.principal as { type: string } | undefined)?.type;
   const catalog = {
-    getEntityByRef: jest.fn(async (ref: string) =>
-      ref === appRef ? system : undefined,
+    getEntityByRef: jest.fn(
+      async (
+        ref: string,
+        requestOptions?: { credentials?: BackstageCredentials },
+      ) =>
+        ref === appRef &&
+        !(
+          options.systemHiddenFromUsers &&
+          principalType(requestOptions?.credentials) === 'user'
+        )
+          ? system
+          : undefined,
     ),
     getEntities: jest.fn(async () => ({
       items: options.components ?? [],
@@ -113,6 +126,10 @@ export function fakeWorld(
   const auth = {
     isPrincipal: (credentials: BackstageCredentials, type: string) =>
       (credentials.principal as { type: string }).type === type,
+    getOwnServiceCredentials: async () =>
+      ({
+        principal: { type: 'service', subject: 'plugin:scaffolder' },
+      } as unknown as BackstageCredentials),
   };
   return {
     catalog,

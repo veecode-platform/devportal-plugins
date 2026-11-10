@@ -88,13 +88,13 @@ an output, a log line or an error message.
 The block `appSecrets.login` turns it on. Without the block the action is registered and refuses to
 run, with a message naming the missing setting.
 
-| Key                 | Meaning                                                                                                                                                        |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `userPoolId`        | The user pool, as `<region>_<id>`. Required in the block. Its region must be the region of the block.                                                          |
-| `region`            | Region of the pool. Default `appSecrets.region`.                                                                                                               |
-| `appUrlPattern`     | Where the app is served, such as `https://{app}.example.test`. https only, a bare origin. Must contain `{app}`; may contain `{environment}` and `{namespace}`. |
-| `clientNamePattern` | Name of the client in the pool. Default `{app}-{environment}`. Must contain both; may contain `{namespace}`.                                                   |
-| `identityProviders` | Identity providers the client signs in through. Default `["Google"]`.                                                                                          |
+| Key                 | Meaning                                                                                                                                                                                                                                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `userPoolId`        | The user pool, as `<region>_<id>`. Required in the block. Its region must be the region of the block.                                                                                                                                                                                                             |
+| `region`            | Region of the pool. Default `appSecrets.region`.                                                                                                                                                                                                                                                                  |
+| `appUrlPattern`     | Where the app is served, such as `https://{app}.example.test`. https only, a bare origin. Must contain `{app}`; may contain `{environment}` and `{namespace}`.                                                                                                                                                    |
+| `clientNamePattern` | Name of the client in the pool. Default `{app}.{environment}`. Must contain both; may contain `{namespace}`. Neighbouring placeholders must be separated by one of `. _ + = , @`, which no name contains: with `{app}-{environment}`, the app `a-b` in `c` and the app `a` in `b-c` would share the name `a-b-c`. |
+| `identityProviders` | Identity providers the client signs in through. Default `["Google"]`.                                                                                                                                                                                                                                             |
 
 The client is always created the same way, and nothing in the configuration changes it: the
 authorization code flow only, the scopes `openid`, `email` and `profile`, read attributes `email`
@@ -115,6 +115,9 @@ string of the wrong length. Each secret carries the registration tags and the ta
 ### Who may run it
 
 - When the System is in the catalog, the caller must own it, the same rule as the register action.
+  The action reads the catalog with the plugin's own credentials, so a System the user cannot see
+  still counts as existing and still has to be owned by the user. (The register action reads it with
+  the user's credentials and refuses a System the user cannot see.)
 - When the System is not in the catalog yet, the action may create a client only if no client with
   that name exists. A template that creates an app can therefore run it before the repository is
   published, so the first deploy finds the values.
@@ -130,14 +133,15 @@ string of the wrong length. Each secret carries the registration tags and the ta
 The run looks first, then writes. It assumes the writer role once, lists the pool's clients by name
 (following every page), and describes the three secrets. Then:
 
-| Client in the pool | Secrets                                                     | Result                                                             |
-| ------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------ |
-| none               | none exist                                                  | creates the client, then the three secrets. `created` is true.     |
-| none               | some exist                                                  | refuses before creating anything.                                  |
-| one                | all exist, each tagged with the client's ID                 | changes nothing, `created` is false.                               |
-| one                | some missing, the others tagged with the client's ID        | writes the missing ones, the client secret read back from Cognito. |
-| one                | one exists without the client's ID tag, or is being deleted | refuses, naming the secret and no value.                           |
-| more than one      | any                                                         | refuses; remove the extra clients first.                           |
+| Client in the pool             | Secrets                                                     | Result                                                                                             |
+| ------------------------------ | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| none                           | none exist                                                  | creates the client, then the three secrets. `created` is true.                                     |
+| none                           | some exist                                                  | refuses before creating anything.                                                                  |
+| one, with another callback URL | any                                                         | refuses, naming no secret. The callback URL must be exactly this app's `<appUrl>/oauth2/callback`. |
+| one                            | all exist, each tagged with the client's ID                 | changes nothing, `created` is false.                                                               |
+| one                            | some missing, the others tagged with the client's ID        | writes the missing ones, the client secret read back from Cognito.                                 |
+| one                            | one exists without the client's ID tag, or is being deleted | refuses, naming the secret and no value.                                                           |
+| more than one                  | any                                                         | refuses; remove the extra clients first.                                                           |
 
 Nothing here overwrites a value: the action only calls `CreateSecret`, never `PutSecretValue`, and
 it never reads a secret's value. The client ID tag is how a rerun sees that a value still belongs to

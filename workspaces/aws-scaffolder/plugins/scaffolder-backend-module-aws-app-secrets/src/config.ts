@@ -4,6 +4,7 @@ import {
   LOGIN_PLACEHOLDERS,
   loginAppUrl,
   loginClientName,
+  placeholdersAreSeparated,
   placeholdersIn,
 } from './loginNames';
 
@@ -25,7 +26,7 @@ const PATH_PLACEHOLDERS = [
 const REQUIRED_PATH_PLACEHOLDERS = ['app', 'environment', 'name'];
 const DECLARATION_PLACEHOLDERS = ['environment'];
 export const DEFAULT_DECLARATION_FILE = 'config/{environment}.yaml';
-export const DEFAULT_CLIENT_NAME_PATTERN = '{app}-{environment}';
+export const DEFAULT_CLIENT_NAME_PATTERN = '{app}.{environment}';
 export const DEFAULT_IDENTITY_PROVIDERS = ['Google'];
 const LOGIN_PROBE = {
   app: 'example-app',
@@ -234,6 +235,13 @@ function checkLogin(
     if (!clientPlaceholders.includes(placeholder)) {
       issue('clientNamePattern', `must contain {${placeholder}}`);
     }
+  }
+
+  if (!placeholdersAreSeparated(login.clientNamePattern)) {
+    issue(
+      'clientNamePattern',
+      'must separate its placeholders with one of . _ + = , @, which no app or environment name contains, so that two apps cannot get the same client name; for example {app}.{environment}',
+    );
   }
 
   const urlPlaceholders = placeholdersIn(login.appUrlPattern);

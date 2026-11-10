@@ -1,4 +1,9 @@
-import { checkLoginIdentity, loginAppUrl, loginClientName } from './loginNames';
+import {
+  checkLoginIdentity,
+  loginAppUrl,
+  loginClientName,
+  placeholdersAreSeparated,
+} from './loginNames';
 
 const parts = { app: 'example-app', environment: 'dev', namespace: 'default' };
 
@@ -34,13 +39,13 @@ describe('checkLoginIdentity', () => {
 describe('loginClientName', () => {
   it('fills the placeholders', () => {
     expect(
-      loginClientName('portal-{namespace}-{app}-{environment}', parts),
-    ).toBe('portal-default-example-app-dev');
+      loginClientName('portal.{namespace}.{app}.{environment}', parts),
+    ).toBe('portal.default.example-app.dev');
   });
 
   it('refuses a name longer than Cognito accepts', () => {
     expect(() =>
-      loginClientName('{app}-{environment}', {
+      loginClientName('{app}.{environment}', {
         ...parts,
         app: 'a'.repeat(63),
         environment: 'e'.repeat(70),
@@ -83,5 +88,38 @@ describe('loginAppUrl', () => {
     ['{app}.example.test', 'is not a valid URL'],
   ])('refuses %s', (pattern, reason) => {
     expect(() => loginAppUrl(pattern, parts)).toThrow(reason);
+  });
+});
+
+describe('placeholdersAreSeparated', () => {
+  it.each([
+    '{app}.{environment}',
+    '{app}_{environment}',
+    '{app}@{environment}',
+    'portal-{namespace}.{app}.{environment}',
+    '{app}-x.{environment}',
+  ])('accepts %s', pattern => {
+    expect(placeholdersAreSeparated(pattern)).toBe(true);
+  });
+
+  it.each([
+    '{app}-{environment}',
+    '{app}{environment}',
+    '{app}.{environment}-{namespace}',
+    '{namespace}-{app}.{environment}',
+  ])('refuses %s', pattern => {
+    expect(placeholdersAreSeparated(pattern)).toBe(false);
+  });
+
+  it('gives the same name to two apps when it is not separated, and different names when it is', () => {
+    const first = { app: 'a-b', environment: 'c', namespace: 'default' };
+    const second = { app: 'a', environment: 'b-c', namespace: 'default' };
+
+    expect(loginClientName('{app}-{environment}', first)).toBe(
+      loginClientName('{app}-{environment}', second),
+    );
+    expect(loginClientName('{app}.{environment}', first)).not.toBe(
+      loginClientName('{app}.{environment}', second),
+    );
   });
 });

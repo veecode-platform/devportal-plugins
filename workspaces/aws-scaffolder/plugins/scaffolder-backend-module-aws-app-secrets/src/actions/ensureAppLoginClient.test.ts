@@ -50,8 +50,10 @@ const base64PlusAndSlashBytes = (size: number) => Buffer.alloc(size, 0xfb);
 const exampleCookieSecret = `${'-_v7'.repeat(10)}-_s=`;
 const exampleAdminScope = 'aws.cognito.signin.user.admin';
 const examplePoolId = 'us-east-1_ExamplePool';
-const exampleClientName = 'example-app-dev';
+const exampleClientName = 'example-app.dev';
 const exampleAppUrl = 'https://example-app.example.test';
+const exampleCallbackUrl = `${exampleAppUrl}/oauth2/callback`;
+const otherCallbackUrl = 'https://other.example.test/oauth2/callback';
 const exampleNames = [
   'OAUTH2_PROXY_CLIENT_ID',
   'OAUTH2_PROXY_CLIENT_SECRET',
@@ -98,7 +100,12 @@ function awsError(name: string): Error {
 }
 
 interface FakePool {
-  clients: { id: string; name: string; secret: string }[];
+  clients: {
+    id: string;
+    name: string;
+    secret: string;
+    callbackUrls: string[];
+  }[];
   secrets: Map<string, { value: string; tags: Tag[]; deleted?: boolean }>;
   pageSize: number;
   failures: Record<string, Error>;
@@ -166,7 +173,11 @@ function installFakeAws(): void {
       );
       if (!found) throw awsError('ResourceNotFoundException');
       return {
-        UserPoolClient: { ClientId: found.id, ClientSecret: found.secret },
+        UserPoolClient: {
+          ClientId: found.id,
+          ClientSecret: found.secret,
+          CallbackURLs: found.callbackUrls,
+        },
       };
     }
     if (command instanceof CreateUserPoolClientCommand) {
@@ -175,6 +186,7 @@ function installFakeAws(): void {
         id,
         name: command.input.ClientName as string,
         secret: exampleClientSecret,
+        callbackUrls: command.input.CallbackURLs ?? [],
       });
       return {
         UserPoolClient: { ClientId: id, ClientSecret: exampleClientSecret },
@@ -277,6 +289,7 @@ function givenClientWith(secretNames: string[], clientId = 'example-client-1') {
     id: clientId,
     name: exampleClientName,
     secret: exampleClientSecret,
+    callbackUrls: [exampleCallbackUrl],
   });
   for (const name of secretNames) {
     pool.secrets.set(examplePath(name), {
@@ -397,7 +410,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
             login: {
               ...exampleLoginSettings,
               appUrlPattern: 'https://{app}-{environment}.example.test',
-              clientNamePattern: 'portal-{app}-{environment}',
+              clientNamePattern: 'portal.{app}.{environment}',
               identityProviders: ['Google', 'ExampleIdp'],
             },
           },
@@ -406,7 +419,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
       );
 
       expect(createdClientInput()).toMatchObject({
-        ClientName: 'portal-example-app-staging',
+        ClientName: 'portal.example-app.staging',
         SupportedIdentityProviders: ['Google', 'ExampleIdp'],
         CallbackURLs: [
           'https://example-app-staging.example.test/oauth2/callback',
@@ -416,6 +429,34 @@ describe('aws:cognito:app-login-client:ensure', () => {
       expect([...pool.secrets.keys()]).toEqual(
         exampleNames.map(name => examplePath(name, 'staging')),
       );
+    });
+
+    it('gives two apps whose names run together two different clients', async () => {
+      const settings = { ...exampleSettings, environments: ['c', 'b-c'] };
+      const first = fakeWorld({
+        system: undefined,
+        appRef: 'system:default/a-b',
+      });
+      await run(
+        { ...first.deps, settings },
+        contextWith({ app: 'system:default/a-b', environment: 'c' }).ctx,
+      );
+      const second = fakeWorld({
+        system: undefined,
+        appRef: 'system:default/a',
+      });
+      const { ctx, output } = contextWith({
+        app: 'system:default/a',
+        environment: 'b-c',
+      });
+
+      await run({ ...second.deps, settings }, ctx);
+
+      expect(pool.clients.map(client => client.name)).toEqual([
+        'a-b.c',
+        'a.b-c',
+      ]);
+      expect(output).toHaveBeenCalledWith('created', true);
     });
 
     it('uses the first configured environment when none is given', async () => {
@@ -450,7 +491,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
               '/{cluster}/{namespace}/apps/{app}/{environment}/{name}',
             login: {
               ...exampleLoginSettings,
-              clientNamePattern: '{namespace}-{app}-{environment}',
+              clientNamePattern: '{namespace}.{app}.{environment}',
             },
           },
         },
@@ -458,7 +499,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
       );
 
       expect(pool.clients.map(client => client.name)).toEqual([
-        'other-ns-example-app-dev',
+        'other-ns.example-app.dev',
       ]);
       expect([...pool.secrets.keys()][0]).toBe(
         '/example-cluster/other-ns/apps/example-app/dev/OAUTH2_PROXY_CLIENT_ID',
@@ -521,14 +562,19 @@ describe('aws:cognito:app-login-client:ensure', () => {
       ).toBe('example-client-1');
     });
 
-    it('does not ask Cognito for the client secret when only the cookie secret is missing', async () => {
+    it('writes only the cookie secret when it is the only one missing', async () => {
       givenClientWith(['OAUTH2_PROXY_CLIENT_ID', 'OAUTH2_PROXY_CLIENT_SECRET']);
       const world = fakeWorld();
       const { ctx } = contextWith(exampleInput);
 
       await run(world.deps, ctx);
 
-      expect(pool.calls).not.toContain('DescribeUserPoolClientCommand');
+      expect(
+        pool.calls.filter(call => call === 'CreateSecretCommand'),
+      ).toHaveLength(1);
+      expect(
+        pool.secrets.get(examplePath('OAUTH2_PROXY_CLIENT_SECRET'))?.value,
+      ).toBe('stored-OAUTH2_PROXY_CLIENT_SECRET');
       expect([...pool.secrets.keys()]).toHaveLength(3);
     });
 
@@ -561,8 +607,13 @@ describe('aws:cognito:app-login-client:ensure', () => {
 
     it('finds the client on a later page of the list', async () => {
       pool.pageSize = 2;
-      for (const name of ['other-a-dev', 'other-b-dev', 'other-c-dev']) {
-        pool.clients.push({ id: `id-${name}`, name, secret: 'other' });
+      for (const name of ['other-a.dev', 'other-b.dev', 'other-c.dev']) {
+        pool.clients.push({
+          id: `id-${name}`,
+          name,
+          secret: 'other',
+          callbackUrls: [otherCallbackUrl],
+        });
       }
       givenClientWith(exampleNames, 'example-client-9');
       const world = fakeWorld();
@@ -580,8 +631,9 @@ describe('aws:cognito:app-login-client:ensure', () => {
     it('does not take a client whose name only starts with the app name', async () => {
       pool.clients.push({
         id: 'id-longer',
-        name: 'example-app-dev-extra',
+        name: 'example-app.dev-extra',
         secret: 'other',
+        callbackUrls: [otherCallbackUrl],
       });
       const world = fakeWorld({ system: undefined });
       const { ctx, output } = contextWith(exampleInput);
@@ -636,6 +688,78 @@ describe('aws:cognito:app-login-client:ensure', () => {
       );
       expectNoAwsCall();
       expect([...pool.secrets]).toEqual(before);
+    });
+
+    it('refuses a System that another team owns and the user cannot see, instead of treating it as new', async () => {
+      const world = fakeWorld({
+        systemHiddenFromUsers: true,
+        ownershipRefs: ['group:default/other-team'],
+      });
+      const { ctx } = contextWith(exampleInput);
+
+      const error = await failureOf(run(world.deps, ctx));
+
+      expect(error.message).toBe(
+        'the user does not own System "system:default/example-app"',
+      );
+      expectNoAwsCall();
+    });
+
+    it('reads the catalog with the plugin credentials, so a hidden System is not mistaken for a missing one', async () => {
+      const world = fakeWorld({ systemHiddenFromUsers: true });
+      const { ctx, output } = contextWith(exampleInput);
+
+      await run(world.deps, ctx);
+
+      expect(world.catalog.getEntityByRef).toHaveBeenCalledWith(exampleAppRef, {
+        credentials: expect.objectContaining({
+          principal: expect.objectContaining({ type: 'service' }),
+        }),
+      });
+      expect(output).toHaveBeenCalledWith('created', true);
+    });
+
+    it('refuses a client whose callback URL is not the one of this app, naming no secret and writing nothing', async () => {
+      givenClientWith(exampleNames);
+      pool.clients[0].callbackUrls = [otherCallbackUrl];
+      const world = fakeWorld();
+      const { ctx } = contextWith(exampleInput);
+
+      const error = await failureOf(run(world.deps, ctx));
+
+      expect(error.message).toBe(
+        `the client named "${exampleClientName}" in the user pool does not belong to this app: its callback URL is not the one of this app; refusing to use it`,
+      );
+      expect(error.message).not.toContain('OAUTH2_PROXY');
+      expectNothingWritten();
+    });
+
+    it('refuses such a client before it writes any missing secret', async () => {
+      givenClientWith(['OAUTH2_PROXY_CLIENT_ID']);
+      pool.clients[0].callbackUrls = [otherCallbackUrl];
+      const world = fakeWorld();
+      const { ctx } = contextWith(exampleInput);
+
+      const error = await failureOf(run(world.deps, ctx));
+
+      expect(error.message).toContain('does not belong to this app');
+      expectNothingWritten();
+      expect([...pool.secrets.keys()]).toHaveLength(1);
+    });
+
+    it.each([
+      ['another URL next to its own', [exampleCallbackUrl, otherCallbackUrl]],
+      ['no callback URL', []],
+    ])('refuses a client with %s', async (_, callbackUrls) => {
+      givenClientWith(exampleNames);
+      pool.clients[0].callbackUrls = callbackUrls;
+      const world = fakeWorld();
+      const { ctx } = contextWith(exampleInput);
+
+      const error = await failureOf(run(world.deps, ctx));
+
+      expect(error.message).toContain('does not belong to this app');
+      expectNothingWritten();
     });
 
     it('refuses to use an existing client when the System is not in the catalog', async () => {
@@ -728,6 +852,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
         id: 'example-client-2',
         name: exampleClientName,
         secret: 'other',
+        callbackUrls: [exampleCallbackUrl],
       });
       const world = fakeWorld();
       const { ctx } = contextWith(exampleInput);

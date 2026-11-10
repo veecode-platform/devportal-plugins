@@ -135,7 +135,11 @@ compared, only the tag.
 the System may not be in the catalog yet. A rule that required the System to exist would block the first
 deploy; a rule that ignored it would let a user name another app and take its login client.
 
-**Decision:** A System in the catalog must be owned by the caller, as for the register action. A
+**Decision:** A System in the catalog must be owned by the caller, as for the register action. The
+catalog is read with the plugin's own credentials, because a permission policy can hide a System
+from a user who does not own it, and a System that is hidden from the user is not a System that
+does not exist. The register action reads with the user's credentials and refuses what it cannot
+see, so it fails closed and is unchanged. A
 System that is not in the catalog may get a client only when no client of that name exists. A client
 that exists needs the System in the catalog and owned by the caller. A System outside the `default`
 namespace is refused unless `clientNamePattern` has `{namespace}`, for the reason of PDR-006. The
@@ -164,3 +168,21 @@ documents and decodes to 32 bytes.
 
 **Consequences:** Changing the recipe is a code change with a test, not a setting. An existing client
 is not checked against the recipe; a client changed by hand keeps its changes.
+
+## PDR-011: Client names cannot collide, and a client is reused only for its own callback URL
+
+**Status:** Accepted
+
+**Context:** App names and environments both allow hyphens, so with `{app}-{environment}` the app
+`a-b` in `c` and the app `a` in `b-c` would both be `a-b-c`. The second run would find the first
+app's client and write its client secret under the second app's secret path.
+
+**Decision:** The default pattern is `{app}.{environment}`, and the configuration refuses a pattern
+whose neighbouring placeholders are not separated by one of `. _ + = , @`, which no app,
+environment or namespace name contains. Before it reuses a client, the action also checks that the
+client's only callback URL is this app's `<appUrl>/oauth2/callback`, and refuses otherwise with a
+message that names no secret.
+
+**Consequences:** A client someone changed by hand to add another callback URL is refused. The
+callback URL check does not tell two apps apart when the URL pattern itself gives them the same
+URL; that is a hosting conflict of its own.

@@ -1,6 +1,7 @@
 const PLACEHOLDER_PATTERN = /\{([^{}]*)\}/g;
 const DNS_LABEL_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 const CLIENT_NAME_PATTERN = /^[\w+=,.@-]+$/;
+const SEPARATOR_PATTERN = /[._+=,@]/;
 
 export const LOGIN_PLACEHOLDERS = ['app', 'environment', 'namespace'];
 export const CLIENT_NAME_MAX_LENGTH = 128;
@@ -13,6 +14,12 @@ export interface LoginNameParts {
 
 export function placeholdersIn(text: string): string[] {
   return [...text.matchAll(PLACEHOLDER_PATTERN)].map(match => match[1]);
+}
+
+export function placeholdersAreSeparated(pattern: string): boolean {
+  const pieces = pattern.split(PLACEHOLDER_PATTERN);
+  const between = pieces.filter((_, index) => index % 2 === 0).slice(1, -1);
+  return between.every(literal => SEPARATOR_PATTERN.test(literal));
 }
 
 function fill(pattern: string, parts: LoginNameParts): string {

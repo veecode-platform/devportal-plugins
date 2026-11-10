@@ -39,18 +39,23 @@ export function parseSystemRef(app: string): CompoundEntityRef {
   return ref;
 }
 
+type OwnershipOptions = OwnershipServices & {
+  app: CompoundEntityRef;
+  credentials: BackstageCredentials;
+};
+
 /**
  * Requires the caller to be a user who owns the System. The owner and the
  * user's own refs are compared in their full form, so `group:example-team` and
  * `group:default/example-team` are the same owner.
  */
 export async function requireOwnedSystem(
-  options: OwnershipServices & {
-    app: CompoundEntityRef;
-    credentials: BackstageCredentials;
-  },
+  options: OwnershipOptions,
 ): Promise<OwnedSystem> {
-  const { system, user } = await findOwnedSystem(options);
+  const { system, user } = await lookupOwned(
+    options,
+    async () => options.credentials,
+  );
   if (!system) {
     throw new Error(
       `System "${stringifyEntityRef(
@@ -62,10 +67,14 @@ export async function requireOwnedSystem(
 }
 
 export async function findOwnedSystem(
-  options: OwnershipServices & {
-    app: CompoundEntityRef;
-    credentials: BackstageCredentials;
-  },
+  options: OwnershipOptions,
+): Promise<{ system: Entity | undefined; user: OwnedSystem['user'] }> {
+  return lookupOwned(options, () => options.auth.getOwnServiceCredentials());
+}
+
+async function lookupOwned(
+  options: OwnershipOptions,
+  readerCredentials: () => Promise<BackstageCredentials>,
 ): Promise<{ system: Entity | undefined; user: OwnedSystem['user'] }> {
   const { auth, catalog, userInfo, app, credentials } = options;
   if (!auth.isPrincipal(credentials, 'user')) {
@@ -78,7 +87,9 @@ export async function findOwnedSystem(
     entityRef: info.userEntityRef,
     name: parseEntityRef(info.userEntityRef).name,
   };
-  const system = await catalog.getEntityByRef(ref, { credentials });
+  const system = await catalog.getEntityByRef(ref, {
+    credentials: await readerCredentials(),
+  });
   if (!system) {
     return { system: undefined, user };
   }

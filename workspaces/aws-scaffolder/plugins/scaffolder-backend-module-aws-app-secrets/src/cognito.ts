@@ -21,6 +21,10 @@ export interface AppClientCredentials {
   clientSecret: string;
 }
 
+export function appCallbackUrl(appUrl: string): string {
+  return `${appUrl}/oauth2/callback`;
+}
+
 export function cognitoClient(
   region: string,
   credentials: WriterCredentials,
@@ -66,11 +70,16 @@ export async function findClientIdsByName(
   );
 }
 
-export async function describeClientSecret(
+export interface ExistingClient {
+  callbackUrls: string[];
+  clientSecret?: string;
+}
+
+export async function describeAppClient(
   client: CognitoIdentityProviderClient,
   userPoolId: string,
   clientId: string,
-): Promise<string> {
+): Promise<ExistingClient> {
   const response = await client
     .send(
       new DescribeUserPoolClientCommand({
@@ -81,13 +90,10 @@ export async function describeClientSecret(
     .catch((error: unknown) => {
       throw cognitoFailure('DescribeUserPoolClient', error);
     });
-  const secret = response.UserPoolClient?.ClientSecret;
-  if (!secret) {
-    throw new Error(
-      'DescribeUserPoolClient returned no client secret: the client was not created with one',
-    );
-  }
-  return secret;
+  return {
+    callbackUrls: response.UserPoolClient?.CallbackURLs ?? [],
+    clientSecret: response.UserPoolClient?.ClientSecret,
+  };
 }
 
 export async function createAppClient(
@@ -122,7 +128,7 @@ export async function createAppClient(
         ExplicitAuthFlows: ['ALLOW_REFRESH_TOKEN_AUTH'],
         PreventUserExistenceErrors: 'ENABLED',
         EnableTokenRevocation: true,
-        CallbackURLs: [`${options.appUrl}/oauth2/callback`],
+        CallbackURLs: [appCallbackUrl(options.appUrl)],
         LogoutURLs: [`${options.appUrl}/`],
       }),
     )

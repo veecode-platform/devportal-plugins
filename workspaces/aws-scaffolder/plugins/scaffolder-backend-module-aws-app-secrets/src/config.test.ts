@@ -139,7 +139,7 @@ describe('readAppSecretsConfig', () => {
         userPoolId: 'us-east-1_ExamplePool',
         region: 'us-east-1',
         appUrlPattern: 'https://{app}.example.test',
-        clientNamePattern: '{app}-{environment}',
+        clientNamePattern: '{app}.{environment}',
         identityProviders: ['Google'],
       });
     });
@@ -150,14 +150,14 @@ describe('readAppSecretsConfig', () => {
           userPoolId: 'eu-west-1_ExamplePool',
           region: 'eu-west-1',
           appUrlPattern: 'https://{app}-{environment}.example.test',
-          clientNamePattern: 'portal-{namespace}-{app}-{environment}',
+          clientNamePattern: 'portal.{namespace}.{app}.{environment}',
           identityProviders: ['Google', 'ExampleIdp'],
         }).login,
       ).toEqual({
         userPoolId: 'eu-west-1_ExamplePool',
         region: 'eu-west-1',
         appUrlPattern: 'https://{app}-{environment}.example.test',
-        clientNamePattern: 'portal-{namespace}-{app}-{environment}',
+        clientNamePattern: 'portal.{namespace}.{app}.{environment}',
         identityProviders: ['Google', 'ExampleIdp'],
       });
     });
@@ -231,6 +231,30 @@ describe('readAppSecretsConfig', () => {
       },
     );
 
+    it.each([
+      '{app}-{environment}',
+      '{app}{environment}',
+      'portal-{app}-{namespace}.{environment}',
+    ])(
+      'refuses the client name pattern %s, which could give two apps the same name',
+      clientNamePattern => {
+        expect(() => readLogin({ clientNamePattern })).toThrow(
+          'appSecrets.login.clientNamePattern must separate its placeholders with one of . _ + = , @',
+        );
+      },
+    );
+
+    it.each([
+      '{app}.{environment}',
+      '{app}_{environment}',
+      'portal-{app}.{environment}',
+      '{namespace}.{app}.{environment}',
+    ])('accepts the client name pattern %s', clientNamePattern => {
+      expect(readLogin({ clientNamePattern }).login?.clientNamePattern).toBe(
+        clientNamePattern,
+      );
+    });
+
     it('refuses a client name pattern with a character Cognito would refuse', () => {
       expect(() =>
         readLogin({ clientNamePattern: '{app}/{environment}' }),
@@ -240,7 +264,7 @@ describe('readAppSecretsConfig', () => {
     it('refuses a client name pattern that gives a name over 128 characters', () => {
       expect(() =>
         readLogin({
-          clientNamePattern: `${'a'.repeat(120)}-{app}-{environment}`,
+          clientNamePattern: `${'a'.repeat(120)}.{app}.{environment}`,
         }),
       ).toThrow(
         'appSecrets.login.clientNamePattern gives a client name Cognito would refuse',
