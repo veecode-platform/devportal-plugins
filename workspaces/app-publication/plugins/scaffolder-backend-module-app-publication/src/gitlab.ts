@@ -97,7 +97,7 @@ export class GitlabClient {
       await discard(response);
       return undefined;
     }
-    return readTail(response, maxBytes);
+    return readBody(() => readTail(response, maxBytes));
   }
 
   /** One artifact file, as text, or undefined when it is missing, expired or larger than `maxBytes`. */
@@ -112,7 +112,7 @@ export class GitlabClient {
       await discard(response);
       return undefined;
     }
-    return readCapped(response, maxBytes);
+    return readBody(() => readCapped(response, maxBytes));
   }
 }
 
@@ -131,6 +131,18 @@ async function parseBody<T>(
     throw new ServiceUnavailableError(MSG_UNAVAILABLE);
   }
   return parsed.data;
+}
+
+/**
+ * A body read that fails, such as one cut off by the call's deadline, is the
+ * same outage as a request that fails, with the same fixed sentence.
+ */
+async function readBody<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch {
+    throw new ServiceUnavailableError(MSG_UNAVAILABLE);
+  }
 }
 
 async function discard(response: Response): Promise<void> {

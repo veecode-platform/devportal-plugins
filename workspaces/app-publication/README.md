@@ -15,7 +15,8 @@ cluster.
 A failed job in a pipeline is returned with its name, stage and link. For a failed lint, build, scan, render or
 conflict-markers job, and for any other failed job with no fixed explanation, the last `failedJobLogLines` lines of its
 log come back in `untrustedJobOutput`, cleaned of the runner's prefix and escape sequences, with each e-mail address
-replaced by `[email]`.
+replaced by `[email]`. When GitLab cannot give the log, the entry comes back without it and its sentence says so. A job
+name that holds `:` or `/` is shown only when it is one of the configured job names or is in `knownJobNames`.
 
 Only the app's owner may call either one. The decisions behind the choices are in [DECISIONS.md](DECISIONS.md).
 

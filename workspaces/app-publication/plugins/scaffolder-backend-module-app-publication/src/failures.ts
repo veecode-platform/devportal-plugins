@@ -1,3 +1,4 @@
+import { ServiceUnavailableError } from '@backstage/errors';
 import type { AppPublicationSettings } from './config';
 import type { GitlabClient } from './gitlab';
 import type { JobShape } from './gitlabShapes';
@@ -20,14 +21,12 @@ const LOG_READ_BYTES = 262144;
 const LOG_LINE_LIMIT = 500;
 const REASON_PATTERN = /^[a-z_]{1,64}$/;
 /**
- * A job or stage name that may appear in a sentence: at most 64 plain characters.
- * A name with neither `:` nor `/` may hold `._-`. A name with one of them is
- * segments of letters, digits, `_` and `-`, one separator between segments and
- * no dot, as GitLab job names are (`secrets:gitleaks`, `test/unit`). So a name
- * never reads as a host, a host and port, or a link.
+ * A name that may appear in a sentence: at most 64 letters, digits and `._-`.
+ * A job name that holds `:` or `/` is shown only when it is exactly a name the
+ * operator configured, because its shape cannot tell `secrets:gitleaks` from
+ * `mailto:attacker`. A shown name is still text the job's author chose.
  */
-const LABEL_PATTERN =
-  /^(?=.{1,64}$)(?:[A-Za-z0-9._-]+|[A-Za-z0-9_-]+(?:[:/][A-Za-z0-9_-]+)+)$/;
+const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
 /** A line the render check prints for a config the platform chart refused, and nothing else on the line. */
@@ -67,12 +66,27 @@ interface Described {
 
 /**
  * A name a sentence may show, or a placeholder with the raw name kept in an
- * untrusted field. The raw name is data written by the job's author.
+ * untrusted field. The raw name is data written by the job's author. A name
+ * outside the plain form is shown only when it is one of `configured`.
  */
-function labelOf(value: string): { shown: string; untrusted?: string } {
-  return LABEL_PATTERN.test(value)
+function labelOf(
+  value: string,
+  configured: readonly string[] = [],
+): { shown: string; untrusted?: string } {
+  return LABEL_PATTERN.test(value) || configured.includes(value)
     ? { shown: value }
     : { shown: '(name not shown)', untrusted: value };
+}
+
+/** The job names the operator configured: the four the module looks for, and `knownJobNames`. */
+function configuredJobNames(settings: AppPublicationSettings): string[] {
+  return [
+    settings.deployJobName,
+    settings.contractJobName,
+    settings.conflictMarkersJobName,
+    settings.renderJobName,
+    ...settings.knownJobNames,
+  ];
 }
 
 function stageRank(stage: string): number {
@@ -119,7 +133,7 @@ export function jobEntry(ctx: FailureContext, job: JobShape): FailedJob {
 function baseEntry(ctx: FailureContext, job: JobShape): FailedJob {
   const reason = job.failure_reason ?? undefined;
   const webUrl = shownLink(ctx.projectWebUrl, job.web_url);
-  const name = labelOf(job.name);
+  const name = labelOf(job.name, configuredJobNames(ctx.settings));
   const stage = labelOf(job.stage);
   return {
     name: name.shown,
@@ -176,7 +190,14 @@ async function describeJob(
     return explain(ctx, job, entry, S.LINT_OR_BUILD(name));
   }
   if (job.stage === 'scan') {
-    return explain(ctx, job, entry, S.SCAN_FAILED(name, link));
+    return explain(
+      ctx,
+      job,
+      entry,
+      request === undefined
+        ? S.SCAN_FAILED_ON_DEFAULT_BRANCH(name, link)
+        : S.SCAN_FAILED(name, link),
+    );
   }
   return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
 }
@@ -261,20 +282,56 @@ async function explain(
   entry: FailedJob,
   sentence: string,
 ): Promise<Described> {
-  const log = await jobLog(ctx, job);
+  return withLog(ctx, job, entry, await jobLog(ctx, job), sentence);
+}
+
+/**
+ * The entry with the end of the log, or, when the log could not be read, the
+ * entry without it and the sentence followed by a clause that says so.
+ */
+function withLog(
+  ctx: FailureContext,
+  job: JobShape,
+  entry: FailedJob,
+  log: string[] | undefined,
+  sentence: string,
+): Described {
+  if (log === undefined) {
+    return {
+      job: entry,
+      sentence: `${sentence} ${S.LOG_UNREADABLE(
+        linkText(ctx.projectWebUrl, job.web_url),
+      )}`,
+    };
+  }
   return {
     job: { ...entry, untrustedJobOutput: lastLines(ctx, log) },
     sentence,
   };
 }
 
-/** The job's log as the reader sees it: every cleaned line of the window that was read. */
-async function jobLog(ctx: FailureContext, job: JobShape): Promise<string[]> {
-  const tail = await ctx.gitlab.textTail(
-    `/jobs/${job.id}/trace`,
-    LOG_READ_BYTES,
-  );
-  return cleanLines(tail);
+/**
+ * The job's log as the reader sees it: every cleaned line of the window that was
+ * read. It is undefined when GitLab could not give the log (an error status, no
+ * access, or a read cut off by the deadline), so one unreadable log does not
+ * fail the whole answer.
+ */
+async function jobLog(
+  ctx: FailureContext,
+  job: JobShape,
+): Promise<string[] | undefined> {
+  try {
+    const tail = await ctx.gitlab.textTail(
+      `/jobs/${job.id}/trace`,
+      LOG_READ_BYTES,
+    );
+    return cleanLines(tail);
+  } catch (error) {
+    if (error instanceof ServiceUnavailableError) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -290,14 +347,16 @@ async function describeRender(
   link: string,
 ): Promise<Described> {
   const log = await jobLog(ctx, job);
-  const refusals = refusedConfigs(ctx, log);
-  return {
-    job: { ...entry, untrustedJobOutput: lastLines(ctx, log) },
-    sentence:
-      refusals.length > 0
-        ? S.RENDER_REFUSED(refusals, link)
-        : S.EXPLAIN_FROM_LOG(name, link),
-  };
+  const refusals = log === undefined ? [] : refusedConfigs(ctx, log);
+  return withLog(
+    ctx,
+    job,
+    entry,
+    log,
+    refusals.length > 0
+      ? S.RENDER_REFUSED(refusals, link)
+      : S.EXPLAIN_FROM_LOG(name, link),
+  );
 }
 
 /**

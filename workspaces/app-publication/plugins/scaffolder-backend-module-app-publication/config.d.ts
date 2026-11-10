@@ -52,6 +52,15 @@ export interface Config {
      */
     renderJobName?: string;
     /**
+     * Job names that hold `:` or `/` and may be named in a sentence, besides
+     * the four job names above. A job name with one of those characters that
+     * is in none of these places is returned only as untrusted data. Setting
+     * this replaces the default; an empty list shows no such name.
+     * Default: ["secrets:gitleaks"].
+     * @visibility backend
+     */
+    knownJobNames?: string[];
+    /**
      * Longest wait of one wait-for-app-publication call, in seconds.
      * Default 20; at most 270. Raise it to about 240 only when the MCP server
      * sends progress notifications.
