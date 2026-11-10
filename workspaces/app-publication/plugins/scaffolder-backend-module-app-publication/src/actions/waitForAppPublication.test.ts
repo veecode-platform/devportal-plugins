@@ -1148,23 +1148,28 @@ describe('wait-for-app-publication: a failed scan, lint, build or test job', () 
 });
 
 describe('wait-for-app-publication: job and stage names in the shown form', () => {
-  it.each(['secrets:gitleaks', 'test/unit', 'scan:deps/npm', 'a.b_c-d:e/f'])(
-    'shows the job name %s',
-    async name => {
-      const w = world();
-      failedWithLogs(w, [{ id: 403, name, stage: 'scan', log: 'output' }]);
+  it.each([
+    'secrets:gitleaks',
+    'tofu:fmt',
+    'test/unit',
+    'scan:deps/npm',
+    'a_b-c:d_e/f-g',
+    'a.b_c-d',
+    'lint-check',
+  ])('shows the job name %s', async name => {
+    const w = world();
+    failedWithLogs(w, [{ id: 403, name, stage: 'scan', log: 'output' }]);
 
-      const output = await run(w, WAIT, input());
+    const output = await run(w, WAIT, input());
 
-      expect(output.nextStep).toContain(`The scan \`${name}\` failed`);
-      expect(output.failedJobs).toEqual([
-        expect.objectContaining({ name, stage: 'scan' }),
-      ]);
-      expect(output.failedJobs).toEqual([
-        expect.not.objectContaining({ untrustedJobName: expect.anything() }),
-      ]);
-    },
-  );
+    expect(output.nextStep).toContain(`The scan \`${name}\` failed`);
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({ name, stage: 'scan' }),
+    ]);
+    expect(output.failedJobs).toEqual([
+      expect.not.objectContaining({ untrustedJobName: expect.anything() }),
+    ]);
+  });
 
   it.each([
     'two words',
@@ -1173,6 +1178,17 @@ describe('wait-for-app-publication: job and stage names in the shown form', () =
     'https://example.test/x',
     '//example.test/x',
     'a'.repeat(65),
+    `${'a:'.repeat(32)}a`,
+    'example.com/login',
+    'example.com:8080',
+    'a.b:c',
+    'a:b.c/d',
+    'a//b',
+    'a::b',
+    'a:/b',
+    ':x',
+    'x/',
+    'x:',
   ])('keeps the job name %j out of the sentence', async name => {
     const w = world();
     failedWithLogs(w, [{ id: 403, name, stage: 'scan', log: 'output' }]);
