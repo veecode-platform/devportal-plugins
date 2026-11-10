@@ -122,7 +122,12 @@ string of the wrong length. Each secret carries the registration tags and the ta
   that name exists. A template that creates an app can therefore run it before the repository is
   published, so the first deploy finds the values.
 - When a client with that name exists, the System must be in the catalog and owned by the caller,
-  so nobody takes over the login of another app by naming it.
+  so nobody takes over the login of another app by naming it. One exception lets a template that
+  creates an app run the step again before the System reaches the catalog: the action adopts the
+  client when all three secrets exist and each carries the tag `veecode.io/cognito-client-id` with
+  the client's own ID, and the client's callback URL is this app's. Adopting writes nothing and
+  reveals nothing. With any secret missing, tagged for another client, untagged, or scheduled for
+  deletion, the run is refused.
 - A System outside the `default` namespace is refused unless `clientNamePattern` has `{namespace}`,
   as it is for the secret path. Otherwise it would share a client with a System of the same name.
 - The app and namespace names must be DNS labels, because they end up in the app's host name. When
@@ -138,6 +143,8 @@ The run looks first, then writes. It assumes the writer role once, lists the poo
 | none                           | none exist                                                  | creates the client, then the three secrets. `created` is true.                                     |
 | none                           | some exist                                                  | refuses before creating anything.                                                                  |
 | one, with another callback URL | any                                                         | refuses, naming no secret. The callback URL must be exactly this app's `<appUrl>/oauth2/callback`. |
+| one, System not in the catalog | all exist, each tagged with the client's ID                 | adopts the client, changes nothing, `created` is false.                                            |
+| one, System not in the catalog | any other state                                             | refuses.                                                                                           |
 | one                            | all exist, each tagged with the client's ID                 | changes nothing, `created` is false.                                                               |
 | one                            | some missing, the others tagged with the client's ID        | writes the missing ones, the client secret read back from Cognito.                                 |
 | one                            | one exists without the client's ID tag, or is being deleted | refuses, naming the secret and no value.                                                           |
@@ -151,11 +158,12 @@ values and make the tag untrue.
 If a write fails after the client was created, the step fails and says so. Run it again with the
 System in the catalog and it writes the values still missing, without a second client.
 
-A client that exists is never used for a System that is not in the catalog, even a client this
-action created a moment earlier. If a template creates the client, then a later step fails before the
-System reaches the catalog, the rerun is refused, and the client and any secrets it wrote have to be
-removed by hand before the template can run again. Two first runs for the same new app at the same
-moment can leave two clients of one name; the action then refuses until one is removed.
+If a write fails after the client was created and the System is not in the catalog yet, the rerun
+is refused, because the three secrets are not all in place: the client and the secrets it wrote have
+to be removed by hand. A rerun after all three secrets were written is adopted, whether a later
+template step failed or the System has simply not been discovered yet. Two first runs for the same
+new app at the same moment can leave two clients of one name; the action then refuses until one is
+removed.
 
 ### Session policy
 

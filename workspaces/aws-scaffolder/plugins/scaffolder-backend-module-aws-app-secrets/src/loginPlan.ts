@@ -40,13 +40,24 @@ export function planLoginClient(options: {
     return { kind: 'create' };
   }
 
+  const [clientId] = clientIds;
   if (!systemInCatalog) {
-    throw new Error(
-      `a client named "${clientName}" already exists in the user pool, so the System must be in the catalog and owned by the user before this step can use it`,
-    );
+    const inPlace = LOGIN_SECRET_NAMES.every(name => {
+      const secret = secrets[name];
+      return (
+        secret.exists &&
+        !secret.scheduledForDeletion &&
+        secret.tags[CLIENT_ID_TAG] === clientId
+      );
+    });
+    if (!inPlace) {
+      throw new Error(
+        `a client named "${clientName}" already exists in the user pool, and its three secrets are not all in place for it, so the System must be in the catalog and owned by the user before this step can use it`,
+      );
+    }
+    return { kind: 'existing', clientId };
   }
 
-  const [clientId] = clientIds;
   const missing: LoginSecretName[] = [];
   for (const name of LOGIN_SECRET_NAMES) {
     const secret = secrets[name];

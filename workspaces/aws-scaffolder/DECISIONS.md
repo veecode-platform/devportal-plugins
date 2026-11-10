@@ -141,14 +141,18 @@ from a user who does not own it, and a System that is hidden from the user is no
 does not exist. The register action reads with the user's credentials and refuses what it cannot
 see, so it fails closed and is unchanged. A
 System that is not in the catalog may get a client only when no client of that name exists. A client
-that exists needs the System in the catalog and owned by the caller. A System outside the `default`
+that exists needs the System in the catalog and owned by the caller, with one exception: the action
+adopts the client when all three secrets exist and each is tagged with that client's ID, and the
+callback URL is this app's, so a rerun of a template that creates an app does not need the System
+yet. Adopting reads no value, writes nothing and returns only the client ID. A System outside the `default`
 namespace is refused unless `clientNamePattern` has `{namespace}`, for the reason of PDR-006. The
 app and namespace names must be DNS labels, because the caller supplies them when the System is not
 in the catalog and they end up in a host name and a client name.
 
-**Consequences:** Any run that ends after it created the client and before the System reaches the
-catalog cannot be repeated, whether a secret write failed or a later template step did: the client
-exists and the System does not. The client and the secrets it wrote have to be removed by hand. Two first runs for one new app at the same moment can leave two clients of one
+**Consequences:** A run that ends after it created the client and before all three secrets were
+written cannot be repeated while the System is not in the catalog: the client exists, the secrets are
+not all in place, and the System does not exist. The client and the secrets it wrote have to be
+removed by hand. A run that ended after all three were written can be repeated. Two first runs for one new app at the same moment can leave two clients of one
 name, and the action refuses until one is removed. A caller can create clients for names of apps
 that do not exist; the pool's limit on clients is the only bound, and the audit trail is the session
 name and source identity of each run.

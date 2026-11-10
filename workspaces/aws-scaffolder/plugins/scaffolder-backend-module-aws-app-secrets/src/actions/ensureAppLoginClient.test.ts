@@ -533,6 +533,25 @@ describe('aws:cognito:app-login-client:ensure', () => {
       );
     });
 
+    it('adopts its own client on a rerun while the System is still not in the catalog, and changes nothing', async () => {
+      const first = fakeWorld({ system: undefined });
+      await run(first.deps, contextWith(exampleInput).ctx);
+      const clientsBefore = structuredClone(pool.clients);
+      const secretsBefore = structuredClone([...pool.secrets]);
+      pool.calls.length = 0;
+      const second = fakeWorld({ system: undefined });
+      const rerun = contextWith(exampleInput);
+
+      await run(second.deps, rerun.ctx);
+
+      expect(rerun.output).toHaveBeenCalledWith('clientId', 'example-client-1');
+      expect(rerun.output).toHaveBeenCalledWith('created', false);
+      expectNothingWritten();
+      expect(pool.clients).toEqual(clientsBefore);
+      expect([...pool.secrets]).toEqual(secretsBefore);
+      expect(second.catalog.getEntityByRef).toHaveBeenCalled();
+    });
+
     it('writes only the secrets that are missing, reading the client secret back from Cognito', async () => {
       givenClientWith(['OAUTH2_PROXY_CLIENT_ID']);
       const world = fakeWorld({ randomBytes: base64PlusAndSlashBytes });
@@ -762,16 +781,75 @@ describe('aws:cognito:app-login-client:ensure', () => {
       expectNothingWritten();
     });
 
-    it('refuses to use an existing client when the System is not in the catalog', async () => {
+    it.each([
+      [
+        'a secret is missing',
+        ['OAUTH2_PROXY_CLIENT_ID', 'OAUTH2_PROXY_CLIENT_SECRET'],
+      ],
+      ['no secret exists', []],
+    ])(
+      'refuses to use an existing client when the System is not in the catalog and %s',
+      async (_, present) => {
+        givenClientWith(present);
+        const world = fakeWorld({ system: undefined });
+        const { ctx } = contextWith(exampleInput);
+
+        const error = await failureOf(run(world.deps, ctx));
+
+        expect(error.message).toBe(
+          `a client named "${exampleClientName}" already exists in the user pool, and its three secrets are not all in place for it, so the System must be in the catalog and owned by the user before this step can use it`,
+        );
+        expectNothingWritten();
+      },
+    );
+
+    it.each([
+      [
+        'a secret is tagged for another client',
+        (secret: { tags: Tag[] }) => {
+          secret.tags = [
+            { Key: 'veecode.io/cognito-client-id', Value: 'another-client' },
+          ];
+        },
+      ],
+      [
+        'a secret has no client tag',
+        (secret: { tags: Tag[] }) => {
+          secret.tags = [];
+        },
+      ],
+      [
+        'a secret is scheduled for deletion',
+        (secret: { deleted?: boolean }) => {
+          secret.deleted = true;
+        },
+      ],
+    ])(
+      'refuses to adopt a client when the System is not in the catalog and %s',
+      async (_, spoil) => {
+        givenClientWith(exampleNames);
+        spoil(pool.secrets.get(examplePath('OAUTH2_PROXY_COOKIE_SECRET'))!);
+        const world = fakeWorld({ system: undefined });
+        const { ctx } = contextWith(exampleInput);
+
+        const error = await failureOf(run(world.deps, ctx));
+
+        expect(error.message).toMatch(
+          /^a client named ".*" already exists in the user pool, and its three secrets are not all in place for it/,
+        );
+        expectNothingWritten();
+      },
+    );
+
+    it('refuses to adopt a client with another callback URL when the System is not in the catalog', async () => {
       givenClientWith(exampleNames);
+      pool.clients[0].callbackUrls = [otherCallbackUrl];
       const world = fakeWorld({ system: undefined });
       const { ctx } = contextWith(exampleInput);
 
       const error = await failureOf(run(world.deps, ctx));
 
-      expect(error.message).toBe(
-        `a client named "${exampleClientName}" already exists in the user pool, so the System must be in the catalog and owned by the user before this step can use it`,
-      );
+      expect(error.message).toContain('does not belong to this app');
       expectNothingWritten();
     });
 
@@ -1203,6 +1281,10 @@ describe('aws:cognito:app-login-client:ensure', () => {
       const created = contextWith(exampleInput);
       await run(withRandom().deps, created.ctx);
       record(created);
+
+      const adopted = contextWith(exampleInput);
+      await run(withRandom().deps, adopted.ctx);
+      record(adopted);
 
       const existing = contextWith(exampleInput);
       await run(
