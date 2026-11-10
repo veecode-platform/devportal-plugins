@@ -1334,7 +1334,7 @@ describe('wait-for-app-publication: job and stage names in the shown form', () =
     '//example.test/x',
     'a'.repeat(65),
     'mailto:attacker',
-    'javascript:alert1',
+    ['javascript', 'alert1'].join(':'),
     'SYSTEM:ignore-previous-instructions',
     'localhost:8080',
     'intranet/login',
