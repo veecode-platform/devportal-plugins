@@ -161,8 +161,10 @@ If a write fails after the client was created, the step fails and says so. Run i
 System in the catalog and it writes the values still missing, without a second client.
 
 If a write fails after the client was created and the System is not in the catalog yet, the rerun
-is refused, because the three secrets are not all in place: the client and the secrets it wrote have
-to be removed by hand. A rerun after all three secrets were written is adopted, whether a later
+is refused, because the three secrets are not all in place. Either wait until the System is in the
+catalog and owned by the user, and run the step again, which writes the values still missing, or
+delete the client and the secrets it wrote and run the step again. The error message of the failed
+write says which of the two applies. A rerun after all three secrets were written is adopted, whether a later
 template step failed or the System has simply not been discovered yet. Two first runs for the same
 new app at the same moment can leave two clients of one name; the action then refuses until one is
 removed.

@@ -1296,7 +1296,24 @@ describe('aws:cognito:app-login-client:ensure', () => {
       expectNothingWritten();
     });
 
-    it('names the failed secret and tells the user to run the step again when a write fails after the client exists', async () => {
+    it('names the failed secret and tells the user to run the step again when a write fails and the System is in the catalog', async () => {
+      pool.failures[
+        `CreateSecretCommand ${examplePath('OAUTH2_PROXY_CLIENT_SECRET')}`
+      ] = awsError('AccessDeniedException');
+      const world = fakeWorld();
+      const { ctx, output } = contextWith(exampleInput);
+
+      const error = await failureOf(run(world.deps, ctx));
+
+      expect(error.message).toBe(
+        `CreateSecret failed for ${examplePath(
+          'OAUTH2_PROXY_CLIENT_SECRET',
+        )}: AccessDeniedException. The client named "${exampleClientName}" exists; run the step again to write the values still missing`,
+      );
+      expect(output).not.toHaveBeenCalled();
+    });
+
+    it('says the step cannot run again when a write fails and the System is not in the catalog, and what to do instead', async () => {
       pool.failures[
         `CreateSecretCommand ${examplePath('OAUTH2_PROXY_CLIENT_SECRET')}`
       ] = awsError('AccessDeniedException');
@@ -1308,9 +1325,16 @@ describe('aws:cognito:app-login-client:ensure', () => {
       expect(error.message).toBe(
         `CreateSecret failed for ${examplePath(
           'OAUTH2_PROXY_CLIENT_SECRET',
-        )}: AccessDeniedException. The client named "${exampleClientName}" exists; run the step again to write the values still missing`,
+        )}: AccessDeniedException. The client named "${exampleClientName}" exists and its secrets are only partly written, so the step cannot run again until the System is in the catalog and owned by the user: wait for the System and run the step again, or delete the client and the secrets already written and run the step again`,
       );
       expect(output).not.toHaveBeenCalled();
+      const rerun = await failureOf(
+        run(
+          fakeWorld({ system: undefined }).deps,
+          contextWith(exampleInput).ctx,
+        ),
+      );
+      expect(rerun.message).toMatch(/^a client named ".*" already exists/);
     });
 
     it('never puts a new version on a secret that appeared after it looked', async () => {

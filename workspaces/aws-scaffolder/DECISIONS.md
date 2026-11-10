@@ -151,8 +151,8 @@ in the catalog and they end up in a host name and a client name.
 
 **Consequences:** A run that ends after it created the client and before all three secrets were
 written cannot be repeated while the System is not in the catalog: the client exists, the secrets are
-not all in place, and the System does not exist. The client and the secrets it wrote have to be
-removed by hand. A run that ended after all three were written can be repeated. Two first runs for one new app at the same moment can leave two clients of one
+not all in place, and the System does not exist. The user waits until the System is in the catalog
+and owned by them, and then runs the step again, or deletes the client and the secrets it wrote. A run that ended after all three were written can be repeated. Two first runs for one new app at the same moment can leave two clients of one
 name, and the action refuses until one is removed. A caller can create clients for names of apps
 that do not exist; the pool's limit on clients is the only bound, and the audit trail is the session
 name and source identity of each run.

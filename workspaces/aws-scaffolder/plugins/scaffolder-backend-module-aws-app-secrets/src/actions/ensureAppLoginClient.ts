@@ -203,7 +203,7 @@ export function createEnsureAppLoginClientAction(deps: AppSecretsDependencies) {
           throw new Error(
             `${
               error instanceof Error ? error.message : 'CreateSecret failed'
-            }. The client named "${clientName}" exists; run the step again to write the values still missing`,
+            }. ${writeFailureAdvice(clientName, system !== undefined)}`,
           );
         });
       }
@@ -286,6 +286,16 @@ async function settle(
     values.OAUTH2_PROXY_COOKIE_SECRET = newCookieSecret(randomBytes);
   }
   return { clientId: plan.clientId, missing: plan.missing, values };
+}
+
+function writeFailureAdvice(
+  clientName: string,
+  systemInCatalog: boolean,
+): string {
+  if (systemInCatalog) {
+    return `The client named "${clientName}" exists; run the step again to write the values still missing`;
+  }
+  return `The client named "${clientName}" exists and its secrets are only partly written, so the step cannot run again until the System is in the catalog and owned by the user: wait for the System and run the step again, or delete the client and the secrets already written and run the step again`;
 }
 
 function describeOutcome(

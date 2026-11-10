@@ -72,7 +72,9 @@ export interface Config {
       /**
        * Name of an app's client in the pool. Must contain {app} and
        * {environment}; may contain {namespace}, which a System outside the
-       * default namespace needs. Defaults to {app}-{environment}.
+       * default namespace needs. Neighbouring placeholders must be separated
+       * by one of . _ + = , @, which no app or environment name contains.
+       * Defaults to {app}.{environment}.
        * @visibility backend
        */
       clientNamePattern?: string;
