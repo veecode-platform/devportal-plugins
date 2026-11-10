@@ -16,6 +16,7 @@ describe('readAppPublicationConfig', () => {
       contractResultArtifact: 'contract-result.json',
       conflictMarkersJobName: 'conflict-markers',
       renderJobName: 'render',
+      knownJobNames: ['secrets:gitleaks'],
       maxWaitSeconds: 20,
       pollIntervalSeconds: 5,
       maxArtifactBytes: 65536,
@@ -70,6 +71,14 @@ describe('readAppPublicationConfig', () => {
       { projectPathPrefix: 'example-org', renderJobName: 'render job' },
     ],
     [
+      'a known job name with a space',
+      { projectPathPrefix: 'example-org', knownJobNames: ['tofu fmt'] },
+    ],
+    [
+      'a known job name with a character outside the set',
+      { projectPathPrefix: 'example-org', knownJobNames: ['tofu`fmt'] },
+    ],
+    [
       'a log of 0 lines',
       { projectPathPrefix: 'example-org', failedJobLogLines: 0 },
     ],
@@ -79,6 +88,19 @@ describe('readAppPublicationConfig', () => {
     ],
   ])('refuses %s', (_label, value) => {
     expect(() => read(value)).toThrow();
+  });
+
+  it('takes the known job names as given, and accepts an empty list', () => {
+    expect(
+      read({
+        projectPathPrefix: 'example-org',
+        knownJobNames: ['tofu:fmt', 'test/unit'],
+      }).knownJobNames,
+    ).toEqual(['tofu:fmt', 'test/unit']);
+    expect(
+      read({ projectPathPrefix: 'example-org', knownJobNames: [] })
+        .knownJobNames,
+    ).toEqual([]);
   });
 
   it('accepts the longest wait the portal may use', () => {

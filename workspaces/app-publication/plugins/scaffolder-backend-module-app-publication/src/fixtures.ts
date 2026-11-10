@@ -222,6 +222,61 @@ export function status(code: number): () => Response {
 }
 
 /**
+ * A reply that sends one chunk of body and then fails, as a read cut off by the
+ * call's deadline does.
+ */
+export function brokenBody(): () => Response {
+  return () =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('partial output\n'));
+        },
+        pull(controller) {
+          const timeout = new Error('The operation was aborted due to timeout');
+          timeout.name = 'TimeoutError';
+          controller.error(timeout);
+        },
+      }),
+    );
+}
+
+/** The ways a job's log can fail to be read, each as a reply. */
+export const UNREADABLE_LOGS: readonly (readonly [string, () => Response])[] = [
+  ['answers 500', status(500)],
+  ['answers 403', status(403)],
+  ['fails in the middle of its body', brokenBody()],
+];
+
+/** Failed jobs whose sentence points to their log: name, stage, and how their sentence starts. */
+export const LOG_JOBS: readonly (readonly [string, string, string])[] = [
+  ['lint-check', 'lint', 'The check `lint-check` failed on the change.'],
+  ['back-test', 'build', 'The check `back-test` failed on the change.'],
+  ['conflict-markers', 'lint', 'A file holds Git conflict markers'],
+  [
+    'secrets:gitleaks',
+    'scan',
+    'The scan `secrets:gitleaks` failed on the change.',
+  ],
+];
+
+type UnreadableLogCase = [string, string, string, string, () => Response];
+
+/** Every job of LOG_JOBS with every way of failing to read its log: name, stage, reason, sentence start, reply. */
+export const UNREADABLE_LOG_CASES: UnreadableLogCase[] = LOG_JOBS.flatMap(
+  ([name, stage, start]) =>
+    UNREADABLE_LOGS.map(
+      ([reason, reply]): UnreadableLogCase => [
+        name,
+        stage,
+        reason,
+        start,
+        reply,
+      ],
+    ),
+);
+
+/**
  * A GitLab that answers by relative path. Replies for one path are used in
  * order, and the last one repeats. A path with no reply is a 404.
  */

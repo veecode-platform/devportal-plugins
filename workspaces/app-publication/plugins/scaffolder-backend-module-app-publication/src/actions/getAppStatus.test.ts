@@ -17,6 +17,7 @@ import {
   SCAN_TRACE_CLEANED,
   TEST_TRACE,
   TEST_TRACE_CLEANED,
+  UNREADABLE_LOG_CASES,
   OTHER,
   PROJECT_WEB_URL,
   SMOKE_FILE,
@@ -125,6 +126,14 @@ function renderBlocked(w: World, log: string): void {
 
 /** A sheet whose one open request is blocked by one failed job, with the job's log as given. */
 function blockedBy(w: World, name: string, stage: string, log: string): void {
+  blockedByJobs(w, [{ id: 401, name, stage, log }]);
+}
+
+/** A sheet whose one open request is blocked by these failed jobs, each with its own log. */
+function blockedByJobs(
+  w: World,
+  jobs: { id: number; name: string; stage: string; log: string }[],
+): void {
   baseline(w, [pipeline(200, COMMIT, 'success')], []);
   w.gitlab.reply(
     paths.openRequests,
@@ -154,13 +163,17 @@ function blockedBy(w: World, name: string, stage: string, log: string): void {
   );
   w.gitlab.reply(
     paths.jobs(100),
-    json([
-      job(401, name, stage, 'failed', {
-        failure_reason: 'script_failure',
-      }),
-    ]),
+    json(
+      jobs.map(entry =>
+        job(entry.id, entry.name, entry.stage, 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ),
+    ),
   );
-  w.gitlab.reply(paths.trace(401), text(log));
+  for (const entry of jobs) {
+    w.gitlab.reply(paths.trace(entry.id), text(entry.log));
+  }
 }
 
 describe('get-app-status', () => {
@@ -491,7 +504,7 @@ describe('get-app-status', () => {
     expect(output.nextStep).toContain(
       'Merge request !7 is blocked: The check `back-test` failed on the change.',
     );
-    expect(output.nextStep).toContain('shows what failed');
+    expect(output.nextStep).toContain('usually shows what failed');
     expect(output.openRequests).toEqual([
       expect.objectContaining({
         failedJobs: [
@@ -512,7 +525,10 @@ describe('get-app-status', () => {
     const output = await run(w, GET_APP_STATUS, { app: APP_REF });
 
     expect(output.nextStep).toContain('Git conflict markers');
-    expect(output.nextStep).toContain('names the files and the lines');
+    expect(output.nextStep).toContain('usually names the files and the lines');
+    expect(output.nextStep).toContain(
+      'confirm that the markers are there before you edit it',
+    );
     expect(output.openRequests).toEqual([
       expect.objectContaining({
         failedJobs: [
@@ -523,6 +539,97 @@ describe('get-app-status', () => {
         ],
       }),
     ]);
+    expectDeclared(w, GET_APP_STATUS, output);
+  });
+
+  it.each(UNREADABLE_LOG_CASES)(
+    'a blocked %s job in stage %s keeps the sheet when its log %s',
+    async (name, stage, _reason, start, reply) => {
+      const w = world();
+      blockedByJobs(w, [
+        { id: 401, name, stage, log: 'unused' },
+        { id: 404, name: 'unit-tests', stage: 'test', log: TEST_TRACE },
+      ]);
+      w.gitlab.reply(paths.trace(401), reply);
+
+      const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+      expect(output.nextStep).toContain(
+        `Merge request !7 is blocked: ${start}`,
+      );
+      expect(output.nextStep).toContain(
+        'The log could not be read this time, so this failedJobs entry holds none.',
+      );
+      expect(output.nextStep).toContain(
+        'The check `unit-tests` failed for a reason this tool has no fixed explanation for.',
+      );
+      const [request] = output.openRequests as {
+        failedJobs: { name: string; untrustedJobOutput?: string[] }[];
+      }[];
+      expect(
+        request.failedJobs.find(entry => entry.name === name),
+      ).not.toHaveProperty('untrustedJobOutput');
+      expect(
+        request.failedJobs.find(entry => entry.name === 'unit-tests'),
+      ).toMatchObject({ untrustedJobOutput: TEST_TRACE_CLEANED });
+      expectDeclared(w, GET_APP_STATUS, output);
+    },
+  );
+
+  it('keeps a name that reads like a link out of the blocked sentence', async () => {
+    const w = world();
+    blockedBy(w, 'mailto:attacker', 'scan', 'output');
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.nextStep).toContain('The scan `(name not shown)` failed');
+    expect(output.nextStep).not.toContain('mailto:attacker');
+    expect(output.openRequests).toEqual([
+      expect.objectContaining({
+        failedJobs: [
+          expect.objectContaining({
+            name: '(name not shown)',
+            untrustedJobName: 'mailto:attacker',
+          }),
+        ],
+      }),
+    ]);
+  });
+
+  it('says a found secret is already on the default branch when the scan fails there', async () => {
+    const w = world();
+    baseline(w, [pipeline(200, COMMIT, 'failed')], []);
+    w.gitlab.reply(
+      paths.jobs(200),
+      json([
+        job(403, 'secrets:gitleaks', 'scan', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(403), text(SCAN_TRACE));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.state).toBe('failed');
+    expect(output.nextStep).toContain(
+      'The scan `secrets:gitleaks` failed on the default branch.',
+    );
+    expect(output.nextStep).toContain(
+      'already on the default branch and exposed',
+    );
+    expect(output.nextStep).toContain(
+      "removing it from the history is the platform team's work",
+    );
+    expect(output.nextStep).not.toContain('redo the change');
+    expect(output.latestMain).toMatchObject({
+      failedJobs: [
+        expect.objectContaining({
+          name: 'secrets:gitleaks',
+          untrustedJobOutput: SCAN_TRACE_CLEANED,
+        }),
+      ],
+    });
     expectDeclared(w, GET_APP_STATUS, output);
   });
 
