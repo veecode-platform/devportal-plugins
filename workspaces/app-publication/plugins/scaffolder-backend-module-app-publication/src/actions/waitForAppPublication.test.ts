@@ -1102,8 +1102,9 @@ describe('wait-for-app-publication: a failed scan, lint, build or test job', () 
       expect(output.nextStep).toContain(
         'without repeating any value that looks like a secret',
       );
-      expect(String(output.nextStep).indexOf('shows what failed')).toBeLessThan(
-        String(output.nextStep).indexOf('run the local checks'),
+      const nextStep = String(output.nextStep);
+      expect(nextStep.indexOf('shows what failed')).toBeLessThan(
+        nextStep.indexOf('run the local checks'),
       );
       expect(output.nextStep).toContain('-o merge_request.auto_merge');
       expect(output.failedJobs).toEqual([
@@ -1276,7 +1277,7 @@ describe('wait-for-app-publication: e-mail addresses in the returned log lines',
         log: [
           `Author: Example Person <${AUTHOR_EMAIL}>`,
           'contact first.last+tag@sub.example.co.uk or other_name@example.org.',
-          'joão.silva@example.com.br',
+          'joão.exemplo@example.com',
           'installing lodash@4.17.21 and @example-scope/example-pkg@1.2.3',
           'no address on this line',
         ].join('\n'),

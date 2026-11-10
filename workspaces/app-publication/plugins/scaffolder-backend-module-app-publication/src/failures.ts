@@ -19,8 +19,12 @@ export const MAX_FAILED = 5;
 const LOG_READ_BYTES = 262144;
 const LOG_LINE_LIMIT = 500;
 const REASON_PATTERN = /^[a-z_]{1,64}$/;
-/** A job or stage name that may appear in a sentence: a closed label, no space, no URL. */
-const LABEL_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+/**
+ * A job or stage name that may appear in a sentence: a closed label of plain
+ * characters. It may hold `:` and `/`, as GitLab job names do (`secrets:gitleaks`,
+ * `test/unit`), but no space, no backtick and no `//`, so it cannot read as a URL.
+ */
+const LABEL_PATTERN = /^(?!.*\/\/)[A-Za-z0-9._:/-]{1,64}$/;
 const STAGE_ORDER = ['lint', 'build', 'scan', 'deploy'];
 const FIXED_REASONS = ['script_failure', 'job_execution_timeout'];
 /** A line the render check prints for a config the platform chart refused, and nothing else on the line. */
@@ -33,6 +37,10 @@ const RUNNER_PREFIX =
 const ANSI_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
 /** A section marker line the runner prints around a step. It has no text for the reader. */
 const SECTION_MARKER = /^section_(?:start|end):\S*$/;
+/** An e-mail address. The domain must end in letters, so a version pin such as `lodash@4.17.21` is not one. */
+const EMAIL_ADDRESS =
+  /[\p{L}\p{N}._%+-]{1,64}@(?:[\p{L}\p{N}-]{1,63}\.)+\p{L}{2,63}/gu;
+const EMAIL_PLACEHOLDER = '[email]';
 
 export interface FailureContext {
   gitlab: GitlabClient;
@@ -146,7 +154,7 @@ async function describeJob(
     return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
   }
   if (job.name === ctx.settings.conflictMarkersJobName) {
-    return { job: entry, sentence: S.SENTENCE.conflictMarkers };
+    return explain(ctx, job, entry, S.SENTENCE.conflictMarkers);
   }
   if (reason === 'job_execution_timeout') {
     return { job: entry, sentence: S.TIMEOUT(name, link) };
@@ -162,7 +170,7 @@ async function describeJob(
     return describeRender(ctx, job, entry, name, link);
   }
   if (job.stage === 'lint' || job.stage === 'build') {
-    return { job: entry, sentence: S.LINT_OR_BUILD(name) };
+    return explain(ctx, job, entry, S.LINT_OR_BUILD(name));
   }
   if (job.stage === 'scan') {
     return explain(ctx, job, entry, S.SCAN_FAILED(name, link));
@@ -240,9 +248,9 @@ function ownedFileSentence(
 }
 
 /**
- * The job's own name, stage and link, plus the end of its log for a failure with
- * no fixed explanation. The log is returned as untrusted data in its own field
- * and never put in a sentence.
+ * The job's own name, stage and link, plus the end of its log for a failure whose
+ * sentence points to the log. The log is returned as untrusted data in its own
+ * field and never put in a sentence.
  */
 async function explain(
   ctx: FailureContext,
@@ -328,9 +336,10 @@ function refusedConfigs(
 /**
  * The lines of a trace window as the reader sees them. The window is split at
  * line feeds and carriage returns, and the runner's prefix and the escape
- * sequences are removed. Leading spaces are kept. Empty lines and section
- * markers are dropped, and a cut-off first line is dropped too. A trace without
- * the runner's prefix goes through the same steps, minus the prefix.
+ * sequences are removed. E-mail addresses are replaced by a placeholder. Leading
+ * spaces are kept. Empty lines and section markers are dropped, and a cut-off
+ * first line is dropped too. A trace without the runner's prefix goes through
+ * the same steps, minus the prefix.
  */
 function cleanLines(
   tail: { text: string; truncated: boolean } | undefined,
@@ -348,9 +357,17 @@ function cleanLines(
     .map(line => line.slice(0, LOG_LINE_LIMIT));
 }
 
-/** One trace line without the runner's prefix and escape sequences, trailing spaces removed. */
+/**
+ * One trace line without the runner's prefix and escape sequences, with each
+ * e-mail address replaced, trailing spaces removed. The addresses go before the
+ * line is cut to its length limit, so half of one is never left.
+ */
 function cleanLine(line: string): string {
-  return line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '').trimEnd();
+  const text = line.replace(RUNNER_PREFIX, '').replace(ANSI_SEQUENCE, '');
+  const redacted = text.includes('@')
+    ? text.replace(EMAIL_ADDRESS, EMAIL_PLACEHOLDER)
+    : text;
+  return redacted.trimEnd();
 }
 
 /** The last `failedJobLogLines` cleaned lines of a log. */

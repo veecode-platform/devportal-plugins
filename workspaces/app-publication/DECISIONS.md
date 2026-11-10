@@ -26,7 +26,8 @@ runner's timestamp and stream prefix, when present, and the ANSI escape sequence
 removed. Leading spaces are kept, so indentation survives. Empty pieces and section markers are dropped. Each cleaned
 line is cut to 500 characters. The field is marked untrusted: it is the job's own data, never a sentence and never
 instructions. The output is read only for the app's own project and only after the owner check passes. The tool does
-not mask the output. The cleaning applies to every job that gets a log tail, so the output of those jobs changes too.
+not mask the output, except for e-mail addresses (PDR-012). The cleaning applies to every job that gets a log tail, so
+the output of those jobs changes too. PDR-012 adds the jobs that get a log tail although their sentence is fixed.
 
 **Consequences:** A value the job script printed, such as a credential, can reach Claude's reply. The product owner
 chose this risk. Revisit it when the deploy access leaves the app's pipeline.
@@ -168,7 +169,8 @@ the end of the log should give the key and the reason, and, when the log shows n
 platform, gives the platform team the job's link and says not to change platform-owned files. The text of the log is
 never copied into a sentence. With no
 such line, the job gets the PDR-002 explanation. The render check applies to merge request pipelines only, which is
-where the generated pipeline runs `render`. A `render` failure on the default branch keeps the generic lint sentence.
+where the generated pipeline runs `render`. A `render` failure on the default branch keeps the generic lint sentence, which returns
+the end of the log too (PDR-012).
 Other job names keep their sentence.
 
 **Consequences:** The search covers the 256 KB that the tool reads from the end of the trace. A refusal earlier than
@@ -180,3 +182,41 @@ A line of the job's log triggers the sentence, so a line that the job prints, or
 the sentence say that a config was refused. The effect is limited to the app's own pieces and configured environments:
 a line that names another piece or environment is ignored, and the file the sentence names is always one of the app's
 own `<piece>/config/<environment>.yaml` files.
+
+## PDR-012: Job names with `:` and `/`, no e-mail address in a returned log, and a log for the jobs the user must act on
+
+**Status:** Accepted
+
+**Context:** A live proof of a business app's merge gates showed four gaps in what the tools return. The secret scan
+is a job named `secrets:gitleaks`, and the label form refused the `:`, so every sentence showed "(name not shown)". The
+scan's log carries the commit author's name and e-mail address, which is personal data, and Claude reads it. The
+sentence for a found secret did not say that the value already reached GitLab, or what the app's root `CLAUDE.md`
+asks for then. A failed conflict-marker check and a failed lint, build or test job gave no log, so Claude could not
+name the file or the test without running the local checks.
+
+**Decision:**
+
+- A job or stage name is shown when it matches `^[A-Za-z0-9._:/-]{1,64}$` and holds no `//`. GitLab job names hold `:` and
+  `/` (the module's own job-name settings accept them already). A space and a backtick still send the name to
+  `untrustedJobName`, and `//` does too, so a shown name never reads as a URL (PDR-008).
+- Every cleaned log line returned in `untrustedJobOutput`, for every job, has each e-mail address replaced by `[email]`.
+  This happens after the runner's prefix and the escape sequences are removed, and before the line is cut to 500
+  characters, so half an address is never left. An address is a local part of letters, digits and `._%+-` (at most 64
+  characters), an at sign, and a domain of dot-separated labels that ends in at least two letters. A version pin such as
+  `lodash@4.17.21` is not an address. The pattern leans toward replacing: an ssh remote such as
+  `git@example.com:example-org/example-app.git` is replaced too. The author's name is not replaced.
+- The scan sentence adds, in fixed text: a real secret already reached GitLab with the push, so Claude tells the user it
+  is exposed and must be changed where it was issued, without repeating it, and redoes the change as the app's root
+  `CLAUDE.md` describes (a new branch from the default branch, one commit that never held the value). The rest of the
+  sentence stays.
+- A failed conflict-marker job returns the log tail, and its sentence says the end of the log names the files and the
+  lines. A failed job in stage `lint` or `build` returns the log tail, and its sentence says the end of the log shows
+  what failed, before it sends Claude to the local checks. Both sentences keep the rule not to repeat a value that looks
+  like a secret.
+- Both tools get this from the same code: `wait-for-app-publication` (a failed request pipeline, and a failed
+  default-branch pipeline) and `get-app-status` (the blocked entry of an open merge request).
+
+**Consequences:** The name of a commit's author still reaches Claude through the scan's `Author:` line. Revisit it with
+PDR-002 if that is not acceptable. Every failed lint or build job costs one more log read of up to 256 KB, and a
+pipeline reads at most five failed jobs, so the status sheet reads more logs for a blocked merge request than before. An
+address-shaped text that is not an address, such as an ssh remote, shows as `[email]`.
