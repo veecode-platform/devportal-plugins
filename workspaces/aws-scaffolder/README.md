@@ -116,8 +116,8 @@ string of the wrong length. Each secret carries the registration tags and the ta
 
 - When the System is in the catalog, the caller must own it, the same rule as the register action.
 - When the System is not in the catalog yet, the action may create a client only if no client with
-  that name exists. A create-app template can therefore run it before the repository is published,
-  so the first deploy finds the values.
+  that name exists. A template that creates an app can therefore run it before the repository is
+  published, so the first deploy finds the values.
 - When a client with that name exists, the System must be in the catalog and owned by the caller,
   so nobody takes over the login of another app by naming it.
 - A System outside the `default` namespace is refused unless `clientNamePattern` has `{namespace}`,
@@ -145,10 +145,13 @@ the client. Add `OAUTH2_PROXY_` to `reservedPrefixes`, so the register action ca
 values and make the tag untrue.
 
 If a write fails after the client was created, the step fails and says so. Run it again with the
-System in the catalog and it writes the values still missing, without a second client. If the
-System is not in the catalog yet, the rerun is refused by the rule above, and the extra client has
-to be removed by hand. Two first runs for the same new app at the same moment can leave two clients
-of one name; the action then refuses until one is removed.
+System in the catalog and it writes the values still missing, without a second client.
+
+A client that exists is never used for a System that is not in the catalog, even a client this
+action created a moment earlier. If a template creates the client, then a later step fails before the
+System reaches the catalog, the rerun is refused, and the client and any secrets it wrote have to be
+removed by hand before the template can run again. Two first runs for the same new app at the same
+moment can leave two clients of one name; the action then refuses until one is removed.
 
 ### Session policy
 

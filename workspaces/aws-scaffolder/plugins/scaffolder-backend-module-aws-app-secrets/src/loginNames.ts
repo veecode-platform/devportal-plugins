@@ -5,7 +5,6 @@ const CLIENT_NAME_PATTERN = /^[\w+=,.@-]+$/;
 export const LOGIN_PLACEHOLDERS = ['app', 'environment', 'namespace'];
 export const CLIENT_NAME_MAX_LENGTH = 128;
 
-/** The parts the login patterns are filled from. */
 export interface LoginNameParts {
   app: string;
   environment: string;
@@ -26,10 +25,6 @@ function fill(pattern: string, parts: LoginNameParts): string {
   });
 }
 
-/**
- * The app name comes from the caller when the System is not in the catalog
- * yet, and it ends up in a host name, so it must be one DNS label.
- */
 export function checkLoginIdentity(parts: LoginNameParts): void {
   for (const [label, value] of [
     ['app', parts.app],
@@ -43,7 +38,6 @@ export function checkLoginIdentity(parts: LoginNameParts): void {
   }
 }
 
-/** The name of the app client in the user pool. */
 export function loginClientName(
   pattern: string,
   parts: LoginNameParts,
@@ -57,11 +51,6 @@ export function loginClientName(
   return name;
 }
 
-/**
- * The origin the app is served from. Only an https origin is accepted: no
- * credentials, path, query or fragment, because the sign-in callback and
- * sign-out URLs are built by appending to it.
- */
 export function loginAppUrl(pattern: string, parts: LoginNameParts): string {
   const filled = fill(pattern, parts);
   let url: URL;

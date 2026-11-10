@@ -8,7 +8,7 @@ const WRITE_ACTIONS = [
   'secretsmanager:DescribeSecret',
 ];
 const DESCRIBE_ACTIONS = ['secretsmanager:DescribeSecret'];
-/** CreateSecret with tags also needs TagResource. PutSecretValue is left out: the login action never overwrites. */
+/** CreateSecret with tags also needs TagResource, per the CreateSecret API reference. */
 const LOGIN_SECRET_ACTIONS = [
   'secretsmanager:CreateSecret',
   'secretsmanager:DescribeSecret',
@@ -40,11 +40,6 @@ export function writeSessionPolicy(options: {
   ]);
 }
 
-/**
- * The login action's session: the client actions on one user pool, and the
- * create-only secret actions on the three secrets it names. It has no
- * PutSecretValue and no GetSecretValue, so it can neither overwrite nor read.
- */
 export function loginSessionPolicy(options: {
   secretsRegion: string;
   secretPaths: string[];

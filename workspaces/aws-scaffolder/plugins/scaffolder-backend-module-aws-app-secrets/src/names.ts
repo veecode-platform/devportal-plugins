@@ -62,7 +62,6 @@ export function pathIdentity(
   );
 }
 
-/** The same check for a System that is named but may not be in the catalog yet. */
 export function refPathIdentity(
   ref: { name: string; namespace: string },
   pattern: string,

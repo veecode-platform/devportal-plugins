@@ -27,7 +27,6 @@ export interface WriteResult {
   versionId: string;
 }
 
-/** The temporary credentials of one writer-role session. */
 export interface WriterCredentials {
   accessKeyId: string;
   secretAccessKey: string;
@@ -161,7 +160,6 @@ export async function describeSecret(
   }
 }
 
-/** What DescribeSecret shows of a secret, without its value. */
 export type SecretPresence =
   | { exists: false }
   | {
@@ -170,7 +168,6 @@ export type SecretPresence =
       tags: Record<string, string>;
     };
 
-/** Metadata and tags only, so the secret's value stays unread. */
 export async function inspectSecret(
   client: SecretsManagerClient,
   path: string,
@@ -198,10 +195,6 @@ export async function inspectSecret(
   }
 }
 
-/**
- * Creates the secret and nothing else. A secret that already exists fails the
- * call, so a value in place is never replaced.
- */
 export async function createSecretOnce(
   client: SecretsManagerClient,
   options: { path: string; value: string; tags: Tag[] },
@@ -231,7 +224,6 @@ function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown error';
 }
 
-/** The tags every secret the module writes carries: who, when, for which app. */
 export function registrationTags(options: {
   registeredBy: string;
   registeredAt: Date;

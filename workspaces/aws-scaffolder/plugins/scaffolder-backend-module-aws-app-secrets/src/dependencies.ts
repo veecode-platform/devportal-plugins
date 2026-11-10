@@ -7,6 +7,5 @@ export interface AppSecretsDependencies
     DeclarationServices {
   settings: AppSecretsSettings;
   now(): Date;
-  /** The random source for generated secrets; `crypto.randomBytes` in the backend. */
   randomBytes(size: number): Buffer;
 }

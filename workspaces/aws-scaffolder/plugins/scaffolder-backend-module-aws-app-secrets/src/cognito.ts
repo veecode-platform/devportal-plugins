@@ -7,7 +7,6 @@ import {
 import type { WriterCredentials } from './secretsManager';
 
 const LIST_PAGE_SIZE = 60;
-/** Cognito allows 1000 app clients per pool, so this many pages is never reached. */
 const LIST_MAX_PAGES = 50;
 
 /**
@@ -28,13 +27,11 @@ export function cognitoClient(
 ): CognitoIdentityProviderClient {
   return new CognitoIdentityProviderClient({
     region,
-    // A retried CreateUserPoolClient would make a second client of the same name.
     maxAttempts: 1,
     credentials,
   });
 }
 
-/** The IDs of every client in the pool that carries this name, across all pages. */
 export async function findClientIdsByName(
   client: CognitoIdentityProviderClient,
   userPoolId: string,
@@ -69,7 +66,6 @@ export async function findClientIdsByName(
   );
 }
 
-/** The secret of an existing client, for the values a half-finished run left unwritten. */
 export async function describeClientSecret(
   client: CognitoIdentityProviderClient,
   userPoolId: string,
@@ -94,11 +90,6 @@ export async function describeClientSecret(
   return secret;
 }
 
-/**
- * Creates the app client the login proxy of one app signs in with: the
- * authorization code flow only, the three scopes above, refresh through the
- * proxy only, and e-mail as the one attribute the client may write.
- */
 export async function createAppClient(
   client: CognitoIdentityProviderClient,
   options: {

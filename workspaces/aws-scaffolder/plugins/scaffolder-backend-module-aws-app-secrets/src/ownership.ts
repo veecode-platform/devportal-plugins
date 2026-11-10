@@ -61,11 +61,6 @@ export async function requireOwnedSystem(
   return { system, user };
 }
 
-/**
- * The same ownership rule, except that a System the catalog does not have is
- * reported as `undefined` instead of refused. A System that is there must be
- * owned by the caller.
- */
 export async function findOwnedSystem(
   options: OwnershipServices & {
     app: CompoundEntityRef;

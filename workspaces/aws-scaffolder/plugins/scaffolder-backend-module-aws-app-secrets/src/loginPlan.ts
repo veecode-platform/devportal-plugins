@@ -1,6 +1,5 @@
 import type { SecretPresence } from './secretsManager';
 
-/** The three values the login proxy of an app reads from its secret path. */
 export const LOGIN_SECRET_NAMES = [
   'OAUTH2_PROXY_CLIENT_ID',
   'OAUTH2_PROXY_CLIENT_SECRET',
@@ -8,11 +7,6 @@ export const LOGIN_SECRET_NAMES = [
 ] as const;
 export type LoginSecretName = (typeof LOGIN_SECRET_NAMES)[number];
 
-/**
- * Each of the three secrets carries the ID of the client it was written for.
- * The tag is how a rerun sees that the values still belong to the client
- * without reading any of them.
- */
 export const CLIENT_ID_TAG = 'veecode.io/cognito-client-id';
 
 export type LoginPlan =
@@ -20,10 +14,6 @@ export type LoginPlan =
   | { kind: 'existing'; clientId: string }
   | { kind: 'complete'; clientId: string; missing: LoginSecretName[] };
 
-/**
- * Decides what one run does from what is already there. Nothing here writes
- * over a value: a secret that exists is either kept or the run is refused.
- */
 export function planLoginClient(options: {
   clientName: string;
   clientIds: string[];

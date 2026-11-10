@@ -121,7 +121,8 @@ rerun compares that tag, read with `DescribeSecret`, with the ID of the client i
 or different tag refuses the run. It looks at the client list and at the three secrets before it
 creates the client, so secrets with no client refuse the run before anything is created.
 
-**Consequences:** The tag is only true while nothing else rewrites the value, so a host adds
+**Consequences:** Each Cognito call is sent once (`maxAttempts: 1`), as the Secrets Manager calls
+are in PDR-001, so a retry cannot create a second client. The tag is only true while nothing else rewrites the value, so a host adds
 `OAUTH2_PROXY_` to `reservedPrefixes`. Secrets written by hand before the action existed carry no
 tag and are refused, not adopted. The values of the client secret and the cookie secret are never
 compared, only the tag.
@@ -130,8 +131,8 @@ compared, only the tag.
 
 **Status:** Accepted
 
-**Context:** The create-app template runs the action before it publishes the repository, so the
-System may not be in the catalog yet. A rule that required the System to exist would block the first
+**Context:** A template that creates an app runs the action before it publishes the repository, so
+the System may not be in the catalog yet. A rule that required the System to exist would block the first
 deploy; a rule that ignored it would let a user name another app and take its login client.
 
 **Decision:** A System in the catalog must be owned by the caller, as for the register action. A
@@ -141,9 +142,9 @@ namespace is refused unless `clientNamePattern` has `{namespace}`, for the reaso
 app and namespace names must be DNS labels, because the caller supplies them when the System is not
 in the catalog and they end up in a host name and a client name.
 
-**Consequences:** A run that fails after it created the client, for a System that is not in the
-catalog, cannot be repeated: the client exists and the System does not. The extra client has to be
-removed by hand. Two first runs for one new app at the same moment can leave two clients of one
+**Consequences:** Any run that ends after it created the client and before the System reaches the
+catalog cannot be repeated, whether a secret write failed or a later template step did: the client
+exists and the System does not. The client and the secrets it wrote have to be removed by hand. Two first runs for one new app at the same moment can leave two clients of one
 name, and the action refuses until one is removed. A caller can create clients for names of apps
 that do not exist; the pool's limit on clients is the only bound, and the audit trail is the session
 name and source identity of each run.

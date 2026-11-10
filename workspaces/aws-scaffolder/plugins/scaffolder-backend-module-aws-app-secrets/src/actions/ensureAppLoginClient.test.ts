@@ -46,8 +46,7 @@ jest.mock('@aws-sdk/client-cognito-identity-provider', () => ({
 }));
 
 const exampleClientSecret = 'example-client-secret-7f3a9c';
-/** Bytes whose base64 form has both `+` and `/`, so the URL-safe form is told apart. */
-const exampleRandomBytes = (size: number) => Buffer.alloc(size, 0xfb);
+const base64PlusAndSlashBytes = (size: number) => Buffer.alloc(size, 0xfb);
 const exampleCookieSecret = `${'-_v7'.repeat(10)}-_s=`;
 const exampleAdminScope = 'aws.cognito.signin.user.admin';
 const examplePoolId = 'us-east-1_ExamplePool';
@@ -102,14 +101,12 @@ interface FakePool {
   clients: { id: string; name: string; secret: string }[];
   secrets: Map<string, { value: string; tags: Tag[]; deleted?: boolean }>;
   pageSize: number;
-  /** Errors by command name, or by `<command name> <path>` for a secret. */
   failures: Record<string, Error>;
   calls: string[];
 }
 
 let pool: FakePool;
 
-/** A user pool and a Secrets Manager that keep what the action writes. */
 function installFakeAws(): void {
   pool = {
     clients: [],
@@ -275,7 +272,6 @@ function tagsOf(path: string): Record<string, string> {
   );
 }
 
-/** A client of the app in the pool, with its three secrets tagged for it. */
 function givenClientWith(secretNames: string[], clientId = 'example-client-1') {
   pool.clients.push({
     id: clientId,
@@ -295,7 +291,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
     it('creates the client and the three secrets for an app that is not in the catalog yet', async () => {
       const world = fakeWorld({
         system: undefined,
-        randomBytes: exampleRandomBytes,
+        randomBytes: base64PlusAndSlashBytes,
       });
       const { ctx, output } = contextWith(exampleInput);
 
@@ -377,7 +373,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
     it('writes the cookie secret as URL-safe base64 of 32 bytes, which oauth2-proxy decodes to an AES-256 key', async () => {
       const world = fakeWorld({
         system: undefined,
-        randomBytes: exampleRandomBytes,
+        randomBytes: base64PlusAndSlashBytes,
       });
       const { ctx } = contextWith(exampleInput);
 
@@ -498,7 +494,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
 
     it('writes only the secrets that are missing, reading the client secret back from Cognito', async () => {
       givenClientWith(['OAUTH2_PROXY_CLIENT_ID']);
-      const world = fakeWorld({ randomBytes: exampleRandomBytes });
+      const world = fakeWorld({ randomBytes: base64PlusAndSlashBytes });
       const { ctx, output } = contextWith(exampleInput);
 
       await run(world.deps, ctx);
@@ -537,7 +533,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
     });
 
     it('finishes a run that failed after the client was created, without a second client', async () => {
-      const world = fakeWorld({ randomBytes: exampleRandomBytes });
+      const world = fakeWorld({ randomBytes: base64PlusAndSlashBytes });
       pool.failures[
         `CreateSecretCommand ${examplePath('OAUTH2_PROXY_CLIENT_SECRET')}`
       ] = awsError('InternalServiceError');
@@ -1077,7 +1073,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
         seen.push(JSON.stringify(attempt.output.mock.calls));
       };
       const withRandom = () =>
-        fakeWorld({ system: undefined, randomBytes: exampleRandomBytes });
+        fakeWorld({ system: undefined, randomBytes: base64PlusAndSlashBytes });
 
       const created = contextWith(exampleInput);
       await run(withRandom().deps, created.ctx);
@@ -1085,7 +1081,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
 
       const existing = contextWith(exampleInput);
       await run(
-        fakeWorld({ randomBytes: exampleRandomBytes }).deps,
+        fakeWorld({ randomBytes: base64PlusAndSlashBytes }).deps,
         existing.ctx,
       );
       record(existing);
@@ -1094,7 +1090,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
       pool.secrets.delete(examplePath('OAUTH2_PROXY_COOKIE_SECRET'));
       const completed = contextWith(exampleInput);
       await run(
-        fakeWorld({ randomBytes: exampleRandomBytes }).deps,
+        fakeWorld({ randomBytes: base64PlusAndSlashBytes }).deps,
         completed.ctx,
       );
       record(completed);
@@ -1108,7 +1104,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
         (
           await failureOf(
             run(
-              fakeWorld({ randomBytes: exampleRandomBytes }).deps,
+              fakeWorld({ randomBytes: base64PlusAndSlashBytes }).deps,
               failed.ctx,
             ),
           )
@@ -1122,7 +1118,7 @@ describe('aws:cognito:app-login-client:ensure', () => {
         (
           await failureOf(
             run(
-              fakeWorld({ randomBytes: exampleRandomBytes }).deps,
+              fakeWorld({ randomBytes: base64PlusAndSlashBytes }).deps,
               refused.ctx,
             ),
           )

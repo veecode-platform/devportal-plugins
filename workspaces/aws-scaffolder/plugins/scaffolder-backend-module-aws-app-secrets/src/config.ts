@@ -27,18 +27,12 @@ const DECLARATION_PLACEHOLDERS = ['environment'];
 export const DEFAULT_DECLARATION_FILE = 'config/{environment}.yaml';
 export const DEFAULT_CLIENT_NAME_PATTERN = '{app}-{environment}';
 export const DEFAULT_IDENTITY_PROVIDERS = ['Google'];
-/** Stand-ins that show whether a login pattern can produce a valid name or URL. */
 const LOGIN_PROBE = {
   app: 'example-app',
   environment: 'dev',
   namespace: 'default',
 };
 
-/**
- * The scopes, flows and token lifetimes of the app clients are fixed in code,
- * so the block takes none: a `scopes` key is refused as an unknown key, and
- * `aws.cognito.signin.user.admin` cannot be added from configuration.
- */
 const loginSchema = z
   .object({
     userPoolId: z
@@ -194,7 +188,6 @@ const settingsSchema = z
       : {}),
   }));
 
-/** Where and how the app login clients are created. */
 export type LoginSettings = {
   userPoolId: string;
   region: string;

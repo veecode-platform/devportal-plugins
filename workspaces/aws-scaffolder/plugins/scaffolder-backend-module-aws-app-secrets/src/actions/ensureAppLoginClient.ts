@@ -216,11 +216,6 @@ export function createEnsureAppLoginClientAction(deps: AppSecretsDependencies) {
 
 type Values = Partial<Record<LoginSecretName, string>>;
 
-/**
- * What the plan still has to write, and the values to write it with. A new
- * client brings its own ID and secret; for an existing client the secret is
- * read back from Cognito, and only a missing cookie secret is generated.
- */
 async function settle(
   plan: LoginPlan,
   context: {

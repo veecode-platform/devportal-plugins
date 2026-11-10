@@ -1,11 +1,9 @@
 const COOKIE_SECRET_BYTES = 32;
 
 /**
- * A cookie secret for oauth2-proxy: 32 random bytes as URL-safe base64, the
- * form its documentation generates (`base64.urlsafe_b64encode(os.urandom(32))`).
- * The proxy decodes that form back to 32 bytes, a valid AES-256 key length.
- * Standard base64 with `+` or `/` would be read as a raw 44-byte string, which
- * is not a valid key length, and the proxy would refuse to start.
+ * oauth2-proxy decodes URL-safe base64 back to bytes and uses them as the key
+ * only when they are 16, 24 or 32 long; any other string is taken as raw text.
+ * Standard base64 with `+` or `/` would therefore be read as a 44-byte string.
  */
 export function newCookieSecret(randomBytes: (size: number) => Buffer): string {
   return randomBytes(COOKIE_SECRET_BYTES)
