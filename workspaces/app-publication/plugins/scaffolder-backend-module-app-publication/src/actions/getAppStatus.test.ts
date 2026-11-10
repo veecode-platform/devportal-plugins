@@ -1,8 +1,11 @@
 import { NotAllowedError } from '@backstage/errors';
 import {
   APP_REF,
+  AUTHOR_EMAIL,
   CANARY,
   COMMIT,
+  CONFLICT_TRACE,
+  CONFLICT_TRACE_CLEANED,
   DEPLOY_JOB,
   FAILED_LINE,
   MERGE_COMMIT,
@@ -10,6 +13,10 @@ import {
   REFUSAL_LINE,
   RUNNER_TRACE,
   RUNNER_TRACE_CLEANED,
+  SCAN_TRACE,
+  SCAN_TRACE_CLEANED,
+  TEST_TRACE,
+  TEST_TRACE_CLEANED,
   OTHER,
   PROJECT_WEB_URL,
   SMOKE_FILE,
@@ -113,6 +120,11 @@ function baseline(
 
 /** A sheet whose one open request is blocked by a failed render job, with the job's log as given. */
 function renderBlocked(w: World, log: string): void {
+  blockedBy(w, 'render', 'lint', log);
+}
+
+/** A sheet whose one open request is blocked by one failed job, with the job's log as given. */
+function blockedBy(w: World, name: string, stage: string, log: string): void {
   baseline(w, [pipeline(200, COMMIT, 'success')], []);
   w.gitlab.reply(
     paths.openRequests,
@@ -143,7 +155,7 @@ function renderBlocked(w: World, log: string): void {
   w.gitlab.reply(
     paths.jobs(100),
     json([
-      job(401, 'render', 'lint', 'failed', {
+      job(401, name, stage, 'failed', {
         failure_reason: 'script_failure',
       }),
     ]),
@@ -434,6 +446,79 @@ describe('get-app-status', () => {
           expect.objectContaining({
             name: 'render',
             untrustedJobOutput: RUNNER_TRACE_CLEANED,
+          }),
+        ],
+      }),
+    ]);
+    expectDeclared(w, GET_APP_STATUS, output);
+  });
+
+  it('names a blocked scan whose job name holds a colon, returns its log with the author address replaced, and says what to do with a found secret', async () => {
+    const w = world();
+    blockedBy(w, 'secrets:gitleaks', 'scan', SCAN_TRACE);
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.nextStep).toContain(
+      'Merge request !7 is blocked: The scan `secrets:gitleaks` failed on the change.',
+    );
+    expect(output.nextStep).toContain(
+      'it is exposed and must be changed where it was issued',
+    );
+    expect(output.nextStep).toContain("the app's root `CLAUDE.md` describes");
+    expect(output.nextStep).toContain('one commit that never held the value');
+    expect(output.openRequests).toEqual([
+      expect.objectContaining({
+        iid: 7,
+        failedJobs: [
+          expect.objectContaining({
+            name: 'secrets:gitleaks',
+            untrustedJobOutput: SCAN_TRACE_CLEANED,
+          }),
+        ],
+      }),
+    ]);
+    expect(JSON.stringify(output)).not.toContain(AUTHOR_EMAIL);
+    expectDeclared(w, GET_APP_STATUS, output);
+  });
+
+  it('returns the end of the log of a blocked test job, and says it shows what failed', async () => {
+    const w = world();
+    blockedBy(w, 'back-test', 'build', TEST_TRACE);
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.nextStep).toContain(
+      'Merge request !7 is blocked: The check `back-test` failed on the change.',
+    );
+    expect(output.nextStep).toContain('shows what failed');
+    expect(output.openRequests).toEqual([
+      expect.objectContaining({
+        failedJobs: [
+          expect.objectContaining({
+            name: 'back-test',
+            untrustedJobOutput: TEST_TRACE_CLEANED,
+          }),
+        ],
+      }),
+    ]);
+    expectDeclared(w, GET_APP_STATUS, output);
+  });
+
+  it('returns the end of the log of a blocked conflict-markers job, which names the files', async () => {
+    const w = world();
+    blockedBy(w, 'conflict-markers', 'lint', CONFLICT_TRACE);
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.nextStep).toContain('Git conflict markers');
+    expect(output.nextStep).toContain('names the files and the lines');
+    expect(output.openRequests).toEqual([
+      expect.objectContaining({
+        failedJobs: [
+          expect.objectContaining({
+            name: 'conflict-markers',
+            untrustedJobOutput: CONFLICT_TRACE_CLEANED,
           }),
         ],
       }),
