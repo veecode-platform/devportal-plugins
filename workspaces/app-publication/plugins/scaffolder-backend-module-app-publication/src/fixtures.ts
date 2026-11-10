@@ -37,6 +37,32 @@ export const DEPLOY_JOB = 'deploy';
 export const SMOKE_FILE = 'smoke-result.json';
 export const CONTRACT_FILE = 'contract-result.json';
 
+/** The first line the platform chart prints for a refused config (a generic example). */
+export const REFUSAL_LINE =
+  "The platform chart refused back/config/dev.yaml: [ERROR] templates/: values don't meet the specifications of the schema(s) in the following chart(s): example-chart: - at '/settings/TIMEOUT_MS': got number, want string";
+export const FAILED_LINE = 'Job failed: exit code 1';
+
+/** The end of a real job's trace as the API returns it: runner timestamps and stream markers, ANSI sequences, section markers. */
+export const RUNNER_TRACE = [
+  '2026-11-09T21:32:59.820067Z 01O $ sh .gitlab/deploy.sh render',
+  `2026-11-09T21:33:00.742470Z 01O ${REFUSAL_LINE}  `,
+  '2026-11-09T21:33:00.742481Z 01O refused back dev',
+  '2026-11-09T21:33:00.879491Z 00O section_end:1794259980:step_script\r\x1b[0K',
+  '2026-11-09T21:33:00.881174Z 00O+section_start:1794259980:cleanup_file_variables\r\x1b[0K',
+  '2026-11-09T21:33:00.881185Z 00O+\x1b[0KCleaning up project directory and file based variables',
+  '2026-11-09T21:33:01.457179Z 00O section_end:1794259981:cleanup_file_variables\r\x1b[0K',
+  '2026-11-09T21:33:01.603918Z 00O ERROR: Job failed: exit code 1',
+].join('\n');
+
+/** What the tools return for RUNNER_TRACE: no prefix, no escape sequence, no section marker, no empty line. */
+export const RUNNER_TRACE_CLEANED = [
+  '$ sh .gitlab/deploy.sh render',
+  REFUSAL_LINE,
+  'refused back dev',
+  'Cleaning up project directory and file based variables',
+  'ERROR: Job failed: exit code 1',
+];
+
 /** Relative paths under the project, exactly as the module requests them. */
 export const paths = {
   commitRequests: (sha: string) => `/repository/commits/${sha}/merge_requests`,

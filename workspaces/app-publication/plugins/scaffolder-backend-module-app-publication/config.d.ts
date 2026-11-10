@@ -45,6 +45,13 @@ export interface Config {
      */
     conflictMarkersJobName?: string;
     /**
+     * Name of the merge-request job that renders every piece's config with the
+     * platform chart. Its refusals are named to the user, with the file to fix.
+     * Default: render.
+     * @visibility backend
+     */
+    renderJobName?: string;
+    /**
      * Longest wait of one wait-for-app-publication call, in seconds.
      * Default 20; at most 270. Raise it to about 240 only when the MCP server
      * sends progress notifications.
@@ -63,8 +70,10 @@ export interface Config {
      */
     maxArtifactBytes?: number;
     /**
-     * Number of final log lines returned for a failed job that has no fixed
-     * explanation. Default 40; from 1 to 200.
+     * Number of final log lines returned for a failed job that is explained
+     * from its log. The lines are cleaned of the runner's prefix and escape
+     * sequences. The render check searches the whole log it reads, not only
+     * these lines. Default 40; from 1 to 200.
      * @visibility backend
      */
     failedJobLogLines?: number;

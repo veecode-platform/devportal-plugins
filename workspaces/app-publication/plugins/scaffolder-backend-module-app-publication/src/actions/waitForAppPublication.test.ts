@@ -9,7 +9,11 @@ import {
   COMMIT,
   CONTRACT_FILE,
   DEPLOY_JOB,
+  FAILED_LINE,
   FakeGitlab,
+  REFUSAL_LINE,
+  RUNNER_TRACE,
+  RUNNER_TRACE_CLEANED,
   MERGE_COMMIT,
   NEWER,
   OTHER,
@@ -592,6 +596,11 @@ describe('wait-for-app-publication: deploy failures', () => {
 
     expect(output.nextStep).toContain("in the app's root `CLAUDE.md`");
     expect(output.nextStep).toContain('`back/config/dev.yaml`');
+    expect(output.nextStep).toContain('every setting value is a quoted string');
+    expect(output.nextStep).toContain(
+      'The local checks do not render the chart',
+    );
+    expect(output.nextStep).not.toContain('run the local checks');
     expect(output.nextStep).not.toContain('back/CLAUDE.md');
   });
 
@@ -1161,5 +1170,355 @@ describe('wait-for-app-publication: a canary in every field GitLab or the job ca
     const output = await run(w, WAIT, input());
 
     expect(JSON.stringify(output)).not.toContain(CANARY);
+  });
+});
+
+/** A merge request whose render job failed, with the job's log as given. */
+function renderFailure(w: World, log: string, jobName = 'render'): void {
+  failedRequest(w, [
+    job(401, jobName, 'lint', 'failed', { failure_reason: 'script_failure' }),
+  ]);
+  w.gitlab.reply(paths.trace(401), text(log));
+}
+
+describe('wait-for-app-publication: a refused render config', () => {
+  it('names the refused file, points to the end of the log, and does not send the user to the local checks', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      [REFUSAL_LINE, 'refused back dev', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({
+      done: true,
+      state: 'failed',
+      step: 'merge_request',
+    });
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.nextStep).toContain('The local checks do not cover this');
+    expect(output.nextStep).toContain('should give the key and the reason');
+    expect(output.nextStep).toContain(
+      `give the platform team this link: ${PROJECT_WEB_URL}/-/jobs/401`,
+    );
+    expect(output.nextStep).toContain('Do not change platform-owned files.');
+    expect(output.nextStep).toContain('-o merge_request.auto_merge');
+    expect(output.nextStep).not.toContain('Run the local checks');
+    expect(output.nextStep).not.toContain('TIMEOUT_MS');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: [REFUSAL_LINE, 'refused back dev', FAILED_LINE],
+      }),
+    ]);
+    expectDeclared(w, WAIT, output);
+  });
+
+  it('names each refused file when the render check refuses two configs', async () => {
+    const w = world({
+      components: [
+        exampleComponent('example-app-back'),
+        exampleComponent('example-app-front'),
+      ],
+    });
+    renderFailure(
+      w,
+      ['refused back dev', 'refused front dev', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`) and `front` for `dev` (file `front/config/dev.yaml`).',
+    );
+  });
+
+  it('gives the generic log explanation when the render job failed with no refusal line', async () => {
+    const w = world();
+    const log = 'pulling the chart failed: connection reset by peer';
+    renderFailure(w, [log, FAILED_LINE].join('\n'));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `render` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: [log, FAILED_LINE],
+      }),
+    ]);
+  });
+
+  it('ignores a refusal that names a piece or an environment the app does not have', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      ['refused front dev', 'refused back prod', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `render` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+    expect(output.nextStep).not.toContain('config/');
+  });
+
+  it('names only the refusal the app has, when other lines name a piece or an environment it does not have', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      [
+        'refused front dev',
+        'refused back prod',
+        'refused back dev',
+        FAILED_LINE,
+      ].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.nextStep).not.toContain('front');
+    expect(output.nextStep).not.toContain('prod');
+  });
+
+  it('treats a job with another name as a plain job, even when its log prints a refusal line', async () => {
+    const w = world();
+    failedRequest(w, [
+      job(401, 'unit-tests', 'test', 'failed', {
+        failure_reason: 'script_failure',
+      }),
+    ]);
+    w.gitlab.reply(paths.trace(401), text('refused back dev'));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `unit-tests` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'unit-tests',
+        untrustedJobOutput: ['refused back dev'],
+      }),
+    ]);
+  });
+
+  it('reads the refusal in a real runner trace, and returns its lines cleaned', async () => {
+    const w = world();
+    renderFailure(w, RUNNER_TRACE);
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.nextStep).not.toContain('Run the local checks');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: RUNNER_TRACE_CLEANED,
+      }),
+    ]);
+  });
+
+  it('returns no runner prefix, escape sequence or section marker anywhere in the output', async () => {
+    const w = world();
+    renderFailure(w, RUNNER_TRACE);
+
+    const output = await run(w, WAIT, input());
+    const serialized = JSON.stringify(output);
+
+    expect(serialized).not.toContain('2026-11-09T');
+    expect(serialized).not.toContain('\\u001b');
+    expect(serialized).not.toContain('\\r');
+    expect(serialized).not.toContain('section_start');
+    expect(serialized).not.toContain('section_end');
+  });
+
+  it('cleans the log tail of every job that gets one, not only the render check', async () => {
+    const w = world();
+    failedRequest(w, [
+      job(403, 'scan-deps', 'scan', 'failed', {
+        failure_reason: 'script_failure',
+      }),
+    ]);
+    w.gitlab.reply(paths.trace(403), text(RUNNER_TRACE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'scan-deps',
+        untrustedJobOutput: RUNNER_TRACE_CLEANED,
+      }),
+    ]);
+  });
+
+  it('does not match a refusal line with extra text, with or without the runner prefix', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      [
+        '2026-11-09T21:33:00.742481Z 01O xrefused back dev',
+        '2026-11-09T21:33:00.742482Z 01O refused back dev extra',
+        FAILED_LINE,
+      ].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `render` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+  });
+
+  it('names a refusal above the returned lines, and returns only the last failedJobLogLines lines', async () => {
+    const w = world({ settings: { failedJobLogLines: 2 } });
+    renderFailure(
+      w,
+      ['refused back dev', 'filler one', 'filler two', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: ['filler two', FAILED_LINE],
+      }),
+    ]);
+  });
+
+  it('names a repeated pair once', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      ['refused back dev', 'refused back dev', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(
+      String(output.nextStep).split('back/config/dev.yaml').length - 1,
+    ).toBe(1);
+  });
+
+  it('splits a bare trace on carriage returns, and cleans its section markers and colour sequences', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      [
+        'section_start:1794259981:step_script\r\x1b[0K\x1b[36;1mValidating configs\x1b[0;m',
+        'Downloading 10%\rDownloading 90%',
+        'refused back dev',
+        'section_end:1794259982:step_script\r\x1b[0K',
+        FAILED_LINE,
+      ].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: [
+          'Validating configs',
+          'Downloading 10%',
+          'Downloading 90%',
+          'refused back dev',
+          FAILED_LINE,
+        ],
+      }),
+    ]);
+  });
+
+  it('keeps the indentation of a log line, drops only its trailing spaces, and drops an indented section marker', async () => {
+    const w = world();
+    failedRequest(w, [
+      job(403, 'scan-deps', 'scan', 'failed', {
+        failure_reason: 'script_failure',
+      }),
+    ]);
+    w.gitlab.reply(
+      paths.trace(403),
+      text(
+        [
+          'Traceback (most recent call last):',
+          '  File "run.py", line 3',
+          '    raise ValueError  ',
+          '   section_start:1794259981:step_script',
+          '2026-11-09T21:33:00.742470Z 01O   settings:',
+        ].join('\n'),
+      ),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'scan-deps',
+        untrustedJobOutput: [
+          'Traceback (most recent call last):',
+          '  File "run.py", line 3',
+          '    raise ValueError',
+          '  settings:',
+        ],
+      }),
+    ]);
+  });
+
+  it('drops the partial first line of a cut read window, so a fragment at the cut is not matched', async () => {
+    const w = world();
+    // The module reads the last 256 KiB of a trace. This window starts inside the line "x refused back dev".
+    const readBytes = 256 * 1024;
+    const cutWindow = `refused back dev\n${'z'.repeat(readBytes - 18)}\n`;
+    renderFailure(w, `x ${cutWindow}`);
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `render` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: ['z'.repeat(500)],
+      }),
+    ]);
+  });
+
+  it('matches the job by renderJobName when the app sets one', async () => {
+    const w = world({ settings: { renderJobName: 'config-render' } });
+    renderFailure(
+      w,
+      ['refused back dev', FAILED_LINE].join('\n'),
+      'config-render',
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
   });
 });
