@@ -545,6 +545,24 @@ describe('aws:secrets-manager:app-secret:register', () => {
       expectNoAwsCall();
     });
 
+    it('refuses a System the catalog hides from the user, as one that cannot be read', async () => {
+      const world = fakeWorld({
+        systemHiddenFromUsers: true,
+        components: [exampleComponent('example-component')],
+        files: { [exampleDeclarationUrl]: exampleDeclaration },
+      });
+      const { ctx } = contextWith(exampleInput, {
+        secrets: { value: exampleMarker },
+      });
+
+      const error = await failureOf(run(world.deps, ctx));
+
+      expect(error.message).toBe(
+        'System "system:default/example-app" was not found, or the user cannot read it',
+      );
+      expectNoAwsCall();
+    });
+
     it('refuses a caller that is not a user', async () => {
       const world = declaring();
       const { ctx } = contextWith(exampleInput, {

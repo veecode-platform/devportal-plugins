@@ -13,9 +13,10 @@ Run commands from `workspaces/aws-scaffolder/`.
 ## Layout
 
 `plugins/scaffolder-backend-module-aws-app-secrets` contains the `backend-plugin-module` product
-package for the `scaffolder` plugin. It registers two actions: the scaffolder action
-`aws:secrets-manager:app-secret:register` and the actions-registry action `list-app-secrets`.
-Both run the same ownership and declaration checks. The role-sized harness is `packages/backend`
+package for the `scaffolder` plugin. It registers three actions: the scaffolder actions
+`aws:secrets-manager:app-secret:register` and `aws:cognito:app-login-client:ensure`, and the
+actions-registry action `list-app-secrets`. The register and list actions run the same ownership and
+declaration checks; the login client action runs the ownership check only. The role-sized harness is `packages/backend`
 plus unit tests. Product code stays under `plugins/`; the harness contains only wiring and the
 example configuration in `app-config.yaml` and `dynamic-plugins.yaml`.
 
@@ -26,15 +27,17 @@ until it is registered through the export overlay. Keep workspace-only decisions
 and do not copy cross-workspace rules into this file.
 
 The module never reads a secret value. The register action takes the value from the task secrets,
-and the list action reads Secrets Manager metadata only. Every AWS call goes through the writer
+the list action reads Secrets Manager metadata only, and the login client action creates secrets
+and never puts a new version on one that exists. Every AWS call goes through the writer
 role, with a session name and source identity that name the task or the user.
 
 ## How to test
 
 Use the [four proofs and official flow](../../CONTRIBUTING.md#the-four-proofs-and-the-official-test-flow).
 For this `backend-plugin-module` (scaffolder), proof 1 is `yarn test:all`, with mocked STS and
-Secrets Manager clients and fake catalog, user-info and URL-reader services. Proof 2 is the action
-`aws:secrets-manager:app-secret:register` listed in `/api/scaffolder/v2/actions` in devportal-local.
+Secrets Manager and Cognito clients and fake catalog, user-info and URL-reader services. Proof 2 is
+the actions `aws:secrets-manager:app-secret:register` and `aws:cognito:app-login-client:ensure`
+listed in `/api/scaffolder/v2/actions` in devportal-local.
 Build in `devportal-plugins`, prove in `devportal-local`, then publish through `export-overlays`,
 in that order: run proofs 1 and 2 before publishing, and state it in the overlay PR when you skip
 proof 2 on purpose. No publication is needed for proof 2.

@@ -7,4 +7,5 @@ export interface AppSecretsDependencies
     DeclarationServices {
   settings: AppSecretsSettings;
   now(): Date;
+  randomBytes(size: number): Buffer;
 }

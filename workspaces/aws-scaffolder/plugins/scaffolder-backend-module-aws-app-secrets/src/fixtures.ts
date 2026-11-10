@@ -6,8 +6,16 @@ import type {
   UserInfoService,
 } from '@backstage/backend-plugin-api';
 import type { CatalogService } from '@backstage/plugin-catalog-node';
-import type { AppSecretsSettings } from './config';
+import type { AppSecretsSettings, LoginSettings } from './config';
 import type { AppSecretsDependencies } from './dependencies';
+
+export const exampleLoginSettings: LoginSettings = {
+  userPoolId: 'us-east-1_ExamplePool',
+  region: 'us-east-1',
+  appUrlPattern: 'https://{app}.example.test',
+  clientNamePattern: '{app}.{environment}',
+  identityProviders: ['Google'],
+};
 
 export const exampleSettings: AppSecretsSettings = {
   region: 'us-east-1',
@@ -18,6 +26,7 @@ export const exampleSettings: AppSecretsSettings = {
   declarationFile: 'config/{environment}.yaml',
   reservedNames: ['PORT', 'OTEL_SERVICE_NAME'],
   reservedPrefixes: ['OTEL_'],
+  login: exampleLoginSettings,
 };
 
 export const exampleUserRef = 'user:default/example.user';
@@ -73,13 +82,28 @@ export function fakeWorld(
     components?: Entity[];
     files?: Record<string, string>;
     now?: Date;
+    randomBytes?: (size: number) => Buffer;
+    systemHiddenFromUsers?: boolean;
+    userRef?: string;
   } = {},
 ): FakeWorld {
   const system = 'system' in options ? options.system : exampleSystem();
   const appRef = options.appRef ?? exampleAppRef;
+  const principalType = (credentials?: BackstageCredentials) =>
+    (credentials?.principal as { type: string } | undefined)?.type;
   const catalog = {
-    getEntityByRef: jest.fn(async (ref: string) =>
-      ref === appRef ? system : undefined,
+    getEntityByRef: jest.fn(
+      async (
+        ref: string,
+        requestOptions?: { credentials?: BackstageCredentials },
+      ) =>
+        ref === appRef &&
+        !(
+          options.systemHiddenFromUsers &&
+          principalType(requestOptions?.credentials) === 'user'
+        )
+          ? system
+          : undefined,
     ),
     getEntities: jest.fn(async () => ({
       items: options.components ?? [],
@@ -87,7 +111,7 @@ export function fakeWorld(
   };
   const userInfo = {
     getUserInfo: jest.fn(async () => ({
-      userEntityRef: exampleUserRef,
+      userEntityRef: options.userRef ?? exampleUserRef,
       ownershipEntityRefs: options.ownershipRefs ?? [exampleTeamRef],
     })),
   };
@@ -103,6 +127,10 @@ export function fakeWorld(
   const auth = {
     isPrincipal: (credentials: BackstageCredentials, type: string) =>
       (credentials.principal as { type: string }).type === type,
+    getOwnServiceCredentials: async () =>
+      ({
+        principal: { type: 'service', subject: 'plugin:scaffolder' },
+      } as unknown as BackstageCredentials),
   };
   return {
     catalog,
@@ -115,6 +143,7 @@ export function fakeWorld(
       userInfo: userInfo as unknown as UserInfoService,
       urlReader: urlReader as unknown as UrlReaderService,
       now: () => options.now ?? new Date('2026-11-04T12:00:00.000Z'),
+      randomBytes: options.randomBytes ?? (size => Buffer.alloc(size, 1)),
     },
   };
 }

@@ -27,13 +27,19 @@ export interface WriteResult {
   versionId: string;
 }
 
+export interface WriterCredentials {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+}
+
 /**
  * Assumes the writer role for one call. The session name ties the call to its
  * task in CloudTrail and the source identity names the user who started it.
  */
-export async function writerClient(
+export async function assumeWriterRole(
   session: WriterSession,
-): Promise<SecretsManagerClient> {
+): Promise<WriterCredentials> {
   const response = await new STSClient({ region: session.region })
     .send(
       new AssumeRoleCommand({
@@ -57,17 +63,29 @@ export async function writerClient(
       'Could not assume the writer role: AssumeRole returned no credentials',
     );
   }
+  return {
+    accessKeyId: credentials.AccessKeyId,
+    secretAccessKey: credentials.SecretAccessKey,
+    sessionToken: credentials.SessionToken,
+  };
+}
 
+export function secretsManagerClient(
+  region: string,
+  credentials: WriterCredentials,
+): SecretsManagerClient {
   return new SecretsManagerClient({
-    region: session.region,
+    region,
     // A network error after a write started fails the step instead of writing twice.
     maxAttempts: 1,
-    credentials: {
-      accessKeyId: credentials.AccessKeyId,
-      secretAccessKey: credentials.SecretAccessKey,
-      sessionToken: credentials.SessionToken,
-    },
+    credentials,
   });
+}
+
+export async function writerClient(
+  session: WriterSession,
+): Promise<SecretsManagerClient> {
+  return secretsManagerClient(session.region, await assumeWriterRole(session));
 }
 
 /**
@@ -142,6 +160,55 @@ export async function describeSecret(
   }
 }
 
+export type SecretPresence =
+  | { exists: false }
+  | {
+      exists: true;
+      scheduledForDeletion: boolean;
+      tags: Record<string, string>;
+    };
+
+export async function inspectSecret(
+  client: SecretsManagerClient,
+  path: string,
+): Promise<SecretPresence> {
+  try {
+    const response = await client.send(
+      new DescribeSecretCommand({ SecretId: path }),
+    );
+    return {
+      exists: true,
+      scheduledForDeletion: Boolean(response.DeletedDate),
+      tags: Object.fromEntries(
+        (response.Tags ?? []).flatMap(tag =>
+          tag.Key !== undefined && tag.Value !== undefined
+            ? [[tag.Key, tag.Value]]
+            : [],
+        ),
+      ),
+    };
+  } catch (error) {
+    if (errorName(error) === 'ResourceNotFoundException') {
+      return { exists: false };
+    }
+    throw awsFailure('DescribeSecret', path, error);
+  }
+}
+
+export async function createSecretOnce(
+  client: SecretsManagerClient,
+  options: { path: string; value: string; tags: Tag[] },
+): Promise<void> {
+  const { path, value, tags } = options;
+  await client
+    .send(
+      new CreateSecretCommand({ Name: path, SecretString: value, Tags: tags }),
+    )
+    .catch((error: unknown) => {
+      throw awsFailure('CreateSecret', path, error);
+    });
+}
+
 function requireVersion(versionId: string | undefined, path: string): string {
   if (!versionId) {
     throw new Error(`Secrets Manager returned no version id for ${path}`);
@@ -155,4 +222,25 @@ function awsFailure(operation: string, path: string, error: unknown): Error {
 
 function errorName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown error';
+}
+
+export const REGISTERED_BY_TAG = 'veecode.io/registered-by';
+export const APP_TAG = 'veecode.io/app';
+export const ENVIRONMENT_TAG = 'veecode.io/environment';
+
+export function registrationTags(options: {
+  registeredBy: string;
+  registeredAt: Date;
+  app: string;
+  environment: string;
+}): Tag[] {
+  return [
+    { Key: REGISTERED_BY_TAG, Value: options.registeredBy },
+    {
+      Key: 'veecode.io/registered-at',
+      Value: options.registeredAt.toISOString(),
+    },
+    { Key: APP_TAG, Value: options.app },
+    { Key: ENVIRONMENT_TAG, Value: options.environment },
+  ];
 }

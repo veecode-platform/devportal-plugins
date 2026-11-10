@@ -39,17 +39,43 @@ export function parseSystemRef(app: string): CompoundEntityRef {
   return ref;
 }
 
+type OwnershipOptions = OwnershipServices & {
+  app: CompoundEntityRef;
+  credentials: BackstageCredentials;
+};
+
 /**
  * Requires the caller to be a user who owns the System. The owner and the
  * user's own refs are compared in their full form, so `group:example-team` and
  * `group:default/example-team` are the same owner.
  */
 export async function requireOwnedSystem(
-  options: OwnershipServices & {
-    app: CompoundEntityRef;
-    credentials: BackstageCredentials;
-  },
+  options: OwnershipOptions,
 ): Promise<OwnedSystem> {
+  const { system, user } = await lookupOwned(
+    options,
+    async () => options.credentials,
+  );
+  if (!system) {
+    throw new Error(
+      `System "${stringifyEntityRef(
+        options.app,
+      )}" was not found, or the user cannot read it`,
+    );
+  }
+  return { system, user };
+}
+
+export async function findOwnedSystem(
+  options: OwnershipOptions,
+): Promise<{ system: Entity | undefined; user: OwnedSystem['user'] }> {
+  return lookupOwned(options, () => options.auth.getOwnServiceCredentials());
+}
+
+async function lookupOwned(
+  options: OwnershipOptions,
+  readerCredentials: () => Promise<BackstageCredentials>,
+): Promise<{ system: Entity | undefined; user: OwnedSystem['user'] }> {
   const { auth, catalog, userInfo, app, credentials } = options;
   if (!auth.isPrincipal(credentials, 'user')) {
     throw new Error('only a signed-in user can work with app secrets');
@@ -57,11 +83,15 @@ export async function requireOwnedSystem(
 
   const info = await userInfo.getUserInfo(credentials);
   const ref = stringifyEntityRef(app);
-  const system = await catalog.getEntityByRef(ref, { credentials });
+  const user = {
+    entityRef: info.userEntityRef,
+    name: parseEntityRef(info.userEntityRef).name,
+  };
+  const system = await catalog.getEntityByRef(ref, {
+    credentials: await readerCredentials(),
+  });
   if (!system) {
-    throw new Error(
-      `System "${ref}" was not found, or the user cannot read it`,
-    );
+    return { system: undefined, user };
   }
 
   const owner = system.spec?.owner;
@@ -76,13 +106,7 @@ export async function requireOwnedSystem(
     throw new Error(`the user does not own System "${ref}"`);
   }
 
-  return {
-    system,
-    user: {
-      entityRef: info.userEntityRef,
-      name: parseEntityRef(info.userEntityRef).name,
-    },
-  };
+  return { system, user };
 }
 
 function normalizedRef(ref: string): string {
