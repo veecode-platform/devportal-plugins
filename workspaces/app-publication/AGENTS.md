@@ -13,7 +13,7 @@ Run commands from `workspaces/app-publication/`.
 `plugins/scaffolder-backend-module-app-publication` contains the `backend-plugin-module` product package for the
 `scaffolder` plugin. It registers two actions in the actions registry, which the portal's MCP server exposes as
 tools: `get-app-status` (a read of the app's sheet, with no wait) and `wait-for-app-publication` (a bounded wait
-that follows one pushed commit through its merge request, the merge, the default branch's pipeline and the deploy).
+that follows one pushed commit through its merge request and the merge, or straight on the default branch, then through the default branch's pipeline and the deploy).
 The role-sized harness is `packages/backend` plus unit tests. Product code stays under `plugins/`; the harness
 contains only wiring and the example configuration in `app-config.yaml` and `dynamic-plugins.yaml`.
 

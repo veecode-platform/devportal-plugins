@@ -9,11 +9,13 @@ cluster.
 - `get-app-status` takes `{ app }` and returns the app's sheet: its pieces, the last deploy of each
   environment with its smoke result, the default branch's newest pipeline and the open merge requests.
   It returns one `state` and one `nextStep`. It never waits.
-- `wait-for-app-publication` takes `{ app, commit, mergeRequest? }` and follows a pushed commit for at
-  most `maxWaitSeconds` (20 by default). It returns `done`, a `state`, the facts it read and a `nextStep`.
+- `wait-for-app-publication` takes `{ app, commit, mergeRequest? }` and follows a pushed commit, through its merge
+  request or straight on the default branch, for at most `maxWaitSeconds` (20 by default). It returns `done`, a `state`,
+  the facts it read and a `nextStep`. Once the app is published, it also returns `addresses`, the app's addresses from
+  its catalog entry.
 
-A failed job in a pipeline is returned with its name, stage and link. For a failed lint, build, scan, render or
-conflict-markers job, and for any other failed job with no fixed explanation, the last `failedJobLogLines` lines of its
+A failed job in a pipeline is returned with its name, stage and link. For a failed lint, build, scan, render,
+conflict-markers or deploy job, and for any other failed job with no fixed explanation, the last `failedJobLogLines` lines of its
 log come back in `untrustedJobOutput`, cleaned of the runner's prefix and escape sequences, with each e-mail address
 replaced by `[email]`. When GitLab cannot give the log, the entry comes back without it and its sentence says so. A job
 name that holds `:` or `/` is shown only when it is one of the configured job names or is in `knownJobNames`.

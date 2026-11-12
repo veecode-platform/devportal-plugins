@@ -235,7 +235,7 @@ could fail a whole answer, and that a name's shape cannot be trusted.
 - A log that cannot be read does not fail the answer. GitLab may answer with an error status or with no access to the
   trace, or a read may be cut off by the call's deadline in the middle of the body. The client maps a body read that
   fails to the same fixed outage error as a request that fails. For a job whose sentence points to its log (the jobs
-  above, the render check, a deploy with no result file and any job with no fixed explanation), the entry is returned
+  above, the render check, a failed deploy with or without a result file and any job with no fixed explanation), the entry is returned
   without `untrustedJobOutput`, and its sentence is followed by a fixed clause: the log could not be read, call the tool
   again once, then give the platform team the job's link. The pipeline's state, the other jobs and their sentences stay
   in the answer. An error that is not an outage still stops the call. A result file whose body fails in the middle
@@ -249,6 +249,35 @@ PDR-002 if that is not acceptable. A read of a trace downloads the whole trace a
 sends no Range request. Every failed lint, build or conflict-marker job now costs one such read. At most five failed
 jobs are read per pipeline, so one `wait-for-app-publication` call reads at most five traces for a failed pipeline.
 One `get-app-status` call reads at most 35: five for the newest default-branch pipeline, five for deploys that failed
-with no result file, and 25 for five open merge requests with five failed jobs each. When the redo of a change on a new
-branch is done, the merge request that held the value stays open and blocked, and its commit still holds the value. This
-module does not close it.
+(with or without a result file, PDR-013), and 25 for five open merge requests with five failed jobs each. When the redo
+of a change on a new branch is done, the merge request that held the value stays open and blocked, and its commit still
+holds the value. This module does not close it.
+
+## PDR-013: The published answer lists the app's addresses, a failed deploy returns its log, and a commit on the default branch is followed
+
+**Status:** Accepted
+
+**Context:** The published sentence said that the app has no public address in this phase, so a person whose app was
+published was sent back to the local flow. The app template now writes the app's address into its System's links with
+the type `app-address`, so every new app's catalog entry holds one. A failed deploy whose result file named a cause, such
+as `install_failed`, returned only its name and link, so Claude could not tell an app fault from a platform fault. The
+wait tool followed only commits that have a merge request, but the template's initial commit goes straight to the default
+branch. For that commit the tool kept answering `waiting_for_push`, while `get-app-status` showed the app published.
+
+**Decision:**
+
+- A published answer carries `addresses`: the System's links of the configured type whose address is http or https, with
+  the catalog title. The fixed sentence says to give each address to the person, with its title as a label, and that an
+  empty or missing list means the app has no address of its own. No address is written into the sentence.
+- A failed deploy with a recognized result file returns the cleaned end of its log, with the cleaning and the
+  `failedJobLogLines` limit of every other failed job. Its sentence and its unreadable-log clause are the generic ones.
+- When no merge request holds the commit, the wait tool looks for a pipeline of that commit on the default branch. If one
+  exists, it follows the pipeline as it follows the landed commit of a merge. If none exists, the answer stays
+  `waiting_for_push`, and that sentence no longer says that the push output named a merge request.
+
+**Consequences:** The `addresses` of a published app come from its catalog entry only; an app with no address link gets an
+empty list. A recognized failed deploy costs one trace read in `wait-for-app-publication`. In `get-app-status`, every
+failed deploy in the window now costs one trace read, not only those without a result file. The log of an older deploy in
+the window is read but not returned, because `lastDeployOf` leaves it out; this is a known cost, not fixed here. The call
+bound above still holds. A commit with no merge
+request costs one more pipeline lookup on each poll until its pipeline appears.
