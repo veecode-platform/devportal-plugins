@@ -1,5 +1,6 @@
 import type { Entity } from '@backstage/catalog-model';
 import { z } from 'zod/v3';
+import { addressesOf } from './addresses';
 import type { AppPiece } from './app';
 import {
   describeFailedJobs,
@@ -28,7 +29,6 @@ import type { FailedJob, LastDeployOut, StatusOutput } from './types';
 const MAX_DEPLOY_PIPELINES = 10;
 const MAX_DEPLOY_JOBS = 5;
 const MAX_OPEN_REQUESTS = 5;
-const HTTP_URL = /^https?:\/\/[^\s]+$/;
 
 export interface SheetInput {
   app: string;
@@ -166,14 +166,7 @@ export async function readSheet(
     }
   }
 
-  const addresses = (input.system.metadata.links ?? [])
-    .filter(
-      link => link.type === input.addressLinkType && HTTP_URL.test(link.url),
-    )
-    .map(link => ({
-      url: link.url,
-      ...(link.title ? { title: link.title } : {}),
-    }));
+  const addresses = addressesOf(input.system, input.addressLinkType);
   const environments = new Map<string, LastDeployOut>();
   for (const entry of deploys) {
     if (

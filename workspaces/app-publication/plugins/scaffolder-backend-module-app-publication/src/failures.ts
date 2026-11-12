@@ -467,12 +467,13 @@ export async function readDeployStep(
   if (job.status === 'failed' && file !== undefined && file.code !== 'ok') {
     const sentence = deploySentence(file, link);
     if (sentence !== undefined) {
+      const explained = await explain(ctx, job, baseEntry(ctx, job), sentence);
       return {
         kind: 'failed',
         commit: pipeline.sha,
         deploy: deployOf(file, pipeline.sha),
-        failedJobs: [baseEntry(ctx, job)],
-        sentence,
+        failedJobs: [explained.job],
+        sentence: explained.sentence,
       };
     }
   }

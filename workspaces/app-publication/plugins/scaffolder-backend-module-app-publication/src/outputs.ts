@@ -168,6 +168,12 @@ export function waitOutput(z: Zod) {
     pipeline: pipelineOutput(z).optional(),
     failedJobs: z.array(failedJobOutput(z)).max(MAX_FAILED_JOBS).optional(),
     deploy: deployOutput(z).optional(),
+    addresses: z
+      .array(addressOutput(z))
+      .optional()
+      .describe(
+        "The app's addresses from its catalog entry, present when the app is published. An empty list means the app has no address of its own.",
+      ),
     nextStep: z.string(),
   });
 }
