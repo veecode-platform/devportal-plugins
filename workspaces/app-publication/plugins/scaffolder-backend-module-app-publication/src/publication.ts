@@ -158,7 +158,7 @@ export async function observeCommit(
   );
   const chosen = chooseRequest(targets, input.mergeRequest);
   if (chosen === undefined) {
-    return waitingForPush(input.commit);
+    return observeDirectCommit(ctx, input.commit);
   }
   const mr = await ctx.gitlab.json(
     `/merge_requests/${chosen.iid}`,
@@ -189,6 +189,22 @@ export async function observeCommit(
     };
   }
   return observeOpenRequest(ctx, mr, request, followedCommit);
+}
+
+/**
+ * A commit pushed straight to the default branch has no merge request. Its
+ * default-branch pipeline is followed the way the landed commit of a merge is.
+ * Until GitLab shows that pipeline, the commit is still waiting for the push.
+ */
+async function observeDirectCommit(
+  ctx: FailureContext,
+  commit: string,
+): Promise<Observation> {
+  const pipelines = await defaultBranchPipelines(ctx, commit);
+  if (pipelines.length === 0) {
+    return waitingForPush(commit);
+  }
+  return observeDefaultBranch(ctx, commit);
 }
 
 async function observeOpenRequest(
@@ -282,6 +298,21 @@ async function observeOpenRequest(
     followedCommit,
     nextStep: S.MERGE_STUCK(request.mergeStatus),
   };
+}
+
+/** The default-branch pipelines GitLab shows for a commit: at most one, newest first. */
+async function defaultBranchPipelines(
+  ctx: FailureContext,
+  commit: string,
+): Promise<PipelineShape[]> {
+  return (
+    (await ctx.gitlab.json(
+      `/pipelines?ref=${encodeRef(
+        ctx.defaultBranch,
+      )}&sha=${commit}&order_by=id&sort=desc&per_page=1`,
+      z.array(pipelineShape),
+    )) ?? []
+  );
 }
 
 /**
@@ -391,14 +422,7 @@ async function observeDefaultBranch(
     nextStep: S.SENTENCE.deploying,
   });
   for (let hop = 0; hop <= MAX_FOLLOWED_COMMITS; hop += 1) {
-    const pipelines =
-      (await ctx.gitlab.json(
-        `/pipelines?ref=${encodeRef(
-          ctx.defaultBranch,
-        )}&sha=${commit}&order_by=id&sort=desc&per_page=1`,
-        z.array(pipelineShape),
-      )) ?? [];
-    const pipeline = pipelines[0];
+    const pipeline = (await defaultBranchPipelines(ctx, commit))[0];
     if (pipeline === undefined) {
       return deploying();
     }

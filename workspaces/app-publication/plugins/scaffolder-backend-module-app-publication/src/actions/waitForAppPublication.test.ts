@@ -472,6 +472,119 @@ describe('wait-for-app-publication: the walk', () => {
   });
 });
 
+describe('wait-for-app-publication: a commit pushed straight to the default branch', () => {
+  it('follows the default-branch pipeline of a commit with no merge request, to published', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'success')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([job(301, DEPLOY_JOB, 'deploy', 'success')]),
+    );
+    w.gitlab.reply(
+      paths.artifact(301, SMOKE_FILE),
+      text(JSON.stringify(smoke({ commit: COMMIT }))),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({
+      done: true,
+      state: 'published',
+      commit: COMMIT,
+      deploy: { commit: COMMIT, result: 'passed', code: 'ok' },
+    });
+    expectDeclared(w, WAIT, output);
+  });
+
+  it('reads failed at the main pipeline when that pipeline failed on such a commit', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'lint-check', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({
+      done: true,
+      state: 'failed',
+      step: 'main_pipeline',
+    });
+    expect(output.nextStep).toContain(
+      'The check `lint-check` failed on the change.',
+    );
+  });
+});
+
+describe('wait-for-app-publication: the addresses of a published app', () => {
+  const publish = (w: World) => {
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'merged', MERGE_COMMIT)]),
+    );
+    w.gitlab.reply(paths.request(7), json(merged()));
+    deployOnMerge(w, { smokeFile: JSON.stringify(smoke()) });
+  };
+
+  it('returns the addresses of the catalog links of the configured type, and keeps the address out of the sentence', async () => {
+    const w = world({
+      system: exampleSystem({
+        metadata: {
+          name: 'example-app',
+          namespace: 'default',
+          annotations: {
+            'gitlab.com/project-slug': 'example-org/example-app',
+            'backstage.io/managed-by-location': `url:${PROJECT_WEB_URL}/-/blob/main/catalog-info.yaml`,
+          },
+          links: [
+            {
+              url: 'https://app.example.com',
+              title: 'Example app',
+              type: 'app-address',
+            },
+            { url: 'https://other.example.com', type: 'other' },
+          ],
+        },
+      } as never),
+    });
+    publish(w);
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({
+      done: true,
+      state: 'published',
+      addresses: [{ url: 'https://app.example.com', title: 'Example app' }],
+    });
+    expect(output.nextStep).toContain('`addresses`');
+    expect(output.nextStep).not.toContain('app.example.com');
+    expectDeclared(w, WAIT, output);
+  });
+
+  it('returns no addresses when the app has no link of the configured type', async () => {
+    const w = world();
+    publish(w);
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({ state: 'published', addresses: [] });
+    expectDeclared(w, WAIT, output);
+  });
+});
+
 describe('wait-for-app-publication: deploy failures', () => {
   const failingDeploy = (file: Record<string, unknown>) => {
     const w = world();
@@ -786,6 +899,43 @@ describe('wait-for-app-publication: deploy failures', () => {
     expect(failedJob.untrustedJobOutput).toHaveLength(40);
     expect(failedJob.untrustedJobOutput?.[39]).toBe('log line 60');
     expect(failedJob.untrustedJobOutput?.[0]).toBe('log line 21');
+  });
+
+  it('returns the cleaned end of the log with a failed deploy whose result names a known cause', async () => {
+    const w = failingDeploy({
+      schema: 2,
+      job: DEPLOY_JOB,
+      result: 'failed',
+      code: 'install_failed',
+      commit: MERGE_COMMIT,
+      environment: 'dev',
+      chart: null,
+      pieces: [
+        {
+          piece: 'back',
+          result: 'failed',
+          code: 'install_failed',
+          checks: [],
+        },
+      ],
+    });
+    w.gitlab.reply(paths.trace(301), text(RUNNER_TRACE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({
+      done: true,
+      state: 'failed',
+      step: 'deploy',
+      deploy: { code: 'install_failed' },
+    });
+    expect(output.nextStep).toContain('it never became ready');
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: DEPLOY_JOB,
+        untrustedJobOutput: RUNNER_TRACE_CLEANED,
+      }),
+    ]);
   });
 });
 

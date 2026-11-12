@@ -3,6 +3,7 @@ import type { BackstageCredentials } from '@backstage/backend-plugin-api';
 import type { Entity } from '@backstage/catalog-model';
 import { ServiceUnavailableError } from '@backstage/errors';
 import { z } from 'zod/v3';
+import { addressesOf } from '../addresses';
 import {
   type AppPiece,
   type AppProject,
@@ -69,7 +70,7 @@ export function registerAppPublicationActions(
     name: WAIT_FOR_APP_PUBLICATION,
     title: 'Wait for an app publication',
     description:
-      "Follows a commit that was just pushed to an app through its merge request, the merge, the default branch's pipeline and the deploy, for a short time. It returns done, one state and the sentence to relay. Call it again with the same input while done is false. Only the app's owner may use it.",
+      "Follows a commit that was just pushed to an app, through its merge request and the merge or straight on the default branch, then through the default branch's pipeline and the deploy, for a short time. It returns done, one state, the sentence to relay and, once published, the app's addresses. Call it again with the same input while done is false. Only the app's owner may use it.",
     schema: {
       input: zod =>
         zod
@@ -227,7 +228,7 @@ async function waitForStatus(
       nextStep: S.SENTENCE.noProject,
     };
   }
-  return waitForPublication(
+  const output = await waitForPublication(
     opened.context,
     { commit: input.commit, mergeRequest: input.mergeRequest },
     {
@@ -236,6 +237,12 @@ async function waitForStatus(
       pollMilliseconds: deps.settings.pollIntervalSeconds * 1000,
     },
   );
+  return output.state === 'published'
+    ? {
+        ...output,
+        addresses: addressesOf(opened.system, deps.settings.addressLinkType),
+      }
+    : output;
 }
 
 function portalUrlOf(
