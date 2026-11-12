@@ -364,6 +364,59 @@ describe('get-app-status', () => {
     );
   });
 
+  it('returns the cleaned end of the log of a failed default-branch deploy whose result names a known cause', async () => {
+    const w = world();
+    baseline(
+      w,
+      [pipeline(200, NEWER, 'failed')],
+      [job(301, DEPLOY_JOB, 'deploy', 'success')],
+    );
+    w.gitlab.reply(
+      paths.jobs(200),
+      json([job(302, DEPLOY_JOB, 'deploy', 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.artifact(302, SMOKE_FILE),
+      text(
+        JSON.stringify({
+          schema: 2,
+          job: DEPLOY_JOB,
+          result: 'failed',
+          code: 'install_failed',
+          commit: NEWER,
+          environment: 'dev',
+          chart: null,
+          pieces: [
+            {
+              piece: 'back',
+              result: 'failed',
+              code: 'install_failed',
+              checks: [],
+            },
+          ],
+        }),
+      ),
+    );
+    w.gitlab.reply(paths.trace(302), text(RUNNER_TRACE));
+    w.gitlab.reply(
+      paths.artifact(301, SMOKE_FILE),
+      text(JSON.stringify(smoke(MERGE_COMMIT))),
+    );
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output).toMatchObject({ state: 'failed' });
+    expect(output.latestMain).toMatchObject({
+      failedJobs: [
+        expect.objectContaining({
+          name: DEPLOY_JOB,
+          untrustedJobOutput: RUNNER_TRACE_CLEANED,
+        }),
+      ],
+    });
+    expectDeclared(w, GET_APP_STATUS, output);
+  });
+
   it('adds the blocked sentence of an open request whose pipeline failed', async () => {
     const w = world();
     baseline(w, [pipeline(200, COMMIT, 'success')], []);
