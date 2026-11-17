@@ -132,6 +132,37 @@ function waitingForPush(commit: string): Observation {
   };
 }
 
+/** The route of a commit pushed straight to the default branch. */
+export function directRoute(ctx: FailureContext): S.Route {
+  return { kind: 'direct_push', defaultBranch: ctx.defaultBranch };
+}
+
+/** The requests that GitLab lists for a commit and that target the default branch. */
+async function defaultBranchRequests(
+  ctx: FailureContext,
+  commit: string,
+): Promise<z.infer<typeof commitMergeRequestShape>[]> {
+  const listed = await ctx.gitlab.json(
+    `/repository/commits/${commit}/merge_requests`,
+    z.array(commitMergeRequestShape),
+  );
+  return (listed ?? []).filter(
+    request => request.target_branch === ctx.defaultBranch,
+  );
+}
+
+/**
+ * The route a default-branch commit took: a request that targets the default
+ * branch and lists the commit landed it; otherwise it was pushed straight to it.
+ */
+export async function routeOf(
+  ctx: FailureContext,
+  commit: string,
+): Promise<S.Route> {
+  const targets = await defaultBranchRequests(ctx, commit);
+  return targets.length > 0 ? S.VIA_MERGE_REQUEST : directRoute(ctx);
+}
+
 /** Which of the target branch's requests holds the commit: the one named, else the open one, else the newest. */
 function chooseRequest<T extends { iid: number; state: string }>(
   targets: readonly T[],
@@ -149,13 +180,7 @@ export async function observeCommit(
   ctx: FailureContext,
   input: { commit: string; mergeRequest?: number },
 ): Promise<Observation> {
-  const listed = await ctx.gitlab.json(
-    `/repository/commits/${input.commit}/merge_requests`,
-    z.array(commitMergeRequestShape),
-  );
-  const targets = (listed ?? []).filter(
-    request => request.target_branch === ctx.defaultBranch,
-  );
+  const targets = await defaultBranchRequests(ctx, input.commit);
   const chosen = chooseRequest(targets, input.mergeRequest);
   if (chosen === undefined) {
     return observeDirectCommit(ctx, input.commit);
@@ -181,7 +206,7 @@ export async function observeCommit(
   }
   if (mr.state === 'merged') {
     const landed = mr.merge_commit_sha ?? mr.squash_commit_sha ?? mr.sha;
-    const after = await observeDefaultBranch(ctx, landed);
+    const after = await observeDefaultBranch(ctx, landed, S.VIA_MERGE_REQUEST);
     return {
       ...after,
       mergeRequest: request,
@@ -204,7 +229,7 @@ async function observeDirectCommit(
   if (pipelines.length === 0) {
     return waitingForPush(commit);
   }
-  return observeDefaultBranch(ctx, commit);
+  return observeDefaultBranch(ctx, commit, directRoute(ctx));
 }
 
 async function observeOpenRequest(
@@ -237,6 +262,7 @@ async function observeOpenRequest(
     const described = await describeFailedJobs(
       ctx,
       jobs,
+      S.VIA_MERGE_REQUEST,
       requestFailure(ctx, mr.iid),
     );
     return {
@@ -340,8 +366,9 @@ async function mainPipelineFailure(
   out: PipelineOut,
   jobs: readonly JobShape[],
   followedCommit: string | undefined,
+  route: S.Route,
 ): Promise<Observation> {
-  const described = await describeFailedJobs(ctx, jobs);
+  const described = await describeFailedJobs(ctx, jobs, route);
   return {
     done: true,
     state: 'failed',
@@ -411,7 +438,10 @@ function mainPipelineEnded(
 async function observeDefaultBranch(
   ctx: FailureContext,
   landed: string,
+  initial: S.Route,
 ): Promise<Observation> {
+  // A followed newer commit may have come by another path, so its route is looked up again.
+  let route = initial;
   let commit = landed;
   let followedCommit: string | undefined;
   const deploying = (pipeline?: PipelineOut): Observation => ({
@@ -419,7 +449,7 @@ async function observeDefaultBranch(
     state: 'deploying',
     pipeline,
     followedCommit,
-    nextStep: S.SENTENCE.deploying,
+    nextStep: S.DEPLOYING(route),
   });
   for (let hop = 0; hop <= MAX_FOLLOWED_COMMITS; hop += 1) {
     const pipeline = (await defaultBranchPipelines(ctx, commit))[0];
@@ -440,7 +470,14 @@ async function observeDefaultBranch(
       DEPLOY_RUNNING_STATES.includes(deployJob.status);
     if (notRun) {
       if (pipeline.status === 'failed') {
-        return mainPipelineFailure(ctx, pipeline, out, jobs, followedCommit);
+        return mainPipelineFailure(
+          ctx,
+          pipeline,
+          out,
+          jobs,
+          followedCommit,
+          route,
+        );
       }
       if (pipeline.status === 'canceled' || pipeline.status === 'skipped') {
         return mainPipelineEnded(ctx, pipeline, out, commit, followedCommit);
@@ -455,7 +492,7 @@ async function observeDefaultBranch(
               state: 'merged',
               pipeline: out,
               followedCommit,
-              nextStep: S.SENTENCE.merged,
+              nextStep: S.MERGED(route),
             }
           : deploying(out);
       }
@@ -469,10 +506,17 @@ async function observeDefaultBranch(
       }
       commit = next;
       followedCommit = next;
+      route = await routeOf(ctx, next);
       continue;
     }
 
-    const step = await readDeployStep(ctx, deployJob, pipeline);
+    const via = route;
+    const step = await readDeployStep(
+      ctx,
+      deployJob,
+      pipeline,
+      async () => via,
+    );
     if (step.kind === 'superseded') {
       const next = await newerDefaultCommit(ctx, commit);
       if (next === undefined) {
@@ -480,6 +524,7 @@ async function observeDefaultBranch(
       }
       commit = next;
       followedCommit = next;
+      route = await routeOf(ctx, next);
       continue;
     }
     if (step.kind === 'published') {
