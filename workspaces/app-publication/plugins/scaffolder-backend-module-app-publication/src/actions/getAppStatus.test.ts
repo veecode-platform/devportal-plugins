@@ -729,6 +729,148 @@ describe('get-app-status', () => {
   });
 });
 
+/** Words that only the merge-request path may put in a sentence. */
+const MERGE_REQUEST_WORDS =
+  /merge_request|auto_merge|auto-merge|new merge request/;
+
+describe('get-app-status: the sentence follows the path the newest default-branch commit took', () => {
+  const landedBy = (iid: number) => [
+    { iid, state: 'merged', target_branch: 'main', sha: COMMIT },
+  ];
+
+  it('pushes the fix to the default branch for a failed check on a direct push', async () => {
+    const w = world();
+    baseline(w, [pipeline(200, COMMIT, 'failed')], []);
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.jobs(200),
+      json([
+        job(401, 'lint-check', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(401), text(TEST_TRACE));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.state).toBe('failed');
+    expect(output.nextStep).toContain(
+      'fix what fails, commit, and push with `git push origin main`.',
+    );
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+  });
+
+  it('keeps the auto-merge push for a failed check on a landed merge request', async () => {
+    const w = world();
+    baseline(w, [pipeline(200, COMMIT, 'failed')], []);
+    w.gitlab.reply(paths.commitRequests(COMMIT), json(landedBy(7)));
+    w.gitlab.reply(
+      paths.jobs(200),
+      json([
+        job(401, 'lint-check', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(401), text(TEST_TRACE));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.nextStep).toContain(
+      'fix what fails, and push again with `-o merge_request.auto_merge`.',
+    );
+  });
+
+  it('fixes a failed deploy of a direct push in a new commit pushed to the default branch', async () => {
+    const w = world();
+    baseline(
+      w,
+      [],
+      [
+        job(302, DEPLOY_JOB, 'deploy', 'failed', {
+          pipeline: { id: 200, sha: COMMIT },
+        }),
+      ],
+    );
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.artifact(302, SMOKE_FILE),
+      text(
+        JSON.stringify({
+          schema: 2,
+          job: DEPLOY_JOB,
+          result: 'failed',
+          code: 'install_failed',
+          commit: COMMIT,
+          environment: 'dev',
+          chart: null,
+          pieces: [
+            {
+              piece: 'back',
+              result: 'failed',
+              code: 'install_failed',
+              checks: [],
+            },
+          ],
+        }),
+      ),
+    );
+    w.gitlab.reply(paths.trace(302), text('helm install timed out'));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.state).toBe('failed');
+    expect(output.nextStep).toContain(
+      'fix it in a new commit and push it to the default branch. The failed release stays installed until then, and the next fix comes through a new push to the default branch.',
+    );
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+  });
+
+  it('keeps the new-merge-request fix for a failed deploy of a landed merge request', async () => {
+    const w = world();
+    baseline(
+      w,
+      [],
+      [
+        job(302, DEPLOY_JOB, 'deploy', 'failed', {
+          pipeline: { id: 200, sha: COMMIT },
+        }),
+      ],
+    );
+    w.gitlab.reply(paths.commitRequests(COMMIT), json(landedBy(7)));
+    w.gitlab.reply(
+      paths.artifact(302, SMOKE_FILE),
+      text(
+        JSON.stringify({
+          schema: 2,
+          job: DEPLOY_JOB,
+          result: 'failed',
+          code: 'install_failed',
+          commit: COMMIT,
+          environment: 'dev',
+          chart: null,
+          pieces: [
+            {
+              piece: 'back',
+              result: 'failed',
+              code: 'install_failed',
+              checks: [],
+            },
+          ],
+        }),
+      ),
+    );
+    w.gitlab.reply(paths.trace(302), text('helm install timed out'));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.nextStep).toContain(
+      'fix it in a new merge request. The failed release stays installed until then, and the next fix comes through a merge request.',
+    );
+  });
+});
+
 describe('get-app-status: the deploys come from the default branch itself', () => {
   it('finds the last deploy of the default branch behind several pipelines that did not deploy', async () => {
     const w = world();

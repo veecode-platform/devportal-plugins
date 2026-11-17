@@ -21,6 +21,7 @@ import {
   pipelineJobs,
   RUNNING_STATES,
   requestFailure,
+  routeOf,
 } from './publication';
 import * as S from './sentences';
 import type { FailedJob, LastDeployOut, StatusOutput } from './types';
@@ -96,17 +97,32 @@ export async function readSheet(
         )
       )?.[0],
   );
+  // One lookup per commit: the newest pipeline and the window may share a commit.
+  const routes = new Map<string, Promise<S.Route>>();
+  const routeFor = (sha: string): Promise<S.Route> => {
+    let known = routes.get(sha);
+    if (known === undefined) {
+      known = routeOf(ctx, sha);
+      routes.set(sha, known);
+    }
+    return known;
+  };
   const mainFail = await within<Failure | undefined>(undefined, async () =>
     latest?.status === 'failed'
-      ? mainFailure(ctx, latest, await pipelineJobs(ctx, latest.id))
+      ? mainFailure(ctx, latest, await pipelineJobs(ctx, latest.id), routeFor)
       : undefined,
   );
   const deployRead = await within<DeployRead>(
     { entries: [], windowFull: false },
     () =>
-      recentDeploys(ctx, input, () => {
-        partial.value = true;
-      }),
+      recentDeploys(
+        ctx,
+        input,
+        () => {
+          partial.value = true;
+        },
+        routeFor,
+      ),
   );
   const deploys = deployRead.entries;
   // The window of recent pipelines is full and holds no deploy: the last deploy
@@ -236,6 +252,7 @@ async function openRequestEntry(
     const described = await describeFailedJobs(
       ctx,
       await pipelineJobs(ctx, head.id),
+      S.VIA_MERGE_REQUEST,
       requestFailure(ctx, mr.iid),
     );
     failedJobs = described.failedJobs;
@@ -280,6 +297,7 @@ async function recentDeploys(
   ctx: FailureContext,
   input: SheetInput,
   onPartial: () => void,
+  routeFor: (sha: string) => Promise<S.Route>,
 ): Promise<DeployRead> {
   const pipelines =
     (await ctx.gitlab.json(
@@ -307,7 +325,9 @@ async function recentDeploys(
     ) {
       continue;
     }
-    const step = await readDeployStep(ctx, deployJob, pipeline);
+    const step = await readDeployStep(ctx, deployJob, pipeline, () =>
+      routeFor(pipeline.sha),
+    );
     if (step.kind === 'superseded') {
       continue;
     }
@@ -345,17 +365,24 @@ async function mainFailure(
   ctx: FailureContext,
   latest: PipelineShape,
   jobs: readonly JobShape[],
+  routeFor: (sha: string) => Promise<S.Route>,
 ): Promise<Failure> {
+  const route = await routeFor(latest.sha);
   const deployJob = newest(
     jobs.filter(job => job.name === ctx.settings.deployJobName),
   );
   if (deployJob !== undefined && deployJob.status === 'failed') {
-    const step = await readDeployStep(ctx, deployJob, { sha: latest.sha });
+    const step = await readDeployStep(
+      ctx,
+      deployJob,
+      { sha: latest.sha },
+      async () => route,
+    );
     if (step.kind === 'failed') {
       return { failedJobs: step.failedJobs, sentence: step.sentence };
     }
   }
-  const described = await describeFailedJobs(ctx, jobs);
+  const described = await describeFailedJobs(ctx, jobs, route);
   return {
     failedJobs: described.failedJobs,
     sentence:

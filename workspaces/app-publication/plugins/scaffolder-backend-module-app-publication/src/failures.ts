@@ -93,6 +93,7 @@ function stageRank(stage: string): number {
 export async function describeFailedJobs(
   ctx: FailureContext,
   jobs: readonly JobShape[],
+  route: S.Route,
   request?: RequestFailure,
 ): Promise<{ failedJobs: FailedJob[]; sentences: string[] }> {
   const failed = jobs
@@ -109,7 +110,7 @@ export async function describeFailedJobs(
     .slice(0, MAX_FAILED);
   const described: Described[] = [];
   for (const job of failed) {
-    described.push(await describeJob(ctx, job, request));
+    described.push(await describeJob(ctx, job, route, request));
   }
   return {
     failedJobs: described.map(entry => entry.job),
@@ -146,6 +147,7 @@ function baseEntry(ctx: FailureContext, job: JobShape): FailedJob {
 async function describeJob(
   ctx: FailureContext,
   job: JobShape,
+  route: S.Route,
   request: RequestFailure | undefined,
 ): Promise<Described> {
   const entry = baseEntry(ctx, job);
@@ -157,13 +159,13 @@ async function describeJob(
     if (REASON_PATTERN.test(reason)) {
       return {
         job: entry,
-        sentence: S.REASON_OUTSIDE(name, reason, link),
+        sentence: S.REASON_OUTSIDE(name, reason, link, route),
       };
     }
     return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
   }
   if (job.name === ctx.settings.conflictMarkersJobName) {
-    return explain(ctx, job, entry, S.SENTENCE.conflictMarkers);
+    return explain(ctx, job, entry, S.CONFLICT_MARKERS(route));
   }
   if (reason === 'job_execution_timeout') {
     return { job: entry, sentence: S.TIMEOUT(name, link) };
@@ -179,7 +181,7 @@ async function describeJob(
     return describeRender(ctx, job, entry, name, link);
   }
   if (job.stage === 'lint' || job.stage === 'build') {
-    return explain(ctx, job, entry, S.LINT_OR_BUILD(name));
+    return explain(ctx, job, entry, S.LINT_OR_BUILD(name, route));
   }
   if (job.stage === 'scan') {
     return explain(
@@ -187,7 +189,7 @@ async function describeJob(
       job,
       entry,
       request === undefined
-        ? S.SCAN_FAILED_ON_DEFAULT_BRANCH(name, link)
+        ? S.SCAN_FAILED_ON_DEFAULT_BRANCH(name, link, route)
         : S.SCAN_FAILED(name, link),
     );
   }
@@ -435,6 +437,7 @@ export async function readDeployStep(
   ctx: FailureContext,
   job: JobShape,
   pipeline: { sha: string },
+  route: () => Promise<S.Route>,
 ): Promise<DeployStep> {
   const link = linkText(ctx.projectWebUrl, job.web_url);
   const text = await ctx.gitlab.artifact(
@@ -465,7 +468,7 @@ export async function readDeployStep(
     };
   }
   if (job.status === 'failed' && file !== undefined && file.code !== 'ok') {
-    const sentence = deploySentence(file, link);
+    const sentence = await deploySentence(file, link, route);
     if (sentence !== undefined) {
       const explained = await explain(ctx, job, baseEntry(ctx, job), sentence);
       return {
@@ -511,17 +514,27 @@ export async function noDetailStep(
   };
 }
 
-function deploySentence(file: SmokeResult, link: string): string | undefined {
+/**
+ * The sentence for a failed deploy's result file. The route is awaited only for a
+ * sentence that depends on it, so a failure that needs none costs no lookup.
+ */
+async function deploySentence(
+  file: SmokeResult,
+  link: string,
+  route: () => Promise<S.Route>,
+): Promise<string | undefined> {
   const pieceWith = (code: SmokePiece['code']) =>
     file.pieces.find(piece => piece.code === code);
   switch (file.code) {
     case 'validate_failed': {
       const piece = pieceWith('validate_failed');
-      return piece && S.VALIDATE_FAILED(piece.piece, file.environment);
+      return (
+        piece && S.VALIDATE_FAILED(piece.piece, file.environment, await route())
+      );
     }
     case 'install_failed': {
       const piece = pieceWith('install_failed');
-      return piece && S.INSTALL_FAILED(piece.piece);
+      return piece && S.INSTALL_FAILED(piece.piece, await route());
     }
     case 'path_failed': {
       const piece = pieceWith('path_failed');
@@ -534,6 +547,7 @@ function deploySentence(file: SmokeResult, link: string): string | undefined {
           check.path,
           check.status === null ? 'no answer' : String(check.status),
           String(check.attempts),
+          await route(),
         )
       );
     }

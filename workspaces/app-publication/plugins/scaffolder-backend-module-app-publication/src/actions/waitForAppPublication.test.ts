@@ -529,6 +529,406 @@ describe('wait-for-app-publication: a commit pushed straight to the default bran
   });
 });
 
+/** Words that only the merge-request path may put in a sentence. */
+const MERGE_REQUEST_WORDS =
+  /merge_request|auto_merge|auto-merge|new merge request/;
+
+describe('wait-for-app-publication: the sentence follows the path the commit took', () => {
+  /** A commit pushed straight to the default branch whose deploy job failed with this result file. */
+  const directDeploy = (file: Record<string, unknown>) => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    deployOnMerge(w, {
+      landed: COMMIT,
+      deployStatus: 'failed',
+      smokeFile: JSON.stringify({
+        schema: 2,
+        job: DEPLOY_JOB,
+        commit: COMMIT,
+        environment: 'dev',
+        chart: null,
+        ...file,
+      }),
+    });
+    return w;
+  };
+  /** A merge request that landed, whose deploy job failed with this result file. */
+  const landedDeploy = (file: Record<string, unknown>) => {
+    const w = world();
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'merged', MERGE_COMMIT)]),
+    );
+    w.gitlab.reply(paths.request(7), json(merged()));
+    deployOnMerge(w, {
+      deployStatus: 'failed',
+      smokeFile: JSON.stringify(file),
+    });
+    return w;
+  };
+
+  it('says the change is on the default branch when a direct push has no piece yet', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'success')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([job(301, 'lint-check', 'lint', 'success')]),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({ done: true, state: 'merged' });
+    expect(output.nextStep).toBe(
+      'The change is on the default branch. The app has no piece yet, so nothing was deployed.',
+    );
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+  });
+
+  it('keeps "is merged" when a merge request landed with no piece yet', async () => {
+    const w = world();
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'merged', MERGE_COMMIT)]),
+    );
+    w.gitlab.reply(paths.request(7), json(merged()));
+    w.gitlab.reply(
+      paths.pipelineBySha(MERGE_COMMIT),
+      json([pipeline(201, MERGE_COMMIT, 'success')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([job(301, 'lint-check', 'lint', 'success')]),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({ done: true, state: 'merged' });
+    expect(output.nextStep).toBe(
+      'The change is merged. The app has no piece yet, so nothing was deployed.',
+    );
+  });
+
+  it('says the change is on the default branch while a direct push deploys', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'running')]),
+    );
+    w.gitlab.reply(paths.jobs(201), json([]));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({ done: false, state: 'deploying' });
+    expect(output.nextStep).toBe(
+      'The change is on the default branch and the platform is building and deploying it. Call this tool again with the same input; do not push again.',
+    );
+  });
+
+  it('keeps "is merged" while a landed merge request deploys', async () => {
+    const w = world();
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'merged', MERGE_COMMIT)]),
+    );
+    w.gitlab.reply(paths.request(7), json(merged()));
+    w.gitlab.reply(
+      paths.pipelineBySha(MERGE_COMMIT),
+      json([pipeline(201, MERGE_COMMIT, 'running')]),
+    );
+    w.gitlab.reply(paths.jobs(201), json([]));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({ done: false, state: 'deploying' });
+    expect(output.nextStep).toBe(
+      'The change is merged and the platform is building and deploying it. Call this tool again with the same input; do not push again.',
+    );
+  });
+
+  it('says a direct push is waiting on the default branch, not in a merge request', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({ done: false, state: 'waiting_for_push' });
+    expect(output.nextStep).toBe(
+      `GitLab does not show commit \`${COMMIT}\` on the default branch yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded.`,
+    );
+  });
+
+  it('keeps the merge-request wording while GitLab does not show the request', async () => {
+    const w = world();
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'opened', COMMIT)]),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({ done: false, state: 'waiting_for_push' });
+    expect(output.nextStep).toBe(
+      `GitLab does not show commit \`${COMMIT}\` in a merge request or on the default branch yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded.`,
+    );
+  });
+
+  it('tells a direct push to push its fix to the default branch when a check fails there', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'contract', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(301), text('contract: owned file changed'));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'fix what fails, commit, and push with `git push origin main`.',
+    );
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+  });
+
+  it('keeps the auto-merge push for a failed check on a landed merge request', async () => {
+    const w = world();
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'merged', MERGE_COMMIT)]),
+    );
+    w.gitlab.reply(paths.request(7), json(merged()));
+    w.gitlab.reply(
+      paths.pipelineBySha(MERGE_COMMIT),
+      json([pipeline(201, MERGE_COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'contract', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(301), text('contract: owned file changed'));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'fix what fails, and push again with `-o merge_request.auto_merge`.',
+    );
+  });
+
+  it('tells a direct push to make an empty commit when a check stopped outside the change', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'build-app', 'build', 'failed', {
+          failure_reason: 'runner_system_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(301), text('runner lost the job'));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'Make an empty commit and push it once with `git push origin main`; if it fails the same way, give the platform team this link:',
+    );
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+  });
+
+  it('keeps the auto-merge push for a check stopped outside the change on a landed merge request', async () => {
+    const w = world();
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'merged', MERGE_COMMIT)]),
+    );
+    w.gitlab.reply(paths.request(7), json(merged()));
+    w.gitlab.reply(
+      paths.pipelineBySha(MERGE_COMMIT),
+      json([pipeline(201, MERGE_COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'build-app', 'build', 'failed', {
+          failure_reason: 'runner_system_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(301), text('runner lost the job'));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'Push again once with `-o merge_request.auto_merge`; if it fails the same way, give the platform team this link:',
+    );
+  });
+
+  it('tells a direct push to resolve conflict markers with a push to the default branch', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'conflict-markers', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(301), text(CONFLICT_TRACE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'Resolve the conflict, commit, and push with `git push origin main`.',
+    );
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+  });
+
+  it('tells a direct push to fix a non-secret scan finding in a new commit, and a landed merge request in a new merge request', async () => {
+    const scanOn = async (landed: string, listing: unknown[]) => {
+      const w = world();
+      w.gitlab.reply(paths.commitRequests(landed), json(listing));
+      w.gitlab.reply(
+        paths.pipelineBySha(landed),
+        json([pipeline(201, landed, 'failed')]),
+      );
+      w.gitlab.reply(
+        paths.jobs(201),
+        json([
+          job(301, 'secrets:gitleaks', 'scan', 'failed', {
+            failure_reason: 'script_failure',
+          }),
+        ]),
+      );
+      w.gitlab.reply(paths.trace(301), text(SCAN_TRACE));
+      if (listing.length > 0) {
+        w.gitlab.reply(paths.request(7), json(merged()));
+      }
+      return run(w, WAIT, input({ commit: landed }));
+    };
+
+    const direct = await scanOn(COMMIT, []);
+    const landed = await scanOn(MERGE_COMMIT, [
+      listed(7, 'merged', MERGE_COMMIT),
+    ]);
+
+    expect(direct.nextStep).toContain(
+      "fix it in the app's code, in a new commit pushed with `git push origin main`, if it is there",
+    );
+    expect(direct.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+    expect(landed.nextStep).toContain(
+      "fix it in the app's code, in a new merge request, if it is there",
+    );
+  });
+
+  it.each([
+    [
+      'validate_failed',
+      {
+        pieces: [
+          {
+            piece: 'back',
+            result: 'failed',
+            code: 'validate_failed',
+            checks: [],
+          },
+        ],
+        result: 'failed',
+        code: 'validate_failed',
+      },
+      'Fix it in a new commit and push it to the default branch.',
+      'Fix it in a new merge request.',
+    ],
+    [
+      'install_failed',
+      {
+        pieces: [
+          {
+            piece: 'back',
+            result: 'failed',
+            code: 'install_failed',
+            checks: [],
+          },
+        ],
+        result: 'failed',
+        code: 'install_failed',
+      },
+      'fix it in a new commit and push it to the default branch. The failed release stays installed until then, and the next fix comes through a new push to the default branch.',
+      'fix it in a new merge request. The failed release stays installed until then, and the next fix comes through a merge request.',
+    ],
+    [
+      'path_failed',
+      {
+        pieces: [
+          {
+            piece: 'back',
+            result: 'failed',
+            code: 'path_failed',
+            checks: [
+              {
+                target: 'service',
+                path: '/health',
+                status: 503,
+                ok: false,
+                attempts: 10,
+              },
+            ],
+          },
+        ],
+        result: 'failed',
+        code: 'path_failed',
+      },
+      'fix it in a new commit and push it to the default branch. The new version stays deployed until then.',
+      'fix it in a new merge request. The new version stays deployed until then.',
+    ],
+  ])(
+    'tells a direct push that a failed %s deploy is fixed in a new commit, and a landed merge request in a new merge request',
+    async (_code, body, directTail, mergeTail) => {
+      const direct = await run(directDeploy(body), WAIT, input());
+      expect(direct.nextStep).toContain(directTail);
+      expect(direct.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+
+      const merge = await run(
+        landedDeploy({
+          schema: 2,
+          job: DEPLOY_JOB,
+          commit: MERGE_COMMIT,
+          environment: 'dev',
+          chart: null,
+          ...body,
+        }),
+        WAIT,
+        input(),
+      );
+      expect(merge.nextStep).toContain(mergeTail);
+    },
+  );
+});
+
 describe('wait-for-app-publication: the addresses of a published app', () => {
   const publish = (w: World) => {
     w.gitlab.reply(
