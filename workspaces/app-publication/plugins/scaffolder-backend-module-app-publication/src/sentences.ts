@@ -23,7 +23,7 @@ export const SENTENCE = {
     'The sheet is partial: GitLab did not answer within the time limit, so part of it is missing. Do not report this state; call get-app-status again.',
   noPieces: 'The app has no piece yet, so there is nothing to publish.',
   notPublished:
-    'The app has pieces but has not been deployed yet. Merge a change to the default branch to publish it.',
+    'The app has pieces but has not been deployed yet. Push a change to the default branch to publish it.',
   noProject:
     'This app has no GitLab project in the catalog; tell the platform team.',
   published:
@@ -87,10 +87,22 @@ export const REASON_OUTSIDE = (
   route: Route,
 ): string =>
   route.kind === 'direct_push'
-    ? `The check \`${job}\` stopped for a reason outside the change (\`${reason}\`). Do not change the code. Make an empty commit and push it once with \`git push origin ${branchForSentence(
+    ? `The check \`${job}\` stopped for a reason outside the change (\`${reason}\`). Do not change the code. Make an empty commit (\`git commit --allow-empty\`) and push it once with \`git push origin ${branchForSentence(
         route.defaultBranch,
       )}\`; if it fails the same way, give the platform team this link: ${link}.`
     : `The check \`${job}\` stopped for a reason outside the change (\`${reason}\`). Do not change the code. Push again once with \`-o merge_request.auto_merge\`; if it fails the same way, give the platform team this link: ${link}.`;
+
+/**
+ * A scan that stopped outside the change, on a direct push. A new push would scan
+ * only the commits after this one, so the commits this push left unscanned would
+ * never be scanned: the platform team gets the job's link instead of a retry.
+ */
+export const SCAN_REASON_OUTSIDE_DIRECT = (
+  job: string,
+  reason: string,
+  link: string,
+): string =>
+  `The scan \`${job}\` stopped for a reason outside the change (\`${reason}\`). Do not change the code and do not push again to retry it: a new push would start its scan after the commits this push left unscanned, so those commits would never be scanned. Give the platform team this link: ${link}.`;
 
 export const TIMEOUT = (job: string, link: string): string =>
   `The check \`${job}\` ran out of time. If the change added something slow, such as a test that waits, fix it; otherwise give the platform team this link: ${link}.`;
@@ -233,14 +245,9 @@ export const RENDER_REFUSED = (
     refusals.map(refusedClause),
   )}. The end of the check's log in its failedJobs entry should give the key and the reason; explain them to the user without repeating any value that looks like a secret. If the log shows no reason for a named file, or the cause is in the platform, give the platform team this link: ${link}. Do not change platform-owned files. The local checks do not cover this: they lint, build and test the code, and they never render the chart. Fix each named file, then push again with \`-o merge_request.auto_merge\`.`;
 
-/**
- * The wait for a commit that GitLab does not show yet. A commit pushed straight
- * to the default branch is only ever waited for on that branch.
- */
-export const WAITING_FOR_PUSH = (commit: string, route: Route): string =>
-  route.kind === 'direct_push'
-    ? `GitLab does not show commit \`${commit}\` on the default branch yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded.`
-    : `GitLab does not show commit \`${commit}\` in a merge request or on the default branch yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded.`;
+/** Neutral for both paths: a commit that GitLab does not show yet has no route until its default-branch pipeline exists. */
+export const WAITING_FOR_PUSH = (commit: string): string =>
+  `GitLab does not show commit \`${commit}\` in a merge request or on the default branch yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded.`;
 
 export const MERGE_STUCK = (mergeStatus: string): string =>
   `The checks passed and the merge request is merging. Call this tool again with the same input. If three calls in a row return \`merging\`, the merge is stuck on \`${mergeStatus}\`: give the platform team the merge request's link.`;

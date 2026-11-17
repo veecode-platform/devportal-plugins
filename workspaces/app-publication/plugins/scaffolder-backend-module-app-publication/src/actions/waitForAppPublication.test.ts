@@ -650,7 +650,7 @@ describe('wait-for-app-publication: the sentence follows the path the commit too
     );
   });
 
-  it('says a direct push is waiting on the default branch, not in a merge request', async () => {
+  it('keeps the neutral waiting sentence for a direct push that has no default-branch pipeline yet', async () => {
     const w = world();
     w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
 
@@ -658,7 +658,7 @@ describe('wait-for-app-publication: the sentence follows the path the commit too
 
     expect(output).toMatchObject({ done: false, state: 'waiting_for_push' });
     expect(output.nextStep).toBe(
-      `GitLab does not show commit \`${COMMIT}\` on the default branch yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded.`,
+      `GitLab does not show commit \`${COMMIT}\` in a merge request or on the default branch yet. Call this tool again with the same input. If two more calls still do not see it, check that \`git push\` succeeded.`,
     );
   });
 
@@ -750,7 +750,7 @@ describe('wait-for-app-publication: the sentence follows the path the commit too
     const output = await run(w, WAIT, input());
 
     expect(output.nextStep).toContain(
-      'Make an empty commit and push it once with `git push origin main`; if it fails the same way, give the platform team this link:',
+      'Make an empty commit (`git commit --allow-empty`) and push it once with `git push origin main`; if it fails the same way, give the platform team this link:',
     );
     expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
   });
@@ -927,6 +927,121 @@ describe('wait-for-app-publication: the sentence follows the path the commit too
       expect(merge.nextStep).toContain(mergeTail);
     },
   );
+});
+
+describe('wait-for-app-publication: a scan that stopped, and a followed newer commit', () => {
+  it('does not tell a direct push to retry a scan that stopped outside the change, and gives the job link instead', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'secrets:gitleaks', 'scan', 'failed', {
+          failure_reason: 'runner_system_failure',
+        }),
+      ]),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(`${PROJECT_WEB_URL}/-/jobs/301`);
+    expect(output.nextStep).toContain('do not push again to retry it');
+    expect(output.nextStep).not.toMatch(
+      /empty commit|git push origin|merge_request/,
+    );
+  });
+
+  it('keeps the auto-merge retry for a scan that stopped outside the change on a landed merge request', async () => {
+    const w = world();
+    w.gitlab.reply(
+      paths.commitRequests(COMMIT),
+      json([listed(7, 'merged', MERGE_COMMIT)]),
+    );
+    w.gitlab.reply(paths.request(7), json(merged()));
+    w.gitlab.reply(
+      paths.pipelineBySha(MERGE_COMMIT),
+      json([pipeline(201, MERGE_COMMIT, 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([
+        job(301, 'secrets:gitleaks', 'scan', 'failed', {
+          failure_reason: 'runner_system_failure',
+        }),
+      ]),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'Push again once with `-o merge_request.auto_merge`; if it fails the same way, give the platform team this link:',
+    );
+  });
+
+  it('looks up the route again for a newer default-branch commit that came by a merge request', async () => {
+    const w = world();
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.pipelineBySha(COMMIT),
+      json([pipeline(201, COMMIT, 'success')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(201),
+      json([job(301, DEPLOY_JOB, 'deploy', 'skipped')]),
+    );
+    w.gitlab.reply(paths.newestMain, json([pipeline(202, NEWER, 'success')]));
+    w.gitlab.reply(
+      paths.commitRequests(NEWER),
+      json([listed(7, 'merged', NEWER)]),
+    );
+    w.gitlab.reply(
+      paths.pipelineBySha(NEWER),
+      json([pipeline(203, NEWER, 'success')]),
+    );
+    w.gitlab.reply(
+      paths.jobs(203),
+      json([job(303, DEPLOY_JOB, 'deploy', 'failed')]),
+    );
+    w.gitlab.reply(
+      paths.artifact(303, SMOKE_FILE),
+      text(
+        JSON.stringify({
+          schema: 2,
+          job: DEPLOY_JOB,
+          result: 'failed',
+          code: 'install_failed',
+          commit: NEWER,
+          environment: 'dev',
+          chart: null,
+          pieces: [
+            {
+              piece: 'back',
+              result: 'failed',
+              code: 'install_failed',
+              checks: [],
+            },
+          ],
+        }),
+      ),
+    );
+    w.gitlab.reply(paths.trace(303), text('helm install timed out'));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({
+      done: true,
+      state: 'failed',
+      step: 'deploy',
+    });
+    expect(output.nextStep).toContain(
+      'fix it in a new merge request. The failed release stays installed until then',
+    );
+    expect(output.nextStep).not.toContain('push it to the default branch');
+  });
 });
 
 describe('wait-for-app-publication: the addresses of a published app', () => {

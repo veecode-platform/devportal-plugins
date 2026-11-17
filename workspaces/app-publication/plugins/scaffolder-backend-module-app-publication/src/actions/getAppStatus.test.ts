@@ -27,9 +27,11 @@ import {
   json,
   paths,
   run,
+  status,
   stranger,
   text,
   world,
+  type Reply,
   type World,
 } from '../fixtures';
 import { GET_APP_STATUS } from './appPublication';
@@ -868,6 +870,60 @@ describe('get-app-status: the sentence follows the path the newest default-branc
     expect(output.nextStep).toContain(
       'fix it in a new merge request. The failed release stays installed until then, and the next fix comes through a merge request.',
     );
+  });
+});
+
+describe('get-app-status: a failed route lookup, and the not-published wording', () => {
+  /** A failed default-branch pipeline whose lint job failed, on a commit whose listing `listing` answers. */
+  const lintFailure = (w: World, listing: Reply) => {
+    baseline(w, [pipeline(200, COMMIT, 'failed')], []);
+    w.gitlab.reply(paths.commitRequests(COMMIT), listing);
+    w.gitlab.reply(
+      paths.jobs(200),
+      json([
+        job(401, 'lint-check', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(paths.trace(401), text(TEST_TRACE));
+  };
+
+  it('still answers, with the direct wording, when the commit listing fails with a server error', async () => {
+    const w = world();
+    lintFailure(w, status(500));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.state).toBe('failed');
+    expect(output.nextStep).toContain(
+      'fix what fails, commit, and push with `git push origin main`.',
+    );
+  });
+
+  it('still answers, with the direct wording, when the commit listing is malformed', async () => {
+    const w = world();
+    lintFailure(w, json({ unexpected: true }));
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.state).toBe('failed');
+    expect(output.nextStep).toContain(
+      'fix what fails, commit, and push with `git push origin main`.',
+    );
+  });
+
+  it('tells the user to push, not to merge, when the app has pieces and no deploy yet', async () => {
+    const w = world();
+    baseline(w, [], []);
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.state).toBe('not_published');
+    expect(output.nextStep).toContain(
+      'Push a change to the default branch to publish it.',
+    );
+    expect(output.nextStep).not.toContain('Merge a change');
   });
 });
 

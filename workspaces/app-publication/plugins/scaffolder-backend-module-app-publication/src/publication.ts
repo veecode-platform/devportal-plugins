@@ -124,16 +124,16 @@ export function requestFailure(
   };
 }
 
-function waitingForPush(commit: string, route: S.Route): Observation {
+function waitingForPush(commit: string): Observation {
   return {
     done: false,
     state: 'waiting_for_push',
-    nextStep: S.WAITING_FOR_PUSH(commit, route),
+    nextStep: S.WAITING_FOR_PUSH(commit),
   };
 }
 
 /** The route of a commit pushed straight to the default branch. */
-function directRoute(ctx: FailureContext): S.Route {
+export function directRoute(ctx: FailureContext): S.Route {
   return { kind: 'direct_push', defaultBranch: ctx.defaultBranch };
 }
 
@@ -190,7 +190,7 @@ export async function observeCommit(
     mergeRequestShape,
   );
   if (mr === undefined) {
-    return waitingForPush(input.commit, S.VIA_MERGE_REQUEST);
+    return waitingForPush(input.commit);
   }
   const followedCommit = mr.sha !== input.commit ? mr.sha : undefined;
   const request = mergeRequestOut(ctx.projectWebUrl, mr);
@@ -225,12 +225,11 @@ async function observeDirectCommit(
   ctx: FailureContext,
   commit: string,
 ): Promise<Observation> {
-  const route = directRoute(ctx);
   const pipelines = await defaultBranchPipelines(ctx, commit);
   if (pipelines.length === 0) {
-    return waitingForPush(commit, route);
+    return waitingForPush(commit);
   }
-  return observeDefaultBranch(ctx, commit, route);
+  return observeDefaultBranch(ctx, commit, directRoute(ctx));
 }
 
 async function observeOpenRequest(
@@ -439,8 +438,10 @@ function mainPipelineEnded(
 async function observeDefaultBranch(
   ctx: FailureContext,
   landed: string,
-  route: S.Route,
+  initial: S.Route,
 ): Promise<Observation> {
+  // A followed newer commit may have come by another path, so its route is looked up again.
+  let route = initial;
   let commit = landed;
   let followedCommit: string | undefined;
   const deploying = (pipeline?: PipelineOut): Observation => ({
@@ -505,14 +506,16 @@ async function observeDefaultBranch(
       }
       commit = next;
       followedCommit = next;
+      route = await routeOf(ctx, next);
       continue;
     }
 
+    const via = route;
     const step = await readDeployStep(
       ctx,
       deployJob,
       pipeline,
-      async () => route,
+      async () => via,
     );
     if (step.kind === 'superseded') {
       const next = await newerDefaultCommit(ctx, commit);
@@ -521,6 +524,7 @@ async function observeDefaultBranch(
       }
       commit = next;
       followedCommit = next;
+      route = await routeOf(ctx, next);
       continue;
     }
     if (step.kind === 'published') {

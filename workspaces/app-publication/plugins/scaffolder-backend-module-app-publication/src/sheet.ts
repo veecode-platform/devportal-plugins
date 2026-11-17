@@ -19,6 +19,7 @@ import { linkText, shownLink } from './links';
 import {
   mergeRequestOut,
   pipelineJobs,
+  directRoute,
   RUNNING_STATES,
   requestFailure,
   routeOf,
@@ -98,11 +99,12 @@ export async function readSheet(
       )?.[0],
   );
   // One lookup per commit: the newest pipeline and the window may share a commit.
+  // A failed lookup leaves the commit on the direct route, so the sheet still answers.
   const routes = new Map<string, Promise<S.Route>>();
   const routeFor = (sha: string): Promise<S.Route> => {
     let known = routes.get(sha);
     if (known === undefined) {
-      known = routeOf(ctx, sha);
+      known = routeOf(ctx, sha).catch(() => directRoute(ctx));
       routes.set(sha, known);
     }
     return known;

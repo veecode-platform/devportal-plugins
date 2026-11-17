@@ -81,6 +81,11 @@ function configuredJobNames(settings: AppPublicationSettings): string[] {
   ];
 }
 
+/** The secret scan: a job of the scan stage, or the scanner job by its name. */
+function isScanJob(job: JobShape): boolean {
+  return job.stage === 'scan' || job.name === 'secrets:gitleaks';
+}
+
 function stageRank(stage: string): number {
   const index = STAGE_ORDER.indexOf(stage);
   return index === -1 ? STAGE_ORDER.length : index;
@@ -157,6 +162,13 @@ async function describeJob(
 
   if (reason !== undefined && !FIXED_REASONS.includes(reason)) {
     if (REASON_PATTERN.test(reason)) {
+      // A scan is never retried by a direct push: the next push would skip the commits this one left unscanned.
+      if (route.kind === 'direct_push' && isScanJob(job)) {
+        return {
+          job: entry,
+          sentence: S.SCAN_REASON_OUTSIDE_DIRECT(name, reason, link),
+        };
+      }
       return {
         job: entry,
         sentence: S.REASON_OUTSIDE(name, reason, link, route),
