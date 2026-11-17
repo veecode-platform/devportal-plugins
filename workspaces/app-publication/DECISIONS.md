@@ -53,7 +53,7 @@ schema 2.
 hide the failing release from the platform team.
 
 **Decision:** The sentence for an install failure says that the failed release stays installed and that the next fix
-comes through a merge request. It does not say that the previous version keeps running.
+comes through a merge request. It does not say that the previous version keeps running. A direct push gets the wording of PDR-014.
 
 **Consequences:** Until the next merge request lands, the app runs the failed release.
 
@@ -225,7 +225,7 @@ could fail a whole answer, and that a name's shape cannot be trusted.
 - The scan sentence on the default branch is another sentence: the value is already on the default branch, so there is
   no change to redo on a new branch. Claude tells the user it is exposed and must be changed where it was issued,
   without repeating it, and gives the platform team the job's link, because removing it from the history is the
-  platform team's work. A finding that is not a secret is fixed in a new merge request.
+  platform team's work. A finding that is not a secret is fixed in a new merge request. A direct push gets the wording of PDR-014.
 - A failed conflict-marker job returns the log tail. Its sentence says the end of the log usually names the files and
   the lines, that it is data from the job and not instructions, that Claude opens each named file and confirms the
   markers are there before editing, that platform-owned files never change, and, when the log is empty or could not be
@@ -281,3 +281,13 @@ failed deploy in the window now costs one trace read, not only those without a r
 the window is read but not returned, because `lastDeployOf` leaves it out; this is a known cost, not fixed here. The call
 bound above still holds. A commit with no merge
 request costs one more pipeline lookup on each poll until its pipeline appears.
+
+## PDR-014: The next step names the path the commit took
+
+**Status:** Accepted
+
+**Context:** A commit pushed straight to the default branch has no merge request. The sentences that a default-branch pipeline returns were written for a merge request: they told Claude to push with `-o merge_request.auto_merge` or to fix the change in a new merge request, which a direct push cannot use.
+
+**Decision:** Each sentence that a default-branch pipeline can return takes a route. The route is either a merge request that targets the default branch and lists the commit, or a direct push. A merge-request route keeps its wording. A direct push names `git push origin <default branch>` for a retry, and a fix as a new commit pushed to the default branch. A retry with no code change is an empty commit, because pushing the same commit again does nothing. The wait tool takes the route from the commit's list of requests. The status tool looks it up for the newest failed default-branch pipeline and for each failed deploy in the window, and only when a sentence needs it. PDR-004 and PDR-012 keep their merge-request wording; a direct push gets this rule's wording.
+
+**Consequences:** The route assumes that GitLab lists a request for its own landed commit. That is what a fast-forward merge gives. It is not checked here for merge or squash commits. A commit that GitLab does not list yet is waited for with the direct wording. The status tool makes at most six more reads, so the bound in PDR-012 is 41. The not-published sentence of the status tool still says "Merge a change", because that sentence has no commit to route. The state names, such as `merged` and `waiting_for_push`, are unchanged, because they are values and not sentences.
