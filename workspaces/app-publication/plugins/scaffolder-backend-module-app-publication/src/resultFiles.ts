@@ -26,12 +26,13 @@ export const CONTRACT_CODES = [
   'owned_file_changed',
   'unreadable_path',
   'checker_missing',
+  'no_platform_base',
 ] as const;
 
 export const PIECE_PATTERN = /^[a-z][a-z0-9-]{0,30}$/;
 const RELEASE_PATTERN = /^[a-z][a-z0-9-]{0,62}$/;
 const ENVIRONMENT_PATTERN = /^[a-z][a-z0-9-]{0,30}$/;
-const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
+export const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
 const SEMVER_PATTERN =
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -102,6 +103,7 @@ export const CONTRACT_RESULT = z
 
 export type SmokeResult = z.infer<typeof SMOKE_RESULT>;
 export type SmokePiece = z.infer<typeof SMOKE_PIECE>;
+export type ContractResult = z.infer<typeof CONTRACT_RESULT>;
 
 /** Returns the parsed file, or undefined when the text is not JSON or does not match the schema. */
 export function parseFile<T>(

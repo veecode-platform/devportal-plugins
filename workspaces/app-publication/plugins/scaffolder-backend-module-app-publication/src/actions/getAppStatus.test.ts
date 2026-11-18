@@ -6,6 +6,7 @@ import {
   COMMIT,
   CONFLICT_TRACE,
   CONFLICT_TRACE_CLEANED,
+  CONTRACT_FILE,
   DEPLOY_JOB,
   FAILED_LINE,
   MERGE_COMMIT,
@@ -19,6 +20,7 @@ import {
   TEST_TRACE_CLEANED,
   UNREADABLE_LOG_CASES,
   OTHER,
+  PLATFORM_COMMIT,
   PROJECT_WEB_URL,
   SMOKE_FILE,
   exampleComponent,
@@ -1095,5 +1097,57 @@ describe('get-app-status: the window of recent default-branch pipelines', () => 
         entityRef: 'component:default/example-app-back',
       }),
     ]);
+  });
+});
+
+describe('get-app-status: a failed contract job on the default branch', () => {
+  it('restores the platform-owned path from the platform commit in the sentence of the newest default-branch pipeline', async () => {
+    const w = world();
+    baseline(w, [pipeline(200, COMMIT, 'failed')], []);
+    w.gitlab.reply(paths.commitRequests(COMMIT), json([]));
+    w.gitlab.reply(
+      paths.jobs(200),
+      json([
+        job(401, 'contract', 'lint', 'failed', {
+          failure_reason: 'script_failure',
+        }),
+      ]),
+    );
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      text(
+        JSON.stringify({
+          schema: 1,
+          job: 'contract',
+          result: 'failed',
+          code: 'owned_file_changed',
+          paths: ['catalog-info.yaml'],
+          commits: [],
+          target: PLATFORM_COMMIT,
+        }),
+      ),
+    );
+    w.gitlab.reply(
+      paths.compare(PLATFORM_COMMIT, COMMIT),
+      json({ diffs: [{ new_path: 'catalog-info.yaml' }] }),
+    );
+
+    const output = await run(w, GET_APP_STATUS, { app: APP_REF });
+
+    expect(output.state).toBe('failed');
+    expect(output.nextStep).toContain('`catalog-info.yaml`');
+    expect(output.nextStep).toContain(
+      `git checkout ${PLATFORM_COMMIT} -- <path>`,
+    );
+    expect(output.nextStep).toContain('`git push origin main`');
+    expect(output.latestMain).toMatchObject({
+      failedJobs: [
+        expect.objectContaining({
+          name: 'contract',
+          code: 'owned_file_changed',
+          paths: ['catalog-info.yaml'],
+        }),
+      ],
+    });
   });
 });

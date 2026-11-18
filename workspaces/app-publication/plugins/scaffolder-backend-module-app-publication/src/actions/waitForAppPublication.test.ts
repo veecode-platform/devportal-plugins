@@ -26,6 +26,7 @@ import {
   MERGE_COMMIT,
   NEWER,
   OTHER,
+  PLATFORM_COMMIT,
   PROJECT_WEB_URL,
   SMOKE_FILE,
   TEAM_REF,
@@ -687,12 +688,12 @@ describe('wait-for-app-publication: the sentence follows the path the commit too
     w.gitlab.reply(
       paths.jobs(201),
       json([
-        job(301, 'contract', 'lint', 'failed', {
+        job(301, 'lint-check', 'lint', 'failed', {
           failure_reason: 'script_failure',
         }),
       ]),
     );
-    w.gitlab.reply(paths.trace(301), text('contract: owned file changed'));
+    w.gitlab.reply(paths.trace(301), text('lint-check: failed'));
 
     const output = await run(w, WAIT, input());
 
@@ -716,12 +717,12 @@ describe('wait-for-app-publication: the sentence follows the path the commit too
     w.gitlab.reply(
       paths.jobs(201),
       json([
-        job(301, 'contract', 'lint', 'failed', {
+        job(301, 'lint-check', 'lint', 'failed', {
           failure_reason: 'script_failure',
         }),
       ]),
     );
-    w.gitlab.reply(paths.trace(301), text('contract: owned file changed'));
+    w.gitlab.reply(paths.trace(301), text('lint-check: failed'));
 
     const output = await run(w, WAIT, input());
 
@@ -2775,6 +2776,312 @@ describe('wait-for-app-publication: a refused render config', () => {
 
     expect(output.nextStep).toContain(
       'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+  });
+});
+
+/** A failed default-branch pipeline of a commit with no merge request, with the given jobs. */
+function failedMainPipeline(w: World, jobs: unknown[], commit = COMMIT): void {
+  w.gitlab.reply(paths.commitRequests(commit), json([]));
+  w.gitlab.reply(
+    paths.pipelineBySha(commit),
+    json([pipeline(201, commit, 'failed')]),
+  );
+  w.gitlab.reply(paths.jobs(201), json(jobs));
+}
+
+describe('wait-for-app-publication: a failed contract or render job on the default branch', () => {
+  const contractJob = () =>
+    job(401, 'contract', 'lint', 'failed', {
+      failure_reason: 'script_failure',
+    });
+  const contractFile = (extra: Record<string, unknown> = {}) =>
+    text(
+      JSON.stringify({
+        schema: 1,
+        job: 'contract',
+        result: 'failed',
+        code: 'owned_file_changed',
+        paths: [],
+        commits: [],
+        ...extra,
+      }),
+    );
+  const comparedPaths = (...changed: string[]) =>
+    json({ diffs: changed.map(path => ({ new_path: path })) });
+
+  it('restores a platform-owned path from the platform commit, and pushes the fix to the default branch', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({
+        paths: ['catalog-info.yaml', 'platform/secret.yaml'],
+        target: PLATFORM_COMMIT,
+      }),
+    );
+    w.gitlab.reply(
+      paths.compare(PLATFORM_COMMIT, COMMIT),
+      comparedPaths('catalog-info.yaml', 'src/app.ts'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output).toMatchObject({
+      done: true,
+      state: 'failed',
+      step: 'main_pipeline',
+    });
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'contract',
+        code: 'owned_file_changed',
+        paths: ['catalog-info.yaml'],
+      }),
+    ]);
+    expect(output.nextStep).toContain('`catalog-info.yaml`');
+    expect(output.nextStep).toContain(
+      `git checkout ${PLATFORM_COMMIT} -- <path>`,
+    );
+    expect(output.nextStep).toContain('`git push origin main`');
+    expect(output.nextStep).not.toContain('platform/secret.yaml');
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+    expect(w.gitlab.paths).toContain(paths.compare(PLATFORM_COMMIT, COMMIT));
+  });
+
+  it('gives the generic log explanation when GitLab flags the compare as possibly incomplete', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ paths: ['catalog-info.yaml'], target: PLATFORM_COMMIT }),
+    );
+    w.gitlab.reply(
+      paths.compare(PLATFORM_COMMIT, COMMIT),
+      json({
+        diffs: [{ new_path: 'catalog-info.yaml' }],
+        compare_timeout: true,
+      }),
+    );
+    w.gitlab.reply(paths.trace(401), text(FAILED_LINE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.not.objectContaining({ code: 'owned_file_changed' }),
+    ]);
+    expect(output.nextStep).toContain(
+      'The check `contract` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('git checkout');
+  });
+
+  it('sends an unreadable path to the platform team, because a rename on the default branch does not clear it', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ code: 'unreadable_path', target: PLATFORM_COMMIT }),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({ name: 'contract', code: 'unreadable_path' }),
+    ]);
+    expect(output.nextStep).toContain('does not clear this check');
+    expect(output.nextStep).toContain(`${PROJECT_WEB_URL}/-/jobs/401`);
+    expect(output.nextStep).not.toContain(
+      'Rename the file, commit, and push again',
+    );
+  });
+
+  it('gives the checker-missing sentence on the default branch', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ code: 'checker_missing', target: PLATFORM_COMMIT }),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({ name: 'contract', code: 'checker_missing' }),
+    ]);
+    expect(output.nextStep).toContain('contract check is missing');
+    expect(output.nextStep).toContain(`${PROJECT_WEB_URL}/-/jobs/401`);
+  });
+
+  it('gives the generic log explanation when the platform-owned path is not in the compare diff', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ paths: ['catalog-info.yaml'], target: PLATFORM_COMMIT }),
+    );
+    w.gitlab.reply(
+      paths.compare(PLATFORM_COMMIT, COMMIT),
+      comparedPaths('src/app.ts'),
+    );
+    w.gitlab.reply(paths.trace(401), text(FAILED_LINE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'contract',
+        untrustedJobOutput: [FAILED_LINE],
+      }),
+    ]);
+    expect(output.failedJobs).toEqual([
+      expect.not.objectContaining({ code: 'owned_file_changed' }),
+    ]);
+    expect(output.nextStep).toContain(
+      'The check `contract` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('git checkout');
+  });
+
+  it.each(['HEAD', '6'.repeat(39), 'A'.repeat(40)])(
+    'gives the generic log explanation, and reads no compare, when the contract target is %j',
+    async target => {
+      const w = world();
+      failedMainPipeline(w, [contractJob()]);
+      w.gitlab.reply(
+        paths.artifact(401, CONTRACT_FILE),
+        contractFile({ paths: ['catalog-info.yaml'], target }),
+      );
+      w.gitlab.reply(paths.trace(401), text(FAILED_LINE));
+
+      const output = await run(w, WAIT, input());
+
+      expect(output.nextStep).toContain(
+        'The check `contract` failed for a reason this tool has no fixed explanation for.',
+      );
+      expect(output.nextStep).not.toContain('git checkout');
+      expect(output.failedJobs).toEqual([
+        expect.not.objectContaining({ code: 'owned_file_changed' }),
+      ]);
+      expect(
+        w.gitlab.paths.filter(path => path.startsWith('/repository/compare')),
+      ).toEqual([]);
+    },
+  );
+
+  it('gives the platform sentence, with the job link, when the default branch has no platform commit', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ code: 'no_platform_base', target: 'HEAD' }),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({ name: 'contract', code: 'no_platform_base' }),
+    ]);
+    expect(output.nextStep).toContain(
+      'No commit of this app comes from the platform',
+    );
+    expect(output.nextStep).toContain('give the platform team this link');
+    expect(output.nextStep).toContain(`${PROJECT_WEB_URL}/-/jobs/401`);
+    expect(output.nextStep).not.toContain('git checkout');
+  });
+
+  it('keeps the log explanation for a failed contract with no platform commit on a merge request', async () => {
+    const w = world();
+    failedRequest(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ code: 'no_platform_base', target: 'HEAD' }),
+    );
+    w.gitlab.reply(paths.trace(401), text(FAILED_LINE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `contract` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('No commit of this app');
+  });
+
+  it('names the refused config of a failed render job on the default branch, with the direct-push wording', async () => {
+    const w = world();
+    failedMainPipeline(w, [
+      job(401, 'render', 'lint', 'failed', {
+        failure_reason: 'script_failure',
+      }),
+    ]);
+    w.gitlab.reply(
+      paths.trace(401),
+      text([REFUSAL_LINE, 'refused back dev', FAILED_LINE].join('\n')),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The platform chart refused the config of `back` for `dev` (file `back/config/dev.yaml`).',
+    );
+    expect(output.nextStep).toContain(
+      'Fix each named file in a new commit and push it with `git push origin main`.',
+    );
+    expect(output.nextStep).not.toMatch(MERGE_REQUEST_WORDS);
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({
+        name: 'render',
+        untrustedJobOutput: [REFUSAL_LINE, 'refused back dev', FAILED_LINE],
+      }),
+    ]);
+  });
+
+  it('gives the generic log explanation for a failed render job on the default branch with no refusal line', async () => {
+    const w = world();
+    failedMainPipeline(w, [
+      job(401, 'render', 'lint', 'failed', {
+        failure_reason: 'script_failure',
+      }),
+    ]);
+    w.gitlab.reply(paths.trace(401), text(FAILED_LINE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toContain(
+      'The check `render` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('refused the config');
+  });
+
+  it('keeps the merge-request restore sentence word for word, and reads no compare on a merge request', async () => {
+    const w = world();
+    failedRequest(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ paths: ['catalog-info.yaml'], target: PLATFORM_COMMIT }),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toBe(
+      'The change edits files that belong to the platform: `catalog-info.yaml`. Restore each one, with `git checkout origin/main -- <path>` when the default branch has it, or `git rm -- <path>` when it does not. Then commit and push with `-o merge_request.auto_merge`.',
+    );
+    expect(
+      w.gitlab.paths.filter(path => path.startsWith('/repository/compare')),
+    ).toEqual([]);
+  });
+
+  it('keeps the merge-request render sentence word for word', async () => {
+    const w = world();
+    renderFailure(
+      w,
+      [REFUSAL_LINE, 'refused back dev', FAILED_LINE].join('\n'),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.nextStep).toBe(
+      `The platform chart refused the config of \`back\` for \`dev\` (file \`back/config/dev.yaml\`). The end of the check's log in its failedJobs entry should give the key and the reason; explain them to the user without repeating any value that looks like a secret. If the log shows no reason for a named file, or the cause is in the platform, give the platform team this link: ${PROJECT_WEB_URL}/-/jobs/401. Do not change platform-owned files. The local checks do not cover this: they lint, build and test the code, and they never render the chart. Fix each named file, then push again with \`-o merge_request.auto_merge\`.`,
     );
   });
 });

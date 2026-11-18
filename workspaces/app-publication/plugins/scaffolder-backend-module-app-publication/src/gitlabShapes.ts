@@ -72,6 +72,13 @@ export const diffShape = z
   })
   .passthrough();
 
+export const compareShape = z
+  .object({
+    diffs: z.array(diffShape),
+    compare_timeout: z.boolean().optional(),
+  })
+  .passthrough();
+
 export type PipelineShape = z.infer<typeof pipelineShape>;
 export type JobShape = z.infer<typeof jobShape>;
 export type MergeRequestShape = z.infer<typeof mergeRequestShape>;
