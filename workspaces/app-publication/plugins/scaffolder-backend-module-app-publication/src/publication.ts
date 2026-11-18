@@ -1,6 +1,7 @@
 import { z } from 'zod/v3';
 import { type Clock } from './dependencies';
 import {
+  changedPaths,
   describeFailedJobs,
   type DeployStep,
   type FailureContext,
@@ -111,14 +112,7 @@ export function requestFailure(
     diffPaths() {
       loaded ??= ctx.gitlab
         .json(`/merge_requests/${iid}/diffs?per_page=100`, z.array(diffShape))
-        .then(diffs => {
-          const paths = new Set<string>();
-          for (const diff of diffs ?? []) {
-            if (diff.new_path) paths.add(diff.new_path);
-            if (diff.old_path) paths.add(diff.old_path);
-          }
-          return paths;
-        });
+        .then(diffs => changedPaths(diffs ?? []));
       return loaded;
     },
   };
@@ -259,12 +253,10 @@ async function observeOpenRequest(
   }
   if (head.status === 'failed') {
     const jobs = await pipelineJobs(ctx, head.id);
-    const described = await describeFailedJobs(
-      ctx,
-      jobs,
-      S.VIA_MERGE_REQUEST,
-      requestFailure(ctx, mr.iid),
-    );
+    const described = await describeFailedJobs(ctx, jobs, S.VIA_MERGE_REQUEST, {
+      kind: 'merge_request',
+      request: requestFailure(ctx, mr.iid),
+    });
     return {
       done: true,
       state: 'failed',
@@ -368,7 +360,10 @@ async function mainPipelineFailure(
   followedCommit: string | undefined,
   route: S.Route,
 ): Promise<Observation> {
-  const described = await describeFailedJobs(ctx, jobs, route);
+  const described = await describeFailedJobs(ctx, jobs, route, {
+    kind: 'default_branch',
+    commit: pipeline.sha,
+  });
   return {
     done: true,
     state: 'failed',

@@ -255,7 +255,7 @@ async function openRequestEntry(
       ctx,
       await pipelineJobs(ctx, head.id),
       S.VIA_MERGE_REQUEST,
-      requestFailure(ctx, mr.iid),
+      { kind: 'merge_request', request: requestFailure(ctx, mr.iid) },
     );
     failedJobs = described.failedJobs;
     const detail =
@@ -384,7 +384,10 @@ async function mainFailure(
       return { failedJobs: step.failedJobs, sentence: step.sentence };
     }
   }
-  const described = await describeFailedJobs(ctx, jobs, route);
+  const described = await describeFailedJobs(ctx, jobs, route, {
+    kind: 'default_branch',
+    commit: latest.sha,
+  });
   return {
     failedJobs: described.failedJobs,
     sentence:

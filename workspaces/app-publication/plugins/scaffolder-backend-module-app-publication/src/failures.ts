@@ -1,13 +1,14 @@
 import { ServiceUnavailableError } from '@backstage/errors';
 import type { AppPublicationSettings } from './config';
 import type { GitlabClient } from './gitlab';
-import type { JobShape } from './gitlabShapes';
+import { type JobShape, compareShape } from './gitlabShapes';
 import { linkText, shownLink } from './links';
 import * as S from './sentences';
 import type { DeployOut, FailedJob, PieceOut } from './types';
 import {
-  CONTRACT_CODES,
+  COMMIT_PATTERN,
   CONTRACT_RESULT,
+  type ContractResult,
   type SmokePiece,
   type SmokeResult,
   SMOKE_RESULT,
@@ -52,6 +53,14 @@ export interface RequestFailure {
   iid: number;
   diffPaths(): Promise<ReadonlySet<string>>;
 }
+
+/**
+ * The pipeline whose failure is described. A merge request's pipeline has the
+ * request's diff; the default branch's pipeline has the commit it ran on.
+ */
+export type FailedPipeline =
+  | { readonly kind: 'merge_request'; readonly request: RequestFailure }
+  | { readonly kind: 'default_branch'; readonly commit: string };
 
 interface Described {
   job: FailedJob;
@@ -99,7 +108,7 @@ export async function describeFailedJobs(
   ctx: FailureContext,
   jobs: readonly JobShape[],
   route: S.Route,
-  request?: RequestFailure,
+  pipeline: FailedPipeline,
 ): Promise<{ failedJobs: FailedJob[]; sentences: string[] }> {
   const failed = jobs
     .filter(
@@ -115,7 +124,7 @@ export async function describeFailedJobs(
     .slice(0, MAX_FAILED);
   const described: Described[] = [];
   for (const job of failed) {
-    described.push(await describeJob(ctx, job, route, request));
+    described.push(await describeJob(ctx, job, route, pipeline));
   }
   return {
     failedJobs: described.map(entry => entry.job),
@@ -153,7 +162,7 @@ async function describeJob(
   ctx: FailureContext,
   job: JobShape,
   route: S.Route,
-  request: RequestFailure | undefined,
+  pipeline: FailedPipeline,
 ): Promise<Described> {
   const entry = baseEntry(ctx, job);
   const name = entry.name;
@@ -182,15 +191,15 @@ async function describeJob(
   if (reason === 'job_execution_timeout') {
     return { job: entry, sentence: S.TIMEOUT(name, link) };
   }
-  if (job.name === ctx.settings.contractJobName && request !== undefined) {
-    const contract = await describeContract(ctx, job, request, entry);
+  if (job.name === ctx.settings.contractJobName) {
+    const contract = await describeContract(ctx, job, pipeline, entry);
     if (contract !== undefined) {
       return contract;
     }
     return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
   }
-  if (job.name === ctx.settings.renderJobName && request !== undefined) {
-    return describeRender(ctx, job, entry, name, link);
+  if (job.name === ctx.settings.renderJobName) {
+    return describeRender(ctx, job, entry, name, link, route);
   }
   if (job.stage === 'lint' || job.stage === 'build') {
     return explain(ctx, job, entry, S.LINT_OR_BUILD(name, route));
@@ -200,9 +209,9 @@ async function describeJob(
       ctx,
       job,
       entry,
-      request === undefined
-        ? S.SCAN_FAILED_ON_DEFAULT_BRANCH(name, link, route)
-        : S.SCAN_FAILED(name, link),
+      pipeline.kind === 'merge_request'
+        ? S.SCAN_FAILED(name, link)
+        : S.SCAN_FAILED_ON_DEFAULT_BRANCH(name, link, route),
     );
   }
   return explain(ctx, job, entry, S.EXPLAIN_FROM_LOG(name, link));
@@ -211,7 +220,7 @@ async function describeJob(
 async function describeContract(
   ctx: FailureContext,
   job: JobShape,
-  request: RequestFailure,
+  pipeline: FailedPipeline,
   entry: FailedJob,
 ): Promise<Described | undefined> {
   const text = await ctx.gitlab.artifact(
@@ -223,58 +232,134 @@ async function describeContract(
   if (file === undefined || file.job !== job.name) {
     return undefined;
   }
-  if (!(CONTRACT_CODES as readonly string[]).includes(file.code)) {
-    return undefined;
-  }
   const link = linkText(ctx.projectWebUrl, job.web_url);
-  if (file.code === 'owned_file_changed') {
+  switch (file.code) {
+    case 'owned_file_changed':
+      return ownedFilesFailure(ctx, file, pipeline, entry, link);
+    case 'no_platform_base':
+      // A merge request keeps the log explanation it has always had.
+      return pipeline.kind === 'default_branch'
+        ? {
+            job: { ...entry, code: 'no_platform_base' },
+            sentence: S.CONTRACT_NO_PLATFORM_BASE(link),
+          }
+        : undefined;
+    case 'unreadable_path':
+      return {
+        job: { ...entry, code: 'unreadable_path' },
+        sentence: S.SENTENCE.contractUnreadable,
+      };
+    case 'checker_missing':
+      return {
+        job: { ...entry, code: 'checker_missing' },
+        sentence: S.CONTRACT_CHECKER_MISSING(link),
+      };
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The owned paths a contract job names, kept only when the change holds them. A
+ * merge request's change is its diff. A default-branch change is what its commit
+ * added since the platform commit the check named, so that name is checked
+ * before GitLab is asked for anything.
+ */
+async function ownedFilesFailure(
+  ctx: FailureContext,
+  file: ContractResult,
+  pipeline: FailedPipeline,
+  entry: FailedJob,
+  link: string,
+): Promise<Described | undefined> {
+  if (pipeline.kind === 'merge_request') {
     const { safe, untrusted } = ownedPathsInDiff(
       file.paths,
-      await request.diffPaths(),
+      await pipeline.request.diffPaths(),
     );
-    if (safe.length === 0 && untrusted.length === 0) {
-      return undefined;
-    }
-    return {
-      job: {
-        ...entry,
-        code: 'owned_file_changed',
-        ...(safe.length > 0 ? { paths: safe } : {}),
-        ...(untrusted.length > 0 ? { untrustedPaths: untrusted } : {}),
-      },
-      sentence: ownedFileSentence(ctx, safe, untrusted.length, link),
-    };
+    return ownedFilesDescribed(entry, safe, untrusted, link, list =>
+      S.CONTRACT_OWNED(list, ctx.defaultBranch),
+    );
   }
-  if (file.code === 'unreadable_path') {
-    return {
-      job: { ...entry, code: 'unreadable_path' },
-      sentence: S.SENTENCE.contractUnreadable,
-    };
+  const target = file.target;
+  if (target === undefined || !COMMIT_PATTERN.test(target)) {
+    return undefined;
+  }
+  const { safe, untrusted } = ownedPathsInDiff(
+    file.paths,
+    await comparedPaths(ctx, target, pipeline.commit),
+  );
+  return ownedFilesDescribed(entry, safe, untrusted, link, list =>
+    S.CONTRACT_OWNED_FROM_TARGET(list, target, ctx.defaultBranch),
+  );
+}
+
+/** The job's entry and sentence for its owned paths, or undefined when the change holds none of them. */
+function ownedFilesDescribed(
+  entry: FailedJob,
+  safe: string[],
+  untrusted: string[],
+  link: string,
+  restore: (list: string) => string,
+): Described | undefined {
+  if (safe.length === 0 && untrusted.length === 0) {
+    return undefined;
   }
   return {
-    job: { ...entry, code: 'checker_missing' },
-    sentence: S.CONTRACT_CHECKER_MISSING(link),
+    job: {
+      ...entry,
+      code: 'owned_file_changed',
+      ...(safe.length > 0 ? { paths: safe } : {}),
+      ...(untrusted.length > 0 ? { untrustedPaths: untrusted } : {}),
+    },
+    sentence: ownedFileSentence(safe, untrusted.length, link, restore),
   };
+}
+
+/**
+ * The paths that a compare of two commits changes, new and old, as a set. A compare
+ * GitLab does not answer holds none, so no path is kept.
+ */
+async function comparedPaths(
+  ctx: FailureContext,
+  from: string,
+  to: string,
+): Promise<ReadonlySet<string>> {
+  const range = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const compare = await ctx.gitlab.json(
+    `/repository/compare?${range}`,
+    compareShape,
+  );
+  return changedPaths(compare?.diffs ?? []);
+}
+
+/** The new and the old path of each diff, as a set. */
+export function changedPaths(
+  diffs: readonly { new_path?: string; old_path?: string }[],
+): Set<string> {
+  const paths = new Set<string>();
+  for (const diff of diffs) {
+    if (diff.new_path) paths.add(diff.new_path);
+    if (diff.old_path) paths.add(diff.old_path);
+  }
+  return paths;
 }
 
 /** The restore sentence for the safe paths, and the note for any path that does not fit the safe form. */
 function ownedFileSentence(
-  ctx: FailureContext,
   safe: readonly string[],
   untrustedCount: number,
   link: string,
+  restore: (list: string) => string,
 ): string {
   if (safe.length === 0) {
     return S.CONTRACT_OWNED_ONLY_WITHHELD(untrustedCount, link);
   }
-  const restore = S.CONTRACT_OWNED(
-    safe.map(path => `\`${path}\``).join(', '),
-    ctx.defaultBranch,
-  );
+  const sentence = restore(safe.map(path => `\`${path}\``).join(', '));
   if (untrustedCount === 0) {
-    return restore;
+    return sentence;
   }
-  return `${restore} ${S.CONTRACT_OWNED_WITHHELD(untrustedCount, link)}`;
+  return `${sentence} ${S.CONTRACT_OWNED_WITHHELD(untrustedCount, link)}`;
 }
 
 /**
@@ -332,9 +417,10 @@ async function jobLog(
 }
 
 /**
- * The render check of a merge request. A refusal line anywhere in the log read
- * names a config of this app, and its file is named to the user. Only the last
- * lines are returned. With no such line, the job gets the generic explanation.
+ * The render check, on a merge request or on the default branch. A refusal line
+ * anywhere in the log read names a config of this app, and its file is named to
+ * the user. Only the last lines are returned. With no such line, the job gets the
+ * generic explanation.
  */
 async function describeRender(
   ctx: FailureContext,
@@ -342,6 +428,7 @@ async function describeRender(
   entry: FailedJob,
   name: string,
   link: string,
+  route: S.Route,
 ): Promise<Described> {
   const log = await jobLog(ctx, job);
   const refusals = log === undefined ? [] : refusedConfigs(ctx, log);
@@ -350,7 +437,7 @@ async function describeRender(
     entry,
     log,
     refusals.length > 0
-      ? S.RENDER_REFUSED(refusals, link)
+      ? S.RENDER_REFUSED(refusals, link, route)
       : S.EXPLAIN_FROM_LOG(name, link),
   );
 }
