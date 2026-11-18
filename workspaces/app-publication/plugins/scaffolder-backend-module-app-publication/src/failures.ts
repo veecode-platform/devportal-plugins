@@ -237,7 +237,6 @@ async function describeContract(
     case 'owned_file_changed':
       return ownedFilesFailure(ctx, file, pipeline, entry, link);
     case 'no_platform_base':
-      // A merge request keeps the log explanation it has always had.
       return pipeline.kind === 'default_branch'
         ? {
             job: { ...entry, code: 'no_platform_base' },
