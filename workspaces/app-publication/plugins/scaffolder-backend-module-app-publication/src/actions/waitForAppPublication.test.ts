@@ -2849,6 +2849,70 @@ describe('wait-for-app-publication: a failed contract or render job on the defau
     expect(w.gitlab.paths).toContain(paths.compare(PLATFORM_COMMIT, COMMIT));
   });
 
+  it('gives the generic log explanation when GitLab flags the compare as possibly incomplete', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ paths: ['catalog-info.yaml'], target: PLATFORM_COMMIT }),
+    );
+    w.gitlab.reply(
+      paths.compare(PLATFORM_COMMIT, COMMIT),
+      json({
+        diffs: [{ new_path: 'catalog-info.yaml' }],
+        compare_timeout: true,
+      }),
+    );
+    w.gitlab.reply(paths.trace(401), text(FAILED_LINE));
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.not.objectContaining({ code: 'owned_file_changed' }),
+    ]);
+    expect(output.nextStep).toContain(
+      'The check `contract` failed for a reason this tool has no fixed explanation for.',
+    );
+    expect(output.nextStep).not.toContain('git checkout');
+  });
+
+  it('sends an unreadable path to the platform team, because a rename on the default branch does not clear it', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ code: 'unreadable_path', target: PLATFORM_COMMIT }),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({ name: 'contract', code: 'unreadable_path' }),
+    ]);
+    expect(output.nextStep).toContain('does not clear this check');
+    expect(output.nextStep).toContain(`${PROJECT_WEB_URL}/-/jobs/401`);
+    expect(output.nextStep).not.toContain(
+      'Rename the file, commit, and push again',
+    );
+  });
+
+  it('gives the checker-missing sentence on the default branch', async () => {
+    const w = world();
+    failedMainPipeline(w, [contractJob()]);
+    w.gitlab.reply(
+      paths.artifact(401, CONTRACT_FILE),
+      contractFile({ code: 'checker_missing', target: PLATFORM_COMMIT }),
+    );
+
+    const output = await run(w, WAIT, input());
+
+    expect(output.failedJobs).toEqual([
+      expect.objectContaining({ name: 'contract', code: 'checker_missing' }),
+    ]);
+    expect(output.nextStep).toContain('contract check is missing');
+    expect(output.nextStep).toContain(`${PROJECT_WEB_URL}/-/jobs/401`);
+  });
+
   it('gives the generic log explanation when the platform-owned path is not in the compare diff', async () => {
     const w = world();
     failedMainPipeline(w, [contractJob()]);

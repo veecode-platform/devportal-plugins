@@ -246,7 +246,10 @@ async function describeContract(
     case 'unreadable_path':
       return {
         job: { ...entry, code: 'unreadable_path' },
-        sentence: S.SENTENCE.contractUnreadable,
+        sentence:
+          pipeline.kind === 'default_branch'
+            ? S.CONTRACT_UNREADABLE_ON_DEFAULT_BRANCH(link)
+            : S.SENTENCE.contractUnreadable,
       };
     case 'checker_missing':
       return {
@@ -317,7 +320,8 @@ function ownedFilesDescribed(
 
 /**
  * The paths that a compare of two commits changes, new and old, as a set. A compare
- * GitLab does not answer holds none, so no path is kept.
+ * GitLab does not find, or flags as possibly incomplete, holds none, so no path is
+ * kept and a partial list never names only some of the files.
  */
 async function comparedPaths(
   ctx: FailureContext,
@@ -329,7 +333,10 @@ async function comparedPaths(
     `/repository/compare?${range}`,
     compareShape,
   );
-  return changedPaths(compare?.diffs ?? []);
+  if (compare === undefined || compare.compare_timeout === true) {
+    return new Set();
+  }
+  return changedPaths(compare.diffs);
 }
 
 /** The new and the old path of each diff, as a set. */

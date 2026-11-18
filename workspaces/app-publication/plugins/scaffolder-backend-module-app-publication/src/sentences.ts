@@ -93,6 +93,9 @@ export const CONTRACT_OWNED_ONLY_WITHHELD = (
 export const CONTRACT_CHECKER_MISSING = (link: string): string =>
   `The platform's contract check is missing from this app. This is a platform problem; give the platform team this link: ${link}.`;
 
+export const CONTRACT_UNREADABLE_ON_DEFAULT_BRANCH = (link: string): string =>
+  `A file name in a commit since the platform's last commit holds a tab, a line break or another control character. Renaming the file in a new commit does not clear this check, because it reads every commit since that platform commit. This is a platform problem; give the platform team this link: ${link}.`;
+
 export const CONTRACT_NO_PLATFORM_BASE = (link: string): string =>
   `No commit of this app comes from the platform, so the contract check has nothing to compare the change with. This is a platform problem, not a change in the code; give the platform team this link: ${link}.`;
 

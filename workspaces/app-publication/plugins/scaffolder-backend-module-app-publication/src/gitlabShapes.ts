@@ -75,6 +75,7 @@ export const diffShape = z
 export const compareShape = z
   .object({
     diffs: z.array(diffShape),
+    compare_timeout: z.boolean().optional(),
   })
   .passthrough();
 
