@@ -32,6 +32,7 @@ export const NEWER = '2'.repeat(40);
 export const MERGE_COMMIT = '3'.repeat(40);
 export const FAST_FORWARD = '4'.repeat(40);
 export const OTHER = '5'.repeat(40);
+export const PLATFORM_COMMIT = '6'.repeat(40);
 
 export const DEPLOY_JOB = 'deploy';
 export const SMOKE_FILE = 'smoke-result.json';
@@ -136,6 +137,8 @@ export const TEST_TRACE_CLEANED = [
 /** Relative paths under the project, exactly as the module requests them. */
 export const paths = {
   commitRequests: (sha: string) => `/repository/commits/${sha}/merge_requests`,
+  compare: (from: string, to: string) =>
+    `/repository/compare?from=${from}&to=${to}`,
   request: (iid: number) => `/merge_requests/${iid}`,
   requestDiffs: (iid: number) => `/merge_requests/${iid}/diffs?per_page=100`,
   pipelineBySha: (sha: string) =>
