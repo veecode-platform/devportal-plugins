@@ -64,7 +64,7 @@ comes through a merge request. It does not say that the previous version keeps r
 **Context:** The contract job writes the paths it found, and a job's file can carry any text. The tool reports those
 paths to Claude.
 
-**Decision:** A path from the contract result is returned only when GitLab's diff of the merge request holds it. A path
+**Decision:** A path from the contract result is returned only when GitLab's diff of the merge request holds it, or, on the default branch, the compare that PDR-015 describes holds it. A path
 in the safe form (`^[A-Za-z0-9._/-]{1,300}$`, no absolute path, no `..` segment) may appear in a sentence and is
 returned in `paths`. Any other path in the diff is left out of every sentence and returned only in `untrustedPaths`,
 marked untrusted. The `repairs` field, which would name the commit each file is restored from, is a follow-up and is
@@ -160,7 +160,7 @@ platform chart. When the chart refuses a config, the job exits 1 and prints a `r
 The module treated that job like a lint job and sent the user to the local checks. Those checks lint, build and test
 the code and never render the chart, so they cannot show the cause.
 
-**Decision:** A failed job named `renderJobName` (default `render`) in a merge request pipeline returns the last
+**Decision:** A failed job named `renderJobName` (default `render`) in a merge request or default-branch pipeline returns the last
 `failedJobLogLines` cleaned lines of its log, as PDR-002 does. The refusal lines are searched in every cleaned line of
 the log read, not only in the returned lines. A line of exactly the form `refused <piece> <environment>`, after the
 cleaning, names a config only when the piece is one of the app's pieces and the environment is one of the configured
@@ -168,9 +168,8 @@ environments. Each such config gets its file, `<piece>/config/<environment>.yaml
 the end of the log should give the key and the reason, and, when the log shows no reason or the cause is in the
 platform, gives the platform team the job's link and says not to change platform-owned files. The text of the log is
 never copied into a sentence. With no
-such line, the job gets the PDR-002 explanation. The render check applies to merge request pipelines only, which is
-where the generated pipeline runs `render`. A `render` failure on the default branch keeps the generic lint sentence, which returns
-the end of the log too (PDR-012).
+such line, the job gets the PDR-002 explanation. The render check applies to a merge request pipeline and to a
+default-branch pipeline, where the generated pipeline runs `render` too (PDR-015).
 Other job names keep their sentence.
 
 **Consequences:** The search covers the 256 KB that the tool reads from the end of the trace. A refusal earlier than
@@ -291,3 +290,19 @@ request costs one more pipeline lookup on each poll until its pipeline appears.
 **Decision:** Each sentence that a default-branch pipeline can return takes a route. The route is either a merge request that targets the default branch and lists the commit, or a direct push. A merge-request route keeps its wording. A direct push names `git push origin <default branch>` for a retry, and a fix as a new commit pushed to the default branch. A retry with no code change is an empty commit (`git commit --allow-empty`), because pushing the same commit again does nothing. A scan that stopped outside the change is never retried by a direct push: a new push would start its scan after the commits this push left unscanned, so the job's link goes to the platform team. The wait tool takes the route from the commit's list of requests, and looks it up again for each newer default-branch commit it follows. A commit that GitLab does not show yet keeps the neutral waiting sentence until its default-branch pipeline exists. The status tool looks the route up for the newest failed default-branch pipeline and for each failed deploy in the window, and only when a sentence needs it. PDR-004 and PDR-012 keep their merge-request wording; a direct push gets this rule's wording.
 
 **Consequences:** The route assumes that GitLab lists a request for its own landed commit. That is what a fast-forward merge gives. It is not checked here for merge or squash commits. The trace-read bound of PDR-012 stays at 35. The status tool makes at most six more reads, each a listing of one commit, and the wait tool makes at most three more, one for each newer commit it follows. If a listing fails, the status tool falls back to the direct route so that it still answers. The wait tool does not fall back, and its call fails as it does for any other GitLab error. The not-published sentence says to push a change to the default branch, which reads the same for both paths. The state names, such as `merged` and `waiting_for_push`, are unchanged, because they are values and not sentences.
+
+## PDR-015: A failed contract or render job on the default branch gets its explanation
+
+**Status:** Accepted, 2026-11-18
+
+**Context:** The generated app pipeline runs its `contract` and `render` jobs on the default branch as well as on a merge request, and a change can be pushed straight to the default branch. The failure reader took the request only for a merge request, so a failed default-branch pipeline gave both jobs the lint sentence, which sends the user to the local checks. Those checks never run the contract or render the chart, so they cannot show the cause.
+
+**Decision:** The failure reader takes the failed pipeline as an explicit argument: a merge request, with its diff, or the default branch, with its commit. The route still says how the commit landed.
+
+- A failed `contract` job that names owned files is filtered by PDR-005 on the default branch too. Its diff is GitLab's compare from the platform commit the result file names (`target`) to the pipeline's commit. A `target` that is not a full lowercase SHA gets the PDR-002 explanation, and no compare is read.
+- The owned paths are restored from that platform commit: each path with `git checkout <target> -- <path>` when the commit has it, or `git rm -- <path>` when it does not. Then the fix is committed and pushed with `git push origin <default branch>`. The restore comes from the target and not from the tip of the default branch, because the target is the commit the check compared against. The platform's own repair also pushes to the default branch, so the sentence uses the same push, whatever the route.
+- A `no_platform_base` result gets its own sentence with the job's link: no commit of the app comes from the platform, so the check has nothing to compare with. On a merge request it keeps the PDR-002 explanation, as before.
+- A `render` refusal on the default branch names the config as PDR-011 does. Its push wording follows the route, as PDR-014 does.
+- The sentences of a merge request pipeline do not change.
+
+**Consequences:** The compare is GitLab's. This module reads its `diffs` as the changed paths and does not check whether GitLab truncates a large list; a path left out of a truncated list gives the PDR-002 explanation instead. A default-branch pipeline adds at most two requests to the wait or status call, the contract artifact and the compare, because it has at most one contract job. Trace reads do not grow: a default-branch contract or render job read its trace before this change, and an owned-file or `no_platform_base` failure now reads none. The contract's push goes to the default branch even when the commit came through a merge request, which a branch protection rule may refuse. Whether the platform team wants a merge request in that case is not decided here.
