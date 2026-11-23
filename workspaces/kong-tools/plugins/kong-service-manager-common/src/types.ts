@@ -165,9 +165,9 @@ export type PromotionState =
   | 'codified'
   /**
    * The code-owned plugin never converged after a successful deploy of the
-   * merged chart, or Kong no longer has the route the promotion acts on
-   * (PDR-028). The experiment is never restored (ADR-020) — `detail` says
-   * what to check.
+   * merged chart, or Kong has answered 404 for the route the promotion acts
+   * on past the confirmation window (PDR-028). The experiment is never
+   * restored (ADR-020) — `detail` says what to check.
    */
   | 'failed'
   /** Legacy terminal state: no longer produced by the finalizer since ADR-020, kept so stored records still parse. */

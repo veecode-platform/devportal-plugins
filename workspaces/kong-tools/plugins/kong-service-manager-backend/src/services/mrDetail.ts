@@ -34,6 +34,8 @@ export interface MrDetail {
   experimentRemovedAt?: string;
   /** First tick on which the project answered 404 (ADR-023 hardening: gone needs confirmation). */
   projectGoneSince?: string;
+  /** First tick of the current run of 404s for the record's route (PDR-028). Past the confirmation window the record ends; a 2xx on the route clears it. */
+  routeGoneSince?: string;
 }
 
 export function encodeMrDetail(detail: MrDetail): string {

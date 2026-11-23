@@ -670,6 +670,23 @@ describe('reconcilePromotions', () => {
       expect(JSON.parse(store.transitionCalls[0][2].detail).projectGoneSince).toBeUndefined();
     });
 
+    it('a project 404 cleared earlier in a tick is not written back by the handover to awaiting-deploy', async () => {
+      const store = liveFakeStore([
+        row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, projectGoneSince: new Date(Date.now() - 60_000).toISOString() }) }),
+      ]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+        fileExistsOnRef: jest.fn().mockResolvedValue(true),
+        getMergeRequest: jest.fn().mockResolvedValue({ state: 'merged', mergedAt: '2026-09-01T00:00:00Z' }),
+      };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockResolvedValue([]) };
+
+      await reconcilePromotions({ logger, gitlab, kong, store, config });
+
+      expect(store.rows[0].state).toBe('awaiting-deploy');
+      expect(JSON.parse(store.rows[0].detail as string).projectGoneSince).toBeUndefined();
+    });
+
     it('aborts the promotion when the project has been gone (404) for longer than the confirmation window', async () => {
       const record = row({
         state: 'mr-open',
@@ -716,14 +733,41 @@ describe('reconcilePromotions', () => {
   describe('a route Kong no longer has (PDR-028)', () => {
     const mrOpenDetail = JSON.stringify({ host: repo.host, projectSlug: repo.projectSlug, projectId: repo.projectId, iid: repo.iid });
     const routeGone = () => new KongApiError('Kong API request failed: 404 Not Found', 404);
+    const pastWindow = () => new Date(Date.now() - 3 * 60_000).toISOString();
+    const detailOf = (store: { rows: PromotionRecordRow[] }) => JSON.parse(store.rows[0].detail as string);
     const mergedMr = () => ({
       getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
       fileExistsOnRef: jest.fn().mockResolvedValue(true),
       getMergeRequest: jest.fn().mockResolvedValue({ state: 'merged', mergedAt: '2026-09-01T00:00:00Z' }),
     });
 
-    it('ends an open promotion as failed, with the reason, and the next tick does not call Kong for it', async () => {
+    it('keeps an open promotion active on the first 404 for its route, with no terminal state, and stamps the route', async () => {
       const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+      const tickLogger = mockServices.logger.mock();
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()) };
+
+      await reconcilePromotions({ logger: tickLogger, gitlab: mergedMr() as any, kong, store, config });
+
+      expect(store.rows[0].state).toBe('mr-open');
+      expect(detailOf(store)).toMatchObject({ host: repo.host, projectSlug: repo.projectSlug, iid: repo.iid, routeGoneSince: expect.any(String) });
+      expect(tickLogger.warn).toHaveBeenCalledWith(expect.stringContaining('waiting for confirmation'), expect.objectContaining({ promotionId: 1 }));
+    });
+
+    it('a 404 inside the window keeps the first stamp and asks Kong again on the next tick', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()) };
+
+      await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab: mergedMr() as any, kong, store, config });
+      const firstStamp = detailOf(store).routeGoneSince;
+      await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab: mergedMr() as any, kong, store, config });
+
+      expect(store.rows[0].state).toBe('mr-open');
+      expect(detailOf(store).routeGoneSince).toBe(firstStamp);
+      expect(kong.getRouteAssociatedPlugins).toHaveBeenCalledTimes(2);
+    });
+
+    it('a 404 that persists past the confirmation window ends an open promotion as failed, and the next tick does not call Kong for it', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, routeGoneSince: pastWindow() }) })]);
       const tickLogger = mockServices.logger.mock();
       const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()) };
 
@@ -737,7 +781,7 @@ describe('reconcilePromotions', () => {
       expect(tickLogger.warn).toHaveBeenCalledWith(expect.stringContaining('route'), expect.objectContaining({ promotionId: 1 }));
     });
 
-    it('fails an applying promotion on the route 404 instead of waiting for the convergence timeout', async () => {
+    it('an applying promotion keeps waiting on the first 404 for its route', async () => {
       const store = liveFakeStore([
         row({
           state: 'applying',
@@ -750,11 +794,58 @@ describe('reconcilePromotions', () => {
 
       await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab, kong, store, config });
 
+      expect(store.rows[0].state).toBe('applying');
+      expect(detailOf(store).routeGoneSince).toEqual(expect.any(String));
+    });
+
+    it('fails an applying promotion on a 404 that persisted past the window, instead of waiting for the convergence timeout', async () => {
+      const store = liveFakeStore([
+        row({
+          state: 'applying',
+          mr_ref: 'mr-url',
+          detail: JSON.stringify({ ...repo, mergedAt: '2026-09-01T00:00:00Z', applyingSince: new Date().toISOString(), routeGoneSince: pastWindow() }),
+        }),
+      ]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }), fileExistsOnRef: jest.fn().mockResolvedValue(true) };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()) };
+
+      await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab, kong, store, config });
+
       expect(store.rows[0]).toMatchObject({ state: 'failed', detail: expect.stringContaining('answered 404') });
     });
 
-    it('a teardown whose route is gone still closes the MR and ends aborted-teardown, not failed', async () => {
-      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+    it('a 2xx on the route clears a pending 404, so a later 404 starts a new window instead of ending the promotion', async () => {
+      const store = liveFakeStore([
+        row({
+          state: 'applying',
+          mr_ref: 'mr-url',
+          detail: JSON.stringify({ ...repo, mergedAt: '2026-09-01T00:00:00Z', applyingSince: new Date().toISOString(), routeGoneSince: pastWindow() }),
+        }),
+      ]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }), fileExistsOnRef: jest.fn().mockResolvedValue(true) };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockResolvedValueOnce([]).mockRejectedValueOnce(routeGone()) };
+      const tickLogger = mockServices.logger.mock();
+
+      await reconcilePromotions({ logger: tickLogger, gitlab, kong, store, config });
+      expect(detailOf(store).routeGoneSince).toBeUndefined();
+
+      await reconcilePromotions({ logger: tickLogger, gitlab, kong, store, config });
+      expect(store.rows[0].state).toBe('applying');
+      expect(Date.now() - Date.parse(detailOf(store).routeGoneSince)).toBeLessThan(60_000);
+    });
+
+    it('a 2xx that clears the stamp in the same tick is not written back by the handover to awaiting-deploy', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, routeGoneSince: pastWindow() }) })]);
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockResolvedValue([]) };
+
+      await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab: mergedMr() as any, kong, store, config });
+
+      expect(store.rows[0].state).toBe('awaiting-deploy');
+      expect(detailOf(store).routeGoneSince).toBeUndefined();
+    });
+
+    it('a teardown whose route is gone past the window still closes the MR and ends aborted-teardown, not failed', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, routeGoneSince: pastWindow() }) })]);
       const gitlab: any = {
         getProject: jest.fn().mockResolvedValue({ archived: true, defaultBranch: 'main' }),
         closeMergeRequest: jest.fn().mockResolvedValue(undefined),
@@ -768,6 +859,24 @@ describe('reconcilePromotions', () => {
       expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
       expect(gitlab.closeMergeRequest).toHaveBeenCalledWith(expect.anything(), repo.iid);
       expect(store.rows[0].state).toBe('aborted-teardown');
+    });
+
+    it('a teardown waits for the 404 to persist: the MR stays open on the first tick', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: true, defaultBranch: 'main' }),
+        closeMergeRequest: jest.fn().mockResolvedValue(undefined),
+        findOpenMergeRequest: jest.fn().mockResolvedValue(undefined),
+        deleteBranch: jest.fn().mockResolvedValue(undefined),
+      };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()), removeRoutePlugin: jest.fn() };
+
+      await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab, kong, store, config });
+
+      expect(gitlab.closeMergeRequest).not.toHaveBeenCalled();
+      expect(gitlab.deleteBranch).not.toHaveBeenCalled();
+      expect(store.rows[0].state).toBe('mr-open');
+      expect(detailOf(store).routeGoneSince).toEqual(expect.any(String));
     });
 
     it('a 404 when deleting the experimental plugin is not a missing route: the route is still there, so the next tick converges', async () => {
@@ -802,7 +911,7 @@ describe('reconcilePromotions', () => {
 
     it('a project gone past the confirmation window whose route is also gone ends aborted-teardown, with one warning that names the route', async () => {
       const store = liveFakeStore([
-        row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, projectGoneSince: new Date(Date.now() - 3 * 60_000).toISOString() }) }),
+        row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, projectGoneSince: pastWindow(), routeGoneSince: pastWindow() }) }),
       ]);
       const tickLogger = mockServices.logger.mock();
       const gitlab: any = { getProject: jest.fn().mockRejectedValue(Object.assign(new Error('gone'), { status: 404 })) };

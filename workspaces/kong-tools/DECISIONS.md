@@ -817,10 +817,10 @@ template still turns it into a `konghq.com/plugins` attachment); a distinct
 `kong-demote/<type>` branch (would make the `handleDraft` hardcode from PDR-025
 diverge for real, with no benefit given the active-per-route index).
 
-## PDR-028: A Route Kong No Longer Has Ends Its Promotion as Failed; Other Kong Errors Keep Retrying
+## PDR-028: A Route Kong No Longer Has Ends Its Promotion as Failed Once the 404 Persists; Other Kong Errors Keep Retrying
 
 **Date:** 2026-11-23
-**Status:** Proposed. The immediate-404 risk below awaits the owner's acceptance.
+**Status:** Proposed. Awaits the owner's acceptance.
 
 A promotion can stay open after its route is gone from Kong. The cause is inferred,
 not proven: the route was most likely removed when its app and repository were
@@ -829,20 +829,32 @@ logged the same 404 for one such promotion on every reconcile tick, with no end.
 
 Decision:
 
-- **A 404 on the route's plugin list ends the record**, with the reason in `detail`,
-  and the finalizer stops reconciling it. The end state is `aborted-teardown` when
-  the project is gone, archived or unregistered, and `failed` otherwise. `failed`
-  already means "a person decides" (PDR-021), so the frontend badge needs no change.
-- **In the teardown path, a missing route has no experiment to remove.** The
-  teardown still closes the MR and deletes the promotion branch when no other MR is
-  open on it (PDR-022), and the record ends as `aborted-teardown` (PDR-023), with one
-  warning that names the route.
+- **A 404 on the route's plugin list ends the record once it has persisted for the
+  confirmation window.** The window is `GONE_CONFIRMATION_MS` (2 minutes), the one a
+  project 404 waits out (PDR-023). The first 404 stamps `routeGoneSince` in `detail`
+  and the record stays active. A 404 still present past the window ends the record,
+  with the reason in `detail`, and the finalizer stops reconciling it. A 2xx on the
+  route clears the stamp, so the next 404 starts a new window. The end state is
+  `aborted-teardown` when the project is gone, archived or unregistered, and `failed`
+  otherwise. `failed` already means "a person decides" (PDR-021), so the frontend
+  badge needs no change.
+- **In the teardown path, a missing route has no experiment to remove.** Once the 404
+  has persisted, the teardown still closes the MR and deletes the promotion branch
+  when no other MR is open on it (PDR-022), and the record ends as `aborted-teardown`
+  (PDR-023), with one warning that names the route. Before that, the teardown waits:
+  it neither closes the MR nor ends the record.
 - **Only the route's plugin list raises this.** A 404 when deleting or editing one
   plugin is a race (the plugin was removed between the read and the write), and the
   next tick converges on it, so it keeps the retry. So does every other error, such
   as a 500.
 - The Kong client throws a `KongApiError` that carries the HTTP status as
   `kongStatus`. The message is unchanged.
+- The record is decoded once per tick, and a stamp cleared by a 2xx is cleared on
+  that same object, so a handover written later in the tick does not put it back.
+  The same defect existed for `projectGoneSince`: a project stamp cleared earlier in
+  a tick was written back by the handover to `awaiting-deploy`, so a later project
+  404 looked old and ended the record at once. The handover now carries the cleared
+  value, with a test.
 
 Rejected:
 
@@ -852,14 +864,17 @@ Rejected:
   end a promotion that converges on the next tick.
 - **A new terminal state.** `failed` already has a badge and a detail path. A new
   state would need a type change and a badge for no behavioral gain.
-- **Wait for a 404 to persist across ticks**, as a project 404 does (PDR-023). Not
-  done here; see the risk below.
+- **End on the first 404.** A wrong Kong base URL or workspace answers 404 for every
+  route, so every active promotion on that instance would end on the first tick, and
+  each teardown would close its MR. The window is there for that case.
 
-Risk for the owner to accept: the 404 is acted on at once, not confirmed across ticks.
-A wrong Kong base URL or workspace also answers 404 for every route, so each active
-promotion on that instance would end on the first tick. A two-tick confirmation would
-delay that by one interval. It was left out because the change asks for an immediate
-end; add it if a misconfigured instance is ever observed.
+Residual risk, for the owner to accept: a misconfiguration that answers 404 for longer
+than the window still ends each promotion on that instance that reads the route (an MR
+that is merged or closed, a promotion in `applying`, or one being torn down). The window
+requires the 404 to last; it does not prevent that. A stamp can also go stale on a path
+that stops reading the route: a closed MR that is reopened makes no route read, so the
+next 404 after the reopen is judged against the old stamp and ends at once. Add a clear
+on the reopen path if that is ever observed.
 
 Known gap: a closed (unmerged) MR whose route is gone ends `failed` and keeps its
 promotion branch, because the untag that precedes the branch delete cannot run.
