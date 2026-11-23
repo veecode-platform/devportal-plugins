@@ -1,7 +1,7 @@
 import { mockServices } from '@backstage/backend-test-utils';
 import { ConfigReader } from '@backstage/config';
 import { NotFoundError } from '@backstage/errors';
-import { KongServiceManagerService } from './KongServiceManagerService';
+import { KongApiError, KongServiceManagerService } from './KongServiceManagerService';
 import {
   mockServiceInfo,
   mockRoutesResponse,
@@ -50,6 +50,23 @@ describe('KongServiceManagerService', () => {
     await expect(
       svc.getServiceInfo('nonexistent', 'my-service'),
     ).rejects.toThrow(NotFoundError);
+  });
+
+  it('throws a KongApiError carrying the HTTP status when Kong answers non-2xx', async () => {
+    fetchSpy.mockResolvedValue(
+      new Response('{"message":"Not found"}', { status: 404, statusText: 'Not Found' }),
+    );
+    const svc = createService();
+
+    const error = await svc
+      .getRouteAssociatedPlugins('default', 'route-1')
+      .then(() => undefined, (e: unknown) => e);
+
+    expect(error).toBeInstanceOf(KongApiError);
+    expect(error).toMatchObject({
+      message: 'Kong API request failed: 404 Not Found',
+      kongStatus: 404,
+    });
   });
 
   // --- getServiceInfo ---

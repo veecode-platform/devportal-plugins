@@ -1,6 +1,7 @@
 import { mockServices } from '@backstage/backend-test-utils';
 import { reconcilePromotions } from './promotionFinalizer';
-import { PromotionRecordRow, PromotionStore } from './promotionStore';
+import { ACTIVE_PROMOTION_STATES, PromotionRecordRow, PromotionStore } from './promotionStore';
+import { KongApiError } from './KongServiceManagerService';
 import type { AssociatedPluginsResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 
 const config = { applyTimeoutMinutes: 10 };
@@ -38,6 +39,27 @@ function fakeStore(rows: PromotionRecordRow[]): PromotionStore & { transitionCal
     async listByRoute() { throw new Error('not used in this test'); },
     async listActive() { return rows; },
     async transition(id, state, extra) { transitionCalls.push([id, state, extra]); },
+  };
+}
+
+/** Behaves like the real store for the reconcile loop: listActive returns only non-terminal rows, and transition updates the row it names. */
+function liveFakeStore(initial: PromotionRecordRow[]): PromotionStore & { rows: PromotionRecordRow[] } {
+  const rows = initial.map(r => ({ ...r }));
+  return {
+    rows,
+    async upsertDraft() { throw new Error('not used in this test'); },
+    async getById() { throw new Error('not used in this test'); },
+    async getByIdempotencyKey() { throw new Error('not used in this test'); },
+    async getActiveByRoute() { throw new Error('not used in this test'); },
+    async listByRoute() { throw new Error('not used in this test'); },
+    async listActive() { return rows.filter(r => ACTIVE_PROMOTION_STATES.includes(r.state)); },
+    async transition(id, state, extra = {}) {
+      const target = rows.find(r => r.id === id);
+      if (!target) throw new Error(`no promotion row ${id}`);
+      target.state = state;
+      if (extra.detail !== undefined) target.detail = extra.detail;
+      if (extra.mrRef !== undefined) target.mr_ref = extra.mrRef;
+    },
   };
 }
 
@@ -689,5 +711,109 @@ describe('reconcilePromotions', () => {
     await reconcilePromotions({ logger, gitlab, kong: {} as any, store, config });
 
     expect(store.transitionCalls).toEqual([[2, 'applying', expect.objectContaining({ detail: expect.any(String) })]]);
+  });
+
+  describe('a route Kong no longer has (PDR-028)', () => {
+    const mrOpenDetail = JSON.stringify({ host: repo.host, projectSlug: repo.projectSlug, projectId: repo.projectId, iid: repo.iid });
+    const routeGone = () => new KongApiError('Kong API request failed: 404 Not Found', 404);
+    const mergedMr = () => ({
+      getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }),
+      fileExistsOnRef: jest.fn().mockResolvedValue(true),
+      getMergeRequest: jest.fn().mockResolvedValue({ state: 'merged', mergedAt: '2026-09-01T00:00:00Z' }),
+    });
+
+    it('ends an open promotion as failed, with the reason, and the next tick does not call Kong for it', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+      const tickLogger = mockServices.logger.mock();
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()) };
+
+      await reconcilePromotions({ logger: tickLogger, gitlab: mergedMr() as any, kong, store, config });
+      await reconcilePromotions({ logger: tickLogger, gitlab: mergedMr() as any, kong, store, config });
+
+      expect(store.rows[0]).toMatchObject({ state: 'failed', detail: expect.stringContaining('answered 404') });
+      expect(store.rows[0].detail).toContain('route-1');
+      expect(kong.getRouteAssociatedPlugins).toHaveBeenCalledTimes(1);
+      expect(tickLogger.warn).toHaveBeenCalledTimes(1);
+      expect(tickLogger.warn).toHaveBeenCalledWith(expect.stringContaining('route'), expect.objectContaining({ promotionId: 1 }));
+    });
+
+    it('fails an applying promotion on the route 404 instead of waiting for the convergence timeout', async () => {
+      const store = liveFakeStore([
+        row({
+          state: 'applying',
+          mr_ref: 'mr-url',
+          detail: JSON.stringify({ ...repo, mergedAt: '2026-09-01T00:00:00Z', applyingSince: new Date().toISOString() }),
+        }),
+      ]);
+      const gitlab: any = { getProject: jest.fn().mockResolvedValue({ archived: false, defaultBranch: 'main' }), fileExistsOnRef: jest.fn().mockResolvedValue(true) };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()) };
+
+      await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab, kong, store, config });
+
+      expect(store.rows[0]).toMatchObject({ state: 'failed', detail: expect.stringContaining('answered 404') });
+    });
+
+    it('a teardown whose route is gone still closes the MR and ends aborted-teardown, not failed', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+      const gitlab: any = {
+        getProject: jest.fn().mockResolvedValue({ archived: true, defaultBranch: 'main' }),
+        closeMergeRequest: jest.fn().mockResolvedValue(undefined),
+        findOpenMergeRequest: jest.fn().mockResolvedValue(undefined),
+        deleteBranch: jest.fn().mockResolvedValue(undefined),
+      };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()), removeRoutePlugin: jest.fn() };
+
+      await reconcilePromotions({ logger: mockServices.logger.mock(), gitlab, kong, store, config });
+
+      expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
+      expect(gitlab.closeMergeRequest).toHaveBeenCalledWith(expect.anything(), repo.iid);
+      expect(store.rows[0].state).toBe('aborted-teardown');
+    });
+
+    it('a 404 when deleting the experimental plugin is not a missing route: the route is still there, so the next tick converges', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+      const tickLogger = mockServices.logger.mock();
+      const kong: any = {
+        getRouteAssociatedPlugins: jest.fn().mockResolvedValueOnce([plugin()]).mockResolvedValueOnce([]),
+        removeRoutePlugin: jest.fn().mockRejectedValueOnce(routeGone()),
+      };
+
+      await reconcilePromotions({ logger: tickLogger, gitlab: mergedMr() as any, kong, store, config });
+      expect(store.rows[0].state).toBe('mr-open');
+
+      await reconcilePromotions({ logger: tickLogger, gitlab: mergedMr() as any, kong, store, config });
+      expect(store.rows[0].state).toBe('awaiting-deploy');
+    });
+
+    it('a 500 from Kong is not a missing route: the record stays active and the next tick asks Kong again', async () => {
+      const store = liveFakeStore([row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail })]);
+      const tickLogger = mockServices.logger.mock();
+      const kong: any = {
+        getRouteAssociatedPlugins: jest.fn().mockRejectedValue(new KongApiError('Kong API request failed: 500 Internal Server Error', 500)),
+      };
+
+      await reconcilePromotions({ logger: tickLogger, gitlab: mergedMr() as any, kong, store, config });
+      await reconcilePromotions({ logger: tickLogger, gitlab: mergedMr() as any, kong, store, config });
+
+      expect(store.rows[0].state).toBe('mr-open');
+      expect(kong.getRouteAssociatedPlugins).toHaveBeenCalledTimes(2);
+      expect(tickLogger.warn).toHaveBeenCalledWith(expect.stringContaining('will retry'), expect.objectContaining({ promotionId: 1 }));
+    });
+
+    it('a project gone past the confirmation window whose route is also gone ends aborted-teardown, with one warning that names the route', async () => {
+      const store = liveFakeStore([
+        row({ state: 'mr-open', mr_ref: 'mr-url', detail: JSON.stringify({ ...repo, projectGoneSince: new Date(Date.now() - 3 * 60_000).toISOString() }) }),
+      ]);
+      const tickLogger = mockServices.logger.mock();
+      const gitlab: any = { getProject: jest.fn().mockRejectedValue(Object.assign(new Error('gone'), { status: 404 })) };
+      const kong: any = { getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()), removeRoutePlugin: jest.fn() };
+
+      await reconcilePromotions({ logger: tickLogger, gitlab, kong, store, config });
+
+      expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
+      expect(store.rows[0].state).toBe('aborted-teardown');
+      expect(tickLogger.warn).toHaveBeenCalledTimes(1);
+      expect(tickLogger.warn).toHaveBeenCalledWith(expect.stringContaining('route'), expect.objectContaining({ promotionId: 1, routeId: 'route-1' }));
+    });
   });
 });

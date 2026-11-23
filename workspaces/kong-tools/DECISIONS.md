@@ -816,3 +816,50 @@ Rejected: leaving the generated `values.yaml` key behind (the chart's Ingress
 template still turns it into a `konghq.com/plugins` attachment); a distinct
 `kong-demote/<type>` branch (would make the `handleDraft` hardcode from PDR-025
 diverge for real, with no benefit given the active-per-route index).
+
+## PDR-028: A Route Kong No Longer Has Ends Its Promotion as Failed; Other Kong Errors Keep Retrying
+
+**Date:** 2026-11-23
+**Status:** Proposed. The immediate-404 risk below awaits the owner's acceptance.
+
+A promotion can stay open after its route is gone from Kong. The cause is inferred,
+not proven: the route was most likely removed when its app and repository were
+deleted while the promotion's merge request was open. On 2026-11-23 a live portal
+logged the same 404 for one such promotion on every reconcile tick, with no end.
+
+Decision:
+
+- **A 404 on the route's plugin list ends the record**, with the reason in `detail`,
+  and the finalizer stops reconciling it. The end state is `aborted-teardown` when
+  the project is gone, archived or unregistered, and `failed` otherwise. `failed`
+  already means "a person decides" (PDR-021), so the frontend badge needs no change.
+- **In the teardown path, a missing route has no experiment to remove.** The
+  teardown still closes the MR and deletes the promotion branch when no other MR is
+  open on it (PDR-022), and the record ends as `aborted-teardown` (PDR-023), with one
+  warning that names the route.
+- **Only the route's plugin list raises this.** A 404 when deleting or editing one
+  plugin is a race (the plugin was removed between the read and the write), and the
+  next tick converges on it, so it keeps the retry. So does every other error, such
+  as a 500.
+- The Kong client throws a `KongApiError` that carries the HTTP status as
+  `kongStatus`. The message is unchanged.
+
+Rejected:
+
+- **Retry with a cap or backoff.** A cap or backoff hides the problem without giving
+  a person anything to act on; the record needs a decision either way.
+- **Match every Kong 404.** A plugin removed between the read and the delete would
+  end a promotion that converges on the next tick.
+- **A new terminal state.** `failed` already has a badge and a detail path. A new
+  state would need a type change and a badge for no behavioral gain.
+- **Wait for a 404 to persist across ticks**, as a project 404 does (PDR-023). Not
+  done here; see the risk below.
+
+Risk for the owner to accept: the 404 is acted on at once, not confirmed across ticks.
+A wrong Kong base URL or workspace also answers 404 for every route, so each active
+promotion on that instance would end on the first tick. A two-tick confirmation would
+delay that by one interval. It was left out because the change asks for an immediate
+end; add it if a misconfigured instance is ever observed.
+
+Known gap: a closed (unmerged) MR whose route is gone ends `failed` and keeps its
+promotion branch, because the untag that precedes the branch delete cannot run.

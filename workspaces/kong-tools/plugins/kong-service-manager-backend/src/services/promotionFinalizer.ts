@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'util';
 import { LoggerService } from '@backstage/backend-plugin-api';
 import type { AssociatedPluginsResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { GitlabClient } from './GitlabClient';
-import { KongServiceManagerService } from './KongServiceManagerService';
+import { KongApiError, KongServiceManagerService } from './KongServiceManagerService';
 import { PromotionRecordRow, PromotionStore } from './promotionStore';
 import { MrDetail, decodeMrDetail, encodeMrDetail } from './mrDetail';
 import { getAdapter } from './adapters';
@@ -19,7 +19,9 @@ export interface PromotionFinalizerConfig {
  * Kong error) is logged and left for the next tick — it never blocks the
  * rest of the queue, and there is no attempt cap: `mr-open` and
  * `awaiting-deploy` are meant to wait indefinitely per spec, and `applying`
- * is bounded by `applyTimeoutMinutes`, not by a retry count.
+ * is bounded by `applyTimeoutMinutes`, not by a retry count. The one
+ * exception is a 404 from Kong for the record's route: the route is gone, so
+ * the record ends as `failed` with the reason in `detail` (PDR-028).
  *
  * Handover invariant (ADR-020): once the promoted chart is on the default
  * branch, the experimental plugin must not exist on the route — Kong allows
@@ -40,7 +42,7 @@ export async function reconcilePromotions(deps: {
   const active = await store.listActive();
   for (const record of active) {
     try {
-      await reconcileOne({ logger, gitlab, kong, store, config, record });
+      await reconcileRecord({ logger, gitlab, kong, store, config, record });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn('kong-service-manager promotion reconcile failed, will retry', {
@@ -52,6 +54,33 @@ export async function reconcilePromotions(deps: {
         error: message,
       });
     }
+  }
+}
+
+/**
+ * Ends a record whose route Kong no longer has (PDR-028). Any other error
+ * propagates to the caller, which logs it and retries on the next tick. If
+ * recording the end fails, that error propagates the same way.
+ */
+async function reconcileRecord(deps: Parameters<typeof reconcileOne>[0]): Promise<void> {
+  const { logger, store, record } = deps;
+  try {
+    await reconcileOne(deps);
+  } catch (err) {
+    if (!(err instanceof RouteGoneError)) throw err;
+    await store.transition(record.id, 'failed', {
+      detail:
+        `Kong has no route '${err.routeId}' on instance '${err.instance}' (it answered 404), so the promotion stopped. ` +
+        `Nothing is restored; check whether the app's route was deleted.`,
+    });
+    logger.warn('kong-service-manager promotion stopped: its route no longer exists on Kong', {
+      promotionId: record.id,
+      instance: record.instance,
+      routeId: record.route_id,
+      pluginType: record.plugin_type,
+      state: record.state,
+      reason: err.message,
+    });
   }
 }
 
@@ -190,10 +219,24 @@ async function abortForTeardown(deps: {
   // A code-only (issue #135) or delete (issue #3) record never created an
   // experiment in Kong, so there is nothing to remove — only the MR/branch
   // cleanup below applies.
+  // A route Kong no longer has holds no experiment to remove (PDR-028), so the
+  // teardown still closes the MR and reaches `aborted-teardown`.
+  let routeGone = false;
   if (isExperimentMode(record)) {
-    const experimental = await findExperimentalPlugin(kong, record);
-    if (experimental) {
-      await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+    try {
+      const experimental = await findExperimentalPlugin(kong, record);
+      if (experimental) {
+        await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+      }
+    } catch (err) {
+      if (!(err instanceof RouteGoneError)) throw err;
+      routeGone = true;
+      logger.warn('kong-service-manager promotion: its route no longer exists on Kong during teardown; nothing to remove', {
+        promotionId: record.id,
+        routeId: record.route_id,
+        instance: record.instance,
+        reason: err.message,
+      });
     }
   }
   // Close the promotion MR so the repo does not keep an orphan (ADR-023).
@@ -210,9 +253,12 @@ async function abortForTeardown(deps: {
       });
     }
   }
+  const removed = routeGone
+    ? 'the route no longer exists on Kong, so no experimental plugin was left to remove'
+    : 'leftover experimental plugin removed';
   await store.transition(record.id, 'aborted-teardown', {
     detail: isExperimentMode(record)
-      ? `project ${reason} during an open promotion; leftover experimental plugin removed, merge request closed`
+      ? `project ${reason} during an open promotion; ${removed}, merge request closed`
       : `project ${reason} during an open ${record.mode} operation; merge request closed (no experiment in Kong)`,
   });
   logger.info('kong-service-manager promotion aborted by teardown', {
@@ -440,6 +486,34 @@ async function findPluginByTag(
   pluginType: string,
   matches: (plugin: AssociatedPluginsResponse) => boolean,
 ): Promise<AssociatedPluginsResponse | undefined> {
-  const plugins = await kong.getRouteAssociatedPlugins(instance, routeId);
+  const plugins = await listRoutePlugins(kong, instance, routeId);
   return plugins.find(p => p.name === pluginType && matches(p));
+}
+
+/** Kong answered 404 for the route a promotion acts on (PDR-028). */
+class RouteGoneError extends Error {
+  readonly instance: string;
+  readonly routeId: string;
+
+  constructor(instance: string, routeId: string) {
+    super(`Kong has no route '${routeId}' on instance '${instance}'`);
+    this.instance = instance;
+    this.routeId = routeId;
+  }
+}
+
+/** The plugin list is the only route-level Kong read the finalizer makes, so a 404 here means the route is gone. */
+async function listRoutePlugins(
+  kong: KongServiceManagerService,
+  instance: string,
+  routeId: string,
+): Promise<AssociatedPluginsResponse[]> {
+  try {
+    return await kong.getRouteAssociatedPlugins(instance, routeId);
+  } catch (err) {
+    if (err instanceof KongApiError && err.kongStatus === 404) {
+      throw new RouteGoneError(instance, routeId);
+    }
+    throw err;
+  }
 }
