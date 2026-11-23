@@ -54,8 +54,9 @@ const costInsightsPtMessages = createTranslationMessages({
     'entityCard.fetchError': 'Erro ao carregar dados de custo da entidade: {{error}}',
     'entityCard.fetchErrorFallback': 'Erro ao carregar dados de custo da entidade',
     'clusterCard.title': 'Workloads em Execução no Cluster (OpenCost / Kubernetes)',
-    'clusterCard.subtitle': 'Consumo em tempo real de CPU e memória alocado no cluster da plataforma',
-    'clusterCard.badge': 'Tempo real',
+    'clusterCard.subtitle':
+      'Custo de CPU e memória alocado no cluster da plataforma nos últimos 7 dias',
+    'clusterCard.badge': 'Últimos 7 dias',
     'clusterCard.workloadHeader': 'Workload / Namespace',
     'clusterCard.cpuCostHeader': 'Custo CPU (Dia)',
     'clusterCard.ramCostHeader': 'Custo RAM (Dia)',
@@ -65,6 +66,11 @@ const costInsightsPtMessages = createTranslationMessages({
     'clusterCard.noWorkload': 'Nenhum workload ativo encontrado no cluster para este identificador.',
     'clusterCard.errorFetching': 'Não foi possível carregar os custos do cluster Kubernetes: {{error}}',
     'clusterCard.fetchErrorFallback': 'Erro ao carregar dados do OpenCost',
+    'entityClusterCard.cpuCostHeader': 'Custo CPU (7 dias)',
+    'entityClusterCard.ramCostHeader': 'Custo RAM (7 dias)',
+    'entityClusterCard.totalHeader': 'Total (7 dias)',
+    'entityClusterCard.noWorkload':
+      'Nenhum workload encontrado no cluster para este identificador nos últimos 7 dias.',
     'globalCluster.title': 'Consumo de Workloads da Plataforma (OpenCost / Kubernetes)',
     'globalCluster.subtitle': 'Alocação de custos em todos os namespaces ativos e stacks da plataforma no cluster',
     'globalCluster.badge': 'Cluster da Plataforma',

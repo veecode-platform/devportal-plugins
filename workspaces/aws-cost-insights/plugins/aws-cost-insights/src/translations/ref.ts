@@ -54,8 +54,9 @@ export const costInsightsMessages = {
   },
   clusterCard: {
     title: 'In-Cluster Workload Spend (OpenCost / Kubernetes)',
-    subtitle: 'Real-time CPU and memory consumption allocated in the platform cluster',
-    badge: 'Real-time',
+    subtitle:
+      'CPU and memory cost allocated in the platform cluster over the last 7 days',
+    badge: 'Last 7 days',
     workloadHeader: 'Workload / Namespace',
     cpuCostHeader: 'CPU Cost (Day)',
     ramCostHeader: 'RAM Cost (Day)',
@@ -65,6 +66,13 @@ export const costInsightsMessages = {
     noWorkload: 'No active workload found in the cluster for this identifier.',
     errorFetching: 'Unable to load Kubernetes cluster costs: {{error}}',
     fetchErrorFallback: 'Error fetching OpenCost data',
+  },
+  entityClusterCard: {
+    cpuCostHeader: 'CPU Cost (7 days)',
+    ramCostHeader: 'RAM Cost (7 days)',
+    totalHeader: 'Total (7 days)',
+    noWorkload:
+      'No workload found in the cluster for this identifier in the last 7 days.',
   },
   globalCluster: {
     title: 'Platform Cluster Workload Spend (OpenCost / Kubernetes)',
