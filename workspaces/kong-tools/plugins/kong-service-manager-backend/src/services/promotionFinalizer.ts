@@ -2,7 +2,10 @@ import { isDeepStrictEqual } from 'util';
 import { LoggerService } from '@backstage/backend-plugin-api';
 import type { AssociatedPluginsResponse } from '@veecode-platform/backstage-plugin-kong-service-manager-common';
 import { GitlabClient } from './GitlabClient';
-import { KongApiError, KongServiceManagerService } from './KongServiceManagerService';
+import {
+  KongApiError,
+  KongServiceManagerService,
+} from './KongServiceManagerService';
 import { PromotionRecordRow, PromotionStore } from './promotionStore';
 import { MrDetail, decodeMrDetail, encodeMrDetail } from './mrDetail';
 import { getAdapter } from './adapters';
@@ -64,18 +67,23 @@ export async function reconcilePromotions(deps: {
  * Any other error propagates to the caller, which logs it and retries on the
  * next tick. If recording the end fails, that error propagates the same way.
  */
-async function reconcileRecord(deps: Parameters<typeof reconcileOne>[0]): Promise<void> {
+async function reconcileRecord(
+  deps: Parameters<typeof reconcileOne>[0],
+): Promise<void> {
   const { logger, store, record } = deps;
   try {
     await reconcileOne(deps);
   } catch (err) {
     if (err instanceof RouteUnconfirmedError) {
-      logger.warn('kong-service-manager promotion: its route answers 404; waiting for confirmation before ending the promotion', {
-        promotionId: record.id,
-        instance: record.instance,
-        routeId: record.route_id,
-        since: err.since,
-      });
+      logger.warn(
+        'kong-service-manager promotion: its route answers 404; waiting for confirmation before ending the promotion',
+        {
+          promotionId: record.id,
+          instance: record.instance,
+          routeId: record.route_id,
+          since: err.since,
+        },
+      );
       return;
     }
     if (!(err instanceof RouteGoneError)) throw err;
@@ -84,14 +92,17 @@ async function reconcileRecord(deps: Parameters<typeof reconcileOne>[0]): Promis
         `Kong has no route '${err.routeId}' on instance '${err.instance}' (it answered 404), so the promotion stopped. ` +
         `Nothing is restored; check whether the app's route was deleted.`,
     });
-    logger.warn('kong-service-manager promotion stopped: its route no longer exists on Kong', {
-      promotionId: record.id,
-      instance: record.instance,
-      routeId: record.route_id,
-      pluginType: record.plugin_type,
-      state: record.state,
-      reason: err.message,
-    });
+    logger.warn(
+      'kong-service-manager promotion stopped: its route no longer exists on Kong',
+      {
+        promotionId: record.id,
+        instance: record.instance,
+        routeId: record.route_id,
+        pluginType: record.plugin_type,
+        state: record.state,
+        reason: err.message,
+      },
+    );
   }
 }
 
@@ -236,19 +247,31 @@ async function abortForTeardown(deps: {
   let routeGone = false;
   if (isExperimentMode(record)) {
     try {
-      const experimental = await findExperimentalPlugin({ kong, store, record, detail });
+      const experimental = await findExperimentalPlugin({
+        kong,
+        store,
+        record,
+        detail,
+      });
       if (experimental) {
-        await kong.removeRoutePlugin(record.instance, record.route_id, experimental.id);
+        await kong.removeRoutePlugin(
+          record.instance,
+          record.route_id,
+          experimental.id,
+        );
       }
     } catch (err) {
       if (!(err instanceof RouteGoneError)) throw err;
       routeGone = true;
-      logger.warn('kong-service-manager promotion: its route no longer exists on Kong during teardown; nothing to remove', {
-        promotionId: record.id,
-        routeId: record.route_id,
-        instance: record.instance,
-        reason: err.message,
-      });
+      logger.warn(
+        'kong-service-manager promotion: its route no longer exists on Kong during teardown; nothing to remove',
+        {
+          promotionId: record.id,
+          routeId: record.route_id,
+          instance: record.instance,
+          reason: err.message,
+        },
+      );
     }
   }
   // Close the promotion MR so the repo does not keep an orphan (ADR-023).
@@ -410,7 +433,9 @@ async function handleApplying(deps: {
   const route: RouteReadDeps = { kong, store, record, detail };
   const kicPlugin = isDeleteMode(record)
     ? await findPluginByTag(route, () => true)
-    : await findPluginByTag(route, p => (p.tags ?? []).includes(KIC_OWNERSHIP_TAG));
+    : await findPluginByTag(route, p =>
+        (p.tags ?? []).includes(KIC_OWNERSHIP_TAG),
+      );
 
   if (isDeleteMode(record)) {
     // Delete converges when no plugin of this type remains — the KIC
@@ -473,8 +498,15 @@ async function handleApplying(deps: {
 async function untagExperimental(route: RouteReadDeps): Promise<void> {
   const plugin = await findExperimentalPlugin(route);
   if (!plugin) return;
-  const filteredTags = (plugin.tags ?? []).filter(t => !t.startsWith(EXPERIMENTAL_TAG_PREFIX));
-  await route.kong.editRoutePlugin(route.record.instance, route.record.route_id, plugin.id, { tags: filteredTags });
+  const filteredTags = (plugin.tags ?? []).filter(
+    t => !t.startsWith(EXPERIMENTAL_TAG_PREFIX),
+  );
+  await route.kong.editRoutePlugin(
+    route.record.instance,
+    route.record.route_id,
+    plugin.id,
+    { tags: filteredTags },
+  );
 }
 
 /** What a route read needs from this tick: the record's route, and its detail, which a read may stamp or clear (PDR-028). */
@@ -486,8 +518,12 @@ interface RouteReadDeps {
 }
 
 /** The live experimental plugin for this record's route, if it is still there — the delete is idempotent everywhere it is used. */
-async function findExperimentalPlugin(route: RouteReadDeps): Promise<AssociatedPluginsResponse | undefined> {
-  return findPluginByTag(route, p => (p.tags ?? []).some(t => t.startsWith(EXPERIMENTAL_TAG_PREFIX)));
+async function findExperimentalPlugin(
+  route: RouteReadDeps,
+): Promise<AssociatedPluginsResponse | undefined> {
+  return findPluginByTag(route, p =>
+    (p.tags ?? []).some(t => t.startsWith(EXPERIMENTAL_TAG_PREFIX)),
+  );
 }
 
 async function findPluginByTag(
@@ -521,17 +557,25 @@ class RouteUnconfirmedError extends Error {
 }
 
 /** A route 404 counts as gone only once it has persisted for GONE_CONFIRMATION_MS (PDR-028). */
-async function listRoutePlugins(route: RouteReadDeps): Promise<AssociatedPluginsResponse[]> {
+async function listRoutePlugins(
+  route: RouteReadDeps,
+): Promise<AssociatedPluginsResponse[]> {
   const { kong, store, record, detail } = route;
   let plugins: AssociatedPluginsResponse[];
   try {
-    plugins = await kong.getRouteAssociatedPlugins(record.instance, record.route_id);
+    plugins = await kong.getRouteAssociatedPlugins(
+      record.instance,
+      record.route_id,
+    );
   } catch (err) {
-    if (!(err instanceof KongApiError && err.kongStatus === 404) || !detail) throw err;
+    if (!(err instanceof KongApiError && err.kongStatus === 404) || !detail)
+      throw err;
     const since = detail.routeGoneSince ?? new Date().toISOString();
     if (Date.now() - Date.parse(since) < GONE_CONFIRMATION_MS) {
       if (!detail.routeGoneSince) {
-        await store.transition(record.id, record.state, { detail: encodeMrDetail({ ...detail, routeGoneSince: since }) });
+        await store.transition(record.id, record.state, {
+          detail: encodeMrDetail({ ...detail, routeGoneSince: since }),
+        });
       }
       throw new RouteUnconfirmedError(since);
     }
@@ -539,7 +583,9 @@ async function listRoutePlugins(route: RouteReadDeps): Promise<AssociatedPlugins
   }
   if (detail?.routeGoneSince) {
     detail.routeGoneSince = undefined;
-    await store.transition(record.id, record.state, { detail: encodeMrDetail(detail) });
+    await store.transition(record.id, record.state, {
+      detail: encodeMrDetail(detail),
+    });
   }
   return plugins;
 }
