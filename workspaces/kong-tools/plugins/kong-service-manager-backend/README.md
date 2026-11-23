@@ -144,8 +144,8 @@ finalizer therefore removes the experiment at merge and never recreates it:
 | `awaiting-deploy` | Merged, experiment removed, waiting for the deploy. No timeout: the route runs without the plugin until the chart lands. |
 | `applying` | Deployed; waiting for the code-owned plugin to match the promoted config. |
 | `codified` | The code-owned plugin converged. Terminal. Shown only while the live plugin is code-owned; a portal-managed plugin of the same type appearing later is a new experiment (PDR-021). When the live plugin also carries the Kong Ingress Controller's ownership tag, the frontend renders it as code-owned **and editable** — the "Edit in code" action, not a bare terminal badge (PDR-021 Refinement, PDR-024). |
-| `failed` | `applyTimeoutMinutes` elapsed without convergence. Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, or revert the merge request. |
-| `aborted-teardown` | The service was torn down mid-promotion: project archived, deleted, or unregistered (`catalog-info.yaml` gone from the default branch, PDR-023). Leftover experiment removed, merge request closed, branch deleted. Terminal. |
+| `failed` | `applyTimeoutMinutes` elapsed without convergence, or the route answered 404 for longer than the confirmation window (PDR-028). Terminal, and nothing is restored — the record's `detail` says what to check. Fix the chart, revert the merge request, or check that the route still exists and that the instance's base URL is right. |
+| `aborted-teardown` | The service was torn down mid-promotion: project archived, deleted, or unregistered (`catalog-info.yaml` gone from the default branch, PDR-023). Leftover experiment removed (nothing to remove when the route itself is gone, PDR-028), merge request closed, branch deleted. Terminal. |
 | `discarded` | The merge request was closed without merging (or the promotion discarded from the UI): the plugin is a plain experiment again and the promotion branch is deleted (PDR-022). Terminal. |
 
 Where pipelines are fast, lower `kong.promotion.reconcileIntervalSeconds`

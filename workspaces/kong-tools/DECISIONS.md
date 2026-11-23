@@ -865,16 +865,31 @@ Rejected:
 - **A new terminal state.** `failed` already has a badge and a detail path. A new
   state would need a type change and a badge for no behavioral gain.
 - **End on the first 404.** A wrong Kong base URL or workspace answers 404 for every
-  route, so every active promotion on that instance would end on the first tick, and
-  each teardown would close its MR. The window is there for that case.
+  route, so every promotion on that instance that reads its route (a merged or closed
+  MR, `applying`, a teardown) would end on the first tick, and each teardown would
+  close its MR. The window is there for that case.
 
 Residual risk, for the owner to accept: a misconfiguration that answers 404 for longer
 than the window still ends each promotion on that instance that reads the route (an MR
 that is merged or closed, a promotion in `applying`, or one being torn down). The window
 requires the 404 to last; it does not prevent that. A stamp can also go stale on a path
 that stops reading the route: a closed MR that is reopened makes no route read, so the
-next 404 after the reopen is judged against the old stamp and ends at once. Add a clear
-on the reopen path if that is ever observed.
+next 404 after the reopen is judged against the old stamp and ends at once. The same
+happens when a teardown signal reverts inside the window (the project is unarchived,
+`catalog-info.yaml` comes back, or the project is readable again): the record returns to
+`mr-open` or `awaiting-deploy`, which read no route, and the `awaiting-deploy` to
+`applying` handover carries the stamp, so the first 404 in `applying` ends at once. Add a
+clear on those paths if that is ever observed.
+
+The worst case of a false 404 is at merge. With a merged MR in experiment mode the
+finalizer reads the route before it removes the experiment, so a false 404 that outlasts
+the window ends the record as `failed` with the experiment still on the route, and
+nothing revisits it. When the merged chart deploys, the Kong Ingress Controller then
+cannot create the code-owned plugin (PDR-020). In a teardown, the same false 404 ends the
+record as `aborted-teardown` with a detail that says no experiment was left, which is
+untrue in that case. Both need a person: remove the experiment by hand and check the
+instance's base URL. Before this change, a persistent false 404 kept retrying and cleaned
+up once Kong answered again.
 
 Known gap: a closed (unmerged) MR whose route is gone ends `failed` and keeps its
 promotion branch, because the untag that precedes the branch delete cannot run.
