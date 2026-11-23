@@ -846,7 +846,7 @@ describe('reconcilePromotions', () => {
       expect(kong.getRouteAssociatedPlugins).toHaveBeenCalledTimes(2);
     });
 
-    it('a 404 that persists past the window, with the Kong root answering, ends an open promotion as failed, and the next tick does not call Kong for it', async () => {
+    it('a 404 that persists past the window, with the Kong instance still listing its routes, ends an open promotion as failed, and the next tick does not call Kong for it', async () => {
       const store = liveFakeStore([
         row({
           state: 'mr-open',
@@ -857,7 +857,7 @@ describe('reconcilePromotions', () => {
       const tickLogger = mockServices.logger.mock();
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-        getNodeInfo: jest.fn().mockResolvedValue(undefined),
+        checkRoutesReadable: jest.fn().mockResolvedValue(undefined),
       };
 
       await reconcilePromotions({
@@ -881,8 +881,8 @@ describe('reconcilePromotions', () => {
       });
       expect(store.rows[0].detail).toContain('route-1');
       expect(kong.getRouteAssociatedPlugins).toHaveBeenCalledTimes(1);
-      expect(kong.getNodeInfo).toHaveBeenCalledTimes(1);
-      expect(kong.getNodeInfo).toHaveBeenCalledWith('default');
+      expect(kong.checkRoutesReadable).toHaveBeenCalledTimes(1);
+      expect(kong.checkRoutesReadable).toHaveBeenCalledWith('default');
       expect(tickLogger.warn).toHaveBeenCalledTimes(1);
       expect(tickLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('route'),
@@ -945,7 +945,7 @@ describe('reconcilePromotions', () => {
       };
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-        getNodeInfo: jest.fn().mockResolvedValue(undefined),
+        checkRoutesReadable: jest.fn().mockResolvedValue(undefined),
       };
 
       await reconcilePromotions({
@@ -956,7 +956,7 @@ describe('reconcilePromotions', () => {
         config,
       });
 
-      expect(kong.getNodeInfo).toHaveBeenCalledWith('default');
+      expect(kong.checkRoutesReadable).toHaveBeenCalledWith('default');
       expect(store.rows[0]).toMatchObject({
         state: 'failed',
         detail: expect.stringContaining('answered 404'),
@@ -1054,7 +1054,7 @@ describe('reconcilePromotions', () => {
       };
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-        getNodeInfo: jest.fn().mockResolvedValue(undefined),
+        checkRoutesReadable: jest.fn().mockResolvedValue(undefined),
         removeRoutePlugin: jest.fn(),
       };
 
@@ -1066,7 +1066,7 @@ describe('reconcilePromotions', () => {
         config,
       });
 
-      expect(kong.getNodeInfo).toHaveBeenCalledWith('default');
+      expect(kong.checkRoutesReadable).toHaveBeenCalledWith('default');
       expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
       expect(gitlab.closeMergeRequest).toHaveBeenCalledWith(
         expect.anything(),
@@ -1197,7 +1197,7 @@ describe('reconcilePromotions', () => {
       };
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-        getNodeInfo: jest.fn().mockResolvedValue(undefined),
+        checkRoutesReadable: jest.fn().mockResolvedValue(undefined),
         removeRoutePlugin: jest.fn(),
       };
 
@@ -1209,7 +1209,7 @@ describe('reconcilePromotions', () => {
         config,
       });
 
-      expect(kong.getNodeInfo).toHaveBeenCalledWith('default');
+      expect(kong.checkRoutesReadable).toHaveBeenCalledWith('default');
       expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
       expect(store.rows[0].state).toBe('aborted-teardown');
       expect(tickLogger.warn).toHaveBeenCalledTimes(1);
@@ -1219,13 +1219,13 @@ describe('reconcilePromotions', () => {
       );
     });
 
-    it('reads the Kong root only after the window: a 404 inside it does not ask for the root', async () => {
+    it('lists the routes only after the window: a 404 inside it does not ask the instance for its routes', async () => {
       const store = liveFakeStore([
         row({ state: 'mr-open', mr_ref: 'mr-url', detail: mrOpenDetail }),
       ]);
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-        getNodeInfo: jest.fn().mockResolvedValue(undefined),
+        checkRoutesReadable: jest.fn().mockResolvedValue(undefined),
       };
 
       await reconcilePromotions({
@@ -1236,7 +1236,7 @@ describe('reconcilePromotions', () => {
         config,
       });
 
-      expect(kong.getNodeInfo).not.toHaveBeenCalled();
+      expect(kong.checkRoutesReadable).not.toHaveBeenCalled();
       expect(store.rows[0].state).toBe('mr-open');
     });
 
@@ -1254,8 +1254,8 @@ describe('reconcilePromotions', () => {
       ],
       ['does not connect', new TypeError('fetch failed')],
     ])(
-      'a persisted route 404 whose Kong root %s keeps the promotion active, with no terminal state, and warns once',
-      async (_case, rootError) => {
+      'a persisted route 404 whose route-list read %s keeps the promotion active, with no terminal state, and warns once',
+      async (_case, listError) => {
         const stamp = pastWindow();
         const store = liveFakeStore([
           row({
@@ -1267,7 +1267,7 @@ describe('reconcilePromotions', () => {
         const tickLogger = mockServices.logger.mock();
         const kong: any = {
           getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-          getNodeInfo: jest.fn().mockRejectedValue(rootError),
+          checkRoutesReadable: jest.fn().mockRejectedValue(listError),
         };
 
         await reconcilePromotions({
@@ -1278,18 +1278,18 @@ describe('reconcilePromotions', () => {
           config,
         });
 
-        expect(kong.getNodeInfo).toHaveBeenCalledWith('default');
+        expect(kong.checkRoutesReadable).toHaveBeenCalledWith('default');
         expect(store.rows[0].state).toBe('mr-open');
         expect(detailOf(store).routeGoneSince).toBe(stamp);
         expect(tickLogger.warn).toHaveBeenCalledTimes(1);
         expect(tickLogger.warn).toHaveBeenCalledWith(
-          expect.stringContaining('did not answer its root'),
+          expect.stringContaining('did not list its routes'),
           expect.objectContaining({ promotionId: 1, since: stamp }),
         );
       },
     );
 
-    it('asks the root again on the next tick, and ends the promotion on the first tick the root answers', async () => {
+    it('checks the route list again on the next tick, and ends the promotion on the first tick the list answers', async () => {
       const store = liveFakeStore([
         row({
           state: 'mr-open',
@@ -1299,7 +1299,7 @@ describe('reconcilePromotions', () => {
       ]);
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-        getNodeInfo: jest
+        checkRoutesReadable: jest
           .fn()
           .mockRejectedValueOnce(
             new KongApiError(
@@ -1330,11 +1330,11 @@ describe('reconcilePromotions', () => {
         state: 'failed',
         detail: expect.stringContaining('answered 404'),
       });
-      expect(kong.getNodeInfo).toHaveBeenCalledTimes(2);
+      expect(kong.checkRoutesReadable).toHaveBeenCalledTimes(2);
       expect(kong.getRouteAssociatedPlugins).toHaveBeenCalledTimes(2);
     });
 
-    it('a teardown whose route is gone past the window waits while the root does not answer: the MR stays open and the record stays active', async () => {
+    it('a teardown whose route is gone past the window waits while the instance does not list its routes: the MR stays open and the record stays active', async () => {
       const store = liveFakeStore([
         row({
           state: 'mr-open',
@@ -1353,7 +1353,7 @@ describe('reconcilePromotions', () => {
       };
       const kong: any = {
         getRouteAssociatedPlugins: jest.fn().mockRejectedValue(routeGone()),
-        getNodeInfo: jest
+        checkRoutesReadable: jest
           .fn()
           .mockRejectedValue(
             new KongApiError('Kong API request failed: 404 Not Found', 404),
@@ -1369,14 +1369,14 @@ describe('reconcilePromotions', () => {
         config,
       });
 
-      expect(kong.getNodeInfo).toHaveBeenCalledWith('default');
+      expect(kong.checkRoutesReadable).toHaveBeenCalledWith('default');
       expect(kong.removeRoutePlugin).not.toHaveBeenCalled();
       expect(gitlab.closeMergeRequest).not.toHaveBeenCalled();
       expect(gitlab.deleteBranch).not.toHaveBeenCalled();
       expect(store.rows[0].state).toBe('mr-open');
       expect(tickLogger.warn).toHaveBeenCalledTimes(1);
       expect(tickLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('did not answer its root'),
+        expect.stringContaining('did not list its routes'),
         expect.objectContaining({ promotionId: 1 }),
       );
     });

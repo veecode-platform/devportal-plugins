@@ -106,16 +106,26 @@ describe('KongServiceManagerService', () => {
     );
   });
 
-  it('reads the Admin API root through the workspace prefix when one is configured', async () => {
-    fetchSpy.mockResolvedValue(
-      new Response('{"tagline":"Welcome to Kong"}', { status: 200 }),
-    );
+  it('reads the route list through the workspace prefix when one is configured', async () => {
+    fetchSpy.mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
     const svc = createService(createConfig({ workspace: 'prod' }));
 
-    await svc.getNodeInfo('default');
+    await svc.checkRoutesReadable('default');
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'http://kong:8001/prod/',
+      'http://kong:8001/prod/routes?size=1',
+      expect.anything(),
+    );
+  });
+
+  it('reads the route list without a prefix when no workspace is configured', async () => {
+    fetchSpy.mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
+    const svc = createService();
+
+    await svc.checkRoutesReadable('default');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://kong:8001/routes?size=1',
       expect.anything(),
     );
   });
