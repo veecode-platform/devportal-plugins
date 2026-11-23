@@ -843,7 +843,8 @@ Decision:
   (`GET /routes?size=1`) through the same client, so with the workspace prefix when one
   is configured. The list replaces the Admin API root (`GET /`), because Kong Enterprise
   may not answer its root under a workspace prefix. The list reads the scope the route
-  lookup uses, so a wrong workspace keeps the record instead of ending it. Only a 2xx
+  lookup uses, so a workspace that does not exist on the instance keeps the record
+  instead of ending it. Only a 2xx
   ends the record. Any other outcome (a 404 or 5xx on the list, no connection,
   or a body that is not JSON) keeps the record active with no terminal transition, keeps
   the stamp, logs one warning that the instance did not list its routes, and reads the
@@ -882,8 +883,8 @@ Rejected:
   close its MR. The window is there for that case.
 - **End on a persisted 404 alone.** The window cannot tell a route that is gone from a
   misconfiguration that answers 404 for every route for longer than the window. The
-  route-list read separates them when the wrong address or workspace does not list its
-  routes.
+  route-list read separates them when the wrong address, or a workspace that does not
+  exist on the instance, does not list its routes.
 
 Residual risk, for the owner to accept: the list read shows that some server answers 2xx
 for the route list at the instance's address and workspace, not that it is the Kong that
