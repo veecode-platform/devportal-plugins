@@ -3,6 +3,17 @@ import { Entity } from '@backstage/catalog-model';
 
 export const DAYS_IN_MONTH = 30.5;
 
+// The cluster cost card reads a 7-day total and projects it to a month as 30/7 of it.
+export const CLUSTER_WINDOW = '7d';
+const CLUSTER_WINDOW_DAYS = 7;
+const CLUSTER_MONTH_DAYS = 30;
+
+const SELECTOR_ANNOTATION = 'backstage.io/kubernetes-label-selector';
+// Exactly one `key=value` or `key==value`. Inequality, set-based and multi-term
+// selectors do not match, so they keep the namespace rules.
+const SINGLE_EQUALITY =
+  /^\s*([A-Za-z0-9][-A-Za-z0-9_./]*)\s*==?\s*([A-Za-z0-9][-A-Za-z0-9_.]*)\s*$/;
+
 export interface OpenCostAllocation {
   name: string;
   cpuCost: number;
@@ -45,12 +56,15 @@ export async function fetchOpenCostAllocations(
   // on it would swing with the wall clock (~$0 right after midnight).
   window: string = 'yesterday',
   aggregate: string = 'namespace',
+  accumulate: boolean = false,
 ): Promise<Record<string, OpenCostAllocation>> {
   const baseUrl = await discoveryApi.getBaseUrl('proxy');
   const response = await fetchApi.fetch(
     `${baseUrl}/opencost/allocation/compute?window=${encodeURIComponent(
       window,
-    )}&aggregate=${encodeURIComponent(aggregate)}`,
+    )}&aggregate=${encodeURIComponent(aggregate)}${
+      accumulate ? '&accumulate=true' : ''
+    }`,
   );
 
   if (!response.ok) {
@@ -90,4 +104,40 @@ export function findMatchingNamespaceAllocation(
   }
 
   return null;
+}
+
+export function parseLabelEquality(
+  selector: string | undefined,
+): { key: string; value: string } | null {
+  const match = selector?.match(SINGLE_EQUALITY);
+  return match ? { key: match[1], value: match[2] } : null;
+}
+
+export function clusterAggregate(entity: Entity): string {
+  const equality = parseLabelEquality(
+    entity.metadata.annotations?.[SELECTOR_ANNOTATION],
+  );
+  return equality ? `label:${equality.key}` : 'namespace';
+}
+
+export function findClusterAllocation(
+  allocations: Record<string, OpenCostAllocation>,
+  entity: Entity,
+): OpenCostAllocation | null {
+  const equality = parseLabelEquality(
+    entity.metadata.annotations?.[SELECTOR_ANNOTATION],
+  );
+  if (equality) {
+    // No namespace fallback: those rules would read a map keyed by label values.
+    return Object.prototype.hasOwnProperty.call(allocations, equality.value)
+      ? allocations[equality.value]
+      : null;
+  }
+  return (
+    findMatchingNamespaceAllocation(allocations, entity)?.allocation ?? null
+  );
+}
+
+export function clusterMonthlyProjection(windowTotal: number): number {
+  return (windowTotal * CLUSTER_MONTH_DAYS) / CLUSTER_WINDOW_DAYS;
 }
