@@ -24,8 +24,8 @@ export interface PromotionFinalizerConfig {
  * `awaiting-deploy` are meant to wait indefinitely per spec, and `applying`
  * is bounded by `applyTimeoutMinutes`, not by a retry count. The one
  * exception is a 404 from Kong for the record's route: once it has persisted
- * for the confirmation window, the record ends as `failed` with the reason in
- * `detail` (PDR-028).
+ * for the confirmation window and the Kong instance answers its root, the
+ * record ends as `failed` with the reason in `detail` (PDR-028).
  *
  * Handover invariant (ADR-020): once the promoted chart is on the default
  * branch, the experimental plugin must not exist on the route — Kong allows
@@ -63,7 +63,8 @@ export async function reconcilePromotions(deps: {
 
 /**
  * Ends a record whose route Kong has answered 404 for past the confirmation
- * window (PDR-028). A 404 still inside the window leaves the record active.
+ * window, while the Kong instance answers its root (PDR-028). A 404 still
+ * inside the window, or a root that does not answer, leaves the record active.
  * Any other error propagates to the caller, which logs it and retries on the
  * next tick. If recording the end fails, that error propagates the same way.
  */
@@ -82,6 +83,19 @@ async function reconcileRecord(
           instance: record.instance,
           routeId: record.route_id,
           since: err.since,
+        },
+      );
+      return;
+    }
+    if (err instanceof InstanceUnansweredError) {
+      logger.warn(
+        'kong-service-manager promotion: its route answers 404 past the confirmation window, but the Kong instance did not answer its root; keeping the promotion active',
+        {
+          promotionId: record.id,
+          instance: record.instance,
+          routeId: record.route_id,
+          since: err.since,
+          reason: err.reason,
         },
       );
       return;
@@ -242,8 +256,9 @@ async function abortForTeardown(deps: {
   // A code-only (issue #135) or delete (issue #3) record never created an
   // experiment in Kong, so there is nothing to remove — only the MR/branch
   // cleanup below applies.
-  // A route whose 404 has persisted holds no experiment to remove (PDR-028), so
-  // the teardown still closes the MR and reaches `aborted-teardown`.
+  // A route whose 404 has persisted, with the instance answering, holds no
+  // experiment to remove (PDR-028), so the teardown still closes the MR and
+  // reaches `aborted-teardown`.
   let routeGone = false;
   if (isExperimentMode(record)) {
     try {
@@ -534,7 +549,7 @@ async function findPluginByTag(
   return plugins.find(p => p.name === route.record.plugin_type && matches(p));
 }
 
-/** A route 404 that persisted past the confirmation window (PDR-028). */
+/** A route 404 that persisted past the confirmation window, with the instance answering its root (PDR-028). */
 class RouteGoneError extends Error {
   readonly instance: string;
   readonly routeId: string;
@@ -556,7 +571,19 @@ class RouteUnconfirmedError extends Error {
   }
 }
 
-/** A route 404 counts as gone only once it has persisted for GONE_CONFIRMATION_MS (PDR-028). */
+/** A route 404 past the window whose Kong instance did not answer its root, so the route is not judged gone yet (PDR-028). */
+class InstanceUnansweredError extends Error {
+  readonly since: string;
+  readonly reason: string;
+
+  constructor(instance: string, since: string, reason: string) {
+    super(`Kong instance '${instance}' did not answer its root: ${reason}`);
+    this.since = since;
+    this.reason = reason;
+  }
+}
+
+/** A route 404 counts as gone only once it has persisted for GONE_CONFIRMATION_MS and the Kong instance answers its root (PDR-028). */
 async function listRoutePlugins(
   route: RouteReadDeps,
 ): Promise<AssociatedPluginsResponse[]> {
@@ -578,6 +605,15 @@ async function listRoutePlugins(
         });
       }
       throw new RouteUnconfirmedError(since);
+    }
+    try {
+      await kong.getNodeInfo(record.instance);
+    } catch (rootErr) {
+      throw new InstanceUnansweredError(
+        record.instance,
+        since,
+        rootErr instanceof Error ? rootErr.message : String(rootErr),
+      );
     }
     throw new RouteGoneError(record.instance, record.route_id);
   }

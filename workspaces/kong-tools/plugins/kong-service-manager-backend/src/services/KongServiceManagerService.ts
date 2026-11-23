@@ -218,6 +218,14 @@ export class KongServiceManagerService {
     return this.getInstance(instanceName).defaultTags;
   }
 
+  /**
+   * The finalizer reads the root before a persisted route 404 ends a promotion,
+   * so a route 404 from an instance that does not answer cannot end one (PDR-028).
+   */
+  async getNodeInfo(instanceName: string): Promise<void> {
+    await this.kongFetch<void>(instanceName, '/');
+  }
+
   // --- Service operations ---
 
   async getServiceInfo(

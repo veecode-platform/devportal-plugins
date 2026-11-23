@@ -106,6 +106,20 @@ describe('KongServiceManagerService', () => {
     );
   });
 
+  it('reads the Admin API root through the workspace prefix when one is configured', async () => {
+    fetchSpy.mockResolvedValue(
+      new Response('{"tagline":"Welcome to Kong"}', { status: 200 }),
+    );
+    const svc = createService(createConfig({ workspace: 'prod' }));
+
+    await svc.getNodeInfo('default');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://kong:8001/prod/',
+      expect.anything(),
+    );
+  });
+
   // --- getRoutes ---
 
   it('builds correct URL for getRoutes', async () => {
