@@ -20,9 +20,11 @@ import { useEntity } from '@backstage/plugin-catalog-react';
 import { useTranslationRef } from '@backstage/core-plugin-api/alpha';
 import { costInsightsTranslationRef } from '../translations';
 import {
+  clusterAggregate,
+  clusterMonthlyProjection,
+  CLUSTER_WINDOW,
   fetchOpenCostAllocations,
-  findMatchingNamespaceAllocation,
-  DAYS_IN_MONTH,
+  findClusterAllocation,
   OpenCostAllocation,
 } from '../api/OpenCostClient';
 
@@ -45,12 +47,12 @@ export const EntityClusterCostCard: React.FC = () => {
         const allocations = await fetchOpenCostAllocations(
           discoveryApi,
           fetchApi,
-          'yesterday',
-          'namespace',
+          CLUSTER_WINDOW,
+          clusterAggregate(entity),
+          true,
         );
         if (mounted) {
-          const match = findMatchingNamespaceAllocation(allocations, entity);
-          setClusterCost(match ? match.allocation : null);
+          setClusterCost(findClusterAllocation(allocations, entity));
         }
       } catch (err: any) {
         if (mounted) {
@@ -106,9 +108,9 @@ export const EntityClusterCostCard: React.FC = () => {
               <TableHead>
                 <TableRow>
                   <TableCell><strong>{t('clusterCard.workloadHeader')}</strong></TableCell>
-                  <TableCell align="right"><strong>{t('clusterCard.cpuCostHeader')}</strong></TableCell>
-                  <TableCell align="right"><strong>{t('clusterCard.ramCostHeader')}</strong></TableCell>
-                  <TableCell align="right"><strong>{t('clusterCard.dailyTotalHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('entityClusterCard.cpuCostHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('entityClusterCard.ramCostHeader')}</strong></TableCell>
+                  <TableCell align="right"><strong>{t('entityClusterCard.totalHeader')}</strong></TableCell>
                   <TableCell align="right"><strong>{t('clusterCard.monthlyProjectionHeader')}</strong></TableCell>
                   <TableCell align="right"><strong>{t('clusterCard.efficiencyHeader')}</strong></TableCell>
                 </TableRow>
@@ -119,7 +121,7 @@ export const EntityClusterCostCard: React.FC = () => {
                   <TableCell align="right">${(clusterCost.cpuCost || 0).toFixed(2)}</TableCell>
                   <TableCell align="right">${(clusterCost.ramCost || 0).toFixed(2)}</TableCell>
                   <TableCell align="right"><strong>${(clusterCost.totalCost || 0).toFixed(2)}</strong></TableCell>
-                  <TableCell align="right">${((clusterCost.totalCost || 0) * DAYS_IN_MONTH).toFixed(2)}</TableCell>
+                  <TableCell align="right">${clusterMonthlyProjection(clusterCost.totalCost || 0).toFixed(2)}</TableCell>
                   <TableCell align="right">
                     <Box display="flex" alignItems="center" justifyContent="flex-end">
                       <Box width={60} mr={1}>
@@ -139,7 +141,7 @@ export const EntityClusterCostCard: React.FC = () => {
             </Table>
           ) : (
             <Typography variant="body2" color="textSecondary">
-              {t('clusterCard.noWorkload')}
+              {t('entityClusterCard.noWorkload')}
             </Typography>
           )}
         </CardContent>
