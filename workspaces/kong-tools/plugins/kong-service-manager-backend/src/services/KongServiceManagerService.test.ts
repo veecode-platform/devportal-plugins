@@ -1,7 +1,7 @@
 import { mockServices } from '@backstage/backend-test-utils';
 import { ConfigReader } from '@backstage/config';
 import { NotFoundError } from '@backstage/errors';
-import { KongServiceManagerService } from './KongServiceManagerService';
+import { KongApiError, KongServiceManagerService } from './KongServiceManagerService';
 import {
   mockServiceInfo,
   mockRoutesResponse,
@@ -52,6 +52,23 @@ describe('KongServiceManagerService', () => {
     ).rejects.toThrow(NotFoundError);
   });
 
+  it('throws a KongApiError carrying the HTTP status when Kong answers non-2xx', async () => {
+    fetchSpy.mockResolvedValue(
+      new Response('{"message":"Not found"}', { status: 404, statusText: 'Not Found' }),
+    );
+    const svc = createService();
+
+    const error = await svc
+      .getRouteAssociatedPlugins('default', 'route-1')
+      .then(() => undefined, (e: unknown) => e);
+
+    expect(error).toBeInstanceOf(KongApiError);
+    expect(error).toMatchObject({
+      message: 'Kong API request failed: 404 Not Found',
+      kongStatus: 404,
+    });
+  });
+
   // --- getServiceInfo ---
 
   it('builds correct URL for getServiceInfo', async () => {
@@ -85,6 +102,30 @@ describe('KongServiceManagerService', () => {
 
     expect(fetchSpy).toHaveBeenCalledWith(
       'http://kong:8001/prod/services/my-service',
+      expect.anything(),
+    );
+  });
+
+  it('reads the route list through the workspace prefix when one is configured', async () => {
+    fetchSpy.mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
+    const svc = createService(createConfig({ workspace: 'prod' }));
+
+    await svc.checkRoutesReadable('default');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://kong:8001/prod/routes?size=1',
+      expect.anything(),
+    );
+  });
+
+  it('reads the route list without a prefix when no workspace is configured', async () => {
+    fetchSpy.mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
+    const svc = createService();
+
+    await svc.checkRoutesReadable('default');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://kong:8001/routes?size=1',
       expect.anything(),
     );
   });

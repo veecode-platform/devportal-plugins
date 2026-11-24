@@ -36,6 +36,16 @@ export type KongInstanceConfig = {
     | { custom: { header: string; value: string } };
 };
 
+/** A non-2xx answer from the Kong Admin API; `kongStatus` is the HTTP status of that answer. */
+export class KongApiError extends Error {
+  readonly kongStatus: number;
+
+  constructor(message: string, kongStatus: number) {
+    super(message);
+    this.kongStatus = kongStatus;
+  }
+}
+
 export class KongServiceManagerService {
   readonly #logger: LoggerService;
   readonly #instances: KongInstanceConfig[];
@@ -169,8 +179,9 @@ export class KongServiceManagerService {
       this.#logger.error(
         `Kong API error: ${response.status} ${response.statusText} - ${body}`,
       );
-      throw new Error(
+      throw new KongApiError(
         `Kong API request failed: ${response.status} ${response.statusText}`,
+        response.status,
       );
     }
 
@@ -205,6 +216,11 @@ export class KongServiceManagerService {
    */
   getInstanceDefaultTags(instanceName: string): string[] | undefined {
     return this.getInstance(instanceName).defaultTags;
+  }
+
+  /** Lists one route in the instance's workspace, the scope the route lookups use (PDR-028). */
+  async checkRoutesReadable(instanceName: string): Promise<void> {
+    await this.kongFetch<void>(instanceName, '/routes?size=1');
   }
 
   // --- Service operations ---

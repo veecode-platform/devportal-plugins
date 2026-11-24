@@ -816,3 +816,103 @@ Rejected: leaving the generated `values.yaml` key behind (the chart's Ingress
 template still turns it into a `konghq.com/plugins` attachment); a distinct
 `kong-demote/<type>` branch (would make the `handleDraft` hardcode from PDR-025
 diverge for real, with no benefit given the active-per-route index).
+
+## PDR-028: A Route Kong No Longer Has Ends Its Promotion as Failed Once the 404 Persists; Other Kong Errors Keep Retrying
+
+**Date:** 2026-11-23
+**Status:** Proposed. Awaits the owner's acceptance.
+
+A promotion can stay open after its route is gone from Kong. The cause is inferred,
+not proven: the route was most likely removed when its app and repository were
+deleted while the promotion's merge request was open. On 2026-11-23 a live portal
+logged the same 404 for one such promotion on every reconcile tick, with no end.
+
+Decision:
+
+- **A 404 on the route's plugin list ends the record once it has persisted for the
+  confirmation window.** The window is `GONE_CONFIRMATION_MS` (2 minutes), the one a
+  project 404 waits out (PDR-023). The first 404 stamps `routeGoneSince` in `detail`
+  and the record stays active. A 404 still present past the window ends the record
+  (once the route-list check below passes), with the reason in `detail`, and the finalizer
+  stops reconciling it. A 2xx on the route clears the stamp, so the next 404 starts a
+  new window. The end state is `aborted-teardown` when the project is gone, archived or
+  unregistered, and `failed` otherwise. `failed` already means "a person decides"
+  (PDR-021), so the frontend badge needs no change.
+- **Before a persisted 404 ends the record, the Kong instance must list its routes.**
+  Past the window, and only then, the finalizer reads one route from the route list
+  (`GET /routes?size=1`) through the same client, so with the workspace prefix when one
+  is configured. The list replaces the Admin API root (`GET /`), because Kong Enterprise
+  may not answer its root under a workspace prefix. The list reads the scope the route
+  lookup uses, so a workspace that does not exist on the instance keeps the record
+  instead of ending it. Only a 2xx
+  ends the record. Any other outcome (a 404 or 5xx on the list, no connection,
+  or a body that is not JSON) keeps the record active with no terminal transition, keeps
+  the stamp, logs one warning that the instance did not list its routes, and reads the
+  list again on the next tick. The read adds one client method, `checkRoutesReadable`,
+  and no error type.
+- **In the teardown path, a missing route has no experiment to remove.** Once the 404
+  has persisted and the instance has listed its routes, the teardown still closes the MR and deletes
+  the promotion branch when no other MR is open on it (PDR-022), and the record ends as
+  `aborted-teardown` (PDR-023), with one warning that names the route. Before that, the
+  teardown waits: it neither closes the MR nor ends the record, and it keeps waiting
+  while the instance does not list its routes.
+- **Only the route's plugin list raises this.** A 404 when deleting or editing one
+  plugin is a race (the plugin was removed between the read and the write), and the
+  next tick converges on it, so it keeps the retry. So does every other error, such
+  as a 500.
+- The Kong client throws a `KongApiError` that carries the HTTP status as
+  `kongStatus`. The message is unchanged.
+- The record is decoded once per tick, and a stamp cleared by a 2xx is cleared on
+  that same object, so a handover written later in the tick does not put it back.
+  The same defect existed for `projectGoneSince`: a project stamp cleared earlier in
+  a tick was written back by the handover to `awaiting-deploy`, so a later project
+  404 looked old and ended the record at once. The handover now carries the cleared
+  value, with a test.
+
+Rejected:
+
+- **Retry with a cap or backoff.** A cap or backoff hides the problem without giving
+  a person anything to act on; the record needs a decision either way.
+- **Match every Kong 404.** A plugin removed between the read and the delete would
+  end a promotion that converges on the next tick.
+- **A new terminal state.** `failed` already has a badge and a detail path. A new
+  state would need a type change and a badge for no behavioral gain.
+- **End on the first 404.** A wrong Kong base URL or workspace answers 404 for every
+  route, so every promotion on that instance that reads its route (a merged or closed
+  MR, `applying`, a teardown) would end on the first tick, and each teardown would
+  close its MR. The window is there for that case.
+- **End on a persisted 404 alone.** The window cannot tell a route that is gone from a
+  misconfiguration that answers 404 for every route for longer than the window. The
+  route-list read separates them when the wrong address, or a workspace that does not
+  exist on the instance, does not list its routes.
+
+Residual risk, for the owner to accept: the list read shows that some server answers 2xx
+for the route list at the instance's address and workspace, not that it is the Kong that
+holds this route. A route 404 that persists while the list answers still ends each
+promotion on that instance that reads the route (an MR that is merged or closed, a
+promotion in `applying`, or one being torn down). A base URL or workspace that reaches
+another live server, or another existing workspace on the same Kong, gives that
+combination: the list answers and the route is missing. The window requires the 404 to
+last; it does not prevent that. A stamp can also go stale on a path that stops reading
+the route: a closed MR that is reopened makes no route read, so the next 404 after the
+reopen is judged against the old stamp and ends at once if the list answers. The same
+happens when a teardown signal reverts inside the window (the project is unarchived,
+`catalog-info.yaml` comes back, or the project is readable again): the record returns to
+`mr-open` or `awaiting-deploy`, which read no route, and the `awaiting-deploy` to
+`applying` handover carries the stamp, so the first 404 in `applying` ends at once if the
+list answers. Add a clear on those paths if that is ever observed.
+
+The worst case of a false 404 is at merge, and it now needs a route list that answers too.
+With a merged MR in experiment mode the finalizer reads the route before it removes the
+experiment, so a route 404 that outlasts the window while the list answers ends the
+record as `failed` with the experiment still on the route, and nothing revisits it.
+When the merged chart deploys, the Kong Ingress Controller then cannot create the
+code-owned plugin (PDR-020). In a teardown, the same case ends the record as
+`aborted-teardown` with a detail that says no experiment was left, which is untrue in
+that case. Both need a person: remove the experiment by hand and check which server
+answers at the instance's base URL and workspace. While the list does not answer, the
+record stays active and the next tick asks again, so a base URL or workspace that is
+fixed later lets the record carry on without a manual end.
+
+Known gap: a closed (unmerged) MR whose route is gone ends `failed` and keeps its
+promotion branch, because the untag that precedes the branch delete cannot run.
