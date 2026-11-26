@@ -1,5 +1,6 @@
 import {
   coreServices,
+  createBackendPlugin,
   createServiceFactory,
   type BackendFeature,
 } from '@backstage/backend-plugin-api';
@@ -7,6 +8,7 @@ import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
 import { mockServices, startTestBackend } from '@backstage/backend-test-utils';
 import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { catalogServiceMock } from '@backstage/plugin-catalog-node/testUtils';
+import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
 import { scaffolderModuleAppPublication } from './module';
 
 const integrations = {
@@ -18,6 +20,13 @@ const integrations = {
     },
   ],
 };
+
+/** The scaffolder's template actions: what the module adds to them is recorded here. */
+const scaffolder = { addActions: jest.fn() };
+
+beforeEach(() => {
+  scaffolder.addActions.mockClear();
+});
 
 /** A logger the framework accepts: the error calls are recorded, and child loggers are this one. */
 interface FakeLogger {
@@ -45,6 +54,16 @@ function featuresWith(
   logger?: ReturnType<typeof fakeLogger>,
 ): BackendFeature[] {
   return [
+    createBackendPlugin({
+      pluginId: 'scaffolder',
+      register(env) {
+        env.registerExtensionPoint(scaffolderActionsExtensionPoint, scaffolder);
+        env.registerInit({
+          deps: {},
+          async init() {},
+        });
+      },
+    }),
     scaffolderModuleAppPublication,
     mockServices.rootConfig.factory({
       data: {
@@ -92,6 +111,38 @@ describe('scaffolderModuleAppPublication', () => {
     for (const call of actionsRegistry.register.mock.calls) {
       expect(call[0].attributes).toEqual({ readOnly: true, idempotent: true });
     }
+  });
+
+  it('adds the auto-merge template action, which is not an actions-registry action', async () => {
+    const actionsRegistry = { register: jest.fn() };
+
+    await startTestBackend({
+      features: featuresWith(
+        { projectPathPrefix: 'example-org' },
+        actionsRegistry,
+      ),
+    });
+
+    expect(scaffolder.addActions).toHaveBeenCalledTimes(1);
+    expect(scaffolder.addActions.mock.calls[0][0].id).toBe(
+      'gitlab:merge-request:auto-merge',
+    );
+    const names = actionsRegistry.register.mock.calls.map(call => call[0].name);
+    expect(names).not.toContain('gitlab:merge-request:auto-merge');
+  });
+
+  it('adds the auto-merge template action even when the app publication block is invalid', async () => {
+    const actionsRegistry = { register: jest.fn() };
+
+    await startTestBackend({
+      features: featuresWith({ deployJobName: 'deploy' }, actionsRegistry),
+    });
+
+    expect(scaffolder.addActions).toHaveBeenCalledTimes(1);
+    expect(scaffolder.addActions.mock.calls[0][0].id).toBe(
+      'gitlab:merge-request:auto-merge',
+    );
+    expect(actionsRegistry.register).not.toHaveBeenCalled();
   });
 
   it('starts without the actions when the required prefix is missing, and logs why', async () => {

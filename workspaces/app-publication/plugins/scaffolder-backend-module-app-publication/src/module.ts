@@ -5,14 +5,17 @@ import {
 import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
 import { ScmIntegrations } from '@backstage/integration';
 import { catalogServiceRef } from '@backstage/plugin-catalog-node';
+import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
 import { registerAppPublicationActions } from './actions/appPublication';
+import { createMergeRequestAutoMergeAction } from './actions/mergeRequestAutoMerge';
 import { readAppPublicationConfig } from './config';
 import { systemClock } from './dependencies';
 
 /**
  * Registers the two actions when `appPublication` is valid. When it is missing
  * or invalid, the module logs the reason and registers nothing, so the rest of
- * the scaffolder keeps working.
+ * the scaffolder keeps working. The auto-merge template action needs only the
+ * GitLab integrations, so it is added whatever the block says.
  */
 export const scaffolderModuleAppPublication = createBackendModule({
   pluginId: 'scaffolder',
@@ -25,9 +28,28 @@ export const scaffolderModuleAppPublication = createBackendModule({
         userInfo: coreServices.userInfo,
         catalog: catalogServiceRef,
         actionsRegistry: actionsRegistryServiceRef,
+        scaffolderActions: scaffolderActionsExtensionPoint,
         logger: coreServices.logger,
       },
-      async init({ config, auth, userInfo, catalog, actionsRegistry, logger }) {
+      async init({
+        config,
+        auth,
+        userInfo,
+        catalog,
+        actionsRegistry,
+        scaffolderActions,
+        logger,
+      }) {
+        const gitlabIntegrations = ScmIntegrations.fromConfig(config).gitlab;
+        scaffolderActions.addActions(
+          createMergeRequestAutoMergeAction({
+            auth,
+            gitlabIntegrations,
+            fetch: globalThis.fetch,
+            clock: systemClock,
+          }),
+        );
+
         let settings;
         try {
           settings = readAppPublicationConfig(config);
@@ -44,7 +66,7 @@ export const scaffolderModuleAppPublication = createBackendModule({
           catalog,
           userInfo,
           settings,
-          gitlabIntegrations: ScmIntegrations.fromConfig(config).gitlab,
+          gitlabIntegrations,
           fetch: globalThis.fetch,
           clock: systemClock,
           appBaseUrl: config.getOptionalString('app.baseUrl'),
