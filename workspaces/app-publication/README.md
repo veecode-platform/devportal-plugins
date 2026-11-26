@@ -22,6 +22,36 @@ name that holds `:` or `/` is shown only when it is one of the configured job na
 
 Only the app's owner may call either one. The decisions behind the choices are in [DECISIONS.md](DECISIONS.md).
 
+## Auto-merge template action
+
+`gitlab:merge-request:auto-merge` is a scaffolder template action. A template calls it after `publish:gitlab:merge-request`,
+so the merge request the run opened merges by itself once GitLab's merge checks pass, without a person.
+
+Input:
+
+- `mergeRequestUrl` (required): the `mergeRequestUrl` output of `publish:gitlab:merge-request` in the same run.
+- `sourceBranch` (required): the branch the run opened the merge request from.
+- `targetBranch` (default `main`): the branch the merge request targets.
+- `removeSourceBranch` (default `true`): whether GitLab deletes the source branch after the merge.
+
+Output:
+
+- `mergeRequestUrl`, and `headSha`, the head commit that auto-merge is pinned to.
+- `status`: `armed` when GitLab merges the request once its checks pass, or `merged` when GitLab merged it at once.
+
+Before it sets anything, the action checks that:
+
+- the link is a GitLab merge request address on a host the portal has a GitLab integration for;
+- the caller is a signed-in user;
+- the portal's GitLab token belongs to the user who opened the merge request, so a request opened by someone else is refused;
+- the request is open, comes from the run's source branch into the target branch, and comes from the same project, not a fork.
+
+It sets auto-merge pinned to the request's head commit. If the head moved after the request was opened, GitLab answers with a
+conflict and nothing is set. If GitLab is still preparing the request, the action reads the request again and retries up to
+three times, three seconds apart. It retries only while GitLab reports a preparing status and the head has not moved. Any
+other refusal fails the run with a sentence that says nothing was merged. The action never merges a request itself, and it
+does not log the token or any request header. The reasons for these choices are in [DECISIONS.md](DECISIONS.md) (PDR-016).
+
 ## Configuration
 
 `appPublication.projectPathPrefix` is required: the GitLab group path under which every app project must sit, for

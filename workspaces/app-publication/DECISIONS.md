@@ -306,3 +306,26 @@ request costs one more pipeline lookup on each poll until its pipeline appears.
 - The sentences of a merge request pipeline do not change.
 
 **Consequences:** The compare is GitLab's. This module reads its `diffs` as the changed paths. When GitLab flags the compare as possibly incomplete (`compare_timeout`), no path is kept and the PDR-002 explanation applies, so a partial list never names only some of the files; a list GitLab cuts without that flag is not detected. On the default branch, `unreadable_path` goes to the platform team: the check reads every commit since the platform commit, so renaming the file in a new commit does not clear it. A default-branch pipeline adds at most two requests to the wait or status call, the contract artifact and the compare, because it has at most one contract job. Trace reads do not grow: a default-branch contract or render job read its trace before this change, and an owned-file or `no_platform_base` failure now reads none. The contract's push goes to the default branch even when the commit came through a merge request, which a branch protection rule may refuse. Whether the platform team wants a merge request in that case is not decided here.
+
+## PDR-016: The auto-merge action arms only the merge request its run opened
+
+**Status:** Proposed, 2026-11-26
+
+**Context:** A template needs GitLab to merge the request it opened once the request's checks pass, without a person. The
+portal's GitLab token can write to every project the portal reaches, and the action runs with the credentials of the
+template run. The status tools decide access with the owner check of PDR-001, which needs the app's System, but the
+action receives a merge request address and no app.
+
+**Decision:** The action is a scaffolder template action, registered with the id the templates use. It is not an
+actions-registry action, so the portal's tools do not expose it. It sets auto-merge only when the merge request's author
+is the GitLab user of the portal's token, the request is open, and its source branch, target branch and project match
+the run. It pins the head commit, so a request that changed after it was opened is refused. The caller must be a signed-in
+user. The action never merges a request itself. When GitLab answers 405 while it prepares the request, the failure names
+the GitLab status word, after a check that the word has a closed shape, and does not copy GitLab's free text.
+
+**Consequences:** The owner check of PDR-001 does not run on this action. The portal's own tools report a new app as not
+found for about five minutes after its run, while the catalog reads it, so a catalog lookup in the same run would
+probably refuse the first merge; this was not tested against the live catalog. A signed-in user who runs a template with
+this step can arm auto-merge on a request that the portal's token opened in the same GitLab host, as long as the branch and
+project checks match. Whether to restrict it to the app's owner, or to the group path of PDR-007, is not decided here. The
+module adds no changeset and no version bump, as the workspace convention says until the module is published.
