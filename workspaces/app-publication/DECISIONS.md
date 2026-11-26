@@ -323,9 +323,8 @@ the run. It pins the head commit, so a request that changed after it was opened 
 user. The action never merges a request itself. When GitLab answers 405 while it prepares the request, the failure names
 the GitLab status word, after a check that the word has a closed shape, and does not copy GitLab's free text.
 
-**Consequences:** The owner check of PDR-001 does not run on this action. The portal's own tools report a new app as not
-found for about five minutes after its run, while the catalog reads it, so a catalog lookup in the same run would
-probably refuse the first merge; this was not tested against the live catalog. A signed-in user who runs a template with
+**Consequences:** The owner check of PDR-001 does not run on this action. The System of a new app may not be in the catalog during the run
+that opens its merge request, so a catalog lookup in that run may refuse the first merge; this is not verified. A signed-in user who runs a template with
 this step can arm auto-merge on a request that the portal's token opened in the same GitLab host, as long as the branch and
 project checks match. Whether to restrict it to the app's owner, or to the group path of PDR-007, is not decided here. The
 module adds no changeset and no version bump, as the workspace convention says until the module is published.
