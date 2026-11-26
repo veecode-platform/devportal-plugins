@@ -5,6 +5,7 @@ const JOB_OR_ARTIFACT_PATTERN = /^[A-Za-z0-9._:/-]{1,255}$/;
 const KEY_PATTERN = /^[A-Za-z0-9._/-]{1,253}$/;
 const ENVIRONMENT_PATTERN = /^[a-z][a-z0-9-]{0,30}$/;
 const GROUP_PATH_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+export const PROJECT_PATH_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/;
 export const DEFAULT_DEPLOY_JOB = 'deploy';
 export const DEFAULT_DEPLOY_ARTIFACT = 'smoke-result.json';
 export const DEFAULT_CONTRACT_JOB = 'contract';
@@ -109,6 +110,8 @@ const settingsSchema = z
       .string()
       .regex(KEY_PATTERN, 'may contain only letters, digits and . _ / -')
       .default(DEFAULT_DASHBOARD_ANNOTATION),
+    // Read by readAutoMergeConfig, so a wrong auto-merge block stops only that action.
+    autoMerge: z.unknown().optional(),
   })
   .strict()
   .refine(settings => settings.pollIntervalSeconds < settings.maxWaitSeconds, {
@@ -128,14 +131,59 @@ export function readAppPublicationConfig(
   const raw = config.getOptional('appPublication') ?? {};
   const parsed = settingsSchema.safeParse(raw);
   if (!parsed.success) {
+    throw new Error(describeIssues('appPublication', parsed.error.issues));
+  }
+  return parsed.data;
+}
+
+const autoMergeSchema = z
+  .object({
+    allowedProjects: z
+      .array(
+        z
+          .string()
+          .regex(
+            PROJECT_PATH_PATTERN,
+            'must be a GitLab project path such as example-org/apps/example-app, with no leading or trailing slash',
+          )
+          .refine(
+            path =>
+              !path
+                .split('/')
+                .some(segment => segment === '..' || segment === '.'),
+            'must not contain a . or .. segment',
+          ),
+      )
+      .default([]),
+    sourceBranchPrefixes: z
+      .array(z.string().min(1, 'must not be empty'))
+      .min(1, 'lists no prefix; leave the setting out to skip the check')
+      .optional(),
+  })
+  .strict();
+
+export type AutoMergeSettings = z.infer<typeof autoMergeSchema>;
+
+/**
+ * Reads `appPublication.autoMerge`: the projects the auto-merge template action
+ * may arm. A missing block, or a missing or empty list, allows no project.
+ */
+export function readAutoMergeConfig(config: Config): AutoMergeSettings {
+  const raw = config.getOptional('appPublication.autoMerge') ?? {};
+  const parsed = autoMergeSchema.safeParse(raw);
+  if (!parsed.success) {
     throw new Error(
-      parsed.error.issues
-        .map(issue => {
-          const path = issue.path.join('.');
-          return `appPublication${path ? `.${path}` : ''} ${issue.message}`;
-        })
-        .join('; '),
+      describeIssues('appPublication.autoMerge', parsed.error.issues),
     );
   }
   return parsed.data;
+}
+
+function describeIssues(prefix: string, issues: z.ZodIssue[]): string {
+  return issues
+    .map(issue => {
+      const path = issue.path.join('.');
+      return `${prefix}${path ? `.${path}` : ''} ${issue.message}`;
+    })
+    .join('; ');
 }

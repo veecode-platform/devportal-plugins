@@ -13,7 +13,7 @@ Run commands from `workspaces/app-publication/`.
 `plugins/scaffolder-backend-module-app-publication` contains the `backend-plugin-module` product package for the
 `scaffolder` plugin. It registers two actions in the actions registry, which the portal's MCP server exposes as
 tools: `get-app-status` (a read of the app's sheet, with no wait) and `wait-for-app-publication` (a bounded wait
-that follows one pushed commit through its merge request and the merge, or straight on the default branch, then through the default branch's pipeline and the deploy).
+that follows one pushed commit through its merge request and the merge, or straight on the default branch, then through the default branch's pipeline and the deploy). It also adds one scaffolder template action, `gitlab:merge-request:auto-merge`, which sets auto-merge on a merge request the run opened in a project listed in `appPublication.autoMerge.allowedProjects`. It is not in the actions registry, so the portal's tools do not expose it.
 The role-sized harness is `packages/backend` plus unit tests. Product code stays under `plugins/`; the harness
 contains only wiring and the example configuration in `app-config.yaml` and `dynamic-plugins.yaml`.
 
@@ -23,8 +23,8 @@ This workspace is generated from the repository workspace template's shape. The 
 it is registered through the export overlay. Keep workspace-only decisions in `DECISIONS.md` and do not copy
 cross-workspace rules into this file.
 
-Both actions are read-only and idempotent. Each one checks that the caller is a user who owns the System, before any
-GitLab request. GitLab is read with the portal's `integrations.gitlab` token. Result files written by a job
+Both status actions are read-only and idempotent. Each one checks that the caller is a user who owns the System, before any
+GitLab request. The template action writes one thing only, auto-merge on a merge request the run opened in a listed project, after its checks pass, and only when that request holds exactly one commit and that commit is its head; it never merges, and it has no app input, so it does not run the owner check (see PDR-016). GitLab is read with the portal's `integrations.gitlab` token. Result files written by a job
 (`smoke-result.json` schema 2 and `contract-result.json`) are untrusted: every field is validated, and a value is
 returned only when it fits a closed list or matches GitLab's own data. Every sentence the tools return is written for
 Claude to relay to a person who has no access to GitLab or to the cluster.

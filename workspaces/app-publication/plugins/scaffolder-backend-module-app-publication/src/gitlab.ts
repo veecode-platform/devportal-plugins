@@ -3,7 +3,11 @@ import { z } from 'zod/v3';
 
 export type FetchFunction = (
   input: string,
-  init?: { headers?: Record<string, string>; signal?: AbortSignal },
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    signal?: AbortSignal;
+  },
 ) => Promise<Response>;
 
 export const MSG_NO_ACCESS =

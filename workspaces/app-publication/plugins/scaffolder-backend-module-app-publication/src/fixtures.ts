@@ -19,6 +19,9 @@ export const GITLAB_HOST = 'gitlab.example.com';
 export const API_BASE = `https://${GITLAB_HOST}/api/v4`;
 export const PROJECT_BASE = `${API_BASE}/projects/example-org%2Fexample-app`;
 export const PROJECT_WEB_URL = `https://${GITLAB_HOST}/example-org/example-app`;
+/** The token's own user, read outside the project. */
+export const USER_PATH = '/user';
+export const USER_URL = `${API_BASE}${USER_PATH}`;
 export const DEFAULT_BRANCH = 'main';
 export const EXAMPLE_PREFIX = 'example-org';
 export const APP_REF = 'system:default/example-app';
@@ -281,7 +284,7 @@ export const UNREADABLE_LOG_CASES: UnreadableLogCase[] = LOG_JOBS.flatMap(
  * order, and the last one repeats. A path with no reply is a 404.
  */
 export class FakeGitlab {
-  readonly calls: { path: string; hasSignal: boolean }[] = [];
+  readonly calls: { path: string; hasSignal: boolean; method: string }[] = [];
   private readonly replies = new Map<string, Reply[]>();
   private latency?: {
     clock: Clock & { elapsed(): number };
@@ -307,13 +310,26 @@ export class FakeGitlab {
 
   readonly fetch = async (
     input: string,
-    init?: { headers?: Record<string, string>; signal?: AbortSignal },
+    init?: {
+      method?: string;
+      headers?: Record<string, string>;
+      signal?: AbortSignal;
+    },
   ): Promise<Response> => {
-    if (!input.startsWith(PROJECT_BASE)) {
+    let path: string | undefined;
+    if (input === USER_URL) {
+      path = USER_PATH;
+    } else if (input.startsWith(PROJECT_BASE)) {
+      path = input.slice(PROJECT_BASE.length);
+    }
+    if (path === undefined) {
       throw new Error(`unexpected URL ${input}`);
     }
-    const path = input.slice(PROJECT_BASE.length);
-    this.calls.push({ path, hasSignal: init?.signal !== undefined });
+    this.calls.push({
+      path,
+      hasSignal: init?.signal !== undefined,
+      method: init?.method ?? 'GET',
+    });
     if (this.latency) {
       await this.latency.clock.sleep(this.latency.milliseconds);
       if (this.latency.cutOffWhen?.(this.latency.clock.now())) {

@@ -1,5 +1,5 @@
 import { ConfigReader } from '@backstage/config';
-import { readAppPublicationConfig } from './config';
+import { readAppPublicationConfig, readAutoMergeConfig } from './config';
 
 const read = (appPublication: Record<string, unknown>) =>
   readAppPublicationConfig(new ConfigReader({ appPublication } as never));
@@ -108,5 +108,87 @@ describe('readAppPublicationConfig', () => {
       read({ projectPathPrefix: 'example-org', maxWaitSeconds: 270 })
         .maxWaitSeconds,
     ).toBe(270);
+  });
+
+  it('accepts an auto-merge block beside the status settings, which are read as before', () => {
+    const settings = read({
+      projectPathPrefix: 'example-org',
+      autoMerge: { allowedProjects: ['example-org/example-app'] },
+    });
+
+    expect(settings.projectPathPrefix).toBe('example-org');
+    expect(settings.deployJobName).toBe('deploy');
+  });
+});
+
+const readAutoMerge = (autoMerge: unknown) =>
+  readAutoMergeConfig(
+    new ConfigReader({ appPublication: { autoMerge } } as never),
+  );
+
+describe('readAutoMergeConfig', () => {
+  it('has no project to arm when the block is absent', () => {
+    expect(readAutoMergeConfig(new ConfigReader({}))).toEqual({
+      allowedProjects: [],
+    });
+  });
+
+  it('takes the listed project paths as GitLab writes them, case included', () => {
+    expect(
+      readAutoMerge({
+        allowedProjects: ['Example-Org/Example-App', 'example-org/apps/a-b'],
+      }),
+    ).toEqual({
+      allowedProjects: ['Example-Org/Example-App', 'example-org/apps/a-b'],
+    });
+  });
+
+  it('keeps the source branch prefixes when the block sets them', () => {
+    expect(
+      readAutoMerge({
+        allowedProjects: ['example-org/example-app'],
+        sourceBranchPrefixes: ['create-app/'],
+      }),
+    ).toEqual({
+      allowedProjects: ['example-org/example-app'],
+      sourceBranchPrefixes: ['create-app/'],
+    });
+  });
+
+  it.each([
+    ['a project path with one segment', { allowedProjects: ['example-app'] }],
+    [
+      'a project path with a leading slash',
+      { allowedProjects: ['/example-org/example-app'] },
+    ],
+    [
+      'a project path with a trailing slash',
+      { allowedProjects: ['example-org/example-app/'] },
+    ],
+    [
+      'a project path with a .. segment',
+      { allowedProjects: ['example-org/../example-app'] },
+    ],
+    ['an empty project path', { allowedProjects: [''] }],
+    [
+      'a list of prefixes that is empty',
+      {
+        allowedProjects: ['example-org/example-app'],
+        sourceBranchPrefixes: [],
+      },
+    ],
+    [
+      'an empty prefix',
+      {
+        allowedProjects: ['example-org/example-app'],
+        sourceBranchPrefixes: [''],
+      },
+    ],
+    [
+      'an unknown key',
+      { allowedProjects: ['example-org/example-app'], unknownKey: true },
+    ],
+  ])('refuses %s', (_label, value) => {
+    expect(() => readAutoMerge(value)).toThrow(/appPublication\.autoMerge/);
   });
 });
