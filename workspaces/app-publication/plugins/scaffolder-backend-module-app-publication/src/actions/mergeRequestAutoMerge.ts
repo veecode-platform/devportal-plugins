@@ -1,7 +1,12 @@
 import type { AuthService } from '@backstage/backend-plugin-api';
 import { NotAllowedError } from '@backstage/errors';
 import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
-import { armAutoMerge, type AutoMergeDependencies } from '../autoMerge';
+import {
+  armAutoMerge,
+  canonicalMergeRequestUrl,
+  parseMergeRequestUrl,
+  type AutoMergeDependencies,
+} from '../autoMerge';
 
 export const AUTO_MERGE_ACTION_ID = 'gitlab:merge-request:auto-merge';
 const DEFAULT_TARGET_BRANCH = 'main';
@@ -17,7 +22,7 @@ export function createMergeRequestAutoMergeAction(
   return createTemplateAction({
     id: AUTO_MERGE_ACTION_ID,
     description:
-      "Sets GitLab's auto-merge on a merge request this run opened, so it merges once its checks pass. It arms only a request the portal's GitLab user opened from the branch this run pushed, into the target branch, at its current head commit. It never merges a request itself.",
+      "Sets GitLab's auto-merge on a merge request this run opened, so it merges once its checks pass. It arms only a request the portal's GitLab user opened from the branch this run pushed, into the target branch, in a project on the portal's auto-merge list, when the request holds exactly one commit and that commit is its head. It never merges a request itself.",
     schema: {
       input: z =>
         z
@@ -41,6 +46,12 @@ export function createMergeRequestAutoMergeAction(
                   'Whether GitLab deletes the source branch after the merge. Defaults to true.',
               })
               .optional(),
+            expectedHeadSha: z
+              .string({
+                description:
+                  "The full commit SHA the run pushed. When given, auto-merge is refused unless the request's head is this commit.",
+              })
+              .optional(),
           })
           .strict(),
       output: z =>
@@ -57,25 +68,30 @@ export function createMergeRequestAutoMergeAction(
           'only a signed-in user can set auto-merge on a merge request',
         );
       }
-      const { mergeRequestUrl, sourceBranch } = ctx.input;
+      // A refused address may carry a secret, so it is never repeated. Only the
+      // canonical form of an address that parsed is logged or returned.
+      let link: string | undefined;
       try {
+        const target = parseMergeRequestUrl(ctx.input.mergeRequestUrl);
+        link = canonicalMergeRequestUrl(target);
         // The scaffolder validates the input against the JSON schema but does not
         // write defaults back into it, so the defaults are applied here.
         const result = await armAutoMerge(deps, {
-          mergeRequestUrl,
-          sourceBranch,
+          target,
+          sourceBranch: ctx.input.sourceBranch,
           targetBranch: ctx.input.targetBranch ?? DEFAULT_TARGET_BRANCH,
           removeSourceBranch: ctx.input.removeSourceBranch ?? true,
+          expectedHeadSha: ctx.input.expectedHeadSha,
         });
-        ctx.output('mergeRequestUrl', mergeRequestUrl);
+        ctx.output('mergeRequestUrl', link);
         ctx.output('headSha', result.headSha);
         ctx.output('status', result.status);
         ctx.logger.info(
-          `Auto-merge ${result.status} on ${mergeRequestUrl} at head ${result.headSha}`,
+          `Auto-merge ${result.status} on ${link} at head ${result.headSha}`,
         );
       } catch (error) {
         ctx.logger.error(
-          `Auto-merge not set on ${mergeRequestUrl}: ${
+          `Auto-merge not set${link === undefined ? '' : ` on ${link}`}: ${
             error instanceof Error ? error.message : 'unknown error'
           }`,
         );

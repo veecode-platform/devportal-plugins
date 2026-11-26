@@ -42,11 +42,18 @@ const mergeRequest = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const PROJECT_PATH = 'example-org/example-app';
 const requestPath = paths.request(7);
+const commitsPath = `${requestPath}/commits`;
 const mergePath = (sha = COMMIT, removeSource = true) =>
   `/merge_requests/7/merge?auto_merge=true&sha=${sha}&should_remove_source_branch=${removeSource}`;
 
-function harness() {
+interface HarnessOptions {
+  allowedProjects?: string[];
+  sourceBranchPrefixes?: string[];
+}
+
+function harness(options: HarnessOptions = {}) {
   const gitlab = new FakeGitlab();
   const clock = fakeClock();
   const logger = {
@@ -56,6 +63,9 @@ function harness() {
     debug: jest.fn(),
   };
   const output = jest.fn();
+  // Replies for the reads after the request, so each test states only the reply it changes.
+  gitlab.reply('', json({ id: 1, path_with_namespace: PROJECT_PATH }));
+  gitlab.reply(commitsPath, json([{ id: COMMIT }]));
   const action = createMergeRequestAutoMergeAction({
     gitlabIntegrations: {
       byHost: (host: string) =>
@@ -69,6 +79,10 @@ function harness() {
       isPrincipal: (credentials: BackstageCredentials, type: string) =>
         (credentials.principal as { type: string }).type === type,
     } as never,
+    autoMerge: {
+      allowedProjects: options.allowedProjects ?? [PROJECT_PATH],
+      sourceBranchPrefixes: options.sourceBranchPrefixes,
+    },
   });
   const run = (
     input: Record<string, unknown> = {},
@@ -378,5 +392,203 @@ describe('gitlab:merge-request:auto-merge', () => {
 
     await expect(w.run({}, service)).rejects.toThrow(NotAllowedError);
     expect(w.gitlab.calls).toEqual([]);
+  });
+
+  describe('the list of projects the action may arm', () => {
+    it('refuses a request in a project that is not on the list, before any write', async () => {
+      const w = harness({ allowedProjects: ['example-org/other-app'] });
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+
+      await expect(w.run()).rejects.toThrow(NotAllowedError);
+      expect(puts(w.gitlab)).toEqual([]);
+    });
+
+    it('compares the project path exactly, case included', async () => {
+      const w = harness({ allowedProjects: ['Example-Org/Example-App'] });
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+
+      await expect(w.run()).rejects.toThrow(NotAllowedError);
+      expect(puts(w.gitlab)).toEqual([]);
+    });
+
+    it('refuses a project whose id is not the request target project', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      w.gitlab.reply('', json({ id: 9, path_with_namespace: PROJECT_PATH }));
+
+      await expect(w.run()).rejects.toThrow(NotAllowedError);
+      expect(puts(w.gitlab)).toEqual([]);
+    });
+
+    it('refuses every request, before any GitLab call, when the list is empty', async () => {
+      const w = harness({ allowedProjects: [] });
+
+      const failure = await w.run().catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(NotAllowedError);
+      expect((failure as Error).message).toContain(
+        'appPublication.autoMerge.allowedProjects',
+      );
+      expect(w.gitlab.calls).toEqual([]);
+    });
+
+    it('refuses a source branch that does not start with an allowed prefix', async () => {
+      const w = harness({ sourceBranchPrefixes: ['release/'] });
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+
+      await expect(w.run()).rejects.toThrow(NotAllowedError);
+      expect(puts(w.gitlab)).toEqual([]);
+    });
+
+    it('arms a request whose source branch starts with an allowed prefix', async () => {
+      const w = harness({ sourceBranchPrefixes: ['example-'] });
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      w.gitlab.reply(
+        mergePath(),
+        json({
+          state: 'opened',
+          merge_when_pipeline_succeeds: true,
+          sha: COMMIT,
+        }),
+      );
+
+      await w.run();
+
+      expect(puts(w.gitlab)).toHaveLength(1);
+    });
+  });
+
+  describe('the commit the action pins', () => {
+    it('refuses a request with more than one commit, before any write', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      // The first commit is the head, so only the count can refuse this request.
+      w.gitlab.reply(commitsPath, json([{ id: COMMIT }, { id: OTHER }]));
+
+      await expect(w.run()).rejects.toThrow(NotAllowedError);
+      expect(puts(w.gitlab)).toEqual([]);
+    });
+
+    it('refuses a request whose only commit is not its head, before any write', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      w.gitlab.reply(commitsPath, json([{ id: OTHER }]));
+
+      await expect(w.run()).rejects.toThrow(NotAllowedError);
+      expect(puts(w.gitlab)).toEqual([]);
+    });
+
+    it('refuses a head other than the expected head the run pushed', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+
+      await expect(w.run({ expectedHeadSha: OTHER })).rejects.toThrow(
+        ConflictError,
+      );
+      expect(puts(w.gitlab)).toEqual([]);
+    });
+
+    it('arms a request whose head is the expected head the run pushed', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      w.gitlab.reply(
+        mergePath(),
+        json({
+          state: 'opened',
+          merge_when_pipeline_succeeds: true,
+          sha: COMMIT,
+        }),
+      );
+
+      await w.run({ expectedHeadSha: COMMIT });
+
+      expect(puts(w.gitlab)).toHaveLength(1);
+    });
+  });
+
+  describe('the merge request address', () => {
+    it.each([
+      [
+        'user information',
+        `https://user:example-secret@${API_HOST}/example-org/example-app/-/merge_requests/7`,
+      ],
+      [
+        'a user name alone',
+        `https://example-secret@${API_HOST}/example-org/example-app/-/merge_requests/7`,
+      ],
+      [
+        'a password alone',
+        `https://:example-secret@${API_HOST}/example-org/example-app/-/merge_requests/7`,
+      ],
+      ['a query', `${MR_URL}?private_token=example-secret`],
+      ['a bare question mark', `${MR_URL}?`],
+      ['a fragment', `${MR_URL}#example-secret`],
+      ['a bare number sign', `${MR_URL}#`],
+    ])(
+      'refuses an address with %s before any request, and never repeats it',
+      async (_label, mergeRequestUrl) => {
+        const w = harness();
+
+        const failure = await w
+          .run({ mergeRequestUrl })
+          .catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(InputError);
+        expect(w.gitlab.calls).toEqual([]);
+        const everything = JSON.stringify([
+          (failure as Error).message,
+          w.logger.info.mock.calls,
+          w.logger.error.mock.calls,
+          w.output.mock.calls,
+        ]);
+        expect(everything).not.toContain('example-secret');
+        expect(everything).not.toContain(API_HOST);
+      },
+    );
+
+    it('returns the canonical address, without the port the template gave', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      w.gitlab.reply(
+        mergePath(),
+        json({
+          state: 'opened',
+          merge_when_pipeline_succeeds: true,
+          sha: COMMIT,
+        }),
+      );
+
+      await w.run({
+        mergeRequestUrl: `https://${API_HOST}:443/example-org/example-app/-/merge_requests/7`,
+      });
+
+      expect(w.output).toHaveBeenCalledWith('mergeRequestUrl', MR_URL);
+      expect(JSON.stringify(w.logger.info.mock.calls)).toContain(MR_URL);
+      expect(JSON.stringify(w.logger.info.mock.calls)).not.toContain(':443');
+    });
+
+    it('logs the canonical address when it refuses a request it has read', async () => {
+      const w = harness({ allowedProjects: ['example-org/other-app'] });
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+
+      await expect(
+        w.run({
+          mergeRequestUrl: `https://${API_HOST}:443/example-org/example-app/-/merge_requests/7`,
+        }),
+      ).rejects.toThrow(NotAllowedError);
+      expect(JSON.stringify(w.logger.error.mock.calls)).toContain(MR_URL);
+      expect(JSON.stringify(w.logger.error.mock.calls)).not.toContain(':443');
+    });
   });
 });

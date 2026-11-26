@@ -100,5 +100,26 @@ export interface Config {
      * @visibility backend
      */
     dashboardAnnotation?: string;
+    /**
+     * Settings of the gitlab:merge-request:auto-merge template action. Without
+     * this block, and with an empty allowedProjects, the action refuses every
+     * request.
+     */
+    autoMerge?: {
+      /**
+       * GitLab project paths (group/subgroup/project) whose merge requests the
+       * auto-merge action may arm, written exactly as GitLab writes them, case
+       * included. Absent or empty refuses every request. Default: none.
+       * @visibility backend
+       */
+      allowedProjects?: string[];
+      /**
+       * When set, a request's source branch must start with one of these
+       * prefixes. An empty list is refused; leave the setting out to skip the
+       * check. Default: no check.
+       * @visibility backend
+       */
+      sourceBranchPrefixes?: string[];
+    };
   };
 }

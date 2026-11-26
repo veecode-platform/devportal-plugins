@@ -131,6 +131,45 @@ describe('scaffolderModuleAppPublication', () => {
     expect(names).not.toContain('gitlab:merge-request:auto-merge');
   });
 
+  it('keeps both status actions registered when the auto-merge block is set', async () => {
+    const actionsRegistry = { register: jest.fn() };
+
+    await startTestBackend({
+      features: featuresWith(
+        {
+          projectPathPrefix: 'example-org',
+          autoMerge: { allowedProjects: ['example-org/example-app'] },
+        },
+        actionsRegistry,
+      ),
+    });
+
+    const names = actionsRegistry.register.mock.calls.map(call => call[0].name);
+    expect(names).toEqual(['get-app-status', 'wait-for-app-publication']);
+  });
+
+  it('logs why an invalid auto-merge block is refused, and keeps the status actions', async () => {
+    const actionsRegistry = { register: jest.fn() };
+    const logger = fakeLogger();
+
+    await startTestBackend({
+      features: featuresWith(
+        {
+          projectPathPrefix: 'example-org',
+          autoMerge: { allowedProjects: ['example-app'] },
+        },
+        actionsRegistry,
+        logger,
+      ),
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('appPublication.autoMerge.allowedProjects.0'),
+    );
+    expect(actionsRegistry.register).toHaveBeenCalledTimes(2);
+    expect(scaffolder.addActions).toHaveBeenCalledTimes(1);
+  });
+
   it('adds the auto-merge template action even when the app publication block is invalid', async () => {
     const actionsRegistry = { register: jest.fn() };
 
