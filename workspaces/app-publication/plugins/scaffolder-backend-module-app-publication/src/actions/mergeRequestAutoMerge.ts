@@ -31,15 +31,16 @@ export function createMergeRequestAutoMergeAction(
             }),
             targetBranch: z
               .string({
-                description: 'The branch the merge request targets.',
+                description:
+                  'The branch the merge request targets. Defaults to main.',
               })
-              .default(DEFAULT_TARGET_BRANCH),
+              .optional(),
             removeSourceBranch: z
               .boolean({
                 description:
-                  'Whether GitLab deletes the source branch after the merge.',
+                  'Whether GitLab deletes the source branch after the merge. Defaults to true.',
               })
-              .default(true),
+              .optional(),
           })
           .strict(),
       output: z =>
@@ -56,9 +57,16 @@ export function createMergeRequestAutoMergeAction(
           'only a signed-in user can set auto-merge on a merge request',
         );
       }
-      const { mergeRequestUrl } = ctx.input;
+      const { mergeRequestUrl, sourceBranch } = ctx.input;
       try {
-        const result = await armAutoMerge(deps, ctx.input);
+        // The scaffolder validates the input against the JSON schema but does not
+        // write defaults back into it, so the defaults are applied here.
+        const result = await armAutoMerge(deps, {
+          mergeRequestUrl,
+          sourceBranch,
+          targetBranch: ctx.input.targetBranch ?? DEFAULT_TARGET_BRANCH,
+          removeSourceBranch: ctx.input.removeSourceBranch ?? true,
+        });
         ctx.output('mergeRequestUrl', mergeRequestUrl);
         ctx.output('headSha', result.headSha);
         ctx.output('status', result.status);

@@ -78,8 +78,6 @@ function harness() {
       input: {
         mergeRequestUrl: MR_URL,
         sourceBranch: SOURCE_BRANCH,
-        targetBranch: DEFAULT_BRANCH,
-        removeSourceBranch: true,
         ...input,
       },
       logger,
@@ -93,16 +91,34 @@ const puts = (gitlab: FakeGitlab) =>
   gitlab.calls.filter(call => call.method === 'PUT');
 
 describe('gitlab:merge-request:auto-merge', () => {
-  it('has the id the template calls it by, and declares its inputs with defaults', () => {
+  it('has the id the template calls it by, and requires only the merge request and its source branch', () => {
     const { action } = harness();
 
     expect(action.id).toBe('gitlab:merge-request:auto-merge');
     expect(action.schema?.input).toMatchObject({
-      properties: {
-        targetBranch: { default: DEFAULT_BRANCH },
-        removeSourceBranch: { default: true },
-      },
+      required: ['mergeRequestUrl', 'sourceBranch'],
     });
+  });
+
+  it('targets main and removes the source branch when the template gives only the two required inputs', async () => {
+    const w = harness();
+    w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+    w.gitlab.reply(requestPath, json(mergeRequest()));
+    w.gitlab.reply(
+      mergePath(COMMIT, true),
+      json({
+        state: 'opened',
+        merge_when_pipeline_succeeds: true,
+        sha: COMMIT,
+      }),
+    );
+
+    await w.run();
+
+    expect(puts(w.gitlab).map(call => call.path)).toEqual([
+      mergePath(COMMIT, true),
+    ]);
+    expect(w.output).toHaveBeenCalledWith('status', 'armed');
   });
 
   it('arms auto-merge on the request, pinned to its head commit, and reports armed', async () => {
