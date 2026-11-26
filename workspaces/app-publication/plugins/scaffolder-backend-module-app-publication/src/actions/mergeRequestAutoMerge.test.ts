@@ -485,6 +485,38 @@ describe('gitlab:merge-request:auto-merge', () => {
       expect(puts(w.gitlab)).toEqual([]);
     });
 
+    it('reads an empty commit list again while GitLab prepares the request, then arms it', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      w.gitlab.reply(commitsPath, json([]), json([]), json([{ id: COMMIT }]));
+      w.gitlab.reply(
+        mergePath(),
+        json({
+          state: 'opened',
+          merge_when_pipeline_succeeds: true,
+          sha: COMMIT,
+        }),
+      );
+
+      await w.run();
+
+      expect(puts(w.gitlab)).toHaveLength(1);
+    });
+
+    it('refuses a request whose commit list stays empty, before any write', async () => {
+      const w = harness();
+      w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));
+      w.gitlab.reply(requestPath, json(mergeRequest()));
+      w.gitlab.reply(commitsPath, json([]));
+
+      await expect(w.run()).rejects.toThrow(NotAllowedError);
+      expect(puts(w.gitlab)).toEqual([]);
+      expect(
+        w.gitlab.calls.filter(call => call.path.endsWith('/commits')),
+      ).toHaveLength(4);
+    });
+
     it('refuses a head other than the expected head the run pushed', async () => {
       const w = harness();
       w.gitlab.reply(USER_PATH, json({ id: TOKEN_USER_ID }));

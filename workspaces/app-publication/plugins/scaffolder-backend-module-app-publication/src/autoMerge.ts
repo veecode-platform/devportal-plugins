@@ -312,13 +312,28 @@ async function refuseUnlessOneCommit(
   requestUrl: string,
   headSha: string,
 ): Promise<void> {
-  const commits = await readGitlab(
+  let commits = await readGitlab(
     deps,
     token,
     `${requestUrl}/commits`,
     commitListShape,
     MSG_TOKEN_REFUSED,
   );
+  // The commit list of a merge request GitLab is still preparing can be empty.
+  for (
+    let retries = 0;
+    commits.length === 0 && retries < MAX_PREPARING_RETRIES;
+    retries += 1
+  ) {
+    await deps.clock.sleep(PREPARING_RETRY_MILLISECONDS);
+    commits = await readGitlab(
+      deps,
+      token,
+      `${requestUrl}/commits`,
+      commitListShape,
+      MSG_TOKEN_REFUSED,
+    );
+  }
   if (commits.length !== 1) {
     throw refusal('The merge request does not hold exactly one commit.');
   }

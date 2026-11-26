@@ -47,7 +47,7 @@ Before it sets anything, the action checks that:
 - the request's project is listed in `appPublication.autoMerge.allowedProjects`, compared with the path GitLab returns for the project, letter case included;
 - the portal's GitLab token belongs to the user who opened the merge request, so a request opened by someone else is refused;
 - the request is open, comes from the run's source branch into the target branch, and comes from the same project, not a fork; when `appPublication.autoMerge.sourceBranchPrefixes` is set, its source branch also starts with one of the prefixes;
-- the request holds exactly one commit, that commit is its head, and, when `expectedHeadSha` is given, the head is that commit.
+- the request holds exactly one commit, that commit is its head, and, when `expectedHeadSha` is given, the head is that commit. An empty commit list, which a request GitLab is still preparing can return, is read again up to three times, three seconds apart.
 
 All of these checks run before the first write. An absent or empty `allowedProjects` refuses every request, and the refusal names the setting.
 
