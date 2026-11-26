@@ -92,8 +92,9 @@ type MergeRequestBody = z.infer<typeof requestShape>;
 /**
  * Sets GitLab's auto-merge on the merge request a run opened. Every check runs
  * before the merge call, so a request that fails one is never armed. The request
- * must sit in a listed project, hold exactly one commit, and be that commit's
- * head. The head commit is pinned: if it moved, GitLab answers 409 and nothing is set.
+ * must sit in a listed project and hold exactly one commit, which is its head.
+ * The head commit is pinned at the first read: if it moved after that, GitLab
+ * answers 409 and nothing is set.
  */
 export async function armAutoMerge(
   deps: AutoMergeDependencies,
@@ -158,7 +159,7 @@ export async function armAutoMerge(
     await discard(response);
     if (response.status === 409) {
       throw new ConflictError(
-        'The merge request changed after the run opened it, so GitLab did not set auto-merge. Nothing was merged.',
+        'The merge request changed after the portal read it, so GitLab did not set auto-merge. Nothing was merged.',
       );
     }
     if (response.status === 401 || response.status === 403) {

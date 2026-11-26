@@ -51,7 +51,7 @@ Before it sets anything, the action checks that:
 
 All of these checks run before the first write. An absent or empty `allowedProjects` refuses every request, and the refusal names the setting.
 
-It sets auto-merge pinned to the request's head commit. If the head moved after the request was opened, GitLab answers with a
+It sets auto-merge pinned to the request's head commit. If the head moves after the action has read the request, GitLab answers with a
 conflict and nothing is set. If GitLab is still preparing the request, the action reads the request again and retries up to
 three times, three seconds apart. It retries only while GitLab reports a preparing status and the head has not moved. Any
 other refusal fails the run with a sentence that says nothing was merged. The action never merges a request itself. It does
