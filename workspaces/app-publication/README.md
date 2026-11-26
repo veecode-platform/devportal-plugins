@@ -43,7 +43,7 @@ Output:
 Before it sets anything, the action checks that:
 
 - the caller is a signed-in user;
-- `mergeRequestUrl` is a GitLab merge request address, `https://<host>/<project path>/-/merge_requests/<number>`, with no user name, query or fragment, on a host the portal has a GitLab integration for;
+- `mergeRequestUrl` is a GitLab merge request address, `https://<host>/<project path>/-/merge_requests/<number>` (`http://` is accepted too), with no user name, query or fragment, on a host the portal has a GitLab integration for;
 - the request's project is listed in `appPublication.autoMerge.allowedProjects`, compared with the path GitLab returns for the project, letter case included;
 - the portal's GitLab token belongs to the user who opened the merge request, so a request opened by someone else is refused;
 - the request is open, comes from the run's source branch into the target branch, and comes from the same project, not a fork; when `appPublication.autoMerge.sourceBranchPrefixes` is set, its source branch also starts with one of the prefixes;
